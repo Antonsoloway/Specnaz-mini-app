@@ -1,21 +1,21 @@
 /**
  * ROYAL CRM — Telegram Mini App API
  * Файл: 12_MINI_APP_API.gs
- * Версия 0.2.1
+ * Версия 0.2.4
  *
  * ВАЖНО: этот файл НЕ объявляет глобальные doGet/doPost.
  * Их существующие точки входа остаются в 01_CORE_MAIN и 05_RELIABLE_WEBHOOK_QUEUE.
  *
- * Транспорт GitHub Pages -> Apps Script:
- * POST (no-cors) передаёт initData в теле запроса и сохраняет результат в CacheService.
- * GET/JSONP получает результат по случайному requestId. initData в URL не попадает.
+ * Основной транспорт v0.2.4: GET/JSONP напрямую валидирует Telegram initData.
+ * Это обход нестабильного cross-origin POST в Telegram Android WebView.
+ * Старый POST + poll оставлен как совместимый резерв.
  */
 
-const MINIAPP_VERSION = '0.2.1';
+const MINIAPP_VERSION = '0.2.4';
 const MINIAPP_TOKEN_PROPERTY = 'TELEGRAM_BOT_TOKEN';
 const MINIAPP_CHAT_ID_PROPERTY = 'MINI_APP_CHAT_ID';
 const MINIAPP_DEFAULT_CHAT_ID = '-1002109152418';
-const MINIAPP_INITDATA_MAX_AGE_SEC = 24 * 60 * 60;
+const MINIAPP_INITDATA_MAX_AGE_SEC = 5 * 60;
 const MINIAPP_ALLOWED_CHAT_STATE = 'В чате';
 const MINIAPP_RESULT_TTL_SEC = 120;
 
@@ -51,10 +51,39 @@ function MINIAPP_doGet_(e) {
   const action = MINIAPP_value_(e && e.parameter && e.parameter.action);
   const callback = MINIAPP_callback_(e && e.parameter && e.parameter.callback);
 
-  if (action !== 'poll' || !callback) {
-    return MINIAPP_jsonp_(callback || '__miniappInvalid', {
+  if (!callback) {
+    return MINIAPP_jsonp_('__miniappInvalid', {
       ok: false,
-      error: 'INVALID_POLL_REQUEST',
+      access: false,
+      error: 'INVALID_CALLBACK',
+      version: MINIAPP_VERSION
+    });
+  }
+
+  // v0.2.4: прямой JSONP auth. Никакой POST для первого входа не нужен.
+  if (action === 'auth') {
+    let result;
+    try {
+      result = MINIAPP_buildAuthResult_(e);
+    } catch (error) {
+      console.error('MINIAPP_doGet_ auth error', error && error.stack ? error.stack : error);
+      result = {
+        ok: false,
+        access: false,
+        error: 'SERVER_ERROR',
+        message: 'Временная ошибка сервера. Попробуйте ещё раз.',
+        version: MINIAPP_VERSION
+      };
+    }
+    return MINIAPP_jsonp_(callback, result);
+  }
+
+  // Старый poll оставлен для обратной совместимости.
+  if (action !== 'poll') {
+    return MINIAPP_jsonp_(callback, {
+      ok: false,
+      access: false,
+      error: 'UNKNOWN_GET_ACTION',
       version: MINIAPP_VERSION
     });
   }
@@ -63,6 +92,7 @@ function MINIAPP_doGet_(e) {
   if (!requestId) {
     return MINIAPP_jsonp_(callback, {
       ok: false,
+      access: false,
       error: 'INVALID_REQUEST_ID',
       version: MINIAPP_VERSION
     });
