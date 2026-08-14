@@ -1,0 +1,15 @@
+name = "royal-crm-miniapp-api"
+main = "src/index.js"
+compatibility_date = "2026-08-15"
+
+[vars]
+FRONTEND_ORIGIN = "https://antonsoloway.github.io"
+DATA_REPO = "Antonsoloway/royal-crm-data"
+DATA_BRANCH = "main"
+DATA_PATH = "snapshot.json"
+TELEGRAM_CHAT_ID = "-1002109152418"
+
+# СЕКРЕТЫ задаются только через Cloudflare Secrets / wrangler secret put:
+# BOT_TOKEN
+# GITHUB_TOKEN
+# SESSION_SECRET
