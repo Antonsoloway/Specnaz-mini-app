@@ -28,10 +28,11 @@ function showDenied(message) {
     </main>`;
 }
 
-function showFatal(message) {
+function showFatal(message, details = '') {
   document.getElementById('panel').innerHTML = `
     <h2>Не удалось войти</h2>
     <p>${esc(message)}</p>
+    ${details ? `<p class="muted">${esc(details)}</p>` : ''}
     <p class="muted">Закройте приложение и откройте его снова из бота.</p>`;
 }
 
@@ -43,11 +44,11 @@ function renderAuth(data) {
   document.getElementById('hello').textContent = `Привет, ${user.crmName || user.telegramFirstName || ''}!`;
   document.getElementById('userMeta').textContent = role.title ? `Роль: ${role.title}` : 'Доступ подтверждён';
   document.getElementById('authStatus').textContent = 'Доступ подтверждён';
-  document.getElementById('versionBadge').textContent = `v${data.version || '0.2'}`;
+  document.getElementById('versionBadge').textContent = `v${data.version || '0.2.1'}`;
 
   const teams = Array.isArray(data.memberships) ? data.memberships : [];
   const teamText = teams.length
-    ? teams.map(m => `${m.team || 'Без команды'} — ${m.role || 'Без роли'}`).join('<br>')
+    ? teams.map(m => `${esc(m.team || 'Без команды')} — ${esc(m.role || 'Без роли')}`).join('<br>')
     : 'Командные роли не указаны';
 
   document.getElementById('panel').innerHTML = `
@@ -56,6 +57,71 @@ function renderAuth(data) {
     <p class="muted">${teamText}</p>`;
 
   setButtonsEnabled(true);
+}
+
+function makeRequestId() {
+  if (window.crypto?.randomUUID) {
+    return window.crypto.randomUUID().replaceAll('-', '');
+  }
+  const part = () => Math.random().toString(36).slice(2);
+  return `${Date.now().toString(36)}${part()}${part()}${part()}`;
+}
+
+function jsonpPoll(requestId, timeoutMs = 12000) {
+  return new Promise((resolve, reject) => {
+    const started = Date.now();
+    let stopped = false;
+
+    const poll = () => {
+      if (stopped) return;
+      if (Date.now() - started > timeoutMs) {
+        stopped = true;
+        reject(new Error('AUTH_TIMEOUT'));
+        return;
+      }
+
+      const callback = `__miniappAuth_${Date.now()}_${Math.random().toString(36).slice(2)}`.replace(/[^A-Za-z0-9_$]/g, '_');
+      const script = document.createElement('script');
+      const cleanup = () => {
+        try { delete window[callback]; } catch (_) { window[callback] = undefined; }
+        script.remove();
+      };
+
+      const timer = setTimeout(() => {
+        cleanup();
+        setTimeout(poll, 450);
+      }, 3500);
+
+      window[callback] = data => {
+        clearTimeout(timer);
+        cleanup();
+        if (data?.pending) {
+          setTimeout(poll, 350);
+          return;
+        }
+        stopped = true;
+        resolve(data);
+      };
+
+      script.onerror = () => {
+        clearTimeout(timer);
+        cleanup();
+        setTimeout(poll, 500);
+      };
+
+      const params = new URLSearchParams({
+        miniapp: '1',
+        action: 'poll',
+        requestId,
+        callback,
+        _: String(Date.now())
+      });
+      script.src = `${API_URL}?${params.toString()}`;
+      document.head.appendChild(script);
+    };
+
+    poll();
+  });
 }
 
 async function authenticate() {
@@ -80,31 +146,32 @@ async function authenticate() {
   }
   document.getElementById('userMeta').textContent = 'Проверяем доступ…';
 
+  const requestId = makeRequestId();
+
   try {
     const body = new URLSearchParams({
       miniapp: '1',
       action: 'auth',
+      requestId,
       initData: tg.initData
     });
 
-    const response = await fetch(API_URL, {
+    // Apps Script ContentService отвечает через другой origin. Поэтому POST отправляем
+    // как no-cors, а результат читаем отдельным JSONP-поллингом по случайному requestId.
+    await fetch(API_URL, {
       method: 'POST',
+      mode: 'no-cors',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
       },
       body: body.toString(),
-      credentials: 'omit',
-      redirect: 'follow'
+      credentials: 'omit'
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
+    const data = await jsonpPoll(requestId);
 
-    const data = await response.json();
-
-    if (!data.ok && !data.access) {
-      showFatal(data.message || 'Не удалось подтвердить Telegram-пользователя.');
+    if (!data?.ok && !data?.access) {
+      showFatal(data?.message || 'Не удалось подтвердить Telegram-пользователя.', data?.error || '');
       return;
     }
 
@@ -116,7 +183,7 @@ async function authenticate() {
     renderAuth(data);
   } catch (error) {
     console.error('Mini App auth error:', error);
-    showFatal('Сервер авторизации пока недоступен.');
+    showFatal('Сервер авторизации пока недоступен.', error?.message || 'NETWORK_ERROR');
   }
 }
 
