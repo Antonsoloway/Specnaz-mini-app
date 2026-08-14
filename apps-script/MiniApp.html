@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="theme-color" content="#17212b">
+  <title>ЧП Mini App</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    *{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,sans-serif;background:#0e1621;color:#fff;padding-bottom:80px}.app{max-width:720px;margin:auto;padding:16px}.hero{display:flex;gap:14px;align-items:center}.avatar{font-size:42px}.eyebrow{font-size:12px;opacity:.65}h1{margin:4px 0}.muted{opacity:.65}.status-card,.panel{background:#17212b;border-radius:18px;padding:18px;margin-top:16px}.status-card{display:flex;align-items:center;justify-content:space-between;gap:12px}.badge{background:#2481cc;border-radius:12px;padding:6px 10px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}.tile{border:0;border-radius:18px;background:#17212b;color:white;padding:18px;text-align:left;min-height:146px}.tile span{font-size:28px;display:block}.tile b{display:block;margin-top:10px}.tile small{opacity:.65}.tile:disabled,.nav:disabled{opacity:.45;cursor:default}.accent{background:#8e44ad}.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#17212b;display:flex;justify-content:space-around;padding:8px;padding-bottom:max(8px,env(safe-area-inset-bottom))}.nav{background:none;border:0;color:white;font-size:11px}.nav span{display:block}.active{color:#54a9eb}button{cursor:pointer}.panel ul{padding-left:20px}.gate-screen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px 24px;background:#0e1621}.gate-screen h1{font-size:30px;margin:12px 0}.gate-screen p{font-size:19px;line-height:1.45;max-width:420px}.gate-screen small{opacity:.6;line-height:1.45;max-width:420px}.gate-icon{font-size:64px}@media(max-width:360px){.app{padding:12px}.grid{gap:10px}.tile{padding:14px;min-height:134px}}
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="hero">
+      <div class="avatar">🕊️</div>
+      <div>
+        <div class="eyebrow">ЧАТ ПОБЕДИТЕЛЕЙ</div>
+        <h1 id="hello">Привет!</h1>
+        <div class="muted" id="userMeta">Проверяем доступ…</div>
+      </div>
+    </header>
+
+    <section class="status-card">
+      <div>
+        <strong>ЧП Mini App</strong>
+        <div class="muted" id="authStatus">Авторизация Telegram</div>
+      </div>
+      <span class="badge">v0.3.0</span>
+    </section>
+
+    <section class="grid">
+      <button class="tile" data-page="players" disabled><span>👥</span><b>Участники</b><small>Поиск и профили</small></button>
+      <button class="tile" data-page="teams" disabled><span>🏰</span><b>Команды</b><small>Список и карточки</small></button>
+      <button class="tile accent" data-page="help" disabled><span>🚨</span><b>Спецназ</b><small>Помощь командам</small></button>
+      <button class="tile" data-page="projects" disabled><span>📢</span><b>Проекты</b><small>Маяк и другие</small></button>
+    </section>
+
+    <section class="panel" id="panel">
+      <h2>Проверяем доступ</h2>
+      <p>Подтверждаем Telegram-пользователя и ищем его в Royal CRM.</p>
+    </section>
+  </main>
+
+  <nav class="bottom-nav">
+    <button class="nav active" data-page="home" disabled>🏠<span>Главная</span></button>
+    <button class="nav" data-page="players" disabled>👥<span>Люди</span></button>
+    <button class="nav" data-page="teams" disabled>🏰<span>Команды</span></button>
+    <button class="nav" data-page="help" disabled>🚨<span>Спецназ</span></button>
+    <button class="nav" data-page="profile" disabled>👤<span>Я</span></button>
+  </nav>
+
+  <script>
+    const BUILD = '0.3.0';
+    const tg = window.Telegram && window.Telegram.WebApp;
+    let authState = null;
+
+    function esc(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+
+    function setButtonsEnabled(enabled) {
+      document.querySelectorAll('button[data-page]').forEach(function(btn) { btn.disabled = !enabled; });
+    }
+
+    function showFatal(message, details) {
+      document.getElementById('panel').innerHTML =
+        '<h2>Не удалось войти</h2>' +
+        '<p>' + esc(message) + '</p>' +
+        (details ? '<p class="muted">' + esc(details) + '</p>' : '') +
+        '<p class="muted">Закройте приложение и откройте его снова из бота.</p>';
+    }
+
+    function showDenied(message) {
+      document.body.innerHTML =
+        '<main class="gate-screen">' +
+          '<div class="gate-icon">🕊️</div>' +
+          '<h1>Доступ закрыт</h1>' +
+          '<p>' + esc(message || 'Извините, вы не состоите в спецназе.') + '</p>' +
+          '<small>Доступ к приложению есть только у участников ЧАТА ПОБЕДИТЕЛЕЙ со статусом «В чате».</small>' +
+        '</main>';
+    }
+
+    function renderAuth(data) {
+      authState = data;
+      const user = data.user || {};
+      const role = data.role || {};
+      const memberships = Array.isArray(data.memberships) ? data.memberships : [];
+      document.getElementById('hello').textContent = 'Привет, ' + (user.crmName || user.telegramFirstName || '') + '!';
+      document.getElementById('userMeta').textContent = role.title ? 'Роль: ' + role.title : 'Доступ подтверждён';
+      document.getElementById('authStatus').textContent = 'Доступ подтверждён';
+      const teamText = memberships.length
+        ? memberships.map(function(m) { return esc(m.team || 'Без команды') + ' — ' + esc(m.role || 'Без роли'); }).join('<br>')
+        : 'Командные роли не указаны';
+      document.getElementById('panel').innerHTML =
+        '<h2>' + esc(role.title || 'Участник') + '</h2>' +
+        '<p><strong>' + esc(user.crmName || user.telegramFirstName || '') + '</strong></p>' +
+        '<p class="muted">' + teamText + '</p>';
+      setButtonsEnabled(true);
+    }
+
+    function handleAuthResult(data) {
+      if (!data || (!data.ok && !data.access)) {
+        showFatal((data && data.message) || 'Не удалось подтвердить Telegram-пользователя.',
+          ((data && data.error) || 'UNKNOWN') + ' · server=' + ((data && data.version) || '?') + ' · build=' + BUILD);
+        return;
+      }
+      if (!data.access) {
+        showDenied(data.message || 'Извините, вы не состоите в спецназе.');
+        return;
+      }
+      renderAuth(data);
+    }
+
+    function authenticate() {
+      setButtonsEnabled(false);
+      if (!tg) {
+        showFatal('Приложение нужно открыть внутри Telegram.', 'build=' + BUILD);
+        return;
+      }
+      tg.ready();
+      tg.expand();
+      if (!tg.initData) {
+        showFatal('Telegram не передал данные авторизации.', 'build=' + BUILD);
+        return;
+      }
+      const previewUser = tg.initDataUnsafe && tg.initDataUnsafe.user;
+      if (previewUser && previewUser.first_name) {
+        document.getElementById('hello').textContent = 'Привет, ' + previewUser.first_name + '!';
+      }
+      document.getElementById('userMeta').textContent = 'Проверяем доступ…';
+
+      let done = false;
+      const timeout = setTimeout(function() {
+        if (done) return;
+        done = true;
+        showFatal('Сервер авторизации пока недоступен.', 'AUTH_TIMEOUT build=' + BUILD + ' transport=google.script.run');
+      }, 30000);
+
+      google.script.run
+        .withSuccessHandler(function(data) {
+          if (done) return;
+          done = true;
+          clearTimeout(timeout);
+          handleAuthResult(data);
+        })
+        .withFailureHandler(function(error) {
+          if (done) return;
+          done = true;
+          clearTimeout(timeout);
+          showFatal('Ошибка серверной функции.', (error && error.message ? error.message : String(error || 'SCRIPT_RUN_ERROR')) + ' · build=' + BUILD);
+        })
+        .MINIAPP_auth(tg.initData);
+    }
+
+    function renderPage(page) {
+      if (!authState || !authState.access) return;
+      const role = (authState.role && authState.role.title) || 'Участник';
+      const memberships = authState.memberships || [];
+      if (page === 'home') {
+        document.getElementById('panel').innerHTML = '<h2>' + esc(role) + '</h2><p>Доступ подтверждён. CRM подключена.</p>';
+        return;
+      }
+      if (page === 'profile') {
+        const items = memberships.length
+          ? memberships.map(function(m) { return '<li>' + esc(m.team || 'Без команды') + ' — ' + esc(m.role || 'Без роли') + '</li>'; }).join('')
+          : '<li>Командные роли не указаны</li>';
+        document.getElementById('panel').innerHTML = '<h2>Мой профиль</h2><p>Основная роль: <strong>' + esc(role) + '</strong></p><ul>' + items + '</ul>';
+        return;
+      }
+      const labels = {
+        players: ['Участники', 'Следующим шагом подключим полный список участников.'],
+        teams: ['Команды', 'Следующим шагом подключим полный список команд и составы.'],
+        help: ['Спецназ', 'Доступ подтверждён. Здесь появятся заявки помощи.'],
+        projects: ['Проекты', 'Здесь появятся Маяк и другие проекты.']
+      };
+      const pair = labels[page] || [page, 'Раздел готовится.'];
+      document.getElementById('panel').innerHTML = '<h2>' + esc(pair[0]) + '</h2><p>' + esc(pair[1]) + '</p>';
+    }
+
+    document.querySelectorAll('button[data-page]').forEach(function(btn) {
+      btn.addEventListener('click', function() { renderPage(btn.getAttribute('data-page')); });
+    });
+
+    authenticate();
+  </script>
+</body>
+</html>
