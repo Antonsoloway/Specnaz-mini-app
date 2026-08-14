@@ -44,7 +44,7 @@ function renderAuth(data) {
   document.getElementById('hello').textContent = `Привет, ${user.crmName || user.telegramFirstName || ''}!`;
   document.getElementById('userMeta').textContent = role.title ? `Роль: ${role.title}` : 'Доступ подтверждён';
   document.getElementById('authStatus').textContent = 'Доступ подтверждён';
-  document.getElementById('versionBadge').textContent = `v${data.version || '0.2.1'}`;
+  document.getElementById('versionBadge').textContent = `v${data.version || '0.2.2'}`;
 
   const teams = Array.isArray(data.memberships) ? data.memberships : [];
   const teamText = teams.length
@@ -67,7 +67,7 @@ function makeRequestId() {
   return `${Date.now().toString(36)}${part()}${part()}${part()}`;
 }
 
-function jsonpPoll(requestId, timeoutMs = 12000) {
+function jsonpPoll(requestId, timeoutMs = 20000) {
   return new Promise((resolve, reject) => {
     const started = Date.now();
     let stopped = false;
@@ -124,6 +124,42 @@ function jsonpPoll(requestId, timeoutMs = 12000) {
   });
 }
 
+function submitAuthPost(requestId, initData) {
+  const frameName = `miniapp_auth_${requestId}`;
+  const iframe = document.createElement('iframe');
+  iframe.name = frameName;
+  iframe.style.display = 'none';
+  iframe.setAttribute('aria-hidden', 'true');
+
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = API_URL;
+  form.target = frameName;
+  form.style.display = 'none';
+
+  const fields = {
+    miniapp: '1',
+    action: 'auth',
+    requestId,
+    initData
+  };
+
+  Object.entries(fields).forEach(([name, value]) => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
+  });
+
+  document.body.appendChild(iframe);
+  document.body.appendChild(form);
+  form.submit();
+
+  setTimeout(() => form.remove(), 500);
+  setTimeout(() => iframe.remove(), 20000);
+}
+
 async function authenticate() {
   setButtonsEnabled(false);
 
@@ -149,25 +185,12 @@ async function authenticate() {
   const requestId = makeRequestId();
 
   try {
-    const body = new URLSearchParams({
-      miniapp: '1',
-      action: 'auth',
-      requestId,
-      initData: tg.initData
-    });
+    // В Telegram WebView cross-origin fetch POST может вести себя нестабильно.
+    // Обычная HTML-форма отправляет POST без CORS и не раскрывает initData в URL.
+    submitAuthPost(requestId, tg.initData);
 
-    // Apps Script ContentService отвечает через другой origin. Поэтому POST отправляем
-    // как no-cors, а результат читаем отдельным JSONP-поллингом по случайному requestId.
-    await fetch(API_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
-      },
-      body: body.toString(),
-      credentials: 'omit'
-    });
-
+    // Даём Apps Script начать обработку POST, затем читаем результат через JSONP.
+    await new Promise(resolve => setTimeout(resolve, 400));
     const data = await jsonpPoll(requestId);
 
     if (!data?.ok && !data?.access) {
