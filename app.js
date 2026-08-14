@@ -1,9 +1,8 @@
 const tg = window.Telegram?.WebApp;
 const API_URL = 'https://script.google.com/macros/s/AKfycbzbjYBCLWHMvpQuMvMeh1B6mOIRMvljCk31sn4o1n5X0aqyL5ZfSzrTra7cGw7sfCvSdQ/exec';
-const BUILD = '0.2.3';
+const BUILD = '0.2.4';
 
 let authState = null;
-let authTransport = 'not-started';
 
 function esc(value) {
   return String(value ?? '')
@@ -61,116 +60,50 @@ function renderAuth(data) {
   setButtonsEnabled(true);
 }
 
-function makeRequestId() {
-  if (window.crypto?.randomUUID) {
-    return window.crypto.randomUUID().replaceAll('-', '');
-  }
-  const part = () => Math.random().toString(36).slice(2);
-  return `${Date.now().toString(36)}${part()}${part()}${part()}`;
-}
-
-function jsonpPoll(requestId, timeoutMs = 22000) {
+function jsonpAuth(initData, timeoutMs = 20000) {
   return new Promise((resolve, reject) => {
-    const started = Date.now();
-    let stopped = false;
+    const callback = `__miniappAuth_${Date.now()}_${Math.random().toString(36).slice(2)}`.replace(/[^A-Za-z0-9_$]/g, '_');
+    const script = document.createElement('script');
+    let finished = false;
 
-    const poll = () => {
-      if (stopped) return;
-      if (Date.now() - started > timeoutMs) {
-        stopped = true;
-        reject(new Error(`AUTH_TIMEOUT build=${BUILD} transport=${authTransport}`));
-        return;
-      }
-
-      const callback = `__miniappAuth_${Date.now()}_${Math.random().toString(36).slice(2)}`.replace(/[^A-Za-z0-9_$]/g, '_');
-      const script = document.createElement('script');
-      const cleanup = () => {
-        try { delete window[callback]; } catch (_) { window[callback] = undefined; }
-        script.remove();
-      };
-
-      const timer = setTimeout(() => {
-        cleanup();
-        setTimeout(poll, 450);
-      }, 3500);
-
-      window[callback] = data => {
-        clearTimeout(timer);
-        cleanup();
-        if (data?.pending) {
-          setTimeout(poll, 350);
-          return;
-        }
-        stopped = true;
-        resolve(data);
-      };
-
-      script.onerror = () => {
-        clearTimeout(timer);
-        cleanup();
-        setTimeout(poll, 500);
-      };
-
-      const params = new URLSearchParams({
-        miniapp: '1',
-        action: 'poll',
-        requestId,
-        callback,
-        _: String(Date.now())
-      });
-      script.src = `${API_URL}?${params.toString()}`;
-      document.head.appendChild(script);
+    const cleanup = () => {
+      try { delete window[callback]; } catch (_) { window[callback] = undefined; }
+      script.remove();
     };
 
-    poll();
+    const timer = setTimeout(() => {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      reject(new Error(`AUTH_TIMEOUT build=${BUILD} transport=jsonp-get`));
+    }, timeoutMs);
+
+    window[callback] = data => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      cleanup();
+      resolve(data);
+    };
+
+    script.onerror = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      cleanup();
+      reject(new Error(`AUTH_SCRIPT_ERROR build=${BUILD} transport=jsonp-get`));
+    };
+
+    const params = new URLSearchParams({
+      miniapp: '1',
+      action: 'auth',
+      initData,
+      callback,
+      _: String(Date.now())
+    });
+    script.src = `${API_URL}?${params.toString()}`;
+    document.head.appendChild(script);
   });
-}
-
-function submitAuthPost(requestId, initData) {
-  const params = new URLSearchParams({
-    miniapp: '1',
-    action: 'auth',
-    requestId,
-    initData
-  });
-
-  let beaconAccepted = false;
-  try {
-    if (navigator.sendBeacon) {
-      beaconAccepted = navigator.sendBeacon(API_URL, params);
-    }
-  } catch (error) {
-    console.warn('sendBeacon failed', error);
-  }
-
-  // Отправляем также обычную HTML-форму в скрытый iframe как независимый fallback.
-  const frameName = `miniapp_auth_${requestId}`;
-  const iframe = document.createElement('iframe');
-  iframe.name = frameName;
-  iframe.style.display = 'none';
-  iframe.setAttribute('aria-hidden', 'true');
-
-  const form = document.createElement('form');
-  form.method = 'POST';
-  form.action = API_URL;
-  form.target = frameName;
-  form.style.display = 'none';
-
-  for (const [name, value] of params.entries()) {
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = name;
-    input.value = value;
-    form.appendChild(input);
-  }
-
-  document.body.appendChild(iframe);
-  document.body.appendChild(form);
-  form.submit();
-
-  authTransport = beaconAccepted ? 'beacon+form' : 'form';
-  setTimeout(() => form.remove(), 500);
-  setTimeout(() => iframe.remove(), 22000);
 }
 
 async function authenticate() {
@@ -196,15 +129,11 @@ async function authenticate() {
   }
   document.getElementById('userMeta').textContent = 'Проверяем доступ…';
 
-  const requestId = makeRequestId();
-
   try {
-    submitAuthPost(requestId, tg.initData);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const data = await jsonpPoll(requestId);
+    const data = await jsonpAuth(tg.initData);
 
     if (!data?.ok && !data?.access) {
-      showFatal(data?.message || 'Не удалось подтвердить Telegram-пользователя.', `${data?.error || 'UNKNOWN'} · build=${BUILD}`);
+      showFatal(data?.message || 'Не удалось подтвердить Telegram-пользователя.', `${data?.error || 'UNKNOWN'} · server=${data?.version || '?'} · build=${BUILD}`);
       return;
     }
 
