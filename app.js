@@ -1,7 +1,9 @@
 const tg = window.Telegram?.WebApp;
 const API_URL = 'https://script.google.com/macros/s/AKfycbzbjYBCLWHMvpQuMvMeh1B6mOIRMvljCk31sn4o1n5X0aqyL5ZfSzrTra7cGw7sfCvSdQ/exec';
+const BUILD = '0.2.3';
 
 let authState = null;
+let authTransport = 'not-started';
 
 function esc(value) {
   return String(value ?? '')
@@ -44,7 +46,7 @@ function renderAuth(data) {
   document.getElementById('hello').textContent = `Привет, ${user.crmName || user.telegramFirstName || ''}!`;
   document.getElementById('userMeta').textContent = role.title ? `Роль: ${role.title}` : 'Доступ подтверждён';
   document.getElementById('authStatus').textContent = 'Доступ подтверждён';
-  document.getElementById('versionBadge').textContent = `v${data.version || '0.2.2'}`;
+  document.getElementById('versionBadge').textContent = `v${BUILD}`;
 
   const teams = Array.isArray(data.memberships) ? data.memberships : [];
   const teamText = teams.length
@@ -67,7 +69,7 @@ function makeRequestId() {
   return `${Date.now().toString(36)}${part()}${part()}${part()}`;
 }
 
-function jsonpPoll(requestId, timeoutMs = 20000) {
+function jsonpPoll(requestId, timeoutMs = 22000) {
   return new Promise((resolve, reject) => {
     const started = Date.now();
     let stopped = false;
@@ -76,7 +78,7 @@ function jsonpPoll(requestId, timeoutMs = 20000) {
       if (stopped) return;
       if (Date.now() - started > timeoutMs) {
         stopped = true;
-        reject(new Error('AUTH_TIMEOUT'));
+        reject(new Error(`AUTH_TIMEOUT build=${BUILD} transport=${authTransport}`));
         return;
       }
 
@@ -125,6 +127,23 @@ function jsonpPoll(requestId, timeoutMs = 20000) {
 }
 
 function submitAuthPost(requestId, initData) {
+  const params = new URLSearchParams({
+    miniapp: '1',
+    action: 'auth',
+    requestId,
+    initData
+  });
+
+  let beaconAccepted = false;
+  try {
+    if (navigator.sendBeacon) {
+      beaconAccepted = navigator.sendBeacon(API_URL, params);
+    }
+  } catch (error) {
+    console.warn('sendBeacon failed', error);
+  }
+
+  // Отправляем также обычную HTML-форму в скрытый iframe как независимый fallback.
   const frameName = `miniapp_auth_${requestId}`;
   const iframe = document.createElement('iframe');
   iframe.name = frameName;
@@ -137,34 +156,29 @@ function submitAuthPost(requestId, initData) {
   form.target = frameName;
   form.style.display = 'none';
 
-  const fields = {
-    miniapp: '1',
-    action: 'auth',
-    requestId,
-    initData
-  };
-
-  Object.entries(fields).forEach(([name, value]) => {
+  for (const [name, value] of params.entries()) {
     const input = document.createElement('input');
     input.type = 'hidden';
     input.name = name;
     input.value = value;
     form.appendChild(input);
-  });
+  }
 
   document.body.appendChild(iframe);
   document.body.appendChild(form);
   form.submit();
 
+  authTransport = beaconAccepted ? 'beacon+form' : 'form';
   setTimeout(() => form.remove(), 500);
-  setTimeout(() => iframe.remove(), 20000);
+  setTimeout(() => iframe.remove(), 22000);
 }
 
 async function authenticate() {
   setButtonsEnabled(false);
+  document.getElementById('versionBadge').textContent = `v${BUILD}`;
 
   if (!tg) {
-    showFatal('Приложение нужно открыть внутри Telegram.');
+    showFatal('Приложение нужно открыть внутри Telegram.', `build=${BUILD}`);
     return;
   }
 
@@ -172,7 +186,7 @@ async function authenticate() {
   tg.expand();
 
   if (!tg.initData) {
-    showFatal('Telegram не передал данные авторизации.');
+    showFatal('Telegram не передал данные авторизации.', `build=${BUILD}`);
     return;
   }
 
@@ -185,16 +199,12 @@ async function authenticate() {
   const requestId = makeRequestId();
 
   try {
-    // В Telegram WebView cross-origin fetch POST может вести себя нестабильно.
-    // Обычная HTML-форма отправляет POST без CORS и не раскрывает initData в URL.
     submitAuthPost(requestId, tg.initData);
-
-    // Даём Apps Script начать обработку POST, затем читаем результат через JSONP.
-    await new Promise(resolve => setTimeout(resolve, 400));
+    await new Promise(resolve => setTimeout(resolve, 500));
     const data = await jsonpPoll(requestId);
 
     if (!data?.ok && !data?.access) {
-      showFatal(data?.message || 'Не удалось подтвердить Telegram-пользователя.', data?.error || '');
+      showFatal(data?.message || 'Не удалось подтвердить Telegram-пользователя.', `${data?.error || 'UNKNOWN'} · build=${BUILD}`);
       return;
     }
 
@@ -206,7 +216,7 @@ async function authenticate() {
     renderAuth(data);
   } catch (error) {
     console.error('Mini App auth error:', error);
-    showFatal('Сервер авторизации пока недоступен.', error?.message || 'NETWORK_ERROR');
+    showFatal('Сервер авторизации пока недоступен.', error?.message || `NETWORK_ERROR build=${BUILD}`);
   }
 }
 
