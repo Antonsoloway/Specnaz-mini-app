@@ -1,0 +1,325 @@
+/**
+ * ROYAL CRM — Private GitHub Snapshot Export
+ * Файл: 14_GITHUB_SNAPSHOT_EXPORT.gs
+ * Версия 1.0.0
+ *
+ * Назначение:
+ *   Google Sheets остаётся источником истины.
+ *   Этот модуль собирает готовый JSON-снимок CRM и коммитит его в ОТДЕЛЬНЫЙ
+ *   ПРИВАТНЫЙ GitHub-репозиторий. Mini App затем читает снимок через backend/Worker,
+ *   а не ходит в Google Sheets при каждом открытии списка.
+ *
+ * НИ ОДИН секрет не хранится в исходниках. Нужные Script Properties:
+ *   DATA_GITHUB_REPO   = Antonsoloway/royal-crm-data   (private repo)
+ *   DATA_GITHUB_TOKEN  = fine-grained GitHub token с Contents: Read and write
+ *   DATA_GITHUB_BRANCH = main                         (необязательно)
+ *   DATA_GITHUB_PATH   = snapshot.json                (необязательно)
+ *
+ * Этот файл не объявляет doGet/doPost и не вмешивается в webhook/CRM.
+ */
+
+const MINIAPP_SNAPSHOT_VERSION = '1.0.0';
+const MINIAPP_SNAPSHOT_PROP_REPO = 'DATA_GITHUB_REPO';
+const MINIAPP_SNAPSHOT_PROP_TOKEN = 'DATA_GITHUB_TOKEN';
+const MINIAPP_SNAPSHOT_PROP_BRANCH = 'DATA_GITHUB_BRANCH';
+const MINIAPP_SNAPSHOT_PROP_PATH = 'DATA_GITHUB_PATH';
+const MINIAPP_SNAPSHOT_PROP_LAST_HASH = 'DATA_GITHUB_LAST_HASH';
+
+function MINIAPP_exportSnapshotToGitHub() {
+  const props = PropertiesService.getScriptProperties();
+  const repo = MINIAPP_snapshotValue_(props.getProperty(MINIAPP_SNAPSHOT_PROP_REPO));
+  const token = MINIAPP_snapshotValue_(props.getProperty(MINIAPP_SNAPSHOT_PROP_TOKEN));
+  const branch = MINIAPP_snapshotValue_(props.getProperty(MINIAPP_SNAPSHOT_PROP_BRANCH)) || 'main';
+  const path = MINIAPP_snapshotValue_(props.getProperty(MINIAPP_SNAPSHOT_PROP_PATH)) || 'snapshot.json';
+
+  if (!repo || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) {
+    throw new Error('Script Property DATA_GITHUB_REPO не задана или имеет неверный формат owner/repo');
+  }
+  if (!token) throw new Error('Script Property DATA_GITHUB_TOKEN не задана');
+
+  const stable = MINIAPP_buildStableSnapshot_();
+  const stableJson = JSON.stringify(stable);
+  const dataHash = MINIAPP_snapshotSha256_(stableJson);
+  const lastHash = MINIAPP_snapshotValue_(props.getProperty(MINIAPP_SNAPSHOT_PROP_LAST_HASH));
+
+  if (lastHash && lastHash === dataHash) {
+    return {
+      ok: true,
+      changed: false,
+      version: MINIAPP_SNAPSHOT_VERSION,
+      hash: dataHash,
+      participants: stable.participants.length,
+      teams: stable.teams.length
+    };
+  }
+
+  const payload = {
+    schemaVersion: MINIAPP_SNAPSHOT_VERSION,
+    generatedAt: new Date().toISOString(),
+    source: 'Royal CRM / Таблица ЧП',
+    dataHash: dataHash,
+    participants: stable.participants,
+    teams: stable.teams,
+    stats: stable.stats
+  };
+
+  const json = JSON.stringify(payload);
+  const result = MINIAPP_putPrivateGitHubFile_(repo, branch, path, json, token, dataHash);
+
+  props.setProperty(MINIAPP_SNAPSHOT_PROP_LAST_HASH, dataHash);
+
+  return {
+    ok: true,
+    changed: true,
+    version: MINIAPP_SNAPSHOT_VERSION,
+    hash: dataHash,
+    participants: stable.participants.length,
+    teams: stable.teams.length,
+    github: result
+  };
+}
+
+function MINIAPP_buildStableSnapshot_() {
+  if (typeof SPREADSHEET_ID === 'undefined' || typeof SHEET_BASE === 'undefined') {
+    throw new Error('Не найдены глобальные настройки CRM SPREADSHEET_ID / SHEET_BASE');
+  }
+  if (typeof SLOT_DEFS === 'undefined' || !Array.isArray(SLOT_DEFS)) {
+    throw new Error('Не найдена структура CRM SLOT_DEFS');
+  }
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEET_BASE);
+  if (!sheet) throw new Error('Лист «' + SHEET_BASE + '» не найден');
+
+  const firstRow = typeof BASE_FIRST_ROW !== 'undefined' ? Number(BASE_FIRST_ROW) : 2;
+  const configuredLast = typeof BASE_LAST_ROW !== 'undefined' ? Number(BASE_LAST_ROW) : sheet.getMaxRows();
+  const lastRow = Math.min(sheet.getLastRow(), configuredLast);
+
+  if (lastRow < firstRow) {
+    return { participants: [], teams: [], stats: { participants: 0, inChat: 0, teams: 0 } };
+  }
+
+  const requiredCols = [
+    COL_NAME,
+    COL_TG_NAME,
+    COL_TG_USERNAME,
+    COL_TG_ID,
+    COL_CHAT_STATE
+  ];
+  SLOT_DEFS.forEach(function(slot) {
+    requiredCols.push(slot.teamCol, slot.nickCol, slot.roleCol, slot.gameCol);
+  });
+  const maxCol = Math.max.apply(null, requiredCols.map(Number));
+
+  const rows = sheet.getRange(firstRow, 1, lastRow - firstRow + 1, maxCol).getDisplayValues();
+  const participants = [];
+  const teamMap = {};
+  let inChatCount = 0;
+
+  rows.forEach(function(row, index) {
+    const name = MINIAPP_snapshotValue_(row[COL_NAME - 1]);
+    const telegramName = MINIAPP_snapshotValue_(row[COL_TG_NAME - 1]);
+    const username = MINIAPP_snapshotValue_(row[COL_TG_USERNAME - 1]);
+    const telegramId = MINIAPP_snapshotNormalizeTelegramId_(row[COL_TG_ID - 1]);
+    const chatState = MINIAPP_snapshotValue_(row[COL_CHAT_STATE - 1]);
+
+    const memberships = [];
+    SLOT_DEFS.forEach(function(slot) {
+      const teamRaw = MINIAPP_snapshotValue_(row[slot.teamCol - 1]);
+      const nickname = MINIAPP_snapshotValue_(row[slot.nickCol - 1]);
+      const role = MINIAPP_snapshotValue_(row[slot.roleCol - 1]);
+      const game = MINIAPP_snapshotValue_(row[slot.gameCol - 1]);
+      if (!teamRaw && !nickname && !role && !game) return;
+
+      const team = MINIAPP_snapshotStripGameSuffix_(teamRaw);
+      const membership = {
+        slot: Number(slot.number || memberships.length + 1),
+        team: team,
+        teamRaw: teamRaw,
+        nickname: nickname,
+        role: role,
+        game: game
+      };
+      memberships.push(membership);
+
+      if (team) {
+        const key = team.toLocaleLowerCase('ru-RU');
+        if (!teamMap[key]) {
+          teamMap[key] = {
+            name: team,
+            games: {},
+            members: [],
+            leaderCount: 0,
+            assistantCount: 0,
+            playerCount: 0
+          };
+        }
+        const teamObj = teamMap[key];
+        if (game) teamObj.games[game] = true;
+        if (telegramId) teamObj.members.push(telegramId);
+        if (role === 'Лидер') teamObj.leaderCount++;
+        else if (role === 'Помощник') teamObj.assistantCount++;
+        else if (role === 'Игрок') teamObj.playerCount++;
+      }
+    });
+
+    if (!name && !telegramName && !username && !telegramId && memberships.length === 0) return;
+    if (chatState === 'В чате') inChatCount++;
+
+    participants.push({
+      row: firstRow + index,
+      telegramId: telegramId,
+      name: name,
+      telegramName: telegramName,
+      username: username,
+      chatState: chatState,
+      memberships: memberships
+    });
+  });
+
+  participants.sort(function(a, b) {
+    return (a.name || a.telegramName || a.username || '').localeCompare(
+      b.name || b.telegramName || b.username || '',
+      'ru',
+      { sensitivity: 'base' }
+    );
+  });
+
+  const teams = Object.keys(teamMap).map(function(key) {
+    const team = teamMap[key];
+    return {
+      name: team.name,
+      games: Object.keys(team.games).sort(),
+      memberTelegramIds: MINIAPP_snapshotUnique_(team.members),
+      memberCount: MINIAPP_snapshotUnique_(team.members).length,
+      leaderCount: team.leaderCount,
+      assistantCount: team.assistantCount,
+      playerCount: team.playerCount
+    };
+  }).sort(function(a, b) {
+    return a.name.localeCompare(b.name, 'ru', { sensitivity: 'base' });
+  });
+
+  return {
+    participants: participants,
+    teams: teams,
+    stats: {
+      participants: participants.length,
+      inChat: inChatCount,
+      teams: teams.length
+    }
+  };
+}
+
+function MINIAPP_putPrivateGitHubFile_(repo, branch, path, text, token, dataHash) {
+  const encodedPath = String(path).split('/').map(encodeURIComponent).join('/');
+  const apiUrl = 'https://api.github.com/repos/' + repo + '/contents/' + encodedPath;
+  const commonHeaders = {
+    Authorization: 'Bearer ' + token,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+    'User-Agent': 'Royal-CRM-Snapshot-Exporter'
+  };
+
+  let currentSha = '';
+  const getResponse = UrlFetchApp.fetch(apiUrl + '?ref=' + encodeURIComponent(branch), {
+    method: 'get',
+    headers: commonHeaders,
+    muteHttpExceptions: true
+  });
+  const getCode = getResponse.getResponseCode();
+
+  if (getCode === 200) {
+    const current = JSON.parse(getResponse.getContentText() || '{}');
+    currentSha = MINIAPP_snapshotValue_(current.sha);
+  } else if (getCode !== 404) {
+    throw new Error('GitHub GET error ' + getCode + ': ' + MINIAPP_snapshotTruncate_(getResponse.getContentText(), 500));
+  }
+
+  const body = {
+    message: 'Update Royal CRM snapshot ' + dataHash.slice(0, 12),
+    content: Utilities.base64Encode(Utilities.newBlob(text, 'application/json', 'snapshot.json').getBytes()),
+    branch: branch
+  };
+  if (currentSha) body.sha = currentSha;
+
+  const putResponse = UrlFetchApp.fetch(apiUrl, {
+    method: 'put',
+    contentType: 'application/json',
+    headers: commonHeaders,
+    payload: JSON.stringify(body),
+    muteHttpExceptions: true
+  });
+  const putCode = putResponse.getResponseCode();
+  if (putCode !== 200 && putCode !== 201) {
+    throw new Error('GitHub PUT error ' + putCode + ': ' + MINIAPP_snapshotTruncate_(putResponse.getContentText(), 700));
+  }
+
+  const saved = JSON.parse(putResponse.getContentText() || '{}');
+  return {
+    status: putCode,
+    path: path,
+    branch: branch,
+    commitSha: saved.commit && saved.commit.sha ? String(saved.commit.sha) : ''
+  };
+}
+
+function MINIAPP_installSnapshotTrigger5m() {
+  MINIAPP_removeSnapshotTriggers_();
+  ScriptApp.newTrigger('MINIAPP_exportSnapshotToGitHub')
+    .timeBased()
+    .everyMinutes(5)
+    .create();
+  return 'OK: snapshot export trigger установлен каждые 5 минут';
+}
+
+function MINIAPP_removeSnapshotTriggers_() {
+  ScriptApp.getProjectTriggers().forEach(function(trigger) {
+    if (trigger.getHandlerFunction() === 'MINIAPP_exportSnapshotToGitHub') {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  });
+}
+
+function MINIAPP_snapshotNormalizeTelegramId_(value) {
+  const text = MINIAPP_snapshotValue_(value).replace(/^'/, '');
+  const match = text.match(/-?\d{5,20}/);
+  return match ? match[0] : '';
+}
+
+function MINIAPP_snapshotStripGameSuffix_(team) {
+  return MINIAPP_snapshotValue_(team).replace(/\s+—\s+(РМ|РК)$/u, '');
+}
+
+function MINIAPP_snapshotUnique_(values) {
+  const seen = {};
+  const out = [];
+  (values || []).forEach(function(value) {
+    const key = String(value || '');
+    if (!key || seen[key]) return;
+    seen[key] = true;
+    out.push(key);
+  });
+  return out;
+}
+
+function MINIAPP_snapshotSha256_(text) {
+  const bytes = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    String(text || ''),
+    Utilities.Charset.UTF_8
+  );
+  return bytes.map(function(byte) {
+    const value = (byte + 256) % 256;
+    return ('0' + value.toString(16)).slice(-2);
+  }).join('');
+}
+
+function MINIAPP_snapshotValue_(value) {
+  return value === null || value === undefined ? '' : String(value).trim();
+}
+
+function MINIAPP_snapshotTruncate_(value, maxLength) {
+  const text = String(value || '');
+  return text.length <= maxLength ? text : text.slice(0, maxLength) + '…';
+}
