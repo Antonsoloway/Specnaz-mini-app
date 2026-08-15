@@ -1,16 +1,53 @@
 /*
  * Royal CRM / Таблица ЧП
  * 21_MINIAPP_START_WELCOME.js
- * v1.0.0
+ * v1.1.0
  *
  * Handles private /start before the reliable webhook queue.
- * First /start: welcome + Mini App button.
- * Repeated /start: compact launch message + button.
+ * Also configures Telegram's private-chat command menu:
+ *   /start — 🚀 Открыть приложение
  */
 
-var MINIAPP_START_WELCOME_VERSION = '1.0.0';
+var MINIAPP_START_WELCOME_VERSION = '1.1.0';
 var MINIAPP_START_WELCOME_PROP_PREFIX = 'MINIAPP_START_WELCOME_SENT_';
 var MINIAPP_START_WELCOME_FALLBACK_URL = 'https://antonsoloway.github.io/Specnaz-mini-app/';
+
+function MINIAPP_setupBotStartMenu() {
+  var props = PropertiesService.getScriptProperties();
+  var token = String(props.getProperty('TELEGRAM_BOT_TOKEN') || props.getProperty('BOT_TOKEN') || '').trim();
+  if (!token) throw new Error('Telegram bot token property is missing');
+
+  var api = 'https://api.telegram.org/bot' + token + '/';
+
+  var commandsResult = MINIAPP_startWelcomeTelegramCall_(api + 'setMyCommands', {
+    commands: [
+      { command: 'start', description: '🚀 Открыть приложение' }
+    ],
+    scope: { type: 'all_private_chats' }
+  });
+  if (!commandsResult.ok) {
+    throw new Error('setMyCommands failed: ' + String(commandsResult.description || 'unknown'));
+  }
+
+  var menuResult = MINIAPP_startWelcomeTelegramCall_(api + 'setChatMenuButton', {
+    menu_button: { type: 'commands' }
+  });
+  if (!menuResult.ok) {
+    throw new Error('setChatMenuButton failed: ' + String(menuResult.description || 'unknown'));
+  }
+
+  var verifyCommands = MINIAPP_startWelcomeTelegramCall_(api + 'getMyCommands', {
+    scope: { type: 'all_private_chats' }
+  });
+  var verifyMenu = MINIAPP_startWelcomeTelegramCall_(api + 'getChatMenuButton', {});
+
+  return {
+    ok: true,
+    version: MINIAPP_START_WELCOME_VERSION,
+    commands: verifyCommands && verifyCommands.ok ? verifyCommands.result : [],
+    menuButton: verifyMenu && verifyMenu.ok ? verifyMenu.result : null
+  };
+}
 
 function MINIAPP_handleStartWelcome_(e) {
   var update;
@@ -83,8 +120,6 @@ function MINIAPP_handleStartWelcome_(e) {
     console.warn('MINIAPP /start welcome error:', err && err.message ? err.message : err);
   }
 
-  // Always acknowledge /start so Telegram does not retry the webhook and
-  // accidentally enqueue the command into CRM.
   return MINIAPP_startWelcomeJson_({ ok: true, handled: true, sent: false });
 }
 
@@ -109,6 +144,21 @@ function MINIAPP_startWelcomeResolveAppUrl_(token) {
   var url = MINIAPP_START_WELCOME_FALLBACK_URL + '?v=055';
   if (gasUrl) url += '&gas=' + encodeURIComponent(gasUrl);
   return url;
+}
+
+function MINIAPP_startWelcomeTelegramCall_(url, payload) {
+  var response = UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload || {}),
+    muteHttpExceptions: true
+  });
+  var body = {};
+  try { body = JSON.parse(response.getContentText() || '{}'); } catch (_) {}
+  if (response.getResponseCode() !== 200 && !body.description) {
+    body.description = 'HTTP ' + response.getResponseCode();
+  }
+  return body;
 }
 
 function MINIAPP_startWelcomeJson_(data) {
