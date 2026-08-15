@@ -1,0 +1,97 @@
+/* Royal CRM Mini App — participant profile enhancements v0.5.26 */
+.participant-detail-memberships--enhanced{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:stretch;
+  gap:10px;
+}
+
+.participant-profile-team-link{
+  appearance:none;
+  -webkit-appearance:none;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  min-width:min(100%,230px);
+  max-width:100%;
+  padding:11px 12px 11px 14px;
+  border:1px solid rgba(86,167,235,.22);
+  border-radius:17px;
+  background:linear-gradient(145deg,rgba(35,55,72,.96),rgba(25,43,58,.96));
+  color:inherit;
+  font:inherit;
+  text-align:left;
+  cursor:pointer;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:rgba(84,169,235,.12);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03),0 5px 16px rgba(0,0,0,.12);
+}
+
+.participant-profile-team-link:active{
+  transform:scale(.98);
+  border-color:rgba(84,169,235,.62);
+  background:linear-gradient(145deg,rgba(39,66,87,.98),rgba(26,48,66,.98));
+}
+
+.participant-profile-team-main{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+
+.participant-profile-team-main b{
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:#f4f7fb;
+  font-size:15px;
+  line-height:1.2;
+}
+
+.participant-profile-team-main small{
+  display:block;
+  color:#9ba9b6;
+  font-size:12px;
+  line-height:1.25;
+}
+
+.participant-profile-team-chevron{
+  flex:0 0 auto;
+  color:#54a9eb;
+  font-size:27px;
+  font-weight:500;
+  line-height:1;
+  margin-left:4px;
+}
+
+.participant-admin-slot{
+  display:flex;
+  align-items:stretch;
+}
+
+.participant-admin-chip{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:46px;
+  padding:0 16px;
+  border-radius:17px;
+  border:1px solid rgba(194,133,255,.42);
+  background:linear-gradient(145deg,rgba(96,55,137,.96),rgba(58,39,91,.98));
+  color:#f4e8ff;
+  font-size:14px;
+  font-weight:900;
+  letter-spacing:.1px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 0 18px rgba(139,77,202,.18);
+  white-space:nowrap;
+}
+
+.participant-profile-no-team{
+  display:flex;
+  align-items:center;
+  min-height:46px;
+  padding:0 4px;
+}
