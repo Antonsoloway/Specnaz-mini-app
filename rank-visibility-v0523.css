@@ -1,0 +1,3 @@
+/* Royal CRM Mini App — visible-only compact rank animation v0.5.23 */
+.rank-badge--compact::after,.rank-badge--compact .rank-medallion{animation-play-state:paused!important}
+.rank-badge--compact.rank-visible::after,.rank-badge--compact.rank-visible .rank-medallion{animation-play-state:running!important}
