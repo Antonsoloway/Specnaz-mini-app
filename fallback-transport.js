@@ -1,6 +1,6 @@
 // Royal CRM Mini App fallback transport — v0.5.4
 // Uses Cloudflare Worker first. On network failure/timeout, transparently
-// retries the same protected request through the Google Apps Script web app.
+// switches the whole Mini App session to the Google Apps Script web app.
 (function () {
   const FALLBACK_TRANSPORT_VERSION = '0.5.4';
   const WORKER_ORIGIN = 'https://royal-crm-miniapp-api.tropical-spoon.workers.dev';
@@ -8,6 +8,7 @@
   const GAS_URL = String(params.get('gas') || '').trim();
   const nativeFetch = window.fetch.bind(window);
   let callbackSeq = 0;
+  let gasMode = false;
 
   function forceVersionBadge() {
     const badge = document.getElementById('versionBadge');
@@ -35,7 +36,7 @@
 
       const script = document.createElement('script');
       let done = false;
-      const timer = setTimeout(() => finish(new Error('GAS_FALLBACK_TIMEOUT')), 12000);
+      const timer = setTimeout(() => finish(new Error('GAS_FALLBACK_TIMEOUT')), 20000);
 
       function cleanup() {
         clearTimeout(timer);
@@ -66,7 +67,7 @@
     if (!options.signal && 'AbortController' in window) {
       controller = new AbortController();
       options.signal = controller.signal;
-      timer = setTimeout(() => controller.abort(), 5500);
+      timer = setTimeout(() => controller.abort(), 4500);
     }
 
     try {
@@ -115,6 +116,7 @@
       let body = {};
       try { body = JSON.parse(String(init?.body || '{}')); } catch (_) {}
       const data = await jsonp('fallback-auth', { initData: body.initData || initData });
+      if (data && data.ok && data.access) gasMode = true;
       const status = data && data.ok !== false ? 200 : 403;
       return jsonResponse(data, status);
     }
@@ -148,6 +150,11 @@
       const urlString = typeof input === 'string' ? input : String(input?.url || '');
       if (!urlString.startsWith(WORKER_ORIGIN)) return nativeFetch(input, init);
 
+      // Once auth had to fall back, keep this entire app session on GAS.
+      // This prevents a later intermittent Worker response from rejecting the
+      // synthetic fallback session token before snapshot/media can load.
+      if (gasMode) return fallbackFor(urlString, init);
+
       try {
         // Server-side HTTP errors are real responses and must not be bypassed.
         return await fetchWorkerWithTimeout(input, init);
@@ -158,8 +165,6 @@
     };
   }
 
-  // Keep the visible build marker honest even though older app/media modules
-  // may write their own legacy build number after rendering.
   const badgeObserver = new MutationObserver(forceVersionBadge);
   const startBadgeWatch = () => {
     forceVersionBadge();
