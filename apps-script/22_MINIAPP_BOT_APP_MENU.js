@@ -1,13 +1,13 @@
 /*
  * Royal CRM / Таблица ЧП
  * 22_MINIAPP_BOT_APP_MENU.js
- * v1.0.0
+ * v1.0.1
  *
  * Configures the bot's private-chat menu button to launch the Mini App directly.
  * Keeps /start registered in the bot command list.
  */
 
-var MINIAPP_BOT_APP_MENU_VERSION = '1.0.0';
+var MINIAPP_BOT_APP_MENU_VERSION = '1.0.1';
 var MINIAPP_BOT_APP_URL = 'https://antonsoloway.github.io/Specnaz-mini-app/';
 
 function MINIAPP_setupBotAppMenu() {
@@ -32,7 +32,7 @@ function MINIAPP_setupBotAppMenu() {
   var menu = MINIAPP_botAppMenuCall_(api + 'setChatMenuButton', {
     menu_button: {
       type: 'web_app',
-      text: '🚀 Приложение',
+      text: '🕊️Приложение ЧП🕊️',
       web_app: { url: appUrl }
     }
   });
