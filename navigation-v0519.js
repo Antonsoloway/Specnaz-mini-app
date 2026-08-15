@@ -12,7 +12,11 @@
   }
 
   function currentPage() {
-    return String(window.activePage || 'home');
+    try {
+      return String(typeof activePage !== 'undefined' && activePage ? activePage : 'home');
+    } catch (_) {
+      return 'home';
+    }
   }
 
   function captureCurrent() {
@@ -122,6 +126,7 @@
     button.setAttribute('data-royal-back', '1');
     button.removeAttribute('data-page');
     button.removeAttribute('data-specnaz17-view');
+    button.removeAttribute('data-participant-profile-back');
     button.textContent = '← Назад';
   }
 
