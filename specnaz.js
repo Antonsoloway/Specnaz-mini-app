@@ -1,6 +1,6 @@
-/* Royal CRM Mini App — Specnaz v0.5.8 */
+/* Royal CRM Mini App — Specnaz v0.5.9 */
 (() => {
-  const UI_VERSION = '0.5.8';
+  const UI_VERSION = '0.5.9';
   let specnazView = 'menu';
 
   function participants() {
@@ -99,6 +99,24 @@
     return raw ? raw.split(',')[0].trim() : 'Без имени';
   }
 
+  function safeHistoryUrl(value) {
+    const url = String(value || '').trim();
+    if (!url) return '';
+    return /^(https?:\/\/|tg:\/\/)/i.test(url) ? url : '';
+  }
+
+  function historyMessageHtml(row) {
+    const plain = String(row?.message || '');
+    const rich = Array.isArray(row?.messageRich) ? row.messageRich : [];
+    if (!rich.length) return esc(plain);
+    return rich.map(segment => {
+      const text = String(segment?.text || '');
+      const url = safeHistoryUrl(segment?.url);
+      if (!url) return esc(text);
+      return `<a class="history-inline-link" href="${esc(url)}" data-history-link="${esc(url)}">${esc(text)}</a>`;
+    }).join('');
+  }
+
   function historyRowHtml(row) {
     const p = historyParticipant(row);
     const name = historyName(row);
@@ -110,7 +128,7 @@
       <div class="history-row-head">${avatar}<div class="history-person"><strong>${esc(name)}</strong><div class="history-date">${esc(row?.date || '')}</div></div><span class="history-rank">${esc(row?.rank || '')}</span></div>
       ${row?.team ? `<div class="history-team">${esc(row.team)}</div>` : ''}
       <div class="history-scoreline"><span>Было <b>${esc(before)}</b></span><span>→</span><span>Стало <b>${esc(after)}</b></span>${added ? `<span class="history-added">+${esc(added)}</span>` : ''}</div>
-      ${row?.message ? `<div class="history-message">${esc(row.message)}</div>` : ''}
+      ${row?.message ? `<div class="history-message">${historyMessageHtml(row)}</div>` : ''}
     </article>`;
   }
 
@@ -128,7 +146,7 @@
     const content = sections.map((section, index) => {
       const rows = Array.isArray(section?.rows) ? section.rows : [];
       const isLast = index === sections.length - 1;
-      return `<details class="history-section"${isLast ? ' open' : ''}><summary><span class="history-section-title">${esc(section?.title || 'Период')}</span><span class="history-section-count">${rows.length} записей</span><span class="history-chevron">⌄</span></summary><div class="history-rows">${rows.map(historyRowHtml).join('') || '<div class="specnaz-empty">Нет записей</div>'}</div></details>`;
+      return `<details class="history-section"${isLast ? ' open' : ''}><summary><span class="history-section-title">${esc(section?.title || 'Период')}</span><span class="history-section-count">${rows.length}</span><span class="history-chevron">⌄</span></summary><div class="history-rows">${rows.map(historyRowHtml).join('') || '<div class="specnaz-empty">Нет записей</div>'}</div></details>`;
     }).join('');
     panel.innerHTML = `<button type="button" class="specnaz-back" data-specnaz-view="menu">‹ Спецназ</button><div class="specnaz-title-row"><h2>📜 История спецназа</h2><span class="muted">${sections.length} периодов</span></div><div class="history-list">${content || '<div class="specnaz-empty">История ещё не синхронизирована.</div>'}</div>`;
     try { setupAvatarLoading(panel); } catch (_) {}
@@ -154,6 +172,20 @@
   };
 
   document.addEventListener('click', event => {
+    const link = event.target.closest('[data-history-link]');
+    if (link) {
+      event.preventDefault();
+      event.stopPropagation();
+      const url = safeHistoryUrl(link.dataset.historyLink);
+      if (!url) return;
+      try {
+        if (/^https:\/\/t\.me\//i.test(url) && tg?.openTelegramLink) tg.openTelegramLink(url);
+        else if (tg?.openLink) tg.openLink(url);
+        else window.open(url, '_blank', 'noopener');
+      } catch (_) { window.location.href = url; }
+      return;
+    }
+
     const button = event.target.closest('[data-specnaz-view]');
     if (!button) return;
     event.preventDefault();
