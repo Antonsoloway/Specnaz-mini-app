@@ -5,17 +5,17 @@
 (() => {
   const VERSION = '0.5.24';
   const defs = [
-    { slug:'novice', name:'Новичок', min:0, glyph:'★', accent:'silver' },
-    { slug:'beginner', name:'Начинающий', min:1, glyph:'▲', accent:'silver' },
-    { slug:'recognizable', name:'Узнаваемый', min:4, glyph:'★', accent:'blue' },
-    { slug:'known', name:'Известный', min:8, glyph:'✦', accent:'cyan' },
-    { slug:'famous', name:'Знаменитый', min:14, glyph:'★', accent:'green' },
-    { slug:'outstanding', name:'Выдающийся', min:22, glyph:'◆', accent:'emerald' },
-    { slug:'maestro', name:'Маэстро', min:30, glyph:'♛', accent:'gold' },
-    { slug:'greatest', name:'Величайший', min:38, glyph:'✹', accent:'amber' },
-    { slug:'immortal', name:'Бессмертный', min:48, glyph:'◆', accent:'violet' },
-    { slug:'legendary', name:'Легендарный', min:60, glyph:'♞', accent:'red' },
-    { slug:'god', name:'БОГ СПЕЦНАЗА', min:80, glyph:'ϟ', accent:'divine' }
+    { slug:'novice', name:'Новичок', min:0, glyph:'★' },
+    { slug:'beginner', name:'Начинающий', min:1, glyph:'▲' },
+    { slug:'recognizable', name:'Узнаваемый', min:4, glyph:'★' },
+    { slug:'known', name:'Известный', min:8, glyph:'✦' },
+    { slug:'famous', name:'Знаменитый', min:14, glyph:'★' },
+    { slug:'outstanding', name:'Выдающийся', min:22, glyph:'◆' },
+    { slug:'maestro', name:'Маэстро', min:30, glyph:'♛' },
+    { slug:'greatest', name:'Величайший', min:38, glyph:'✹' },
+    { slug:'immortal', name:'Бессмертный', min:48, glyph:'◆' },
+    { slug:'legendary', name:'Легендарный', min:60, glyph:'♞' },
+    { slug:'god', name:'БОГ СПЕЦНАЗА', min:80, glyph:'ϟ' }
   ];
 
   function safe(value) {
@@ -92,20 +92,21 @@
     };
   }
 
-  let observed = new WeakSet();
-  const motionObserver = 'IntersectionObserver' in window
-    ? new IntersectionObserver(entries => {
-        entries.forEach(entry => entry.target.classList.toggle('rank-is-visible', entry.isIntersecting));
-      }, { rootMargin:'80px 0px 80px 0px', threshold:0.01 })
-    : null;
-
-  function observeCompact(root = document) {
-    root.querySelectorAll?.('.rank-badge--compact').forEach(el => {
-      if (observed.has(el)) return;
-      observed.add(el);
-      if (motionObserver) motionObserver.observe(el);
-      else el.classList.add('rank-is-visible');
+  let refreshQueued = false;
+  function refreshVisible() {
+    refreshQueued = false;
+    const h = window.innerHeight || document.documentElement.clientHeight || 800;
+    document.querySelectorAll('.rank-badge--compact').forEach(el => {
+      const rect = el.getBoundingClientRect();
+      const visible = rect.bottom > -80 && rect.top < h + 80;
+      el.classList.toggle('rank-is-visible', visible);
     });
+  }
+
+  function scheduleVisibleRefresh() {
+    if (refreshQueued) return;
+    refreshQueued = true;
+    window.requestAnimationFrame(refreshVisible);
   }
 
   function firework(stage) {
@@ -151,22 +152,21 @@
 
   document.addEventListener('click', event => {
     const badge = event.target?.closest?.('[data-rank-firework="1"]');
-    if (!badge) return;
-    event.preventDefault();
-    event.stopPropagation();
-    firework(badge.closest('[data-rank-stage="1"]'));
+    if (badge) {
+      event.preventDefault();
+      event.stopPropagation();
+      firework(badge.closest('[data-rank-stage="1"]'));
+      return;
+    }
+    window.setTimeout(scheduleVisibleRefresh, 40);
   }, true);
 
-  const domObserver = new MutationObserver(records => {
-    records.forEach(record => record.addedNodes.forEach(node => {
-      if (node.nodeType !== 1) return;
-      if (node.matches?.('.rank-badge--compact')) observeCompact(node.parentElement || document);
-      else if (node.querySelector?.('.rank-badge--compact')) observeCompact(node);
-    }));
-  });
-  domObserver.observe(document.documentElement, { childList:true, subtree:true });
-  observeCompact(document);
+  document.addEventListener('input', () => window.setTimeout(scheduleVisibleRefresh, 40), true);
+  window.addEventListener('scroll', scheduleVisibleRefresh, { passive:true });
+  window.addEventListener('resize', scheduleVisibleRefresh, { passive:true });
+  window.setTimeout(scheduleVisibleRefresh, 80);
+  window.setInterval(scheduleVisibleRefresh, 1600);
 
-  window.RoyalRank = { version:VERSION, defs, resolve, compact, premium, firework, observeCompact };
+  window.RoyalRank = { version:VERSION, defs, resolve, compact, premium, firework, refreshVisible:scheduleVisibleRefresh };
   window.__ROYAL_RANK_SYSTEM_VERSION__ = VERSION;
 })();
