@@ -1,12 +1,12 @@
 /*
  * Royal CRM / Таблица ЧП
  * 15_MINIAPP_MEDIA_CACHE.js
- * v1.0.0
+ * v1.1.0
  *
  * Persistent private media cache for Telegram Mini App.
- * Source of truth remains snapshot.json in private DATA_GITHUB_REPO.
- * Media files are written only to DATA_GITHUB_REPO/media/... and are never
- * published in the public frontend repository.
+ * Existing media is never re-downloaded. Each run reads the private repo tree,
+ * calculates only missing avatar/team media files and uploads a small batch.
+ * New or changed source keys produce a new SHA-256 media path automatically.
  *
  * Required Script Properties already used by the project:
  *   DATA_GITHUB_REPO
@@ -16,10 +16,8 @@
  *   TELEGRAM_BOT_TOKEN or BOT_TOKEN (for Telegram avatars)
  */
 
-var MINIAPP_MEDIA_CACHE_VERSION = '1.0.0';
+var MINIAPP_MEDIA_CACHE_VERSION = '1.1.0';
 var MINIAPP_MEDIA_CACHE_BATCH_SIZE = 12;
-var MINIAPP_MEDIA_CACHE_CURSOR_PROP = 'MINIAPP_MEDIA_CACHE_CURSOR';
-var MINIAPP_MEDIA_CACHE_HASH_PROP = 'MINIAPP_MEDIA_CACHE_SNAPSHOT_HASH';
 
 function MINIAPP_syncMediaCacheBatch() {
   var props = PropertiesService.getScriptProperties();
@@ -28,38 +26,21 @@ function MINIAPP_syncMediaCacheBatch() {
   var items = MINIAPP_mediaBuildItems_(snapshot);
 
   if (!items.length) {
-    props.setProperty(MINIAPP_MEDIA_CACHE_CURSOR_PROP, '0');
-    return { ok: true, version: MINIAPP_MEDIA_CACHE_VERSION, total: 0, processed: 0, cached: 0, skipped: 0, failed: 0 };
+    return { ok: true, version: MINIAPP_MEDIA_CACHE_VERSION, total: 0, missing: 0, processed: 0, cached: 0, failed: 0 };
   }
 
-  var snapshotHash = String(snapshot.dataHash || snapshot.generatedAt || '');
-  var previousHash = String(props.getProperty(MINIAPP_MEDIA_CACHE_HASH_PROP) || '');
-  var cursor = Number(props.getProperty(MINIAPP_MEDIA_CACHE_CURSOR_PROP) || 0);
+  var existing = MINIAPP_mediaGithubPathSet_(cfg);
+  var missing = items.filter(function(item) { return !existing[item.path]; });
+  var batch = MINIAPP_mediaSelectBatch_(missing, MINIAPP_MEDIA_CACHE_BATCH_SIZE);
 
-  if (snapshotHash !== previousHash || !isFinite(cursor) || cursor < 0 || cursor >= items.length) {
-    cursor = 0;
-    props.setProperty(MINIAPP_MEDIA_CACHE_HASH_PROP, snapshotHash);
-  }
-
-  var processed = 0;
   var cached = 0;
-  var skipped = 0;
   var failed = 0;
-  var index = cursor;
   var started = Date.now();
   var maxMs = 4.5 * 60 * 1000;
 
-  while (processed < MINIAPP_MEDIA_CACHE_BATCH_SIZE && index < items.length && (Date.now() - started) < maxMs) {
-    var item = items[index];
-    index += 1;
-    processed += 1;
-
+  for (var i = 0; i < batch.length && (Date.now() - started) < maxMs; i += 1) {
+    var item = batch[i];
     try {
-      if (MINIAPP_mediaGithubExists_(cfg, item.path)) {
-        skipped += 1;
-        continue;
-      }
-
       var blob = item.kind === 'avatar'
         ? MINIAPP_mediaFetchAvatar_(item, cfg)
         : MINIAPP_mediaFetchTeamPhoto_(item);
@@ -77,17 +58,14 @@ function MINIAPP_syncMediaCacheBatch() {
     }
   }
 
-  if (index >= items.length) index = 0;
-  props.setProperty(MINIAPP_MEDIA_CACHE_CURSOR_PROP, String(index));
-
   return {
     ok: true,
     version: MINIAPP_MEDIA_CACHE_VERSION,
     total: items.length,
-    cursor: index,
-    processed: processed,
+    existing: items.length - missing.length,
+    missing: missing.length,
+    processed: batch.length,
     cached: cached,
-    skipped: skipped,
     failed: failed
   };
 }
@@ -106,6 +84,24 @@ function MINIAPP_installMediaCacheTrigger() {
     .create();
 
   return { ok: true, handler: handler, everyMinutes: 5, version: MINIAPP_MEDIA_CACHE_VERSION };
+}
+
+function MINIAPP_mediaSelectBatch_(missing, limit) {
+  var avatars = [];
+  var teams = [];
+  missing.forEach(function(item) {
+    if (item.kind === 'team') teams.push(item);
+    else avatars.push(item);
+  });
+
+  var out = [];
+  var ai = 0;
+  var ti = 0;
+  while (out.length < limit && (ai < avatars.length || ti < teams.length)) {
+    if (ai < avatars.length && out.length < limit) out.push(avatars[ai++]);
+    if (ti < teams.length && out.length < limit) out.push(teams[ti++]);
+  }
+  return out;
 }
 
 function MINIAPP_mediaConfig_(props) {
@@ -150,13 +146,14 @@ function MINIAPP_mediaBuildItems_(snapshot) {
     var chatState = String(p && p.chatState || '').trim();
     if (!fileId || chatState !== 'В чате') return;
 
+    var hash = MINIAPP_mediaSha256Hex_(fileId);
     items.push({
       kind: 'avatar',
       sourceKey: fileId,
       fileId: fileId,
       telegramId: telegramId,
-      path: 'media/avatars/' + MINIAPP_mediaSha256Hex_(fileId) + '.bin',
-      commitMessage: 'cache avatar ' + MINIAPP_mediaSha256Hex_(fileId).slice(0, 12)
+      path: 'media/avatars/' + hash + '.bin',
+      commitMessage: 'cache avatar ' + hash.slice(0, 12)
     });
   });
 
@@ -165,17 +162,40 @@ function MINIAPP_mediaBuildItems_(snapshot) {
     var teamName = String(t && t.name || '').trim();
     if (!photoUrl) return;
 
+    var hash = MINIAPP_mediaSha256Hex_(photoUrl);
     items.push({
       kind: 'team',
       sourceKey: photoUrl,
       photoUrl: photoUrl,
       teamName: teamName,
-      path: 'media/teams/' + MINIAPP_mediaSha256Hex_(photoUrl) + '.bin',
-      commitMessage: 'cache team photo ' + MINIAPP_mediaSha256Hex_(photoUrl).slice(0, 12)
+      path: 'media/teams/' + hash + '.bin',
+      commitMessage: 'cache team photo ' + hash.slice(0, 12)
     });
   });
 
   return items;
+}
+
+function MINIAPP_mediaGithubPathSet_(cfg) {
+  var url = 'https://api.github.com/repos/' + cfg.repo + '/git/trees/' + encodeURIComponent(cfg.branch) + '?recursive=1';
+  var response = UrlFetchApp.fetch(url, {
+    method: 'get',
+    muteHttpExceptions: true,
+    headers: MINIAPP_mediaGithubHeaders_(cfg)
+  });
+
+  if (response.getResponseCode() !== 200) {
+    throw new Error('GitHub tree HTTP ' + response.getResponseCode());
+  }
+
+  var body = JSON.parse(response.getContentText());
+  var tree = body && Array.isArray(body.tree) ? body.tree : [];
+  var set = {};
+  tree.forEach(function(entry) {
+    var path = String(entry && entry.path || '');
+    if (entry && entry.type === 'blob' && path.indexOf('media/') === 0) set[path] = true;
+  });
+  return set;
 }
 
 function MINIAPP_mediaFetchAvatar_(item, cfg) {
@@ -228,23 +248,10 @@ function MINIAPP_mediaFetchTeamPhoto_(item) {
     method: 'get',
     muteHttpExceptions: true,
     followRedirects: true,
-    headers: { 'User-Agent': 'Royal-CRM-MiniApp-MediaCache/1.0' }
+    headers: { 'User-Agent': 'Royal-CRM-MiniApp-MediaCache/1.1' }
   });
   if (response.getResponseCode() !== 200) return null;
   return response.getBlob();
-}
-
-function MINIAPP_mediaGithubExists_(cfg, path) {
-  var url = 'https://api.github.com/repos/' + cfg.repo + '/contents/' + MINIAPP_mediaEncodePath_(path) + '?ref=' + encodeURIComponent(cfg.branch);
-  var response = UrlFetchApp.fetch(url, {
-    method: 'get',
-    muteHttpExceptions: true,
-    headers: MINIAPP_mediaGithubHeaders_(cfg)
-  });
-  var code = response.getResponseCode();
-  if (code === 200) return true;
-  if (code === 404) return false;
-  throw new Error('GitHub exists HTTP ' + code);
 }
 
 function MINIAPP_mediaGithubCreate_(cfg, path, blob, message) {
