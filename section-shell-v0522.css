@@ -1,0 +1,40 @@
+/* Royal CRM Mini App — dedicated section screens v0.5.22 */
+body.royal-section-screen .hero,
+body.royal-section-screen .status-card,
+body.royal-section-screen .grid,
+body.royal-section-screen #selfProfileCard {
+  display: none !important;
+}
+
+body.royal-section-screen .app {
+  padding-top: 18px;
+}
+
+body.royal-section-screen #panel {
+  margin-top: 0;
+  min-height: calc(100dvh - 116px);
+}
+
+body.royal-section-screen #panel[hidden] {
+  display: none !important;
+}
+
+body.royal-section-screen #panel > .royal-root-back:first-child {
+  margin-bottom: 16px;
+}
+
+.bottom-nav .nav[data-page="players"] span {
+  font-size: 10.5px;
+  letter-spacing: -0.2px;
+}
+
+@media (max-width: 370px) {
+  body.royal-section-screen .app {
+    padding-top: 12px;
+  }
+
+  .bottom-nav .nav[data-page="players"] span {
+    font-size: 9.8px;
+    letter-spacing: -0.35px;
+  }
+}
