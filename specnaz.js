@@ -1,6 +1,6 @@
-/* Royal CRM Mini App — Specnaz v0.5.9 */
+/* Royal CRM Mini App — Specnaz v0.5.15 */
 (() => {
-  const UI_VERSION = '0.5.9';
+  const UI_VERSION = '0.5.15';
   let specnazView = 'menu';
 
   function participants() {
@@ -20,9 +20,11 @@
   function avatarHtml(p, cls) {
     const name = displayName(p);
     const fileId = String(p?.avatarFileId || '').trim();
+    const key = String(p?.participantKey || '').trim();
+    const keyAttr = key ? ` data-participant-key="${esc(key)}"` : '';
     return fileId
-      ? `<div class="${cls}"><span>${esc(firstLetter(name))}</span><img alt="" data-avatar-file="${esc(fileId)}"></div>`
-      : `<div class="${cls}"><span>${esc(firstLetter(name))}</span></div>`;
+      ? `<div class="${cls}"${keyAttr}><span>${esc(firstLetter(name))}</span><img alt="" data-avatar-file="${esc(fileId)}"></div>`
+      : `<div class="${cls}"${keyAttr}><span>${esc(firstLetter(name))}</span></div>`;
   }
 
   function usernameButtonHtml(p) {
@@ -81,16 +83,9 @@
   }
 
   function historyParticipant(row) {
-    const raw = String(row?.name || '');
-    const userMatch = raw.match(/@([A-Za-z0-9_]{3,})/);
-    if (userMatch) {
-      const wanted = normalizeUsername(userMatch[1]).toLowerCase();
-      const found = participants().find(p => normalizeUsername(p?.username || '').toLowerCase() === wanted);
-      if (found) return found;
-    }
-    const first = raw.split(',')[0].trim().toLocaleLowerCase('ru-RU');
-    if (!first) return null;
-    const matches = participants().filter(p => displayName(p).trim().toLocaleLowerCase('ru-RU') === first);
+    const key = String(row?.participantKey || '').trim();
+    if (!key) return null;
+    const matches = participants().filter(p => String(p?.participantKey || '').trim() === key);
     return matches.length === 1 ? matches[0] : null;
   }
 
