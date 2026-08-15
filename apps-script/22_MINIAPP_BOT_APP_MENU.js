@@ -1,14 +1,14 @@
 /*
  * Royal CRM / Таблица ЧП
  * 22_MINIAPP_BOT_APP_MENU.js
- * v1.0.7
+ * v1.0.8
  *
  * Configures the bot's private-chat menu button to launch the Mini App directly.
- * Keeps /start registered in the bot command list.
+ * Uses a dedicated versioned HTML entry so Telegram cannot reuse an old WebView page.
  */
 
-var MINIAPP_BOT_APP_MENU_VERSION = '1.0.7';
-var MINIAPP_BOT_APP_URL = 'https://antonsoloway.github.io/Specnaz-mini-app/';
+var MINIAPP_BOT_APP_MENU_VERSION = '1.0.8';
+var MINIAPP_BOT_APP_URL = 'https://antonsoloway.github.io/Specnaz-mini-app/app-v0511.html';
 
 function MINIAPP_setupBotAppMenu() {
   var props = PropertiesService.getScriptProperties();
@@ -16,7 +16,7 @@ function MINIAPP_setupBotAppMenu() {
   if (!token) throw new Error('Telegram bot token property is missing');
 
   var gasUrl = String(ScriptApp.getService().getUrl() || '').trim();
-  var appUrl = MINIAPP_BOT_APP_URL + '?v=0511';
+  var appUrl = MINIAPP_BOT_APP_URL + '?cb=20260815-2041';
   if (gasUrl) appUrl += '&gas=' + encodeURIComponent(gasUrl);
 
   var api = 'https://api.telegram.org/bot' + token + '/';
@@ -28,6 +28,12 @@ function MINIAPP_setupBotAppMenu() {
     scope: { type: 'all_private_chats' }
   });
   if (!commands.ok) throw new Error('setMyCommands failed: ' + String(commands.description || 'unknown'));
+
+  // Force Telegram to invalidate the previous menu button state before assigning the new URL.
+  MINIAPP_botAppMenuCall_(api + 'setChatMenuButton', {
+    menu_button: { type: 'commands' }
+  });
+  Utilities.sleep(350);
 
   var menu = MINIAPP_botAppMenuCall_(api + 'setChatMenuButton', {
     menu_button: {
