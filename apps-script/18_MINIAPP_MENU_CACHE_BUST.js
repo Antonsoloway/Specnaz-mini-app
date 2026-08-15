@@ -1,21 +1,24 @@
 /*
  * Royal CRM / Таблица ЧП
  * 18_MINIAPP_MENU_CACHE_BUST.js
- * v1.1.0
+ * v1.2.0
  *
- * One-shot helper: changes the Telegram bot Mini App menu URL query parameter
- * so Android Telegram/WebView cannot reuse the previously cached page.
- * Reuses the existing Telegram bot token from Script Properties.
+ * Switches Telegram bot Mini App menu to the latest frontend URL and passes
+ * the current Apps Script web-app URL as a non-secret network fallback.
  */
 
-var MINIAPP_MENU_CACHE_BUST_VERSION = '1.1.0';
-var MINIAPP_MENU_URL_V053 = 'https://antonsoloway.github.io/Specnaz-mini-app/?v=053';
+var MINIAPP_MENU_CACHE_BUST_VERSION = '1.2.0';
+var MINIAPP_FRONTEND_URL_V054 = 'https://antonsoloway.github.io/Specnaz-mini-app/';
 
-function MINIAPP_switchMenuToV053() {
+function MINIAPP_switchMenuToV054() {
   var props = PropertiesService.getScriptProperties();
   var token = String(props.getProperty('TELEGRAM_BOT_TOKEN') || props.getProperty('BOT_TOKEN') || '').trim();
   if (!token) throw new Error('Telegram bot token property is missing');
 
+  var gasUrl = String(ScriptApp.getService().getUrl() || '').trim();
+  if (!gasUrl) throw new Error('Apps Script web app URL is unavailable');
+
+  var menuUrl = MINIAPP_FRONTEND_URL_V054 + '?v=054&gas=' + encodeURIComponent(gasUrl);
   var api = 'https://api.telegram.org/bot' + token + '/';
   var text = 'Открыть приложение';
 
@@ -37,7 +40,7 @@ function MINIAPP_switchMenuToV053() {
     menu_button: {
       type: 'web_app',
       text: text,
-      web_app: { url: MINIAPP_MENU_URL_V053 }
+      web_app: { url: menuUrl }
     }
   };
 
@@ -57,7 +60,12 @@ function MINIAPP_switchMenuToV053() {
   return {
     ok: true,
     version: MINIAPP_MENU_CACHE_BUST_VERSION,
-    url: MINIAPP_MENU_URL_V053,
+    url: menuUrl,
+    gasFallback: true,
     text: text
   };
 }
+
+// Compatibility aliases: old manual selections now move to the latest build.
+function MINIAPP_switchMenuToV053() { return MINIAPP_switchMenuToV054(); }
+function MINIAPP_switchMenuToV052() { return MINIAPP_switchMenuToV054(); }
