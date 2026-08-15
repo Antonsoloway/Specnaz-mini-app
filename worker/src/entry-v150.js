@@ -1,6 +1,6 @@
 import currentWorker from './entry-v140.js';
 
-const WRAPPER_VERSION = '1.5.0';
+const WRAPPER_VERSION = '1.5.1';
 const ALLOWED_CHAT_STATE = 'В чате';
 
 export default {
@@ -17,7 +17,7 @@ export default {
         version: WRAPPER_VERSION,
         teamIdentity: 'name+game',
         profileStats: 'snapshot',
-        specnazHistory: 'private-snapshot',
+        specnazHistory: 'private-snapshot-rich-links',
         mediaCache: 'private-github-raw'
       }), { status: 200, headers });
     }
@@ -112,18 +112,44 @@ function sanitizeHistory(history) {
     updatedAt: String(history?.updatedAt || ''),
     sections: sections.map(section => ({
       title: String(section?.title || ''),
-      rows: (Array.isArray(section?.rows) ? section.rows : []).map(row => ({
-        date: String(row?.date || ''),
-        name: String(row?.name || ''),
-        team: String(row?.team || ''),
-        before: String(row?.before || ''),
-        after: String(row?.after || ''),
-        added: String(row?.added || ''),
-        rank: String(row?.rank || ''),
-        message: String(row?.message || '')
-      }))
+      rows: (Array.isArray(section?.rows) ? section.rows : []).map(row => {
+        const clean = {
+          date: String(row?.date || ''),
+          name: String(row?.name || ''),
+          team: String(row?.team || ''),
+          before: String(row?.before || ''),
+          after: String(row?.after || ''),
+          added: String(row?.added || ''),
+          rank: String(row?.rank || ''),
+          message: String(row?.message || '')
+        };
+        const rich = sanitizeMessageRich(row?.messageRich);
+        if (rich.length) clean.messageRich = rich;
+        return clean;
+      })
     }))
   };
+}
+
+function sanitizeMessageRich(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map(segment => {
+    const text = String(segment?.text || '');
+    const url = safeHistoryUrl(segment?.url);
+    const clean = { text };
+    if (url) clean.url = url;
+    return clean;
+  }).filter(segment => segment.text);
+}
+
+function safeHistoryUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    if (url.protocol === 'https:' || url.protocol === 'http:' || url.protocol === 'tg:') return raw;
+  } catch {}
+  return '';
 }
 
 function rankFromTrips(value) {
