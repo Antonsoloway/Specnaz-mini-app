@@ -9,6 +9,13 @@ DATA_BRANCH = "main"
 DATA_PATH = "snapshot.json"
 TELEGRAM_CHAT_ID = "-1002109152418"
 
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[observability.logs]
+invocation_logs = true
+
 # Secrets stay in Cloudflare Variables and Secrets:
 # BOT_TOKEN
 # GITHUB_TOKEN
