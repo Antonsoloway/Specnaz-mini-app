@@ -1,5 +1,5 @@
 name = "royal-crm-miniapp-api"
-main = "src/entry.js"
+main = "src/entry-v122.js"
 compatibility_date = "2026-08-15"
 
 [vars]
