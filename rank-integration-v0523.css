@@ -1,0 +1,15 @@
+/* Royal CRM Mini App — rank integration polish v0.5.23 */
+.hero-rank,.history-rank,.participant-trip-rank{background:transparent!important;padding:0!important;border-radius:0!important;color:inherit!important}
+.history-rank{flex:0 1 auto;max-width:132px}
+.history-rank .rank-label{max-width:86px}
+.hero-rank{display:flex;align-items:center;min-height:28px}
+.participant-trip-rank{margin-left:auto!important;display:inline-flex;align-items:center}
+.participant-rank-inline{display:flex;align-items:center;min-height:29px;margin-bottom:4px}
+.self-rank-badge{display:flex;justify-content:center;max-width:100%}
+.self-stat.rank .rank-badge--compact{max-width:100%;justify-content:flex-start}
+.self-stat.rank .rank-label{max-width:112px}
+.person-main .rank-list-slot,.team-member-main .rank-list-slot{max-width:100%}
+.person-main .rank-badge--tiny .rank-label{max-width:115px}
+.team-member-main .rank-badge--tiny .rank-label{max-width:105px}
+.participant-detail-card>.rank-premium-stage{border-radius:20px;background:radial-gradient(circle at 50% 52%,rgba(255,255,255,.035),transparent 64%);margin-top:8px}
+@media(max-width:390px){.history-rank{max-width:104px}.history-rank .rank-label{max-width:60px}.participant-trip-rank{margin-left:0!important}.self-stat.rank .rank-label{max-width:88px}}
