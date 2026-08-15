@@ -1,8 +1,8 @@
-// Royal CRM Mini App fallback transport — v0.5.4
+// Royal CRM Mini App fallback transport — v0.5.5
 // Uses Cloudflare Worker first. On network failure/timeout, transparently
 // switches the whole Mini App session to the Google Apps Script web app.
 (function () {
-  const FALLBACK_TRANSPORT_VERSION = '0.5.4';
+  const FALLBACK_TRANSPORT_VERSION = '0.5.5';
   const WORKER_ORIGIN = 'https://royal-crm-miniapp-api.tropical-spoon.workers.dev';
   const params = new URLSearchParams(window.location.search);
   const GAS_URL = String(params.get('gas') || '').trim();
@@ -118,9 +118,6 @@
       const data = await jsonp('fallback-auth', { initData: body.initData || initData });
       if (data && data.ok && data.access) {
         gasMode = true;
-        // Existing UI only starts snapshot/media loading when session is non-empty.
-        // GAS revalidates Telegram initData on every request, so this is only a
-        // local transport marker, never a security credential.
         if (!data.session) data.session = 'gas-fallback-session';
       }
       const status = data && data.ok !== false ? 200 : 403;
@@ -143,7 +140,8 @@
     if (url.pathname === '/team-photo') {
       const data = await jsonp('fallback-team-photo', {
         initData,
-        team: url.searchParams.get('team') || ''
+        team: url.searchParams.get('team') || '',
+        game: url.searchParams.get('game') || ''
       });
       return mediaResponse(data);
     }
