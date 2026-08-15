@@ -16,6 +16,7 @@
     { slug:'legendary', name:'Легендарный', min:60, glyph:'ϟ' },
     { slug:'god', name:'БОГ СПЕЦНАЗА', min:80, glyph:'↯' }
   ];
+  let visibilityObserver = null;
 
   function safe(value) {
     return String(value ?? '')
@@ -54,6 +55,32 @@
     return `<div class="rank-premium-stage"><div class="rank-badge rank-badge--premium rank-${def.slug}" data-level="${level}" aria-label="${safe(def.name)}"><span class="rank-premium-halo"></span><span class="rank-premium-wing left"></span><span class="rank-premium-wing right"></span><span class="rank-premium-orbit"></span><span class="rank-premium-core"><span class="rank-premium-crown">♛</span><span class="rank-glyph">${safe(def.glyph)}</span></span>${particles}<span class="rank-premium-name">${safe(def.name)}</span></div></div>`;
   }
 
+  function ensureVisibilityObserver() {
+    if (visibilityObserver || !('IntersectionObserver' in window)) return visibilityObserver;
+    visibilityObserver = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        entry.target.classList.toggle('rank-visible', !!entry.isIntersecting);
+      });
+    }, { rootMargin: '80px 0px', threshold: 0.01 });
+    return visibilityObserver;
+  }
+
+  function activate(root) {
+    const scope = root || document;
+    const badges = [...scope.querySelectorAll('.rank-badge--compact')];
+    if (!badges.length) return;
+    const observer = ensureVisibilityObserver();
+    if (!observer) {
+      badges.forEach(b => b.classList.add('rank-visible'));
+      return;
+    }
+    badges.forEach(b => {
+      if (b.dataset.rankObserved === '1') return;
+      b.dataset.rankObserved = '1';
+      observer.observe(b);
+    });
+  }
+
   function injectAfter(html, pattern, badge) {
     const text = String(html || '');
     if (!badge || text.includes('rank-list-slot')) return text;
@@ -77,6 +104,24 @@
     };
   }
 
-  window.RoyalRank = { version: VERSION, defs, resolve, compact, premium };
+  if (typeof renderParticipantsPage === 'function') {
+    const nativeRenderParticipantsPage = renderParticipantsPage;
+    renderParticipantsPage = function(query) {
+      const result = nativeRenderParticipantsPage(query);
+      activate(document.getElementById('panel'));
+      return result;
+    };
+  }
+
+  if (typeof renderTeamDetail === 'function') {
+    const nativeRenderTeamDetail = renderTeamDetail;
+    renderTeamDetail = function(teamRef) {
+      const result = nativeRenderTeamDetail(teamRef);
+      activate(document.getElementById('panel'));
+      return result;
+    };
+  }
+
+  window.RoyalRank = { version: VERSION, defs, resolve, compact, premium, activate };
   window.__ROYAL_RANK_SYSTEM_VERSION__ = VERSION;
 })();
