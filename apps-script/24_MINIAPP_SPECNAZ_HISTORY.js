@@ -1,18 +1,23 @@
 /*
  * Royal CRM / Таблица ЧП
  * 24_MINIAPP_SPECNAZ_HISTORY.js
- * v1.1.0
+ * v1.2.0
  *
  * Syncs the "История спецназа" sheet into the private Mini App snapshot.
- * Real separator rows like "Спецназ с 14 по 17 августа 2026" become sections.
+ * Identity binding is STRICT:
+ *   История спецназа!K (Строка базы) -> База участников!D (id тг).
+ * Names and @usernames are never used to assign history ownership.
+ * If a history row cannot be linked to a Telegram ID, it is marked unresolved
+ * so downstream code will NOT guess an owner by name.
  * Rich-text hyperlinks from the visible "Сообщение" column are preserved.
- * Technical source and Telegram IDs are not exported in history rows.
  */
 
-var MINIAPP_SPECNAZ_HISTORY_VERSION = '1.1.0';
+var MINIAPP_SPECNAZ_HISTORY_VERSION = '1.2.0';
 var MINIAPP_SPECNAZ_HISTORY_SPREADSHEET_ID = '1kkADcKysWdoGy95O36z9jCaoGUUHN0g4XH4LwVtAK_o';
 var MINIAPP_SPECNAZ_HISTORY_SHEET = 'История спецназа';
+var MINIAPP_SPECNAZ_HISTORY_BASE_SHEET = 'База участников';
 var MINIAPP_SPECNAZ_HISTORY_HANDLER = 'MINIAPP_refreshSpecnazHistorySnapshot';
+var MINIAPP_SPECNAZ_HISTORY_UNRESOLVED_ID = '__UNRESOLVED__';
 
 function MINIAPP_bootstrapSpecnazHistory() {
   var sync = MINIAPP_refreshSpecnazHistorySnapshot();
@@ -50,7 +55,9 @@ function MINIAPP_refreshSpecnazHistorySnapshot() {
         ok: true,
         changed: false,
         sections: sections.length,
-        entries: MINIAPP_specnazHistoryEntryCount_(sections)
+        entries: MINIAPP_specnazHistoryEntryCount_(sections),
+        linked: MINIAPP_specnazHistoryLinkedCount_(sections),
+        unresolved: MINIAPP_specnazHistoryUnresolvedCount_(sections)
       };
     }
 
@@ -69,6 +76,8 @@ function MINIAPP_refreshSpecnazHistorySnapshot() {
         changed: true,
         sections: sections.length,
         entries: MINIAPP_specnazHistoryEntryCount_(sections),
+        linked: MINIAPP_specnazHistoryLinkedCount_(sections),
+        unresolved: MINIAPP_specnazHistoryUnresolvedCount_(sections),
         updatedAt: snapshot.specnazHistory.updatedAt
       };
     }
@@ -87,13 +96,17 @@ function MINIAPP_readSpecnazHistorySections_() {
   var sheet = ss.getSheetByName(MINIAPP_SPECNAZ_HISTORY_SHEET);
   if (!sheet) throw new Error('Sheet not found: ' + MINIAPP_SPECNAZ_HISTORY_SHEET);
 
+  var baseSheet = ss.getSheetByName(MINIAPP_SPECNAZ_HISTORY_BASE_SHEET);
+  if (!baseSheet) throw new Error('Sheet not found: ' + MINIAPP_SPECNAZ_HISTORY_BASE_SHEET);
+
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
 
-  // A:J = Дата, Аватар, Имя, Команда, Было, Стало, Добавлено, Звание, Сообщение, Источник.
-  var values = sheet.getRange(1, 1, lastRow, 10).getDisplayValues();
-  // Preserve cell-level and partial rich-text links from the visible message column I.
+  // A:K = Дата, Аватар, Имя, Команда, Было, Стало, Добавлено,
+  //       Звание, Сообщение, Источник, Строка базы.
+  var values = sheet.getRange(1, 1, lastRow, 11).getDisplayValues();
   var messageRich = sheet.getRange(1, 9, lastRow, 1).getRichTextValues();
+  var telegramIdsByBaseRow = MINIAPP_specnazHistoryTelegramIdsByBaseRow_(baseSheet);
   var sections = [];
   var current = null;
 
@@ -107,7 +120,6 @@ function MINIAPP_readSpecnazHistorySections_() {
       continue;
     }
 
-    // Do not invent an "Архив спецназа" section. Only rows under a real sheet divider are exported.
     if (!current) continue;
 
     var date = first;
@@ -118,11 +130,16 @@ function MINIAPP_readSpecnazHistorySections_() {
     var added = MINIAPP_specnazHistoryValue_(row[6]);
     var rank = MINIAPP_specnazHistoryValue_(row[7]);
     var message = MINIAPP_specnazHistoryValue_(row[8]);
+    var baseRow = MINIAPP_specnazHistoryPositiveInt_(row[10]);
+    var telegramId = baseRow && telegramIdsByBaseRow[baseRow]
+      ? telegramIdsByBaseRow[baseRow]
+      : MINIAPP_SPECNAZ_HISTORY_UNRESOLVED_ID;
 
     if (!date && !name && !team && !before && !after && !added && !rank && !message) continue;
     if (!name && !date) continue;
 
     var entry = {
+      telegramId: telegramId,
       date: date,
       name: name,
       team: team,
@@ -142,6 +159,25 @@ function MINIAPP_readSpecnazHistorySections_() {
   return sections.filter(function(section) {
     return section && section.title && Array.isArray(section.rows);
   });
+}
+
+function MINIAPP_specnazHistoryTelegramIdsByBaseRow_(baseSheet) {
+  var lastRow = baseSheet.getLastRow();
+  var map = {};
+  if (lastRow < 2) return map;
+
+  // База участников!D = id тг. Keep the actual sheet row as the lookup key.
+  var ids = baseSheet.getRange(1, 4, lastRow, 1).getDisplayValues();
+  for (var i = 1; i < ids.length; i += 1) {
+    var id = MINIAPP_specnazHistoryValue_(ids[i][0]);
+    if (id) map[i + 1] = id;
+  }
+  return map;
+}
+
+function MINIAPP_specnazHistoryPositiveInt_(value) {
+  var n = parseInt(String(value == null ? '' : value).trim(), 10);
+  return isFinite(n) && n > 0 ? n : 0;
 }
 
 function MINIAPP_isSpecnazHistorySeparator_(value) {
@@ -201,6 +237,26 @@ function MINIAPP_specnazHistoryEntryCount_(sections) {
   }, 0);
 }
 
+function MINIAPP_specnazHistoryLinkedCount_(sections) {
+  var total = 0;
+  (sections || []).forEach(function(section) {
+    (section && Array.isArray(section.rows) ? section.rows : []).forEach(function(row) {
+      if (row && row.telegramId && row.telegramId !== MINIAPP_SPECNAZ_HISTORY_UNRESOLVED_ID) total += 1;
+    });
+  });
+  return total;
+}
+
+function MINIAPP_specnazHistoryUnresolvedCount_(sections) {
+  var total = 0;
+  (sections || []).forEach(function(section) {
+    (section && Array.isArray(section.rows) ? section.rows : []).forEach(function(row) {
+      if (!row || !row.telegramId || row.telegramId === MINIAPP_SPECNAZ_HISTORY_UNRESOLVED_ID) total += 1;
+    });
+  });
+  return total;
+}
+
 function MINIAPP_specnazHistoryValue_(value) {
   return String(value == null ? '' : value).trim();
 }
@@ -220,7 +276,7 @@ function MINIAPP_specnazHistoryHeaders_(cfg) {
     Authorization: 'Bearer ' + cfg.token,
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
-    'User-Agent': 'Royal-CRM-Specnaz-History/1.1'
+    'User-Agent': 'Royal-CRM-Specnaz-History/1.2'
   };
 }
 
