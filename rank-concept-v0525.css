@@ -1,0 +1,77 @@
+/* Royal CRM Mini App — rank concept fidelity overrides v0.5.25
+ * Visual only: stronger concept-like metallic crests and clearly color-filled rank labels.
+ */
+.rank-novice{--rLabelA:#66737f;--rLabelB:#35414b;--rLabelText:#f7fafc}
+.rank-beginner{--rLabelA:#7a8792;--rLabelB:#46525d;--rLabelText:#ffffff}
+.rank-recognizable{--rLabelA:#2d74c9;--rLabelB:#174b88;--rLabelText:#eff8ff}
+.rank-known{--rLabelA:#18b9df;--rLabelB:#087390;--rLabelText:#eaffff}
+.rank-famous{--rLabelA:#62b82f;--rLabelB:#34731a;--rLabelText:#f4ffe9}
+.rank-outstanding{--rLabelA:#16b985;--rLabelB:#087356;--rLabelText:#ecfff8}
+.rank-maestro{--rLabelA:#dfaf1e;--rLabelB:#8b6506;--rLabelText:#fffbe8}
+.rank-greatest{--rLabelA:#ef8d1e;--rLabelB:#9a4e05;--rLabelText:#fff6e8}
+.rank-immortal{--rLabelA:#a642cb;--rLabelB:#681b86;--rLabelText:#fff0ff}
+.rank-legendary{--rLabelA:#df3227;--rLabelB:#8e1510;--rLabelText:#fff0ed}
+.rank-god{--rLabelA:#168ee7;--rLabelB:#0a4f9a;--rLabelText:#fff7c4}
+
+/* Compact badges: keep dark metallic frame, but make the rank name itself visibly color-filled. */
+.rank-badge--compact{padding-right:4px;background:linear-gradient(105deg,rgba(3,10,16,.98),rgba(7,22,32,.97));border-color:var(--rMain);box-shadow:inset 0 0 13px rgba(255,255,255,.04),0 0 0 1px rgba(0,0,0,.62),0 0 15px var(--rGlow)}
+.rank-badge--compact .rank-label{display:inline-flex;align-items:center;min-height:25px;padding:5px 10px;margin-left:1px;border-radius:13px;background:linear-gradient(135deg,var(--rLabelA),var(--rLabelB));color:var(--rLabelText);border:1px solid rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -7px 12px rgba(0,0,0,.14),0 0 11px var(--rGlow);text-shadow:0 1px 1px rgba(0,0,0,.72),0 0 8px var(--rGlow);letter-spacing:.01em}
+.rank-badge--tiny{padding-right:3px}
+.rank-badge--tiny .rank-label{min-height:22px;padding:4px 8px;border-radius:11px;font-size:9.5px}
+
+/* Make mini crest read as a true metallic insignia, not a flat icon. */
+.rank-crest--mini{left:-8px;width:54px;height:42px;filter:drop-shadow(0 2px 2px rgba(0,0,0,.65)) drop-shadow(0 0 7px var(--rGlow))}
+.rank-crest--mini .rank-shield{width:31px;height:37px;background:linear-gradient(145deg,#f8fdff 0%,var(--rLight) 7%,var(--rMid) 19%,var(--rMain) 41%,var(--rDark) 70%,#02080d 100%);filter:drop-shadow(0 0 5px var(--rGlow))}
+.rank-crest--mini .rank-shield::before{inset:2.5px;background:linear-gradient(160deg,#0e2432 0%,var(--rDark) 52%,#020609 100%)}
+.rank-crest--mini .rank-shield-inner{inset:6px;background:radial-gradient(circle at 45% 34%,var(--rLight) 0 7%,var(--rMid) 18%,var(--rMain) 48%,var(--rDark) 82%)}
+.rank-crest--mini .rank-wing{width:24px;height:22px;top:10px;background:repeating-linear-gradient(160deg,var(--rLight) 0 3px,var(--rMid) 3px 7px,var(--rMain) 7px 11px,var(--rDark) 11px 15px);opacity:.98}
+.rank-crest--mini .rank-wing::before{content:"";position:absolute;inset:4px -1px -3px;background:inherit;clip-path:inherit;opacity:.8;filter:brightness(.78)}
+
+/* Premium profile crest — much closer to the approved concept: wide layered wings + deep shield + energetic aura. */
+.rank-premium-stage{min-height:326px;margin:0 0 8px;overflow:visible}
+.rank-premium-stage::before{content:"";position:absolute;z-index:0;left:4%;right:4%;top:10%;bottom:12%;border-radius:50%;background-image:radial-gradient(circle,rgba(93,225,255,.95) 0 1.4px,transparent 2px),radial-gradient(circle,rgba(255,187,94,.8) 0 1.2px,transparent 1.9px),radial-gradient(circle,rgba(198,116,255,.68) 0 1.2px,transparent 1.8px);background-size:29px 31px,43px 47px,59px 53px;background-position:3px 11px,17px 2px,31px 25px;mask-image:radial-gradient(circle,#000 0 48%,rgba(0,0,0,.74) 65%,transparent 84%);opacity:.44;filter:drop-shadow(0 0 6px var(--rGlow));animation:rankConceptStars 4.8s ease-in-out infinite;pointer-events:none}
+.rank-badge--premium{width:min(100%,430px);height:310px}
+.rank-premium-halo{width:285px;height:250px;background:radial-gradient(ellipse,var(--rGlow) 0,rgba(20,147,219,.18) 35%,rgba(0,0,0,0) 72%);filter:blur(12px)}
+.rank-premium-ring.r1{width:225px;height:225px;opacity:.38}.rank-premium-ring.r2{width:272px;height:272px;opacity:.18}
+.rank-crest--premium{width:410px;height:245px;max-width:100%;filter:drop-shadow(0 8px 10px rgba(0,0,0,.7)) drop-shadow(0 0 17px var(--rGlow))}
+.rank-crest--premium .rank-shield{width:126px;height:151px;background:linear-gradient(145deg,#ffffff 0%,var(--rLight) 5%,var(--rMid) 15%,var(--rMain) 35%,var(--rDark) 67%,#02080d 100%);filter:drop-shadow(0 0 13px var(--rGlow)) drop-shadow(0 10px 8px rgba(0,0,0,.55));box-shadow:none}
+.rank-crest--premium .rank-shield::before{inset:7px;background:linear-gradient(155deg,#102a3a 0%,var(--rDark) 40%,#02070b 100%);box-shadow:inset 0 0 10px rgba(255,255,255,.24)}
+.rank-crest--premium .rank-shield::after{content:"";position:absolute;z-index:1;inset:12px;clip-path:inherit;background:linear-gradient(145deg,rgba(255,255,255,.24),transparent 30% 70%,rgba(0,0,0,.34));pointer-events:none}
+.rank-crest--premium .rank-shield-inner{inset:20px;background:radial-gradient(circle at 48% 35%,var(--rLight) 0 5%,var(--rMid) 14%,var(--rMain) 42%,var(--rDark) 76%,#03111a 100%);box-shadow:inset 0 0 20px rgba(255,255,255,.18),0 0 14px var(--rGlow)}
+.rank-crest--premium .rank-glyph{font-size:57px;text-shadow:0 3px 2px #000,0 0 9px var(--rLight),0 0 28px var(--rGlow)}
+.rank-crest--premium .rank-wing{top:62px;width:160px;height:116px;background:repeating-linear-gradient(158deg,#f7fdff 0 7px,var(--rLight) 7px 15px,var(--rMid) 15px 25px,var(--rMain) 25px 37px,var(--rDark) 37px 49px,#06111a 49px 59px);filter:drop-shadow(0 0 12px var(--rGlow)) drop-shadow(0 7px 5px rgba(0,0,0,.65));opacity:1}
+.rank-crest--premium .rank-wing--left{left:4px;clip-path:polygon(100% 19%,85% 20%,47% 0,60% 23%,20% 7%,47% 35%,0 22%,40% 49%,5% 45%,44% 62%,13% 67%,54% 76%,30% 100%,100% 78%)}
+.rank-crest--premium .rank-wing--right{right:4px;clip-path:polygon(0 19%,15% 20%,53% 0,40% 23%,80% 7%,53% 35%,100% 22%,60% 49%,95% 45%,56% 62%,87% 67%,46% 76%,70% 100%,0 78%)}
+.rank-crest--premium .rank-wing::before,.rank-crest--premium .rank-wing::after{content:"";position:absolute;inset:0;background:inherit;clip-path:inherit;pointer-events:none}
+.rank-crest--premium .rank-wing::before{transform:translateY(10px) scale(.92);filter:brightness(.78);opacity:.82}
+.rank-crest--premium .rank-wing::after{transform:translateY(20px) scale(.83);filter:brightness(.58);opacity:.58}
+.rank-crest--premium .rank-laurel{top:53px;width:70px;height:125px;border-width:10px}
+.rank-crest--premium .rank-laurel--left{left:45px}.rank-crest--premium .rank-laurel--right{right:45px}
+.rank-crest--premium .rank-crown{top:8px;font-size:39px}
+.rank-crest--premium .rank-lightning{font-size:40px;top:137px}
+.rank-crest--premium .rank-lightning--left{left:27px}.rank-crest--premium .rank-lightning--right{right:27px}
+.rank-premium-name{bottom:3px;min-width:138px;padding:9px 22px;background:linear-gradient(135deg,var(--rLabelA),var(--rLabelB));color:var(--rLabelText);border-color:var(--rAccent);box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 -9px 16px rgba(0,0,0,.18),0 0 21px var(--rGlow);font-size:15px}
+.rank-tap-hint{right:25px;bottom:23px;opacity:.7}
+
+/* Make tap celebration look much more like the approved fireworks reference. */
+.rank-firework-layer{top:47%;z-index:40}
+.rank-firework-particle{box-shadow:0 0 5px currentColor,0 0 12px currentColor,0 0 20px var(--rGlow)}
+.rank-firework-flash{filter:blur(1px);box-shadow:0 0 28px 12px var(--rGlow),0 0 60px 25px rgba(65,193,255,.28)}
+.rank-firework-burst-ring{border-width:2px;box-shadow:0 0 16px var(--rGlow),inset 0 0 12px var(--rGlow)}
+.rank-celebrate .rank-premium-stage::before{opacity:.9}
+
+/* Specific compact locations: keep readable, strongly color-coded pills. */
+.participant-rank-inline .rank-badge--compact,.history-rank .rank-badge--compact,.participant-trip-rank .rank-badge--compact,.hero-rank .rank-badge--compact,.self-rank-badge .rank-badge--compact{max-width:100%}
+
+@keyframes rankConceptStars{0%,100%{opacity:.36;transform:scale(.98)}50%{opacity:.62;transform:scale(1.03)}}
+
+@media (max-width:430px){
+  .rank-premium-stage{min-height:300px}
+  .rank-badge--premium{height:286px}
+  .rank-crest--premium{width:365px;height:226px}
+  .rank-crest--premium .rank-shield{width:116px;height:140px}
+  .rank-crest--premium .rank-wing{width:143px;height:106px;top:60px}
+  .rank-crest--premium .rank-glyph{font-size:52px}
+}
+
+@media (prefers-reduced-motion:reduce){.rank-premium-stage::before{animation:none}}
