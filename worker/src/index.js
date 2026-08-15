@@ -2,6 +2,7 @@ const SNAPSHOT_MEMORY_TTL_MS = 60_000;
 const SESSION_TTL_SEC = 6 * 60 * 60;
 const INIT_DATA_MAX_AGE_SEC = 5 * 60;
 const ALLOWED_CHAT_STATE = 'В чате';
+const WORKER_VERSION = '1.1.0';
 
 let snapshotMemory = null;
 let snapshotFetchedAt = 0;
@@ -18,7 +19,7 @@ export default {
 
     try {
       if (url.pathname === '/health' && request.method === 'GET') {
-        return json({ ok: true, service: 'royal-crm-miniapp-api', version: '1.0.0' }, 200, cors);
+        return json({ ok: true, service: 'royal-crm-miniapp-api', version: WORKER_VERSION }, 200, cors);
       }
 
       if (url.pathname === '/auth' && request.method === 'POST') {
@@ -29,6 +30,11 @@ export default {
       if (url.pathname === '/snapshot' && request.method === 'GET') {
         enforceOrigin(request, env);
         return await handleSnapshot(request, env, cors);
+      }
+
+      if (url.pathname === '/avatar' && request.method === 'GET') {
+        enforceOrigin(request, env);
+        return await handleAvatar(request, env, cors, url);
       }
 
       return json({ ok: false, error: 'NOT_FOUND' }, 404, cors);
@@ -85,7 +91,7 @@ async function handleAuth(request, env, cors) {
   return json({
     ok: true,
     access: true,
-    version: '1.0.0',
+    version: WORKER_VERSION,
     session,
     expiresIn: SESSION_TTL_SEC,
     snapshot: {
@@ -136,6 +142,49 @@ async function handleSnapshot(request, env, cors) {
     status: 200,
     headers: withJson(headers)
   });
+}
+
+async function handleAvatar(request, env, cors, url) {
+  requireSecret(env.BOT_TOKEN, 'BOT_TOKEN');
+  requireSecret(env.SESSION_SECRET, 'SESSION_SECRET');
+  const token = bearerToken(request);
+  if (!token) throw appError(401, 'SESSION_MISSING', 'Требуется авторизация.');
+
+  const session = await verifySession(token, env.SESSION_SECRET);
+  const snapshot = await loadSnapshot(env);
+  const viewer = (snapshot.participants || []).find(p => String(p.telegramId || '') === String(session.tg));
+  if (!viewer || String(viewer.chatState || '').trim() !== ALLOWED_CHAT_STATE) {
+    throw appError(403, 'ACCESS_REVOKED', 'Доступ к приложению больше не активен.');
+  }
+
+  const fileId = String(url.searchParams.get('fileId') || '').trim();
+  if (!fileId) throw appError(400, 'AVATAR_FILE_MISSING', 'Аватар не найден.');
+
+  const allowed = (snapshot.participants || []).some(p =>
+    String(p.chatState || '').trim() === ALLOWED_CHAT_STATE &&
+    String(p.avatarFileId || '') === fileId
+  );
+  if (!allowed) throw appError(404, 'AVATAR_NOT_FOUND', 'Аватар не найден.');
+
+  const getFileUrl = new URL(`https://api.telegram.org/bot${env.BOT_TOKEN}/getFile`);
+  getFileUrl.searchParams.set('file_id', fileId);
+  const getFileResponse = await fetch(getFileUrl.toString(), { cache: 'no-store' });
+  const fileInfo = await getFileResponse.json().catch(() => ({}));
+  const filePath = String(fileInfo?.result?.file_path || '');
+  if (!getFileResponse.ok || !fileInfo?.ok || !filePath) {
+    throw appError(404, 'AVATAR_FILE_UNAVAILABLE', 'Аватар временно недоступен.');
+  }
+
+  const fileResponse = await fetch(`https://api.telegram.org/file/bot${env.BOT_TOKEN}/${filePath}`);
+  if (!fileResponse.ok || !fileResponse.body) {
+    throw appError(502, 'AVATAR_FETCH_FAILED', 'Аватар временно недоступен.');
+  }
+
+  const headers = new Headers(cors);
+  headers.set('Content-Type', fileResponse.headers.get('Content-Type') || 'image/jpeg');
+  headers.set('Cache-Control', 'private, max-age=86400');
+  headers.set('X-Content-Type-Options', 'nosniff');
+  return new Response(fileResponse.body, { status: 200, headers });
 }
 
 async function validateTelegramInitData(initData, botToken) {
@@ -288,12 +337,14 @@ function sanitizeSnapshot(snapshot) {
         name: p.name || '',
         telegramName: p.telegramName || '',
         username: p.username || '',
+        avatarFileId: p.avatarFileId || '',
         chatState: p.chatState || '',
         memberships: p.memberships || []
       })),
     teams: (snapshot.teams || []).map(t => ({
       name: t.name || '',
       games: t.games || [],
+      photoUrl: t.photoUrl || '',
       memberCount: Number(t.memberCount || 0),
       leaderCount: Number(t.leaderCount || 0),
       assistantCount: Number(t.assistantCount || 0),
