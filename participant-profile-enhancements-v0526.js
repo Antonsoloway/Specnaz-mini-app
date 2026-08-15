@@ -91,7 +91,7 @@
     const info = await getAdminInfo(id);
     const currentAvatar = document.querySelector('.participant-detail-card .participant-detail-avatar[data-telegram-id]');
     if (cleanId(currentAvatar?.dataset?.telegramId) !== id) return;
-    const slot = document.querySelector(`.participant-admin-slot[data-admin-for="${CSS.escape(id)}"]`);
+    const slot = document.querySelector(`.participant-admin-slot[data-admin-for="${id}"]`);
     if (!slot) return;
     slot.innerHTML = info?.isChatAdmin
       ? '<span class="participant-admin-chip">🛡️ Админ</span>'
