@@ -1,29 +1,25 @@
 /**
  * ROYAL CRM — Private GitHub Snapshot Export
  * Файл: 14_GITHUB_SNAPSHOT_EXPORT.gs
- * Версия 1.0.0
+ * Версия 1.1.0
  *
- * Назначение:
- *   Google Sheets остаётся источником истины.
- *   Этот модуль собирает готовый JSON-снимок CRM и коммитит его в ОТДЕЛЬНЫЙ
- *   ПРИВАТНЫЙ GitHub-репозиторий. Mini App затем читает снимок через backend/Worker,
- *   а не ходит в Google Sheets при каждом открытии списка.
+ * Google Sheets остаётся источником истины.
+ * Модуль собирает JSON-снимок CRM и коммитит его в приватный GitHub.
+ * Дополнительно передаёт:
+ *   - Telegram avatar file_id из скрытого листа «Аватары»;
+ *   - фото команд из колонки «Фото» листа «Команды», если это CellImage/IMAGE().
  *
- * НИ ОДИН секрет не хранится в исходниках. Нужные Script Properties:
- *   DATA_GITHUB_REPO   = Antonsoloway/royal-crm-data   (private repo)
- *   DATA_GITHUB_TOKEN  = fine-grained GitHub token с Contents: Read and write
- *   DATA_GITHUB_BRANCH = main                         (необязательно)
- *   DATA_GITHUB_PATH   = snapshot.json                (необязательно)
- *
- * Этот файл не объявляет doGet/doPost и не вмешивается в webhook/CRM.
+ * Не объявляет doGet/doPost и не вмешивается в webhook/CRM.
  */
 
-const MINIAPP_SNAPSHOT_VERSION = '1.0.0';
+const MINIAPP_SNAPSHOT_VERSION = '1.1.0';
 const MINIAPP_SNAPSHOT_PROP_REPO = 'DATA_GITHUB_REPO';
 const MINIAPP_SNAPSHOT_PROP_TOKEN = 'DATA_GITHUB_TOKEN';
 const MINIAPP_SNAPSHOT_PROP_BRANCH = 'DATA_GITHUB_BRANCH';
 const MINIAPP_SNAPSHOT_PROP_PATH = 'DATA_GITHUB_PATH';
 const MINIAPP_SNAPSHOT_PROP_LAST_HASH = 'DATA_GITHUB_LAST_HASH';
+const MINIAPP_SNAPSHOT_AVATARS_SHEET = 'Аватары';
+const MINIAPP_SNAPSHOT_TEAMS_SHEET = 'Команды';
 
 function MINIAPP_exportSnapshotToGitHub() {
   const props = PropertiesService.getScriptProperties();
@@ -91,6 +87,9 @@ function MINIAPP_buildStableSnapshot_() {
   const sheet = ss.getSheetByName(SHEET_BASE);
   if (!sheet) throw new Error('Лист «' + SHEET_BASE + '» не найден');
 
+  const avatarFileMap = MINIAPP_snapshotLoadAvatarFileMap_(ss);
+  const teamPhotoMap = MINIAPP_snapshotLoadTeamPhotoMap_(ss);
+
   const firstRow = typeof BASE_FIRST_ROW !== 'undefined' ? Number(BASE_FIRST_ROW) : 2;
   const configuredLast = typeof BASE_LAST_ROW !== 'undefined' ? Number(BASE_LAST_ROW) : sheet.getMaxRows();
   const lastRow = Math.min(sheet.getLastRow(), configuredLast);
@@ -99,13 +98,7 @@ function MINIAPP_buildStableSnapshot_() {
     return { participants: [], teams: [], stats: { participants: 0, inChat: 0, teams: 0 } };
   }
 
-  const requiredCols = [
-    COL_NAME,
-    COL_TG_NAME,
-    COL_TG_USERNAME,
-    COL_TG_ID,
-    COL_CHAT_STATE
-  ];
+  const requiredCols = [COL_NAME, COL_TG_NAME, COL_TG_USERNAME, COL_TG_ID, COL_CHAT_STATE];
   SLOT_DEFS.forEach(function(slot) {
     requiredCols.push(slot.teamCol, slot.nickCol, slot.roleCol, slot.gameCol);
   });
@@ -151,10 +144,12 @@ function MINIAPP_buildStableSnapshot_() {
             members: [],
             leaderCount: 0,
             assistantCount: 0,
-            playerCount: 0
+            playerCount: 0,
+            photoUrl: MINIAPP_snapshotValue_(teamPhotoMap[key])
           };
         }
         const teamObj = teamMap[key];
+        if (!teamObj.photoUrl && teamPhotoMap[key]) teamObj.photoUrl = MINIAPP_snapshotValue_(teamPhotoMap[key]);
         if (game) teamObj.games[game] = true;
         if (telegramId) teamObj.members.push(telegramId);
         if (role === 'Лидер') teamObj.leaderCount++;
@@ -172,6 +167,7 @@ function MINIAPP_buildStableSnapshot_() {
       name: name,
       telegramName: telegramName,
       username: username,
+      avatarFileId: telegramId ? MINIAPP_snapshotValue_(avatarFileMap[telegramId]) : '',
       chatState: chatState,
       memberships: memberships
     });
@@ -179,19 +175,19 @@ function MINIAPP_buildStableSnapshot_() {
 
   participants.sort(function(a, b) {
     return (a.name || a.telegramName || a.username || '').localeCompare(
-      b.name || b.telegramName || b.username || '',
-      'ru',
-      { sensitivity: 'base' }
+      b.name || b.telegramName || b.username || '', 'ru', { sensitivity: 'base' }
     );
   });
 
   const teams = Object.keys(teamMap).map(function(key) {
     const team = teamMap[key];
+    const uniqueMembers = MINIAPP_snapshotUnique_(team.members);
     return {
       name: team.name,
       games: Object.keys(team.games).sort(),
-      memberTelegramIds: MINIAPP_snapshotUnique_(team.members),
-      memberCount: MINIAPP_snapshotUnique_(team.members).length,
+      photoUrl: MINIAPP_snapshotValue_(team.photoUrl),
+      memberTelegramIds: uniqueMembers,
+      memberCount: uniqueMembers.length,
       leaderCount: team.leaderCount,
       assistantCount: team.assistantCount,
       playerCount: team.playerCount
@@ -203,12 +199,67 @@ function MINIAPP_buildStableSnapshot_() {
   return {
     participants: participants,
     teams: teams,
-    stats: {
-      participants: participants.length,
-      inChat: inChatCount,
-      teams: teams.length
-    }
+    stats: { participants: participants.length, inChat: inChatCount, teams: teams.length }
   };
+}
+
+function MINIAPP_snapshotLoadAvatarFileMap_(ss) {
+  const out = {};
+  try {
+    const sheet = ss.getSheetByName(MINIAPP_SNAPSHOT_AVATARS_SHEET);
+    if (!sheet || sheet.getLastRow() < 2) return out;
+    const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 6).getDisplayValues();
+    rows.forEach(function(row) {
+      const telegramId = MINIAPP_snapshotNormalizeTelegramId_(row[0]);
+      const fileId = MINIAPP_snapshotValue_(row[2]);
+      const status = MINIAPP_snapshotValue_(row[5]);
+      if (!telegramId || !fileId) return;
+      if (status && status !== 'OK') return;
+      out[telegramId] = fileId;
+    });
+  } catch (error) {
+    console.log('MINIAPP avatar map warning: ' + error);
+  }
+  return out;
+}
+
+function MINIAPP_snapshotLoadTeamPhotoMap_(ss) {
+  const out = {};
+  try {
+    const sheet = ss.getSheetByName(MINIAPP_SNAPSHOT_TEAMS_SHEET);
+    if (!sheet || sheet.getLastRow() < 2) return out;
+
+    const count = sheet.getLastRow() - 1;
+    const names = sheet.getRange(2, 2, count, 1).getDisplayValues();
+    const photoRange = sheet.getRange(2, 3, count, 1);
+    const values = photoRange.getValues();
+    const formulas = photoRange.getFormulas();
+
+    for (let i = 0; i < count; i++) {
+      const team = MINIAPP_snapshotStripGameSuffix_(MINIAPP_snapshotValue_(names[i][0]));
+      if (!team) continue;
+      const key = team.toLocaleLowerCase('ru-RU');
+      if (out[key]) continue;
+
+      let url = '';
+      const value = values[i][0];
+      try {
+        if (value && typeof value === 'object' && value.valueType === SpreadsheetApp.ValueType.IMAGE && typeof value.getContentUrl === 'function') {
+          url = MINIAPP_snapshotValue_(value.getContentUrl());
+        }
+      } catch (_) {}
+
+      if (!url) {
+        const formula = MINIAPP_snapshotValue_(formulas[i][0]);
+        const match = formula.match(/^=IMAGE\(\s*"([^"]+)"/i);
+        if (match) url = MINIAPP_snapshotValue_(match[1]);
+      }
+      if (url) out[key] = url;
+    }
+  } catch (error) {
+    console.log('MINIAPP team photo map warning: ' + error);
+  }
+  return out;
 }
 
 function MINIAPP_putPrivateGitHubFile_(repo, branch, path, text, token, dataHash) {
@@ -223,9 +274,7 @@ function MINIAPP_putPrivateGitHubFile_(repo, branch, path, text, token, dataHash
 
   let currentSha = '';
   const getResponse = UrlFetchApp.fetch(apiUrl + '?ref=' + encodeURIComponent(branch), {
-    method: 'get',
-    headers: commonHeaders,
-    muteHttpExceptions: true
+    method: 'get', headers: commonHeaders, muteHttpExceptions: true
   });
   const getCode = getResponse.getResponseCode();
 
@@ -244,11 +293,8 @@ function MINIAPP_putPrivateGitHubFile_(repo, branch, path, text, token, dataHash
   if (currentSha) body.sha = currentSha;
 
   const putResponse = UrlFetchApp.fetch(apiUrl, {
-    method: 'put',
-    contentType: 'application/json',
-    headers: commonHeaders,
-    payload: JSON.stringify(body),
-    muteHttpExceptions: true
+    method: 'put', contentType: 'application/json', headers: commonHeaders,
+    payload: JSON.stringify(body), muteHttpExceptions: true
   });
   const putCode = putResponse.getResponseCode();
   if (putCode !== 200 && putCode !== 201) {
@@ -266,18 +312,13 @@ function MINIAPP_putPrivateGitHubFile_(repo, branch, path, text, token, dataHash
 
 function MINIAPP_installSnapshotTrigger5m() {
   MINIAPP_removeSnapshotTriggers_();
-  ScriptApp.newTrigger('MINIAPP_exportSnapshotToGitHub')
-    .timeBased()
-    .everyMinutes(5)
-    .create();
+  ScriptApp.newTrigger('MINIAPP_exportSnapshotToGitHub').timeBased().everyMinutes(5).create();
   return 'OK: snapshot export trigger установлен каждые 5 минут';
 }
 
 function MINIAPP_removeSnapshotTriggers_() {
   ScriptApp.getProjectTriggers().forEach(function(trigger) {
-    if (trigger.getHandlerFunction() === 'MINIAPP_exportSnapshotToGitHub') {
-      ScriptApp.deleteTrigger(trigger);
-    }
+    if (trigger.getHandlerFunction() === 'MINIAPP_exportSnapshotToGitHub') ScriptApp.deleteTrigger(trigger);
   });
 }
 
@@ -305,9 +346,7 @@ function MINIAPP_snapshotUnique_(values) {
 
 function MINIAPP_snapshotSha256_(text) {
   const bytes = Utilities.computeDigest(
-    Utilities.DigestAlgorithm.SHA_256,
-    String(text || ''),
-    Utilities.Charset.UTF_8
+    Utilities.DigestAlgorithm.SHA_256, String(text || ''), Utilities.Charset.UTF_8
   );
   return bytes.map(function(byte) {
     const value = (byte + 256) % 256;
