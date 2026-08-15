@@ -13,3 +13,4 @@ TELEGRAM_CHAT_ID = "-1002109152418"
 # BOT_TOKEN
 # GITHUB_TOKEN
 # SESSION_SECRET
+# Cloudflare Builds source: GitHub main, root path /worker.
