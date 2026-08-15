@@ -1,0 +1,33 @@
+/* Royal CRM Mini App — navigation v0.5.19 */
+.royal-back-button,
+.participant-profile-back,
+.specnaz-back,
+.back-link[data-page="teams"]{
+  appearance:none;
+  -webkit-appearance:none;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:46px;
+  padding:0 18px;
+  margin:0 0 18px;
+  border:1px solid rgba(84,169,235,.32);
+  border-radius:15px;
+  background:#152737;
+  color:#63b7f3;
+  font-size:16px;
+  font-weight:850;
+  line-height:1;
+  text-decoration:none;
+  box-shadow:0 4px 14px rgba(0,0,0,.16);
+  cursor:pointer;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:rgba(84,169,235,.16);
+}
+.royal-back-button:active,
+.participant-profile-back:active,
+.specnaz-back:active,
+.back-link[data-page="teams"]:active{
+  transform:scale(.98);
+  background:#1b3144;
+}
