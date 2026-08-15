@@ -1,7 +1,7 @@
 /*
  * Royal CRM / Таблица ЧП
  * 19_MINIAPP_FALLBACK_API.js
- * v1.0.0
+ * v1.0.1
  *
  * Network fallback API for Mini App when workers.dev is unreachable.
  * Reuses the existing Telegram initData validator from 12_MINI_APP_API.js
@@ -9,7 +9,7 @@
  * Responses are JSONP so Android Telegram WebView does not depend on CORS.
  */
 
-var MINIAPP_FALLBACK_API_VERSION = '1.0.0';
+var MINIAPP_FALLBACK_API_VERSION = '1.0.1';
 
 function MINIAPP_fallbackMaybeHandle_(e) {
   var action = MINIAPP_value_(e && e.parameter && e.parameter.action);
@@ -150,7 +150,7 @@ function MINIAPP_fallbackMediaResult_(cfg, path, errorCode, errorMessage) {
 function MINIAPP_fallbackReadPrivateMedia_(cfg, path) {
   var url = 'https://api.github.com/repos/' + cfg.repo + '/contents/' + MINIAPP_mediaEncodePath_(path) + '?ref=' + encodeURIComponent(cfg.branch);
   var headers = MINIAPP_mediaGithubHeaders_(cfg);
-  headers.Accept = 'application/vnd.github.raw';
+  headers.Accept = 'application/vnd.github.raw+json';
 
   var response = UrlFetchApp.fetch(url, {
     method: 'get',
