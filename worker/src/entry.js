@@ -1,6 +1,6 @@
 import baseWorker from './index.js';
 
-const WRAPPER_VERSION = '1.1.1';
+const WRAPPER_VERSION = '1.1.2';
 const ALLOWED_CHAT_STATE = 'В чате';
 
 export default {
@@ -11,6 +11,7 @@ export default {
       const baseResponse = await baseWorker.fetch(request, env, ctx);
       const headers = new Headers(baseResponse.headers);
       headers.set('Content-Type', 'application/json; charset=utf-8');
+
       return new Response(JSON.stringify({
         ok: true,
         service: 'royal-crm-miniapp-api',
@@ -18,11 +19,15 @@ export default {
       }), { status: 200, headers });
     }
 
+    if (url.pathname === '/team-photo' && request.method === 'GET') {
+      return handleTeamPhoto(request, env, ctx, url);
+    }
+
     if (url.pathname !== '/avatar' || request.method !== 'GET') {
       return baseWorker.fetch(request, env, ctx);
     }
 
-    // First use the existing, stricter implementation. It validates Origin,
+    // First use the existing strict implementation. It validates Origin,
     // session token, current chat membership and ownership of avatarFileId.
     const primaryResponse = await baseWorker.fetch(request, env, ctx);
     if (primaryResponse.ok) return primaryResponse;
@@ -48,6 +53,7 @@ export default {
         String(p.chatState || '').trim() === ALLOWED_CHAT_STATE &&
         String(p.avatarFileId || '') === requestedFileId
       );
+
       const telegramId = String(owner?.telegramId || '').trim();
       if (!telegramId) return primaryResponse;
 
@@ -60,6 +66,7 @@ export default {
       const fileResponse = await fetch(`https://api.telegram.org/file/bot${env.BOT_TOKEN}/${filePath}`, {
         cache: 'no-store'
       });
+
       if (!fileResponse.ok || !fileResponse.body) return primaryResponse;
 
       const headers = new Headers(primaryResponse.headers);
@@ -77,11 +84,119 @@ export default {
   }
 };
 
+async function handleTeamPhoto(request, env, ctx, url) {
+  const authResponse = await authorizeProtectedRequest(request, env, ctx);
+  if (!authResponse.ok) return authResponse;
+
+  const teamName = String(url.searchParams.get('team') || '').trim();
+  if (!teamName) {
+    return jsonFromAuth(authResponse, {
+      ok: false,
+      error: 'TEAM_PHOTO_TEAM_MISSING',
+      message: 'Команда не указана.'
+    }, 400);
+  }
+
+  try {
+    const snapshot = await loadPrivateSnapshot(env);
+    const wanted = normalizeTeam(teamName);
+    const team = (snapshot.teams || []).find(t => normalizeTeam(t?.name) === wanted);
+    const photoUrl = String(team?.photoUrl || '').trim();
+
+    if (!team || !photoUrl) {
+      return jsonFromAuth(authResponse, {
+        ok: false,
+        error: 'TEAM_PHOTO_NOT_FOUND',
+        message: 'Фото команды не найдено.'
+      }, 404);
+    }
+
+    const photoResponse = await fetch(photoUrl, {
+      redirect: 'follow',
+      cache: 'no-store'
+    });
+
+    if (!photoResponse.ok || !photoResponse.body) {
+      console.warn('team photo upstream failed', photoResponse.status);
+      return jsonFromAuth(authResponse, {
+        ok: false,
+        error: 'TEAM_PHOTO_FETCH_FAILED',
+        message: 'Фото команды временно недоступно.'
+      }, 502);
+    }
+
+    const contentType = String(photoResponse.headers.get('Content-Type') || '');
+    if (!contentType.toLowerCase().startsWith('image/')) {
+      console.warn('team photo invalid content type', contentType || 'missing');
+      return jsonFromAuth(authResponse, {
+        ok: false,
+        error: 'TEAM_PHOTO_INVALID_TYPE',
+        message: 'Фото команды временно недоступно.'
+      }, 502);
+    }
+
+    const headers = new Headers(authResponse.headers);
+    headers.set('Content-Type', contentType);
+    headers.set('Cache-Control', 'private, max-age=3600');
+    headers.set('X-Content-Type-Options', 'nosniff');
+    headers.delete('Content-Length');
+    headers.delete('ETag');
+
+    console.log('team photo served', teamName);
+    return new Response(photoResponse.body, { status: 200, headers });
+  } catch (error) {
+    console.warn('team photo failed', error?.message || 'unknown');
+
+    return jsonFromAuth(authResponse, {
+      ok: false,
+      error: 'TEAM_PHOTO_SERVER_ERROR',
+      message: 'Фото команды временно недоступно.'
+    }, 502);
+  }
+}
+
+async function authorizeProtectedRequest(request, env, ctx) {
+  const sourceUrl = new URL(request.url);
+  sourceUrl.pathname = '/snapshot';
+  sourceUrl.search = '';
+
+  const headers = new Headers();
+  const authorization = request.headers.get('Authorization');
+  const origin = request.headers.get('Origin');
+
+  if (authorization) headers.set('Authorization', authorization);
+  if (origin) headers.set('Origin', origin);
+
+  const authRequest = new Request(sourceUrl.toString(), {
+    method: 'GET',
+    headers
+  });
+
+  return baseWorker.fetch(authRequest, env, ctx);
+}
+
+function jsonFromAuth(authResponse, body, status) {
+  const headers = new Headers(authResponse.headers);
+  headers.set('Content-Type', 'application/json; charset=utf-8');
+  headers.set('Cache-Control', 'no-store');
+  headers.delete('Content-Length');
+  headers.delete('ETag');
+
+  return new Response(JSON.stringify(body), { status, headers });
+}
+
+function normalizeTeam(value) {
+  return String(value || '').trim().toLocaleLowerCase('ru-RU');
+}
+
 async function loadPrivateSnapshot(env) {
   const repo = String(env.DATA_REPO || '').trim();
   const branch = String(env.DATA_BRANCH || 'main').trim();
   const path = String(env.DATA_PATH || 'snapshot.json').trim();
-  if (!repo || !env.GITHUB_TOKEN) throw new Error('snapshot config missing');
+
+  if (!repo || !env.GITHUB_TOKEN) {
+    throw new Error('snapshot config missing');
+  }
 
   const encodedPath = path.split('/').map(encodeURIComponent).join('/');
   const response = await fetch(
@@ -96,11 +211,17 @@ async function loadPrivateSnapshot(env) {
       cache: 'no-store'
     }
   );
-  if (!response.ok) throw new Error(`snapshot ${response.status}`);
+
+  if (!response.ok) {
+    throw new Error(`snapshot ${response.status}`);
+  }
 
   const body = await response.json();
   const encoded = String(body?.content || '').replace(/\s+/g, '');
-  if (!encoded) throw new Error('snapshot empty');
+
+  if (!encoded) {
+    throw new Error('snapshot empty');
+  }
 
   const bytes = Uint8Array.from(atob(encoded), c => c.charCodeAt(0));
   return JSON.parse(new TextDecoder().decode(bytes));
@@ -108,6 +229,7 @@ async function loadPrivateSnapshot(env) {
 
 async function getFreshProfilePhotoFileId(telegramId, botToken) {
   if (!botToken) return '';
+
   const url = new URL(`https://api.telegram.org/bot${botToken}/getUserProfilePhotos`);
   url.searchParams.set('user_id', telegramId);
   url.searchParams.set('offset', '0');
@@ -116,20 +238,24 @@ async function getFreshProfilePhotoFileId(telegramId, botToken) {
   const response = await fetch(url.toString(), { cache: 'no-store' });
   const body = await response.json().catch(() => ({}));
   const sizes = Array.isArray(body?.result?.photos?.[0]) ? body.result.photos[0] : [];
+
   if (!response.ok || !body?.ok || !sizes.length) return '';
 
   for (let i = sizes.length - 1; i >= 0; i -= 1) {
     const fileId = String(sizes[i]?.file_id || '').trim();
     if (fileId) return fileId;
   }
+
   return '';
 }
 
 async function getTelegramFilePath(fileId, botToken) {
   const url = new URL(`https://api.telegram.org/bot${botToken}/getFile`);
   url.searchParams.set('file_id', fileId);
+
   const response = await fetch(url.toString(), { cache: 'no-store' });
   const body = await response.json().catch(() => ({}));
+
   if (!response.ok || !body?.ok) return '';
   return String(body?.result?.file_path || '').trim();
 }
