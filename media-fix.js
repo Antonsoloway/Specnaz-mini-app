@@ -1,5 +1,5 @@
-// Android/Telegram WebView media compatibility patch — v0.5.1
-const MEDIA_FIX_VERSION = '0.5.1';
+// Android/Telegram WebView media compatibility patch — v0.5.3
+const MEDIA_FIX_VERSION = '0.5.3';
 const mediaAvatarCache = new Map();
 const mediaTeamPhotoCache = new Map();
 
@@ -12,7 +12,26 @@ function mediaBlobToDataUrl(blob) {
   });
 }
 
-// Override v0.5.0 avatar loader: no IntersectionObserver, no blob: URLs.
+function mediaEnsureTeamPhotoFull(img) {
+  if (!img) return;
+  const box = img.parentElement;
+
+  img.style.setProperty('width', '100%', 'important');
+  img.style.setProperty('height', 'auto', 'important');
+  img.style.setProperty('max-height', 'none', 'important');
+  img.style.setProperty('object-fit', 'contain', 'important');
+  img.style.setProperty('object-position', 'center', 'important');
+  img.style.setProperty('display', 'block', 'important');
+
+  if (box) {
+    box.style.setProperty('height', 'auto', 'important');
+    box.style.setProperty('min-height', '0', 'important');
+    box.style.setProperty('display', 'block', 'important');
+    box.style.setProperty('overflow', 'hidden', 'important');
+  }
+}
+
+// Override avatar loader: no IntersectionObserver, no blob: URLs.
 async function loadAvatarImage(img) {
   if (!img || img.dataset.avatarLoaded === '1' || img.dataset.avatarLoaded === 'loading') return;
 
@@ -65,6 +84,8 @@ async function mediaLoadTeamPhoto() {
   const title = panel.querySelector('.team-detail-head h2');
   if (!img || !title) return;
 
+  mediaEnsureTeamPhotoFull(img);
+
   const teamName = String(title.textContent || '').trim();
   if (!teamName || img.dataset.teamProxyLoaded === '1' || img.dataset.teamProxyLoaded === 'loading') return;
 
@@ -73,6 +94,7 @@ async function mediaLoadTeamPhoto() {
     img.src = mediaTeamPhotoCache.get(key);
     img.dataset.teamProxyLoaded = '1';
     img.parentElement?.classList.remove('photo-error');
+    mediaEnsureTeamPhotoFull(img);
     return;
   }
 
@@ -101,6 +123,7 @@ async function mediaLoadTeamPhoto() {
     img.src = dataUrl;
     img.dataset.teamProxyLoaded = '1';
     img.parentElement?.classList.remove('photo-error');
+    mediaEnsureTeamPhotoFull(img);
   } catch (error) {
     console.warn('Team photo load failed:', error?.message || 'unknown');
     img.dataset.teamProxyLoaded = 'error';
