@@ -43,6 +43,7 @@ function mediaV0516ScheduleAvatar(img) {
 function mediaV0516PumpAvatarQueue() {
   while (mediaV0516ActiveLoads < MEDIA_V0516_MAX_CONCURRENT && mediaV0516AvatarQueue.length) {
     const img = mediaV0516AvatarQueue.shift();
+    if (img) mediaV0516Queued.delete(img);
     if (!img || !img.isConnected) continue;
     mediaV0516ActiveLoads += 1;
     loadAvatarImage(img).finally(() => {
