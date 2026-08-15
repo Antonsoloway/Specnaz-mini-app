@@ -16,6 +16,11 @@
     return String(value || '').trim().toLocaleLowerCase('ru-RU').replace(/ё/g, 'е').replace(/\s+/g, ' ');
   }
 
+  function isCurrentDirectory(key) {
+    const node = document.querySelector('.royal-directory[data-directory-key]');
+    return currentDirectory === key && String(node?.dataset?.directoryKey || '') === key;
+  }
+
   function participants() {
     return Array.isArray(snapshotState?.participants) ? snapshotState.participants : [];
   }
@@ -110,7 +115,7 @@
     const wanted = normalizeRank(raw);
     if (!wanted) return;
     const key = `rank:${wanted}`;
-    if (currentDirectory === key && document.querySelector(`.royal-directory[data-directory-key="${CSS.escape(key)}"]`)) return;
+    if (isCurrentDirectory(key)) return;
 
     const list = participants()
       .filter(p => normalizeRank(p?.specnazRank || '') === wanted)
@@ -152,10 +157,10 @@
     return adminsPromise;
   }
 
-  async function openAdmins() {
+  async function openAdmins(retry = false) {
     const key = 'admins';
-    if (currentDirectory === key && document.querySelector('.royal-directory[data-directory-key="admins"]')) return;
-    pushOrigin();
+    if (!retry && isCurrentDirectory(key)) return;
+    if (!retry) pushOrigin();
     openShell('🛡️ Админы чата', 'Загружаем актуальный список из Telegram…', '<div class="directory-loading">Проверяем администраторов…</div>', key);
 
     try {
@@ -187,7 +192,7 @@
     if (adminChip) {
       event.preventDefault();
       event.stopPropagation();
-      openAdmins();
+      openAdmins(false);
       return;
     }
 
@@ -196,7 +201,7 @@
       event.preventDefault();
       event.stopPropagation();
       adminsPromise = null;
-      openAdmins();
+      openAdmins(true);
       return;
     }
 
