@@ -89,16 +89,21 @@
   function renderProfilePageCard() {
     const panel = document.getElementById('panel');
     if (!panel || !authState?.access) return;
+    panel.classList.add('profile-panel');
     panel.innerHTML = `<section class="self-profile-card profile-page-card">${profileInnerHtml()}</section>`;
     try { setupAvatarLoading(panel); } catch (_) {}
   }
 
   function syncHomeLayout(page) {
-    const home = (page || activePage || 'home') === 'home';
+    const current = page || activePage || 'home';
+    const home = current === 'home';
     const card = document.getElementById('selfProfileCard');
     const panel = document.getElementById('panel');
     if (card) card.hidden = !home;
-    if (panel) panel.hidden = home;
+    if (panel) {
+      panel.hidden = home;
+      if (current !== 'profile') panel.classList.remove('profile-panel');
+    }
   }
 
   const originalRenderAuth = renderAuth;
