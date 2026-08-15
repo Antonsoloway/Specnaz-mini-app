@@ -1,25 +1,22 @@
 /*
  * Royal CRM / Таблица ЧП
  * 24_MINIAPP_SPECNAZ_HISTORY.js
- * v1.2.0
+ * v1.3.0
  *
- * Syncs the "История спецназа" sheet into the private Mini App snapshot.
- * Identity binding is STRICT:
- *   История спецназа!K (Строка базы) -> База участников!D (id тг).
- * Names and @usernames are never used to assign history ownership.
- * If a history row cannot be linked to a Telegram ID, it is marked unresolved
- * so downstream code will NOT guess an owner by name.
- * Rich-text hyperlinks from the visible "Сообщение" column are preserved.
+ * Identity rule: Telegram ID ONLY.
+ * История спецназа!L = Telegram ID.
+ * No participant lookup by name, @username, team or base row.
+ * Rows without Telegram ID stay visible in common history but cannot belong to a personal profile.
  */
 
-var MINIAPP_SPECNAZ_HISTORY_VERSION = '1.2.0';
+var MINIAPP_SPECNAZ_HISTORY_VERSION = '1.3.0';
 var MINIAPP_SPECNAZ_HISTORY_SPREADSHEET_ID = '1kkADcKysWdoGy95O36z9jCaoGUUHN0g4XH4LwVtAK_o';
 var MINIAPP_SPECNAZ_HISTORY_SHEET = 'История спецназа';
-var MINIAPP_SPECNAZ_HISTORY_BASE_SHEET = 'База участников';
 var MINIAPP_SPECNAZ_HISTORY_HANDLER = 'MINIAPP_refreshSpecnazHistorySnapshot';
-var MINIAPP_SPECNAZ_HISTORY_UNRESOLVED_ID = '__UNRESOLVED__';
+var MINIAPP_SPECNAZ_HISTORY_ID_COLUMN = 12; // L = Telegram ID
 
 function MINIAPP_bootstrapSpecnazHistory() {
+  MINIAPP_ensureSpecnazHistoryTelegramIdColumn_();
   var sync = MINIAPP_refreshSpecnazHistorySnapshot();
   MINIAPP_installSpecnazHistoryTrigger_();
 
@@ -56,8 +53,7 @@ function MINIAPP_refreshSpecnazHistorySnapshot() {
         changed: false,
         sections: sections.length,
         entries: MINIAPP_specnazHistoryEntryCount_(sections),
-        linked: MINIAPP_specnazHistoryLinkedCount_(sections),
-        unresolved: MINIAPP_specnazHistoryUnresolvedCount_(sections)
+        linkedByTelegramId: MINIAPP_specnazHistoryLinkedCount_(sections)
       };
     }
 
@@ -76,8 +72,7 @@ function MINIAPP_refreshSpecnazHistorySnapshot() {
         changed: true,
         sections: sections.length,
         entries: MINIAPP_specnazHistoryEntryCount_(sections),
-        linked: MINIAPP_specnazHistoryLinkedCount_(sections),
-        unresolved: MINIAPP_specnazHistoryUnresolvedCount_(sections),
+        linkedByTelegramId: MINIAPP_specnazHistoryLinkedCount_(sections),
         updatedAt: snapshot.specnazHistory.updatedAt
       };
     }
@@ -91,22 +86,28 @@ function MINIAPP_refreshSpecnazHistorySnapshot() {
   throw new Error('Specnaz history snapshot changed concurrently; retry later.');
 }
 
+function MINIAPP_ensureSpecnazHistoryTelegramIdColumn_() {
+  var ss = SpreadsheetApp.openById(MINIAPP_SPECNAZ_HISTORY_SPREADSHEET_ID);
+  var sheet = ss.getSheetByName(MINIAPP_SPECNAZ_HISTORY_SHEET);
+  if (!sheet) throw new Error('Sheet not found: ' + MINIAPP_SPECNAZ_HISTORY_SHEET);
+  var cell = sheet.getRange(1, MINIAPP_SPECNAZ_HISTORY_ID_COLUMN);
+  if (String(cell.getDisplayValue() || '').trim() !== 'Telegram ID') {
+    cell.setValue('Telegram ID');
+  }
+}
+
 function MINIAPP_readSpecnazHistorySections_() {
   var ss = SpreadsheetApp.openById(MINIAPP_SPECNAZ_HISTORY_SPREADSHEET_ID);
   var sheet = ss.getSheetByName(MINIAPP_SPECNAZ_HISTORY_SHEET);
   if (!sheet) throw new Error('Sheet not found: ' + MINIAPP_SPECNAZ_HISTORY_SHEET);
 
-  var baseSheet = ss.getSheetByName(MINIAPP_SPECNAZ_HISTORY_BASE_SHEET);
-  if (!baseSheet) throw new Error('Sheet not found: ' + MINIAPP_SPECNAZ_HISTORY_BASE_SHEET);
-
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
 
-  // A:K = Дата, Аватар, Имя, Команда, Было, Стало, Добавлено,
-  //       Звание, Сообщение, Источник, Строка базы.
-  var values = sheet.getRange(1, 1, lastRow, 11).getDisplayValues();
+  // A:J = visible history data. L = Telegram ID. K is ignored completely.
+  var values = sheet.getRange(1, 1, lastRow, 10).getDisplayValues();
+  var telegramIds = sheet.getRange(1, MINIAPP_SPECNAZ_HISTORY_ID_COLUMN, lastRow, 1).getDisplayValues();
   var messageRich = sheet.getRange(1, 9, lastRow, 1).getRichTextValues();
-  var telegramIdsByBaseRow = MINIAPP_specnazHistoryTelegramIdsByBaseRow_(baseSheet);
   var sections = [];
   var current = null;
 
@@ -130,10 +131,7 @@ function MINIAPP_readSpecnazHistorySections_() {
     var added = MINIAPP_specnazHistoryValue_(row[6]);
     var rank = MINIAPP_specnazHistoryValue_(row[7]);
     var message = MINIAPP_specnazHistoryValue_(row[8]);
-    var baseRow = MINIAPP_specnazHistoryPositiveInt_(row[10]);
-    var telegramId = baseRow && telegramIdsByBaseRow[baseRow]
-      ? telegramIdsByBaseRow[baseRow]
-      : MINIAPP_SPECNAZ_HISTORY_UNRESOLVED_ID;
+    var telegramId = MINIAPP_specnazHistoryTelegramId_(telegramIds[r] && telegramIds[r][0]);
 
     if (!date && !name && !team && !before && !after && !added && !rank && !message) continue;
     if (!name && !date) continue;
@@ -152,7 +150,6 @@ function MINIAPP_readSpecnazHistorySections_() {
 
     var rich = MINIAPP_specnazHistoryRichSegments_(messageRich[r] && messageRich[r][0], message);
     if (rich.length) entry.messageRich = rich;
-
     current.rows.push(entry);
   }
 
@@ -161,23 +158,9 @@ function MINIAPP_readSpecnazHistorySections_() {
   });
 }
 
-function MINIAPP_specnazHistoryTelegramIdsByBaseRow_(baseSheet) {
-  var lastRow = baseSheet.getLastRow();
-  var map = {};
-  if (lastRow < 2) return map;
-
-  // База участников!D = id тг. Keep the actual sheet row as the lookup key.
-  var ids = baseSheet.getRange(1, 4, lastRow, 1).getDisplayValues();
-  for (var i = 1; i < ids.length; i += 1) {
-    var id = MINIAPP_specnazHistoryValue_(ids[i][0]);
-    if (id) map[i + 1] = id;
-  }
-  return map;
-}
-
-function MINIAPP_specnazHistoryPositiveInt_(value) {
-  var n = parseInt(String(value == null ? '' : value).trim(), 10);
-  return isFinite(n) && n > 0 ? n : 0;
+function MINIAPP_specnazHistoryTelegramId_(value) {
+  var id = String(value == null ? '' : value).trim().replace(/\.0$/, '');
+  return /^\d+$/.test(id) ? id : '';
 }
 
 function MINIAPP_isSpecnazHistorySeparator_(value) {
@@ -188,14 +171,12 @@ function MINIAPP_isSpecnazHistorySeparator_(value) {
 function MINIAPP_specnazHistoryRichSegments_(richText, fallbackText) {
   var fallback = String(fallbackText == null ? '' : fallbackText);
   if (!fallback || !richText) return [];
-
   try {
     var runs = richText.getRuns();
     if (!runs || !runs.length) {
       var wholeUrl = richText.getLinkUrl();
       return wholeUrl ? [{ text: fallback, url: String(wholeUrl) }] : [];
     }
-
     var segments = [];
     var hasLink = false;
     runs.forEach(function(run) {
@@ -207,7 +188,6 @@ function MINIAPP_specnazHistoryRichSegments_(richText, fallbackText) {
       if (url) segment.url = String(url);
       segments.push(segment);
     });
-
     if (!hasLink) {
       var cellUrl = richText.getLinkUrl();
       return cellUrl ? [{ text: fallback, url: String(cellUrl) }] : [];
@@ -220,15 +200,9 @@ function MINIAPP_specnazHistoryRichSegments_(richText, fallbackText) {
 
 function MINIAPP_installSpecnazHistoryTrigger_() {
   ScriptApp.getProjectTriggers().forEach(function(trigger) {
-    if (trigger.getHandlerFunction() === MINIAPP_SPECNAZ_HISTORY_HANDLER) {
-      ScriptApp.deleteTrigger(trigger);
-    }
+    if (trigger.getHandlerFunction() === MINIAPP_SPECNAZ_HISTORY_HANDLER) ScriptApp.deleteTrigger(trigger);
   });
-
-  ScriptApp.newTrigger(MINIAPP_SPECNAZ_HISTORY_HANDLER)
-    .timeBased()
-    .everyMinutes(5)
-    .create();
+  ScriptApp.newTrigger(MINIAPP_SPECNAZ_HISTORY_HANDLER).timeBased().everyMinutes(5).create();
 }
 
 function MINIAPP_specnazHistoryEntryCount_(sections) {
@@ -241,17 +215,7 @@ function MINIAPP_specnazHistoryLinkedCount_(sections) {
   var total = 0;
   (sections || []).forEach(function(section) {
     (section && Array.isArray(section.rows) ? section.rows : []).forEach(function(row) {
-      if (row && row.telegramId && row.telegramId !== MINIAPP_SPECNAZ_HISTORY_UNRESOLVED_ID) total += 1;
-    });
-  });
-  return total;
-}
-
-function MINIAPP_specnazHistoryUnresolvedCount_(sections) {
-  var total = 0;
-  (sections || []).forEach(function(section) {
-    (section && Array.isArray(section.rows) ? section.rows : []).forEach(function(row) {
-      if (!row || !row.telegramId || row.telegramId === MINIAPP_SPECNAZ_HISTORY_UNRESOLVED_ID) total += 1;
+      if (row && MINIAPP_specnazHistoryTelegramId_(row.telegramId)) total += 1;
     });
   });
   return total;
@@ -276,7 +240,7 @@ function MINIAPP_specnazHistoryHeaders_(cfg) {
     Authorization: 'Bearer ' + cfg.token,
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
-    'User-Agent': 'Royal-CRM-Specnaz-History/1.2'
+    'User-Agent': 'Royal-CRM-Specnaz-History/1.3'
   };
 }
 
@@ -285,15 +249,9 @@ function MINIAPP_specnazHistoryPath_(path) {
 }
 
 function MINIAPP_specnazHistoryReadSnapshot_(cfg) {
-  var url = 'https://api.github.com/repos/' + cfg.repo + '/contents/' +
-    MINIAPP_specnazHistoryPath_(cfg.path) + '?ref=' + encodeURIComponent(cfg.branch);
-  var response = UrlFetchApp.fetch(url, {
-    method: 'get', muteHttpExceptions: true, headers: MINIAPP_specnazHistoryHeaders_(cfg)
-  });
-  if (response.getResponseCode() !== 200) {
-    throw new Error('Specnaz history snapshot read HTTP ' + response.getResponseCode());
-  }
-
+  var url = 'https://api.github.com/repos/' + cfg.repo + '/contents/' + MINIAPP_specnazHistoryPath_(cfg.path) + '?ref=' + encodeURIComponent(cfg.branch);
+  var response = UrlFetchApp.fetch(url, { method: 'get', muteHttpExceptions: true, headers: MINIAPP_specnazHistoryHeaders_(cfg) });
+  if (response.getResponseCode() !== 200) throw new Error('Specnaz history snapshot read HTTP ' + response.getResponseCode());
   var body = JSON.parse(response.getContentText() || '{}');
   var encoded = String(body.content || '').replace(/\s+/g, '');
   if (!encoded) throw new Error('Specnaz history snapshot is empty');
@@ -305,35 +263,24 @@ function MINIAPP_specnazHistoryWriteSnapshot_(cfg, snapshot, sha) {
   var url = 'https://api.github.com/repos/' + cfg.repo + '/contents/' + MINIAPP_specnazHistoryPath_(cfg.path);
   var json = JSON.stringify(snapshot);
   var payload = {
-    message: 'sync Mini App specnaz history',
+    message: 'sync Mini App specnaz history telegram-id-only',
     content: Utilities.base64Encode(Utilities.newBlob(json, 'application/json').getBytes()),
     branch: cfg.branch,
     sha: sha
   };
   var headers = MINIAPP_specnazHistoryHeaders_(cfg);
   headers['Content-Type'] = 'application/json';
-  var response = UrlFetchApp.fetch(url, {
-    method: 'put', muteHttpExceptions: true, headers: headers, payload: JSON.stringify(payload)
-  });
-  return {
-    ok: response.getResponseCode() === 200 || response.getResponseCode() === 201,
-    code: response.getResponseCode(),
-    body: response.getContentText()
-  };
+  var response = UrlFetchApp.fetch(url, { method: 'put', muteHttpExceptions: true, headers: headers, payload: JSON.stringify(payload) });
+  return { ok: response.getResponseCode() === 200 || response.getResponseCode() === 201, code: response.getResponseCode(), body: response.getContentText() };
 }
 
 function MINIAPP_specnazHistoryHash_(snapshot) {
   if (typeof MINIAPP_profileStatsHash_ === 'function') {
     try { return MINIAPP_profileStatsHash_(snapshot); } catch (_) {}
   }
-
   var copy = JSON.parse(JSON.stringify(snapshot || {}));
   delete copy.dataHash;
-  var bytes = Utilities.computeDigest(
-    Utilities.DigestAlgorithm.SHA_256,
-    JSON.stringify(copy),
-    Utilities.Charset.UTF_8
-  );
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, JSON.stringify(copy), Utilities.Charset.UTF_8);
   return bytes.map(function(b) {
     var n = b < 0 ? b + 256 : b;
     return ('0' + n.toString(16)).slice(-2);
