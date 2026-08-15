@@ -1,0 +1,277 @@
+/* Royal CRM Mini App — participant profiles v0.5.14
+ * Observer-free: nothing scans or watches the DOM in background.
+ * A single delegated click handler resolves the clicked avatar on demand.
+ */
+(() => {
+  const AVATAR_SELECTOR = '.person-avatar-wrap,.hero-avatar,.history-avatar,.self-avatar';
+  let origin = null;
+
+  function participants() {
+    return Array.isArray(snapshotState?.participants) ? snapshotState.participants : [];
+  }
+
+  function norm(value) {
+    return String(value || '').trim().replace(/^@+\s*/, '').replace(/\s+/g, ' ').toLocaleLowerCase('ru-RU');
+  }
+
+  function usernameOf(p) {
+    return normalizeUsername(p?.username || '').toLocaleLowerCase('ru-RU');
+  }
+
+  function findByUsername(value) {
+    const wanted = normalizeUsername(value || '').toLocaleLowerCase('ru-RU');
+    if (!wanted) return null;
+    return participants().find(p => usernameOf(p) === wanted) || null;
+  }
+
+  function findByAvatarFile(value) {
+    const wanted = String(value || '').trim();
+    if (!wanted) return null;
+    return participants().find(p => String(p?.avatarFileId || '').trim() === wanted) || null;
+  }
+
+  function participantNames(p) {
+    return [...new Set([p?.name, p?.telegramName, p?.username].map(norm).filter(Boolean))];
+  }
+
+  function findByName(value, contextText = '') {
+    const wanted = norm(value);
+    if (!wanted) return null;
+    const matches = participants().filter(p => participantNames(p).includes(wanted));
+    if (matches.length === 1) return matches[0];
+    if (matches.length > 1 && contextText) {
+      const hay = norm(contextText);
+      const narrowed = matches.filter(p => (p?.memberships || []).some(m => {
+        const team = norm(m?.team);
+        return team && hay.includes(team);
+      }));
+      if (narrowed.length === 1) return narrowed[0];
+    }
+    return matches[0] || null;
+  }
+
+  function currentSelfParticipant() {
+    const user = authState?.user || {};
+    return findByUsername(user.crmUsername || user.telegramUsername || '')
+      || findByAvatarFile(authState?.profileStats?.avatarFileId || '')
+      || findByName(user.crmName || user.telegramFirstName || '');
+  }
+
+  function resolveParticipant(avatar) {
+    if (!avatar) return null;
+
+    if (avatar.classList.contains('self-avatar')) {
+      const self = currentSelfParticipant();
+      if (self) return self;
+    }
+
+    const img = avatar.querySelector('img[data-avatar-file]');
+    const byAvatar = findByAvatarFile(img?.dataset?.avatarFile || '');
+    if (byAvatar) return byAvatar;
+
+    const card = avatar.closest('.person-card,.team-member,.hero-card,.history-row,.self-profile-card');
+    const userNode = card?.querySelector('[data-user-menu]');
+    const byUser = findByUsername(userNode?.dataset?.userMenu || '');
+    if (byUser) return byUser;
+
+    if (card?.classList.contains('person-card')) {
+      return findByName(card.querySelector('.person-title')?.textContent || '', card.textContent || '');
+    }
+    if (card?.classList.contains('team-member')) {
+      return findByName(card.querySelector('.team-member-main strong')?.textContent || '', card.textContent || '');
+    }
+    if (card?.classList.contains('hero-card')) {
+      return findByName(card.querySelector('.hero-main strong')?.textContent || '', card.textContent || '');
+    }
+    if (card?.classList.contains('history-row')) {
+      return findByName(card.querySelector('.history-person strong')?.textContent || '', card.textContent || '');
+    }
+    return null;
+  }
+
+  function safeUrl(value) {
+    const url = String(value || '').trim();
+    return /^(https?:\/\/|tg:\/\/)/i.test(url) ? url : '';
+  }
+
+  function richMessageHtml(row) {
+    const rich = Array.isArray(row?.messageRich) ? row.messageRich : [];
+    if (!rich.length) return esc(row?.message || '');
+    return rich.map(segment => {
+      const text = String(segment?.text || '');
+      const url = safeUrl(segment?.url);
+      return url
+        ? `<a class="participant-history-link" href="${esc(url)}" data-participant-history-link="${esc(url)}">${esc(text)}</a>`
+        : esc(text);
+    }).join('');
+  }
+
+  function rowMatchesParticipant(row, p) {
+    const raw = String(row?.name || '');
+    const username = usernameOf(p);
+    if (username) {
+      const users = [...raw.matchAll(/@\s*([A-Za-z0-9_]{3,})/g)].map(m => String(m[1] || '').toLocaleLowerCase('ru-RU'));
+      if (users.includes(username)) return true;
+    }
+    const rowNames = raw.split(',').map(norm).filter(Boolean);
+    const names = participantNames(p);
+    return names.some(name => rowNames.includes(name));
+  }
+
+  function dateValue(value) {
+    const raw = String(value || '').trim();
+    const m = raw.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+    if (!m) return 0;
+    return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), Number(m[4] || 0), Number(m[5] || 0), Number(m[6] || 0)).getTime();
+  }
+
+  function participantHistory(p) {
+    const sections = Array.isArray(snapshotState?.specnazHistory?.sections) ? snapshotState.specnazHistory.sections : [];
+    const result = [];
+    sections.forEach(section => {
+      const rows = Array.isArray(section?.rows) ? section.rows : [];
+      rows.forEach(row => {
+        if (rowMatchesParticipant(row, p)) {
+          result.push({ ...row, sectionTitle: String(section?.title || '') });
+        }
+      });
+    });
+    return result.sort((a, b) => dateValue(b.date) - dateValue(a.date));
+  }
+
+  function membershipHtmlProfile(m) {
+    const team = String(m?.team || '').trim();
+    const role = String(m?.role || 'Без роли').trim();
+    const game = String(m?.game || '').trim();
+    if (!team) return `<span class="participant-profile-membership special">🚨 ${esc(role)}</span>`;
+    return `<span class="participant-profile-membership"><b>${esc(team)}</b><small>${esc(role)}${game ? ` · ${esc(game)}` : ''}</small></span>`;
+  }
+
+  function historyCardHtml(row) {
+    const added = String(row?.added || '').trim();
+    return `<article class="participant-trip-card">
+      <div class="participant-trip-top"><div><b>${esc(row?.date || '')}</b>${row?.sectionTitle ? `<small>${esc(row.sectionTitle)}</small>` : ''}</div>${added ? `<span class="participant-trip-added">+${esc(added)}</span>` : ''}</div>
+      ${row?.team ? `<div class="participant-trip-team">${esc(row.team)}</div>` : ''}
+      <div class="participant-trip-score"><span>Было <b>${esc(row?.before || '')}</b></span><span>→</span><span>Стало <b>${esc(row?.after || '')}</b></span>${row?.rank ? `<span class="participant-trip-rank">${esc(row.rank)}</span>` : ''}</div>
+      ${row?.message ? `<div class="participant-trip-message">${richMessageHtml(row)}</div>` : ''}
+    </article>`;
+  }
+
+  function captureOrigin() {
+    const panel = document.getElementById('panel');
+    const page = activePage || 'home';
+    const data = { page, scrollY: window.scrollY || 0 };
+    if (page === 'players') data.query = document.getElementById('participantSearch')?.value || '';
+    if (page === 'teams') {
+      const title = panel?.querySelector('.team-detail-head h2')?.textContent || '';
+      const game = panel?.querySelector('.team-detail-head .muted')?.textContent || '';
+      if (title) data.teamName = title.trim();
+      if (game) data.teamGame = game.trim();
+      if (!title) data.query = document.getElementById('teamSearch')?.value || '';
+    }
+    if (page === 'help') data.html = panel?.innerHTML || '';
+    return data;
+  }
+
+  function restoreOrigin() {
+    const saved = origin;
+    origin = null;
+    if (!saved) {
+      renderPage('players');
+      return;
+    }
+
+    if (saved.page === 'players') {
+      renderParticipantsPage(saved.query || '');
+    } else if (saved.page === 'teams' && saved.teamName) {
+      // team-identity-fix accepts the normal team identity used by the current UI.
+      const ref = saved.teamGame ? JSON.stringify([saved.teamName, saved.teamGame]) : saved.teamName;
+      try { renderTeamDetail(ref); } catch (_) { renderTeamsPage(''); }
+    } else if (saved.page === 'teams') {
+      renderTeamsPage(saved.query || '');
+    } else if (saved.page === 'help' && saved.html) {
+      setActiveNav('help');
+      const panel = document.getElementById('panel');
+      if (panel) {
+        panel.hidden = false;
+        panel.innerHTML = saved.html;
+        try { setupAvatarLoading(panel); } catch (_) {}
+      }
+    } else {
+      renderPage(saved.page || 'home');
+    }
+
+    try { window.scrollTo(0, saved.scrollY || 0); } catch (_) {}
+  }
+
+  function renderParticipantProfile(p) {
+    if (!p) return;
+    origin = captureOrigin();
+    const panel = document.getElementById('panel');
+    const selfCard = document.getElementById('selfProfileCard');
+    if (selfCard) selfCard.hidden = true;
+    if (!panel) return;
+    panel.hidden = false;
+
+    const name = displayName(p);
+    const username = normalizeUsername(p?.username || '');
+    const avatarFile = String(p?.avatarFileId || '').trim();
+    const trips = Number(p?.specnazTrips || 0);
+    const rank = String(p?.specnazRank || 'Новичок');
+    const memberships = Array.isArray(p?.memberships) ? p.memberships : [];
+    const history = participantHistory(p);
+    const avatar = avatarFile
+      ? `<div class="participant-detail-avatar"><span>${esc(firstLetter(name))}</span><img alt="" data-avatar-file="${esc(avatarFile)}"></div>`
+      : `<div class="participant-detail-avatar fallback"><span>${esc(firstLetter(name))}</span></div>`;
+
+    panel.innerHTML = `
+      <button type="button" class="participant-profile-back" data-participant-profile-back>‹ Назад</button>
+      <section class="participant-detail-card">
+        <div class="participant-detail-head">${avatar}<div class="participant-detail-identity"><span class="participant-detail-rank-chip">${esc(rank)}</span><h2>${esc(name)}</h2>${username ? `<button type="button" class="username-link" data-user-menu="${esc(username)}" data-user-name="${esc(name)}">@${esc(username)}</button>` : ''}</div></div>
+        <div class="participant-detail-stats"><div><b>${trips}</b><small>Очки спецназа</small></div><div><b>${history.length}</b><small>Походов в истории</small></div></div>
+        <div class="participant-detail-memberships">${memberships.length ? memberships.map(membershipHtmlProfile).join('') : '<span class="muted">Команда не указана</span>'}</div>
+      </section>
+      <div class="participant-history-title"><h3>🚨 Походы в спецназ</h3><span>${history.length}</span></div>
+      <div class="participant-trip-list">${history.length ? history.map(historyCardHtml).join('') : '<div class="participant-history-empty">В истории спецназа записей пока нет.</div>'}</div>`;
+
+    try { setupAvatarLoading(panel); } catch (_) {}
+    try { panel.scrollIntoView({ block: 'start' }); } catch (_) {}
+  }
+
+  document.addEventListener('click', event => {
+    const back = event.target.closest('[data-participant-profile-back]');
+    if (back) {
+      event.preventDefault();
+      event.stopPropagation();
+      restoreOrigin();
+      return;
+    }
+
+    const historyLink = event.target.closest('[data-participant-history-link]');
+    if (historyLink) {
+      event.preventDefault();
+      event.stopPropagation();
+      const url = safeUrl(historyLink.dataset.participantHistoryLink);
+      if (!url) return;
+      const webapp = window.Telegram?.WebApp;
+      try {
+        if (/^https:\/\/t\.me\//i.test(url) && webapp?.openTelegramLink) webapp.openTelegramLink(url);
+        else if (webapp?.openLink) webapp.openLink(url);
+        else window.location.href = url;
+      } catch (_) {
+        window.location.href = url;
+      }
+      return;
+    }
+
+    const avatar = event.target.closest(AVATAR_SELECTOR);
+    if (!avatar || avatar.closest('.participant-detail-card')) return;
+    const participant = resolveParticipant(avatar);
+    if (!participant) return;
+    event.preventDefault();
+    event.stopPropagation();
+    renderParticipantProfile(participant);
+  }, true);
+
+  window.__ROYAL_PARTICIPANT_PROFILE_VERSION__ = '0.5.14';
+})();
