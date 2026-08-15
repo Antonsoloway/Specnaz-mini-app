@@ -109,6 +109,8 @@ async function mediaLoadTeamPhoto() {
 }
 
 function mediaRefresh() {
+  const badge = document.getElementById('versionBadge');
+  if (badge) badge.textContent = `v${MEDIA_FIX_VERSION}`;
   setupAvatarLoading(document.getElementById('panel'));
   mediaLoadTeamPhoto();
 }
