@@ -1,5 +1,5 @@
-// Android/Telegram WebView media compatibility patch — v0.5.5
-const MEDIA_FIX_VERSION = '0.5.5';
+// Android/Telegram WebView media compatibility patch — v0.5.10
+const MEDIA_FIX_VERSION = '0.5.10';
 const mediaAvatarCache = new Map();
 const mediaTeamPhotoCache = new Map();
 
@@ -31,7 +31,6 @@ function mediaEnsureTeamPhotoFull(img) {
   }
 }
 
-// Override avatar loader: no IntersectionObserver, no blob: URLs.
 async function loadAvatarImage(img) {
   if (!img || img.dataset.avatarLoaded === '1' || img.dataset.avatarLoaded === 'loading') return;
 
@@ -48,20 +47,14 @@ async function loadAvatarImage(img) {
 
   try {
     const response = await fetch(`${API_URL}/avatar?fileId=${encodeURIComponent(fileId)}`, {
-      method: 'GET',
-      mode: 'cors',
-      cache: 'no-store',
+      method: 'GET', mode: 'cors', cache: 'no-store',
       headers: { Authorization: `Bearer ${sessionToken}` }
     });
-
     if (!response.ok) throw new Error(`avatar ${response.status}`);
-
     const blob = await response.blob();
     if (!blob.type.startsWith('image/')) throw new Error(`avatar type ${blob.type || 'missing'}`);
-
     const dataUrl = await mediaBlobToDataUrl(blob);
     if (!dataUrl) throw new Error('avatar empty');
-
     mediaAvatarCache.set(fileId, dataUrl);
     img.src = dataUrl;
     img.dataset.avatarLoaded = '1';
@@ -87,14 +80,12 @@ function mediaNormalizeGame(value) {
 async function mediaLoadTeamPhoto() {
   const panel = document.getElementById('panel');
   if (!panel || !sessionToken) return;
-
   const img = panel.querySelector('.team-photo-box .team-photo');
   const title = panel.querySelector('.team-detail-head h2');
   const gameNode = panel.querySelector('.team-detail-head .muted');
   if (!img || !title) return;
 
   mediaEnsureTeamPhotoFull(img);
-
   const teamName = String(img.dataset.teamName || title.textContent || '').trim();
   const game = mediaNormalizeGame(img.dataset.teamGame || gameNode?.textContent || '');
   if (!teamName || img.dataset.teamProxyLoaded === '1' || img.dataset.teamProxyLoaded === 'loading') return;
@@ -109,30 +100,20 @@ async function mediaLoadTeamPhoto() {
   }
 
   img.dataset.teamProxyLoaded = 'loading';
-
   try {
-    // Never depend on the temporary googleusercontent URL embedded in snapshot.
     img.removeAttribute('src');
-
     const url = new URL(`${API_URL}/team-photo`);
     url.searchParams.set('team', teamName);
     if (game) url.searchParams.set('game', game);
-
     const response = await fetch(url.toString(), {
-      method: 'GET',
-      mode: 'cors',
-      cache: 'no-store',
+      method: 'GET', mode: 'cors', cache: 'no-store',
       headers: { Authorization: `Bearer ${sessionToken}` }
     });
-
     if (!response.ok) throw new Error(`team photo ${response.status}`);
-
     const blob = await response.blob();
     if (!blob.type.startsWith('image/')) throw new Error(`team photo type ${blob.type || 'missing'}`);
-
     const dataUrl = await mediaBlobToDataUrl(blob);
     if (!dataUrl) throw new Error('team photo empty');
-
     mediaTeamPhotoCache.set(key, dataUrl);
     img.src = dataUrl;
     img.dataset.teamProxyLoaded = '1';
