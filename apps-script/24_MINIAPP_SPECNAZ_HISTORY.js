@@ -1,14 +1,15 @@
 /*
  * Royal CRM / Таблица ЧП
  * 24_MINIAPP_SPECNAZ_HISTORY.js
- * v1.0.0
+ * v1.1.0
  *
  * Syncs the "История спецназа" sheet into the private Mini App snapshot.
- * Separator rows beginning with "Спецназ" become collapsible sections.
+ * Real separator rows like "Спецназ с 14 по 17 августа 2026" become sections.
+ * Rich-text hyperlinks from the visible "Сообщение" column are preserved.
  * Technical source and Telegram IDs are not exported in history rows.
  */
 
-var MINIAPP_SPECNAZ_HISTORY_VERSION = '1.0.0';
+var MINIAPP_SPECNAZ_HISTORY_VERSION = '1.1.0';
 var MINIAPP_SPECNAZ_HISTORY_SPREADSHEET_ID = '1kkADcKysWdoGy95O36z9jCaoGUUHN0g4XH4LwVtAK_o';
 var MINIAPP_SPECNAZ_HISTORY_SHEET = 'История спецназа';
 var MINIAPP_SPECNAZ_HISTORY_HANDLER = 'MINIAPP_refreshSpecnazHistorySnapshot';
@@ -91,6 +92,8 @@ function MINIAPP_readSpecnazHistorySections_() {
 
   // A:J = Дата, Аватар, Имя, Команда, Было, Стало, Добавлено, Звание, Сообщение, Источник.
   var values = sheet.getRange(1, 1, lastRow, 10).getDisplayValues();
+  // Preserve cell-level and partial rich-text links from the visible message column I.
+  var messageRich = sheet.getRange(1, 9, lastRow, 1).getRichTextValues();
   var sections = [];
   var current = null;
 
@@ -98,11 +101,14 @@ function MINIAPP_readSpecnazHistorySections_() {
     var row = values[r];
     var first = MINIAPP_specnazHistoryValue_(row[0]);
 
-    if (/^Спецназ\b/i.test(first)) {
+    if (MINIAPP_isSpecnazHistorySeparator_(first)) {
       current = { title: first, rows: [] };
       sections.push(current);
       continue;
     }
+
+    // Do not invent an "Архив спецназа" section. Only rows under a real sheet divider are exported.
+    if (!current) continue;
 
     var date = first;
     var name = MINIAPP_specnazHistoryValue_(row[2]);
@@ -116,12 +122,7 @@ function MINIAPP_readSpecnazHistorySections_() {
     if (!date && !name && !team && !before && !after && !added && !rank && !message) continue;
     if (!name && !date) continue;
 
-    if (!current) {
-      current = { title: 'Архив спецназа', rows: [] };
-      sections.push(current);
-    }
-
-    current.rows.push({
+    var entry = {
       date: date,
       name: name,
       team: team,
@@ -130,12 +131,55 @@ function MINIAPP_readSpecnazHistorySections_() {
       added: added,
       rank: rank,
       message: message
-    });
+    };
+
+    var rich = MINIAPP_specnazHistoryRichSegments_(messageRich[r] && messageRich[r][0], message);
+    if (rich.length) entry.messageRich = rich;
+
+    current.rows.push(entry);
   }
 
   return sections.filter(function(section) {
     return section && section.title && Array.isArray(section.rows);
   });
+}
+
+function MINIAPP_isSpecnazHistorySeparator_(value) {
+  var text = MINIAPP_specnazHistoryValue_(value).toLocaleLowerCase('ru-RU');
+  return text === 'спецназ' || text.indexOf('спецназ ') === 0;
+}
+
+function MINIAPP_specnazHistoryRichSegments_(richText, fallbackText) {
+  var fallback = String(fallbackText == null ? '' : fallbackText);
+  if (!fallback || !richText) return [];
+
+  try {
+    var runs = richText.getRuns();
+    if (!runs || !runs.length) {
+      var wholeUrl = richText.getLinkUrl();
+      return wholeUrl ? [{ text: fallback, url: String(wholeUrl) }] : [];
+    }
+
+    var segments = [];
+    var hasLink = false;
+    runs.forEach(function(run) {
+      var text = String(run.getText() || '');
+      if (!text) return;
+      var url = run.getLinkUrl();
+      if (url) hasLink = true;
+      var segment = { text: text };
+      if (url) segment.url = String(url);
+      segments.push(segment);
+    });
+
+    if (!hasLink) {
+      var cellUrl = richText.getLinkUrl();
+      return cellUrl ? [{ text: fallback, url: String(cellUrl) }] : [];
+    }
+    return segments;
+  } catch (_) {
+    return [];
+  }
 }
 
 function MINIAPP_installSpecnazHistoryTrigger_() {
@@ -176,7 +220,7 @@ function MINIAPP_specnazHistoryHeaders_(cfg) {
     Authorization: 'Bearer ' + cfg.token,
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
-    'User-Agent': 'Royal-CRM-Specnaz-History/1.0'
+    'User-Agent': 'Royal-CRM-Specnaz-History/1.1'
   };
 }
 
