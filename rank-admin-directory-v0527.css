@@ -1,6 +1,7 @@
 /* Royal CRM Mini App — rank/admin directories v0.5.27 */
 .participant-admin-chip,
-.rank-badge--compact[data-rank]{
+.rank-badge--compact[data-rank],
+.rank-premium-name{
   cursor:pointer;
   touch-action:manipulation;
   -webkit-tap-highlight-color:rgba(84,169,235,.14);
@@ -16,7 +17,8 @@
 }
 
 .participant-admin-chip:active,
-.rank-badge--compact[data-rank]:active{
+.rank-badge--compact[data-rank]:active,
+.rank-premium-name:active{
   transform:scale(.96);
 }
 
@@ -35,6 +37,18 @@
   font-size:14px;
   font-weight:900;
   line-height:1;
+}
+
+.rank-premium-name{
+  position:relative;
+  z-index:12;
+  pointer-events:auto;
+}
+
+.rank-premium-name::after{
+  content:'  ›';
+  color:rgba(255,255,255,.88);
+  font-weight:900;
 }
 
 .royal-directory{
