@@ -1,0 +1,3 @@
+.team-photo-box{height:auto;min-height:180px;overflow:hidden;display:grid;place-items:center}
+.team-photo{width:100%;height:auto;max-height:none;object-fit:contain;display:block}
+@media(max-width:360px){.team-photo-box{height:auto;min-height:155px}}
