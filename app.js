@@ -1,8 +1,10 @@
 const tg = window.Telegram?.WebApp;
-const API_URL = 'https://script.google.com/macros/s/AKfycbzbjYBCLWHMvpQuMvMeh1B6mOIRMvljCk31sn4o1n5X0aqyL5ZfSzrTra7cGw7sfCvSdQ/exec';
-const BUILD = '0.2.4';
+const API_URL = 'https://royal-crm-miniapp-api.tropical-spoon.workers.dev';
+const BUILD = '0.4.0';
 
 let authState = null;
+let snapshotState = null;
+let sessionToken = '';
 
 function esc(value) {
   return String(value ?? '')
@@ -39,6 +41,8 @@ function showFatal(message, details = '') {
 
 function renderAuth(data) {
   authState = data;
+  sessionToken = data.session || '';
+
   const user = data.user || {};
   const role = data.role || {};
 
@@ -55,55 +59,53 @@ function renderAuth(data) {
   document.getElementById('panel').innerHTML = `
     <h2>${esc(role.title || 'Участник')}</h2>
     <p><strong>${esc(user.crmName || user.telegramFirstName || '')}</strong></p>
-    <p class="muted">${teamText}</p>`;
+    <p class="muted">${teamText}</p>
+    <p class="muted" id="dataStatus">Загружаем справочник…</p>`;
 
   setButtonsEnabled(true);
 }
 
-function jsonpAuth(initData, timeoutMs = 20000) {
-  return new Promise((resolve, reject) => {
-    const callback = `__miniappAuth_${Date.now()}_${Math.random().toString(36).slice(2)}`.replace(/[^A-Za-z0-9_$]/g, '_');
-    const script = document.createElement('script');
-    let finished = false;
-
-    const cleanup = () => {
-      try { delete window[callback]; } catch (_) { window[callback] = undefined; }
-      script.remove();
-    };
-
-    const timer = setTimeout(() => {
-      if (finished) return;
-      finished = true;
-      cleanup();
-      reject(new Error(`AUTH_TIMEOUT build=${BUILD} transport=jsonp-get`));
-    }, timeoutMs);
-
-    window[callback] = data => {
-      if (finished) return;
-      finished = true;
-      clearTimeout(timer);
-      cleanup();
-      resolve(data);
-    };
-
-    script.onerror = () => {
-      if (finished) return;
-      finished = true;
-      clearTimeout(timer);
-      cleanup();
-      reject(new Error(`AUTH_SCRIPT_ERROR build=${BUILD} transport=jsonp-get`));
-    };
-
-    const params = new URLSearchParams({
-      miniapp: '1',
-      action: 'auth',
-      initData,
-      callback,
-      _: String(Date.now())
-    });
-    script.src = `${API_URL}?${params.toString()}`;
-    document.head.appendChild(script);
+async function workerAuth(initData) {
+  const response = await fetch(`${API_URL}/auth`, {
+    method: 'POST',
+    mode: 'cors',
+    cache: 'no-store',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData })
   });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(data?.message || `HTTP ${response.status}`);
+    error.code = data?.error || `HTTP_${response.status}`;
+    throw error;
+  }
+  return data;
+}
+
+async function loadSnapshot() {
+  if (!sessionToken) return;
+
+  const response = await fetch(`${API_URL}/snapshot`, {
+    method: 'GET',
+    mode: 'cors',
+    cache: 'no-store',
+    headers: { Authorization: `Bearer ${sessionToken}` }
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data?.ok) {
+    const error = new Error(data?.message || `HTTP ${response.status}`);
+    error.code = data?.error || `HTTP_${response.status}`;
+    throw error;
+  }
+
+  snapshotState = data.snapshot || null;
+  const status = document.getElementById('dataStatus');
+  if (status && snapshotState) {
+    const stats = snapshotState.stats || {};
+    status.textContent = `CRM загружена: ${Number(stats.inChat || stats.participants || 0)} участников, ${Number(stats.teams || 0)} команд.`;
+  }
 }
 
 async function authenticate() {
@@ -130,10 +132,10 @@ async function authenticate() {
   document.getElementById('userMeta').textContent = 'Проверяем доступ…';
 
   try {
-    const data = await jsonpAuth(tg.initData);
+    const data = await workerAuth(tg.initData);
 
-    if (!data?.ok && !data?.access) {
-      showFatal(data?.message || 'Не удалось подтвердить Telegram-пользователя.', `${data?.error || 'UNKNOWN'} · server=${data?.version || '?'} · build=${BUILD}`);
+    if (!data?.ok) {
+      showFatal(data?.message || 'Не удалось подтвердить Telegram-пользователя.', `${data?.error || 'UNKNOWN'} · build=${BUILD}`);
       return;
     }
 
@@ -143,10 +145,48 @@ async function authenticate() {
     }
 
     renderAuth(data);
+
+    loadSnapshot().catch(error => {
+      console.error('Snapshot load error:', error);
+      const status = document.getElementById('dataStatus');
+      if (status) status.textContent = `Справочник временно недоступен: ${error?.code || error?.message || 'UNKNOWN'}`;
+    });
   } catch (error) {
     console.error('Mini App auth error:', error);
-    showFatal('Сервер авторизации пока недоступен.', error?.message || `NETWORK_ERROR build=${BUILD}`);
+    showFatal('Сервер авторизации пока недоступен.', `${error?.code || error?.message || 'NETWORK_ERROR'} · build=${BUILD}`);
   }
+}
+
+function renderParticipants() {
+  const participants = snapshotState?.participants || [];
+  if (!participants.length) {
+    return '<p>Список участников ещё загружается. Попробуйте открыть раздел через секунду.</p>';
+  }
+
+  const items = participants.map(p => {
+    const memberships = (p.memberships || [])
+      .filter(m => m.team || m.role)
+      .map(m => `${esc(m.team || 'Без команды')} — ${esc(m.role || 'Без роли')}`)
+      .join('<br>');
+    const tgName = p.username ? ` ${esc(p.username)}` : '';
+    return `<li><strong>${esc(p.name || p.telegramName || p.username || 'Без имени')}</strong>${tgName}${memberships ? `<br><span class="muted">${memberships}</span>` : ''}</li>`;
+  }).join('');
+
+  return `<p class="muted">Всего: ${participants.length}</p><ul>${items}</ul>`;
+}
+
+function renderTeams() {
+  const teams = snapshotState?.teams || [];
+  if (!teams.length) {
+    return '<p>Список команд ещё загружается. Попробуйте открыть раздел через секунду.</p>';
+  }
+
+  const items = teams.map(t => {
+    const games = Array.isArray(t.games) && t.games.length ? ` · ${esc(t.games.join(', '))}` : '';
+    return `<li><strong>${esc(t.name || 'Без названия')}</strong>${games}<br><span class="muted">Участников: ${Number(t.memberCount || 0)} · лидеров: ${Number(t.leaderCount || 0)} · помощников: ${Number(t.assistantCount || 0)}</span></li>`;
+  }).join('');
+
+  return `<p class="muted">Всего: ${teams.length}</p><ul>${items}</ul>`;
 }
 
 function renderPage(page) {
@@ -156,7 +196,11 @@ function renderPage(page) {
   const memberships = authState.memberships || [];
 
   if (page === 'home') {
-    document.getElementById('panel').innerHTML = `<h2>${esc(role)}</h2><p>Доступ подтверждён. CRM подключена.</p>`;
+    const stats = snapshotState?.stats || {};
+    const loaded = snapshotState
+      ? `<p class="muted">CRM: ${Number(stats.inChat || stats.participants || 0)} участников · ${Number(stats.teams || 0)} команд</p>`
+      : '<p class="muted">CRM загружается…</p>';
+    document.getElementById('panel').innerHTML = `<h2>${esc(role)}</h2><p>Доступ подтверждён.</p>${loaded}`;
     return;
   }
 
@@ -168,9 +212,17 @@ function renderPage(page) {
     return;
   }
 
+  if (page === 'players') {
+    document.getElementById('panel').innerHTML = `<h2>Участники</h2>${renderParticipants()}`;
+    return;
+  }
+
+  if (page === 'teams') {
+    document.getElementById('panel').innerHTML = `<h2>Команды</h2>${renderTeams()}`;
+    return;
+  }
+
   const labels = {
-    players: ['Участники', 'Следующим шагом подключим полный список участников.'],
-    teams: ['Команды', 'Следующим шагом подключим полный список команд и составы.'],
     help: ['Спецназ', 'Доступ подтверждён. Здесь появятся заявки помощи.'],
     projects: ['Проекты', 'Здесь появятся Маяк и другие проекты.']
   };
