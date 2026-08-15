@@ -1,6 +1,6 @@
-/* Royal CRM Mini App — self profile card v0.5.7 */
+/* Royal CRM Mini App — self profile card v0.5.8 */
 (() => {
-  const UI_VERSION = '0.5.7';
+  const UI_VERSION = '0.5.8';
 
   function rankFromTrips(value) {
     const score = Number(value || 0);
