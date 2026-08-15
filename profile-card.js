@@ -1,6 +1,6 @@
-/* Royal CRM Mini App — self profile card v0.5.8 */
+/* Royal CRM Mini App — self profile card v0.5.15 */
 (() => {
-  const UI_VERSION = '0.5.8';
+  const UI_VERSION = '0.5.15';
 
   function rankFromTrips(value) {
     const score = Number(value || 0);
@@ -15,9 +15,10 @@
   }
 
   function currentSnapshotProfile() {
-    const id = String(window.Telegram?.WebApp?.initDataUnsafe?.user?.id || '');
-    if (!id || !snapshotState?.participants) return null;
-    return snapshotState.participants.find(p => String(p?.telegramId || '') === id) || null;
+    const key = String(authState?.user?.participantKey || '').trim();
+    if (!key || !snapshotState?.participants) return null;
+    const matches = snapshotState.participants.filter(p => String(p?.participantKey || '').trim() === key);
+    return matches.length === 1 ? matches[0] : null;
   }
 
   function membershipLine(m) {
@@ -30,20 +31,24 @@
 
   function profileInnerHtml() {
     const snapshotProfile = currentSnapshotProfile();
-    const stats = authState?.profileStats || snapshotProfile || {};
+    const stats = snapshotProfile || authState?.profileStats || {};
     const user = authState?.user || {};
     const role = authState?.role?.title || 'Участник';
     const name = String(user.crmName || snapshotProfile?.name || user.telegramFirstName || 'Участник').trim();
     const username = normalizeUsername(user.crmUsername || snapshotProfile?.username || user.telegramUsername || '');
     const avatarFile = String(stats.avatarFileId || snapshotProfile?.avatarFileId || '').trim();
+    const participantKey = String(snapshotProfile?.participantKey || user.participantKey || '').trim();
     const hasTrips = stats.specnazTrips !== undefined && stats.specnazTrips !== null && stats.specnazTrips !== '';
     const trips = hasTrips ? Number(stats.specnazTrips || 0) : null;
     const rank = String(stats.specnazRank || (trips !== null ? rankFromTrips(trips) : '—'));
-    const memberships = Array.isArray(authState?.memberships) ? authState.memberships : (snapshotProfile?.memberships || []);
+    const memberships = Array.isArray(snapshotProfile?.memberships)
+      ? snapshotProfile.memberships
+      : (Array.isArray(authState?.memberships) ? authState.memberships : []);
+    const keyAttr = participantKey ? ` data-participant-key="${esc(participantKey)}"` : '';
 
     const avatar = avatarFile
-      ? `<div class="self-avatar"><span>${esc(firstLetter(name))}</span><img alt="" data-avatar-file="${esc(avatarFile)}"></div>`
-      : `<div class="self-avatar fallback"><span>${esc(firstLetter(name))}</span></div>`;
+      ? `<div class="self-avatar"${keyAttr}><span>${esc(firstLetter(name))}</span><img alt="" data-avatar-file="${esc(avatarFile)}"></div>`
+      : `<div class="self-avatar fallback"${keyAttr}><span>${esc(firstLetter(name))}</span></div>`;
 
     const crmStatus = snapshotState
       ? `CRM: ${Number(snapshotState.stats?.inChat || snapshotState.stats?.participants || 0)} участников · ${Number(snapshotState.stats?.teams || 0)} команд`
@@ -82,8 +87,6 @@
     const card = ensureCard();
     card.innerHTML = profileInnerHtml();
     try { setupAvatarLoading(card); } catch (_) {}
-    const badge = document.getElementById('versionBadge');
-    if (badge) badge.textContent = `v${UI_VERSION}`;
   }
 
   function renderProfilePageCard() {
@@ -130,6 +133,5 @@
     syncHomeLayout(page);
   };
 
-  const badge = document.getElementById('versionBadge');
-  if (badge) badge.textContent = `v${UI_VERSION}`;
+  window.__ROYAL_SELF_PROFILE_VERSION__ = UI_VERSION;
 })();
