@@ -1,5 +1,5 @@
-// Android/Telegram WebView media compatibility patch — v0.5.3
-const MEDIA_FIX_VERSION = '0.5.3';
+// Android/Telegram WebView media compatibility patch — v0.5.5
+const MEDIA_FIX_VERSION = '0.5.5';
 const mediaAvatarCache = new Map();
 const mediaTeamPhotoCache = new Map();
 
@@ -76,20 +76,30 @@ function setupAvatarLoading(root) {
   images.forEach(img => loadAvatarImage(img));
 }
 
+function mediaNormalizeGame(value) {
+  const raw = String(value || '').trim();
+  const low = raw.toLocaleLowerCase('ru-RU');
+  if (low === 'рм' || low.includes('royal match')) return 'Royal Match';
+  if (low === 'рк' || low.includes('royal kingdom')) return 'Royal Kingdom';
+  return raw;
+}
+
 async function mediaLoadTeamPhoto() {
   const panel = document.getElementById('panel');
   if (!panel || !sessionToken) return;
 
   const img = panel.querySelector('.team-photo-box .team-photo');
   const title = panel.querySelector('.team-detail-head h2');
+  const gameNode = panel.querySelector('.team-detail-head .muted');
   if (!img || !title) return;
 
   mediaEnsureTeamPhotoFull(img);
 
-  const teamName = String(title.textContent || '').trim();
+  const teamName = String(img.dataset.teamName || title.textContent || '').trim();
+  const game = mediaNormalizeGame(img.dataset.teamGame || gameNode?.textContent || '');
   if (!teamName || img.dataset.teamProxyLoaded === '1' || img.dataset.teamProxyLoaded === 'loading') return;
 
-  const key = normalizeTeam(teamName);
+  const key = `${normalizeTeam(teamName)}\n${game.toLocaleLowerCase('ru-RU')}`;
   if (mediaTeamPhotoCache.has(key)) {
     img.src = mediaTeamPhotoCache.get(key);
     img.dataset.teamProxyLoaded = '1';
@@ -101,10 +111,14 @@ async function mediaLoadTeamPhoto() {
   img.dataset.teamProxyLoaded = 'loading';
 
   try {
-    // Stop relying on the temporary googleusercontent URL embedded in snapshot.
+    // Never depend on the temporary googleusercontent URL embedded in snapshot.
     img.removeAttribute('src');
 
-    const response = await fetch(`${API_URL}/team-photo?team=${encodeURIComponent(teamName)}`, {
+    const url = new URL(`${API_URL}/team-photo`);
+    url.searchParams.set('team', teamName);
+    if (game) url.searchParams.set('game', game);
+
+    const response = await fetch(url.toString(), {
       method: 'GET',
       mode: 'cors',
       cache: 'no-store',
