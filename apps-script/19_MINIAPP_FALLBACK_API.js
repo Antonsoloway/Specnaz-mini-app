@@ -1,15 +1,15 @@
 /*
  * Royal CRM / Таблица ЧП
  * 19_MINIAPP_FALLBACK_API.js
- * v1.0.1
+ * v1.1.0
  *
  * Network fallback API for Mini App when workers.dev is unreachable.
- * Reuses the existing Telegram initData validator from 12_MINI_APP_API.js
- * and the private GitHub configuration/helpers from 15_MINIAPP_MEDIA_CACHE.js.
- * Responses are JSONP so Android Telegram WebView does not depend on CORS.
+ * Participant/history association is based on Telegram-ID-derived private keys.
+ * Raw Telegram IDs are never returned to the browser.
  */
 
-var MINIAPP_FALLBACK_API_VERSION = '1.0.1';
+var MINIAPP_FALLBACK_API_VERSION = '1.1.0';
+var MINIAPP_FALLBACK_IDENTITY_SECRET_PROP = 'MINIAPP_FALLBACK_IDENTITY_SECRET';
 
 function MINIAPP_fallbackMaybeHandle_(e) {
   var action = MINIAPP_value_(e && e.parameter && e.parameter.action);
@@ -54,6 +54,9 @@ function MINIAPP_fallbackAuth_(e) {
   if (!auth.ok) return auth.result;
 
   var result = auth.result || {};
+  var telegramId = MINIAPP_fallbackTelegramIdFromInitData_(MINIAPP_value_(e && e.parameter && e.parameter.initData));
+  if (!result.user) result.user = {};
+  if (telegramId) result.user.participantKey = MINIAPP_fallbackParticipantKey_(telegramId);
   result.backend = 'google-apps-script';
   result.fallbackVersion = MINIAPP_FALLBACK_API_VERSION;
   return result;
@@ -71,7 +74,7 @@ function MINIAPP_fallbackSnapshot_(e) {
     access: true,
     backend: 'google-apps-script',
     version: MINIAPP_FALLBACK_API_VERSION,
-    snapshot: snapshot
+    snapshot: MINIAPP_fallbackSafeSnapshot_(snapshot)
   };
 }
 
@@ -131,6 +134,201 @@ function MINIAPP_fallbackAuthorize_(e) {
   var allowed = !!(result && result.ok && result.access);
 
   return { ok: allowed, result: result };
+}
+
+function MINIAPP_fallbackSafeSnapshot_(snapshot) {
+  snapshot = snapshot || {};
+  var sourceParticipants = Array.isArray(snapshot.participants)
+    ? snapshot.participants.filter(function(p) { return String(p && p.chatState || '').trim() === 'В чате'; })
+    : [];
+
+  var participants = sourceParticipants.map(function(p) {
+    return {
+      participantKey: MINIAPP_fallbackParticipantKey_(p && p.telegramId),
+      name: String(p && p.name || ''),
+      telegramName: String(p && p.telegramName || ''),
+      username: String(p && p.username || ''),
+      avatarFileId: String(p && p.avatarFileId || ''),
+      chatState: String(p && p.chatState || ''),
+      memberships: Array.isArray(p && p.memberships) ? p.memberships : [],
+      specnazTrips: Number(p && p.specnazTrips || 0),
+      specnazRank: String(p && p.specnazRank || 'Новичок')
+    };
+  });
+
+  var history = MINIAPP_fallbackSafeHistory_(snapshot.specnazHistory, sourceParticipants);
+
+  return {
+    schemaVersion: String(snapshot.schemaVersion || ''),
+    generatedAt: String(snapshot.generatedAt || ''),
+    dataHash: String(snapshot.dataHash || ''),
+    stats: snapshot.stats || {},
+    participants: participants,
+    teams: (Array.isArray(snapshot.teams) ? snapshot.teams : []).map(function(t) {
+      return {
+        key: String(t && t.key || ''),
+        name: String(t && t.name || ''),
+        game: String(t && t.game || ''),
+        games: Array.isArray(t && t.games) ? t.games : [],
+        photoUrl: String(t && t.photoUrl || ''),
+        memberCount: Number(t && t.memberCount || 0),
+        leaderCount: Number(t && t.leaderCount || 0),
+        assistantCount: Number(t && t.assistantCount || 0),
+        playerCount: Number(t && t.playerCount || 0)
+      };
+    }),
+    specnazHistory: history,
+    specnazHistoryVersion: String(snapshot.specnazHistoryVersion || history.version || '')
+  };
+}
+
+function MINIAPP_fallbackSafeHistory_(history, participants) {
+  history = history || {};
+  var sections = Array.isArray(history.sections) ? history.sections : [];
+  return {
+    version: String(history.version || ''),
+    updatedAt: String(history.updatedAt || ''),
+    sections: sections.map(function(section) {
+      return {
+        title: String(section && section.title || ''),
+        rows: (Array.isArray(section && section.rows) ? section.rows : []).map(function(row) {
+          var owner = MINIAPP_fallbackResolveHistoryParticipant_(row, participants);
+          var entry = {
+            participantKey: owner ? MINIAPP_fallbackParticipantKey_(owner.telegramId) : '',
+            date: String(row && row.date || ''),
+            name: String(row && row.name || ''),
+            team: String(row && row.team || ''),
+            before: String(row && row.before || ''),
+            after: String(row && row.after || ''),
+            added: String(row && row.added || ''),
+            rank: String(row && row.rank || ''),
+            message: String(row && row.message || '')
+          };
+          var rich = MINIAPP_fallbackSafeRich_(row && row.messageRich);
+          if (rich.length) entry.messageRich = rich;
+          return entry;
+        })
+      };
+    })
+  };
+}
+
+function MINIAPP_fallbackResolveHistoryParticipant_(row, participants) {
+  var rawId = String(row && row.telegramId || '').trim();
+  if (rawId) {
+    var exact = participants.filter(function(p) { return String(p && p.telegramId || '').trim() === rawId; });
+    return exact.length === 1 ? exact[0] : null;
+  }
+
+  var rawName = String(row && row.name || '');
+  var usernames = [];
+  var re = /@\s*([A-Za-z0-9_]{3,})/g;
+  var match;
+  while ((match = re.exec(rawName)) !== null) {
+    var username = MINIAPP_fallbackIdentityUsername_(match[1]);
+    if (username) usernames.push(username);
+  }
+
+  if (usernames.length) {
+    var userMatches = participants.filter(function(p) {
+      return usernames.indexOf(MINIAPP_fallbackIdentityUsername_(p && p.username)) !== -1;
+    });
+    if (userMatches.length === 1) return userMatches[0];
+    if (userMatches.length > 1) return null;
+  }
+
+  var tokens = rawName.split(',').map(MINIAPP_fallbackIdentityText_).filter(function(v) { return !!v; });
+  if (!tokens.length) return null;
+
+  var candidates = participants.filter(function(p) {
+    return MINIAPP_fallbackParticipantNames_(p).some(function(name) { return tokens.indexOf(name) !== -1; });
+  });
+  if (candidates.length === 1) return candidates[0];
+
+  if (candidates.length > 1) {
+    var teamText = MINIAPP_fallbackIdentityText_(row && row.team || '');
+    if (teamText) {
+      var narrowed = candidates.filter(function(p) {
+        return (Array.isArray(p && p.memberships) ? p.memberships : []).some(function(m) {
+          var team = MINIAPP_fallbackIdentityText_(m && m.team || '');
+          return team && teamText.indexOf(team) !== -1;
+        });
+      });
+      if (narrowed.length === 1) return narrowed[0];
+    }
+  }
+
+  return null;
+}
+
+function MINIAPP_fallbackParticipantNames_(p) {
+  var names = [p && p.name, p && p.telegramName]
+    .map(MINIAPP_fallbackIdentityText_)
+    .filter(function(v) { return !!v; });
+  return names.filter(function(value, index) { return names.indexOf(value) === index; });
+}
+
+function MINIAPP_fallbackIdentityUsername_(value) {
+  return String(value || '').trim().replace(/^@+\s*/, '').toLocaleLowerCase('ru-RU');
+}
+
+function MINIAPP_fallbackIdentityText_(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('ru-RU');
+}
+
+function MINIAPP_fallbackParticipantKey_(telegramId) {
+  var id = String(telegramId || '').trim();
+  if (!id) return '';
+  var secret = MINIAPP_fallbackIdentitySecret_();
+  var bytes = Utilities.computeHmacSha256Signature('participant:' + id, secret, Utilities.Charset.UTF_8);
+  return 'p_' + Utilities.base64EncodeWebSafe(bytes).replace(/=+$/g, '').slice(0, 24);
+}
+
+function MINIAPP_fallbackIdentitySecret_() {
+  var props = PropertiesService.getScriptProperties();
+  var secret = String(props.getProperty(MINIAPP_FALLBACK_IDENTITY_SECRET_PROP) || '').trim();
+  if (secret) return secret;
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(5000);
+  try {
+    secret = String(props.getProperty(MINIAPP_FALLBACK_IDENTITY_SECRET_PROP) || '').trim();
+    if (!secret) {
+      secret = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
+      props.setProperty(MINIAPP_FALLBACK_IDENTITY_SECRET_PROP, secret);
+    }
+    return secret;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function MINIAPP_fallbackTelegramIdFromInitData_(initData) {
+  try {
+    var parts = String(initData || '').split('&');
+    for (var i = 0; i < parts.length; i += 1) {
+      var pair = parts[i].split('=');
+      if (decodeURIComponent(pair[0] || '') !== 'user') continue;
+      var raw = pair.slice(1).join('=');
+      var user = JSON.parse(decodeURIComponent(raw.replace(/\+/g, '%20')) || '{}');
+      return String(user && user.id || '').trim();
+    }
+  } catch (_) {}
+  return '';
+}
+
+function MINIAPP_fallbackSafeRich_(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map(function(segment) {
+    var text = String(segment && segment.text || '');
+    var url = MINIAPP_fallbackSafeUrl_(segment && segment.url);
+    return url ? { text: text, url: url } : { text: text };
+  }).filter(function(segment) { return !!segment.text; });
+}
+
+function MINIAPP_fallbackSafeUrl_(value) {
+  var url = String(value || '').trim();
+  return /^(https?:\/\/|tg:\/\/)/i.test(url) ? url : '';
 }
 
 function MINIAPP_fallbackMediaResult_(cfg, path, errorCode, errorMessage) {
