@@ -2,7 +2,7 @@ const SNAPSHOT_MEMORY_TTL_MS = 60_000;
 const SESSION_TTL_SEC = 6 * 60 * 60;
 const INIT_DATA_MAX_AGE_SEC = 5 * 60;
 const ALLOWED_CHAT_STATE = 'В чате';
-const WORKER_VERSION = '1.1.0';
+const WORKER_VERSION = '1.6.0';
 
 let snapshotMemory = null;
 let snapshotFetchedAt = 0;
@@ -87,6 +87,7 @@ async function handleAuth(request, env, cors) {
     role: role.code,
     exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SEC
   }, env.SESSION_SECRET);
+  const participantKey = await participantIdentityKey(telegramId, env.SESSION_SECRET);
 
   return json({
     ok: true,
@@ -100,6 +101,7 @@ async function handleAuth(request, env, cors) {
       stats: snapshot.stats || {}
     },
     user: {
+      participantKey,
       telegramFirstName: validated.user.first_name || '',
       telegramLastName: validated.user.last_name || '',
       telegramUsername: validated.user.username || '',
@@ -133,7 +135,7 @@ async function handleSnapshot(request, env, cors) {
     throw appError(403, 'ACCESS_REVOKED', 'Доступ к приложению больше не активен.');
   }
 
-  const safeSnapshot = sanitizeSnapshot(snapshot);
+  const safeSnapshot = await sanitizeSnapshot(snapshot, env);
   const headers = new Headers(cors);
   headers.set('Cache-Control', 'private, max-age=60');
   if (snapshot.dataHash) headers.set('ETag', `"${snapshot.dataHash}"`);
@@ -325,32 +327,151 @@ async function loadSnapshot(env) {
   return snapshot;
 }
 
-function sanitizeSnapshot(snapshot) {
+async function sanitizeSnapshot(snapshot, env) {
+  const sourceParticipants = (snapshot.participants || [])
+    .filter(p => String(p.chatState || '').trim() === ALLOWED_CHAT_STATE);
+
+  const safeParticipants = await Promise.all(sourceParticipants.map(async p => ({
+    participantKey: await participantIdentityKey(p.telegramId, env.SESSION_SECRET),
+    name: p.name || '',
+    telegramName: p.telegramName || '',
+    username: p.username || '',
+    avatarFileId: p.avatarFileId || '',
+    chatState: p.chatState || '',
+    memberships: p.memberships || [],
+    specnazTrips: Number(p.specnazTrips || 0),
+    specnazRank: p.specnazRank || 'Новичок'
+  })));
+
+  const specnazHistory = await sanitizeSpecnazHistory(snapshot.specnazHistory, sourceParticipants, env.SESSION_SECRET);
+
   return {
     schemaVersion: snapshot.schemaVersion || '',
     generatedAt: snapshot.generatedAt || '',
     dataHash: snapshot.dataHash || '',
     stats: snapshot.stats || {},
-    participants: (snapshot.participants || [])
-      .filter(p => String(p.chatState || '').trim() === ALLOWED_CHAT_STATE)
-      .map(p => ({
-        name: p.name || '',
-        telegramName: p.telegramName || '',
-        username: p.username || '',
-        avatarFileId: p.avatarFileId || '',
-        chatState: p.chatState || '',
-        memberships: p.memberships || []
-      })),
+    participants: safeParticipants,
     teams: (snapshot.teams || []).map(t => ({
+      key: t.key || '',
       name: t.name || '',
+      game: t.game || '',
       games: t.games || [],
       photoUrl: t.photoUrl || '',
       memberCount: Number(t.memberCount || 0),
       leaderCount: Number(t.leaderCount || 0),
       assistantCount: Number(t.assistantCount || 0),
       playerCount: Number(t.playerCount || 0)
-    }))
+    })),
+    specnazHistory,
+    specnazHistoryVersion: snapshot.specnazHistoryVersion || specnazHistory.version || ''
   };
+}
+
+async function sanitizeSpecnazHistory(history, participants, secret) {
+  const sections = Array.isArray(history?.sections) ? history.sections : [];
+  const safeSections = [];
+
+  for (const section of sections) {
+    const rows = [];
+    for (const row of (Array.isArray(section?.rows) ? section.rows : [])) {
+      const owner = resolveHistoryParticipant(row, participants);
+      const participantKey = owner ? await participantIdentityKey(owner.telegramId, secret) : '';
+      const safe = {
+        participantKey,
+        date: String(row?.date || ''),
+        name: String(row?.name || ''),
+        team: String(row?.team || ''),
+        before: String(row?.before || ''),
+        after: String(row?.after || ''),
+        added: String(row?.added || ''),
+        rank: String(row?.rank || ''),
+        message: String(row?.message || '')
+      };
+      const rich = sanitizeHistoryRich(row?.messageRich);
+      if (rich.length) safe.messageRich = rich;
+      rows.push(safe);
+    }
+    safeSections.push({ title: String(section?.title || ''), rows });
+  }
+
+  return {
+    version: String(history?.version || ''),
+    updatedAt: String(history?.updatedAt || ''),
+    sections: safeSections
+  };
+}
+
+function resolveHistoryParticipant(row, participants) {
+  const rawId = String(row?.telegramId || '').trim();
+  if (rawId) {
+    const exact = participants.filter(p => String(p?.telegramId || '').trim() === rawId);
+    return exact.length === 1 ? exact[0] : null;
+  }
+
+  const rawName = String(row?.name || '');
+  const usernames = [...rawName.matchAll(/@\s*([A-Za-z0-9_]{3,})/g)]
+    .map(m => normalizeIdentityUsername(m[1]))
+    .filter(Boolean);
+  if (usernames.length) {
+    const wanted = new Set(usernames);
+    const matches = participants.filter(p => wanted.has(normalizeIdentityUsername(p?.username)));
+    if (matches.length === 1) return matches[0];
+    if (matches.length > 1) return null;
+  }
+
+  const tokens = rawName.split(',').map(normalizeIdentityText).filter(Boolean);
+  if (!tokens.length) return null;
+  let candidates = participants.filter(p => participantIdentityNames(p).some(name => tokens.includes(name)));
+  if (candidates.length === 1) return candidates[0];
+
+  if (candidates.length > 1) {
+    const teamText = normalizeIdentityText(row?.team || '');
+    if (teamText) {
+      const narrowed = candidates.filter(p => (p?.memberships || []).some(m => {
+        const team = normalizeIdentityText(m?.team || '');
+        return team && teamText.includes(team);
+      }));
+      if (narrowed.length === 1) return narrowed[0];
+    }
+  }
+
+  return null;
+}
+
+function participantIdentityNames(p) {
+  return [...new Set([
+    p?.name,
+    p?.telegramName
+  ].map(normalizeIdentityText).filter(Boolean))];
+}
+
+function normalizeIdentityUsername(value) {
+  return String(value || '').trim().replace(/^@+\s*/, '').toLocaleLowerCase('ru-RU');
+}
+
+function normalizeIdentityText(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('ru-RU');
+}
+
+function sanitizeHistoryRich(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map(segment => {
+    const text = String(segment?.text || '');
+    const url = safeHistoryUrl(segment?.url);
+    return url ? { text, url } : { text };
+  }).filter(segment => segment.text);
+}
+
+function safeHistoryUrl(value) {
+  const url = String(value || '').trim();
+  return /^(https?:\/\/|tg:\/\/)/i.test(url) ? url : '';
+}
+
+async function participantIdentityKey(telegramId, secret) {
+  const id = String(telegramId || '').trim();
+  if (!id) return '';
+  const digest = await hmacSha256(secret, `participant:${id}`);
+  return `p_${base64UrlEncode(digest).slice(0, 24)}`;
 }
 
 async function issueSession(payload, secret) {
