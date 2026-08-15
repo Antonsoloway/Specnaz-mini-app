@@ -116,7 +116,13 @@
       let body = {};
       try { body = JSON.parse(String(init?.body || '{}')); } catch (_) {}
       const data = await jsonp('fallback-auth', { initData: body.initData || initData });
-      if (data && data.ok && data.access) gasMode = true;
+      if (data && data.ok && data.access) {
+        gasMode = true;
+        // Existing UI only starts snapshot/media loading when session is non-empty.
+        // GAS revalidates Telegram initData on every request, so this is only a
+        // local transport marker, never a security credential.
+        if (!data.session) data.session = 'gas-fallback-session';
+      }
       const status = data && data.ok !== false ? 200 : 403;
       return jsonResponse(data, status);
     }
@@ -150,13 +156,9 @@
       const urlString = typeof input === 'string' ? input : String(input?.url || '');
       if (!urlString.startsWith(WORKER_ORIGIN)) return nativeFetch(input, init);
 
-      // Once auth had to fall back, keep this entire app session on GAS.
-      // This prevents a later intermittent Worker response from rejecting the
-      // synthetic fallback session token before snapshot/media can load.
       if (gasMode) return fallbackFor(urlString, init);
 
       try {
-        // Server-side HTTP errors are real responses and must not be bypassed.
         return await fetchWorkerWithTimeout(input, init);
       } catch (workerError) {
         console.warn('Worker network unavailable; switching to GAS fallback:', workerError?.message || workerError);
