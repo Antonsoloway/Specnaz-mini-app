@@ -205,6 +205,14 @@
       return;
     }
 
+    const premiumLabel = event.target?.closest?.('.rank-premium-name');
+    if (premiumLabel) {
+      event.preventDefault();
+      event.stopPropagation();
+      openRank(premiumLabel.textContent || '');
+      return;
+    }
+
     const rankBadge = event.target?.closest?.('.rank-badge--compact[data-rank]');
     if (rankBadge) {
       event.preventDefault();
