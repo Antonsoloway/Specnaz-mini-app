@@ -9,6 +9,16 @@
 
 .self-profile-card[hidden] { display: none !important; }
 
+.panel.profile-panel {
+  background: transparent;
+  padding: 0;
+  margin-top: 0;
+}
+
+.profile-page-card {
+  margin-top: 16px;
+}
+
 .self-profile-head {
   display: flex;
   align-items: center;
