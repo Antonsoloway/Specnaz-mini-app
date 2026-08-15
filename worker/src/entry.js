@@ -1,6 +1,6 @@
 import baseWorker from './index.js';
 
-const WRAPPER_VERSION = '1.2.0';
+const WRAPPER_VERSION = '1.2.1';
 const ALLOWED_CHAT_STATE = 'В чате';
 const MEDIA_ROOT = 'media';
 
@@ -16,7 +16,7 @@ export default {
         ok: true,
         service: 'royal-crm-miniapp-api',
         version: WRAPPER_VERSION,
-        mediaCache: 'private-github'
+        mediaCache: 'private-github-stable'
       }), { status: 200, headers });
     }
 
@@ -62,9 +62,7 @@ async function handleAvatar(request, env, ctx, url) {
 
     const mediaPath = await mediaPathFor('avatars', requestedFileId);
     const cached = await readMediaFromGitHub(env, mediaPath);
-    if (cached) {
-      return mediaResponse(authResponse, cached.bytes, cached.contentType, 'HIT');
-    }
+    if (cached) return mediaResponse(authResponse, cached.bytes, cached.contentType, 'HIT');
 
     let sourceFileId = requestedFileId;
     let filePath = await getTelegramFilePath(sourceFileId, env.BOT_TOKEN);
@@ -85,10 +83,7 @@ async function handleAvatar(request, env, ctx, url) {
       }, 502);
     }
 
-    const upstream = await fetch(`https://api.telegram.org/file/bot${env.BOT_TOKEN}/${filePath}`, {
-      cache: 'no-store'
-    });
-
+    const upstream = await fetch(`https://api.telegram.org/file/bot${env.BOT_TOKEN}/${filePath}`, { cache: 'no-store' });
     if (!upstream.ok) {
       return jsonFromAuth(authResponse, {
         ok: false,
@@ -108,7 +103,6 @@ async function handleAvatar(request, env, ctx, url) {
 
     const contentType = normalizeImageType(upstream.headers.get('Content-Type'), bytes);
     ctx.waitUntil(writeMediaToGitHub(env, mediaPath, bytes, `cache avatar ${mediaPath.split('/').pop()}`));
-
     return mediaResponse(authResponse, bytes, contentType, 'MISS');
   } catch (error) {
     console.warn('avatar cache failed', error?.message || 'unknown');
@@ -137,9 +131,25 @@ async function handleTeamPhoto(request, env, ctx, url) {
     const snapshot = await loadPrivateSnapshot(env);
     const wanted = normalizeTeam(teamName);
     const team = (snapshot.teams || []).find(t => normalizeTeam(t?.name) === wanted);
-    const photoUrl = String(team?.photoUrl || '').trim();
 
-    if (!team || !photoUrl) {
+    if (!team) {
+      return jsonFromAuth(authResponse, {
+        ok: false,
+        error: 'TEAM_NOT_FOUND',
+        message: 'Команда не найдена.'
+      }, 404);
+    }
+
+    // Permanent cache path is based only on normalized team name.
+    // It never depends on the short-lived Google Sheets content URL.
+    const mediaPath = await mediaPathFor('teams', wanted);
+    const cached = await readMediaFromGitHub(env, mediaPath);
+    if (cached) return mediaResponse(authResponse, cached.bytes, cached.contentType, 'HIT');
+
+    // Transitional fallback only. New Apps Script sync writes the permanent
+    // binary first; this fallback helps while the initial cache is filling.
+    const photoUrl = String(team?.photoUrl || '').trim();
+    if (!photoUrl) {
       return jsonFromAuth(authResponse, {
         ok: false,
         error: 'TEAM_PHOTO_NOT_FOUND',
@@ -147,24 +157,18 @@ async function handleTeamPhoto(request, env, ctx, url) {
       }, 404);
     }
 
-    const mediaPath = await mediaPathFor('teams', photoUrl);
-    const cached = await readMediaFromGitHub(env, mediaPath);
-    if (cached) {
-      return mediaResponse(authResponse, cached.bytes, cached.contentType, 'HIT');
-    }
-
     const upstream = await fetch(photoUrl, {
       redirect: 'follow',
       cache: 'no-store',
-      headers: { 'User-Agent': 'Royal-CRM-MiniApp-Worker/1.2' }
+      headers: { 'User-Agent': 'Royal-CRM-MiniApp-Worker/1.2.1' }
     });
 
     if (!upstream.ok) {
-      console.warn('team photo upstream failed', upstream.status);
+      console.warn('team photo fallback failed', upstream.status);
       return jsonFromAuth(authResponse, {
         ok: false,
         error: 'TEAM_PHOTO_FETCH_FAILED',
-        message: 'Фото команды временно недоступно.'
+        message: 'Фото команды ещё не закэшировано.'
       }, 502);
     }
 
@@ -173,7 +177,7 @@ async function handleTeamPhoto(request, env, ctx, url) {
       return jsonFromAuth(authResponse, {
         ok: false,
         error: 'TEAM_PHOTO_FETCH_FAILED',
-        message: 'Фото команды временно недоступно.'
+        message: 'Фото команды ещё не закэшировано.'
       }, 502);
     }
 
@@ -182,7 +186,7 @@ async function handleTeamPhoto(request, env, ctx, url) {
       return jsonFromAuth(authResponse, {
         ok: false,
         error: 'TEAM_PHOTO_INVALID_TYPE',
-        message: 'Фото команды временно недоступно.'
+        message: 'Фото команды ещё не закэшировано.'
       }, 502);
     }
 
@@ -209,10 +213,7 @@ async function authorizeProtectedRequest(request, env, ctx) {
   if (authorization) headers.set('Authorization', authorization);
   if (origin) headers.set('Origin', origin);
 
-  return baseWorker.fetch(new Request(sourceUrl.toString(), {
-    method: 'GET',
-    headers
-  }), env, ctx);
+  return baseWorker.fetch(new Request(sourceUrl.toString(), { method: 'GET', headers }), env, ctx);
 }
 
 function mediaResponse(authResponse, bytes, contentType, cacheState) {
@@ -236,7 +237,7 @@ function jsonFromAuth(authResponse, body, status) {
 }
 
 function normalizeTeam(value) {
-  return String(value || '').trim().toLocaleLowerCase('ru-RU');
+  return String(value || '').trim().toLowerCase();
 }
 
 async function mediaPathFor(kind, sourceKey) {
@@ -286,22 +287,14 @@ async function writeMediaToGitHub(env, path, bytes, message) {
     const encodedPath = path.split('/').map(encodeURIComponent).join('/');
     const response = await fetch(`https://api.github.com/repos/${repo}/contents/${encodedPath}`, {
       method: 'PUT',
-      headers: {
-        ...githubHeaders(env),
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        message,
-        content: bytesToBase64(bytes),
-        branch
-      })
+      headers: { ...githubHeaders(env), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, content: bytesToBase64(bytes), branch })
     });
 
     if (response.ok || response.status === 409 || response.status === 422) {
       console.log('media cached', path, response.status);
       return;
     }
-
     console.warn('media cache write failed', path, response.status);
   } catch (error) {
     console.warn('media cache write exception', path, error?.message || 'unknown');
