@@ -1,7 +1,8 @@
-/* Royal CRM / Таблица ЧП — 26_MINIAPP_MAYAK_MEDIA_SETUP.js v1.0.0
- * One-time setup: make historical Project MAYAK media readable by the Mini App.
+/* Royal CRM / Таблица ЧП — 26_MINIAPP_MAYAK_MEDIA_SETUP.js v1.0.1
+ * One-time setup for v0.5.36: make historical Project MAYAK media readable
+ * and then switch Telegram bot menu to the new Mini App entrypoint.
  */
-var MINIAPP_MAYAK_MEDIA_SETUP_VERSION = '1.0.0';
+var MINIAPP_MAYAK_MEDIA_SETUP_VERSION = '1.0.1';
 var MINIAPP_MAYAK_MEDIA_FILES = {
   'leaderboard-players': '1qP59gUe5hB7fymTk89RjJ0ks5ahc2r7e',
   'leaderboard-team': '1q-wZDOswV5D8PpqPDIHPo-4sNdwTzJAY',
@@ -28,6 +29,22 @@ function MINIAPP_setupMayakMediaSharing() {
     };
   });
   var output = { ok:true, version:MINIAPP_MAYAK_MEDIA_SETUP_VERSION, files:result };
-  console.log(JSON.stringify(output));
+  console.log('MAYAK MEDIA OK: ' + JSON.stringify(output));
+  return output;
+}
+
+function MINIAPP_finishV0536Setup() {
+  var media = MINIAPP_setupMayakMediaSharing();
+  if (!media || !media.ok) throw new Error('MAYAK media setup failed');
+  if (typeof MINIAPP_setupBotAppMenu !== 'function') throw new Error('MINIAPP_setupBotAppMenu is missing');
+  var menu = MINIAPP_setupBotAppMenu();
+  var output = {
+    ok: true,
+    miniApp: 'v0.5.36',
+    mediaSetup: MINIAPP_MAYAK_MEDIA_SETUP_VERSION,
+    botMenu: menu && menu.version ? menu.version : '',
+    appUrl: menu && menu.appUrl ? menu.appUrl : ''
+  };
+  console.log('V0.5.36 SETUP OK: ' + JSON.stringify(output));
   return output;
 }
