@@ -1,16 +1,15 @@
 /*
  * Royal CRM / Таблица ЧП
  * 21_MINIAPP_START_WELCOME.js
- * v1.1.0
+ * v1.2.0
  *
- * Handles private /start before the reliable webhook queue.
- * Also configures Telegram's private-chat command menu:
- *   /start — 🚀 Открыть приложение
+ * Handles private /start AND Telegram write_access_allowed before the reliable webhook queue.
+ * Rule for Mini App v0.5.38+: granting write access is treated as starting the bot dialog.
  */
 
-var MINIAPP_START_WELCOME_VERSION = '1.1.0';
+var MINIAPP_START_WELCOME_VERSION = '1.2.0';
 var MINIAPP_START_WELCOME_PROP_PREFIX = 'MINIAPP_START_WELCOME_SENT_';
-var MINIAPP_START_WELCOME_FALLBACK_URL = 'https://antonsoloway.github.io/Specnaz-mini-app/';
+var MINIAPP_START_WELCOME_FALLBACK_URL = 'https://antonsoloway.github.io/Specnaz-mini-app/app.html';
 
 function MINIAPP_setupBotStartMenu() {
   var props = PropertiesService.getScriptProperties();
@@ -63,7 +62,9 @@ function MINIAPP_handleStartWelcome_(e) {
   if (!message || !message.chat || String(message.chat.type || '') !== 'private') return null;
 
   var text = String(message.text || '').trim();
-  if (!/^\/start(?:@[A-Za-z0-9_]+)?(?:\s|$)/i.test(text)) return null;
+  var isStart = /^\/start(?:@[A-Za-z0-9_]+)?(?:\s|$)/i.test(text);
+  var isWriteAccess = !!message.write_access_allowed;
+  if (!isStart && !isWriteAccess) return null;
 
   var chatId = String(message.chat.id || '').trim();
   var userId = String((message.from && message.from.id) || message.chat.id || '').trim();
@@ -72,8 +73,8 @@ function MINIAPP_handleStartWelcome_(e) {
   var props = PropertiesService.getScriptProperties();
   var token = String(props.getProperty('TELEGRAM_BOT_TOKEN') || props.getProperty('BOT_TOKEN') || '').trim();
   if (!token) {
-    console.warn('MINIAPP /start welcome: bot token is missing');
-    return MINIAPP_startWelcomeJson_({ ok: true, handled: true, sent: false });
+    console.warn('MINIAPP welcome: bot token is missing');
+    return MINIAPP_startWelcomeJson_({ ok: true, handled: true, sent: false, source:isWriteAccess ? 'write_access' : 'start' });
   }
 
   var markerKey = MINIAPP_START_WELCOME_PROP_PREFIX + userId;
@@ -82,9 +83,17 @@ function MINIAPP_handleStartWelcome_(e) {
 
   var firstName = String((message.from && message.from.first_name) || '').trim();
   var greetingName = firstName ? ', ' + firstName : '';
-  var body = firstWelcome
-    ? '🕊️ Добро пожаловать' + greetingName + ' в ЧАТ ПОБЕДИТЕЛЕЙ!\n\nЗдесь можно быстро найти участников и команды, посмотреть составы, спецназ и проекты.\n\nНажмите кнопку ниже, чтобы открыть приложение.'
-    : '🕊️ Приложение ЧАТА ПОБЕДИТЕЛЕЙ готово к запуску.';
+  var body;
+
+  if (isWriteAccess) {
+    body = firstWelcome
+      ? '🕊️ Голубь подключён' + greetingName + '!\n\nТеперь я могу присылать вам личные уведомления ЧАТА ПОБЕДИТЕЛЕЙ. Отдельно запускать /start уже не нужно.\n\nПриложение всегда можно открыть кнопкой ниже.'
+      : '🕊️ Голубь подключён. Личные уведомления ЧАТА ПОБЕДИТЕЛЕЙ разрешены.';
+  } else {
+    body = firstWelcome
+      ? '🕊️ Добро пожаловать' + greetingName + ' в ЧАТ ПОБЕДИТЕЛЕЙ!\n\nЗдесь можно быстро найти участников и команды, посмотреть составы, спецназ и проекты.\n\nНажмите кнопку ниже, чтобы открыть приложение.'
+      : '🕊️ Приложение ЧАТА ПОБЕДИТЕЛЕЙ готово к запуску.';
+  }
 
   var payload = {
     chat_id: chatId,
@@ -112,15 +121,21 @@ function MINIAPP_handleStartWelcome_(e) {
 
     if (code === 200 && result && result.ok) {
       if (firstWelcome) props.setProperty(markerKey, new Date().toISOString());
-      return MINIAPP_startWelcomeJson_({ ok: true, handled: true, sent: true, first: firstWelcome });
+      return MINIAPP_startWelcomeJson_({
+        ok: true,
+        handled: true,
+        sent: true,
+        first: firstWelcome,
+        source: isWriteAccess ? 'write_access' : 'start'
+      });
     }
 
-    console.warn('MINIAPP /start welcome send failed HTTP ' + code + ': ' + String(result.description || 'unknown'));
+    console.warn('MINIAPP welcome send failed HTTP ' + code + ': ' + String(result.description || 'unknown'));
   } catch (err) {
-    console.warn('MINIAPP /start welcome error:', err && err.message ? err.message : err);
+    console.warn('MINIAPP welcome error:', err && err.message ? err.message : err);
   }
 
-  return MINIAPP_startWelcomeJson_({ ok: true, handled: true, sent: false });
+  return MINIAPP_startWelcomeJson_({ ok: true, handled: true, sent: false, source:isWriteAccess ? 'write_access' : 'start' });
 }
 
 function MINIAPP_startWelcomeResolveAppUrl_(token) {
@@ -141,7 +156,7 @@ function MINIAPP_startWelcomeResolveAppUrl_(token) {
   } catch (_) {}
 
   var gasUrl = String(ScriptApp.getService().getUrl() || '').trim();
-  var url = MINIAPP_START_WELCOME_FALLBACK_URL + '?v=055';
+  var url = MINIAPP_START_WELCOME_FALLBACK_URL + '?v=058';
   if (gasUrl) url += '&gas=' + encodeURIComponent(gasUrl);
   return url;
 }
