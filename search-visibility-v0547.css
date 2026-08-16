@@ -1,0 +1,18 @@
+/* Royal CRM Mini App — Search Visibility Fix v0.5.47
+ * v0.5.46 already computes matches correctly and toggles the native `hidden`
+ * attribute. Some author card styles override the browser's default
+ * `[hidden] { display:none }`, so non-matching cards remained visible.
+ * Keep search logic untouched; enforce visibility at CSS level only.
+ */
+#panel .people-list > .person-card[hidden],
+#panel .teams-list > .team-card[hidden],
+#panel .people-list > .search-empty-v0546[hidden],
+#panel .teams-list > .search-empty-v0546[hidden] {
+  display: none !important;
+}
+
+/* Future-proof the same rule for subsequent native-search empty states. */
+#panel .people-list > [class*="search-empty-"][hidden],
+#panel .teams-list > [class*="search-empty-"][hidden] {
+  display: none !important;
+}
