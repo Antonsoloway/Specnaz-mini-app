@@ -1,0 +1,22 @@
+/* Royal CRM Mini App — Telegram write-access gate v0.5.38 */
+.royal-write-access-gate{
+  position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;
+  padding:22px;background:rgba(7,14,20,.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)
+}
+.royal-write-access-card{
+  width:min(100%,420px);border:1px solid rgba(94,169,224,.38);border-radius:24px;padding:24px 20px;
+  background:linear-gradient(145deg,#1a2a36,#101b24);box-shadow:0 24px 60px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.05);
+  text-align:center;color:#eef6fc
+}
+.royal-write-access-icon{font-size:50px;line-height:1;margin-bottom:12px}
+.royal-write-access-card h2{margin:0 0 10px;font-size:24px}
+.royal-write-access-card p{margin:0;color:#b8c5d0;line-height:1.5;font-size:15px}
+.royal-write-access-card strong{color:#fff}
+.royal-write-access-button{
+  width:100%;margin-top:20px;min-height:50px;border:0;border-radius:16px;padding:12px 16px;
+  background:linear-gradient(135deg,#2a9bea,#1879c2);color:#fff;font:900 15px/1.2 inherit;
+  box-shadow:0 8px 22px rgba(31,135,204,.32);cursor:pointer
+}
+.royal-write-access-button:active{transform:scale(.985)}
+.royal-write-access-help{display:block;margin-top:12px;color:#7f919f;font-size:12px;line-height:1.45}
+.royal-write-access-error{margin-top:12px!important;color:#ffb5b5!important;font-size:13px!important}
