@@ -1,0 +1,134 @@
+/* Royal CRM Mini App — changelog screen v0.5.28 */
+#versionBadge {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  transition: transform .14s ease, box-shadow .14s ease, filter .14s ease;
+  box-shadow: 0 0 0 1px rgba(92, 184, 255, .08), 0 8px 22px rgba(27, 141, 220, .16);
+}
+#versionBadge:active {
+  transform: scale(.95);
+  filter: brightness(1.1);
+}
+#versionBadge::after {
+  content: '›';
+  margin-left: 5px;
+  font-size: .9em;
+  opacity: .78;
+}
+
+.changelog-screen {
+  padding-bottom: 18px;
+}
+.changelog-head {
+  margin: 4px 0 18px;
+}
+.changelog-head h2 {
+  margin: 0 0 6px;
+  font-size: 30px;
+  line-height: 1.08;
+}
+.changelog-head p {
+  margin: 0;
+  color: var(--muted, #9aa8b7);
+  line-height: 1.45;
+}
+.changelog-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 12px;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: rgba(42, 151, 232, .14);
+  border: 1px solid rgba(78, 180, 255, .28);
+  color: #74c8ff;
+  font-weight: 800;
+  font-size: 13px;
+}
+.changelog-list {
+  display: grid;
+  gap: 10px;
+}
+.release-card {
+  overflow: hidden;
+  border-radius: 18px;
+  background: rgba(15, 30, 43, .78);
+  border: 1px solid rgba(119, 157, 185, .12);
+}
+.release-card[open] {
+  border-color: rgba(73, 173, 244, .28);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, .13);
+}
+.release-summary {
+  list-style: none;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 15px;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(84, 169, 235, .12);
+}
+.release-summary::-webkit-details-marker { display: none; }
+.release-version {
+  min-width: 64px;
+  padding: 6px 9px;
+  border-radius: 10px;
+  background: rgba(52, 151, 219, .16);
+  border: 1px solid rgba(86, 183, 250, .22);
+  color: #72c7ff;
+  font-size: 13px;
+  font-weight: 900;
+  text-align: center;
+}
+.release-card.is-current .release-version {
+  background: linear-gradient(135deg, rgba(32, 151, 235, .94), rgba(44, 119, 209, .94));
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 7px 20px rgba(31, 141, 223, .22);
+}
+.release-title {
+  min-width: 0;
+  font-weight: 800;
+  color: #eef6fc;
+  line-height: 1.25;
+}
+.release-arrow {
+  color: #6ebdf0;
+  font-size: 20px;
+  transition: transform .16s ease;
+}
+.release-card[open] .release-arrow { transform: rotate(90deg); }
+.release-body {
+  padding: 0 16px 15px 18px;
+  border-top: 1px solid rgba(120, 158, 184, .09);
+}
+.release-body ul {
+  margin: 12px 0 0;
+  padding-left: 20px;
+}
+.release-body li {
+  margin: 7px 0;
+  color: #c9d5df;
+  line-height: 1.42;
+}
+.release-note {
+  margin-top: 16px;
+  padding: 13px 14px;
+  border-radius: 15px;
+  background: rgba(126, 85, 191, .12);
+  border: 1px solid rgba(162, 109, 231, .18);
+  color: #cbb5ee;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+@media (max-width: 370px) {
+  .changelog-head h2 { font-size: 27px; }
+  .release-summary { padding: 12px; gap: 8px; }
+  .release-version { min-width: 58px; font-size: 12px; padding: 5px 7px; }
+  .release-title { font-size: 14px; }
+}
