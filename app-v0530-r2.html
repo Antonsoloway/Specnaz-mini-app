@@ -7,20 +7,18 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <meta http-equiv="refresh" content="0; url=app-v0531.html" />
   <title>ЧП — Mini App</title>
   <script>
     (() => {
-      const target = new URL('app-v0531.html', window.location.href);
       const current = new URL(window.location.href);
-      current.searchParams.forEach((value, key) => target.searchParams.set(key, value));
+      const target = new URL('app-v0532.html', current.href);
+      target.search = current.search;
       target.searchParams.set('from', 'v0530-r2');
       target.searchParams.set('cb', String(Date.now()));
+      target.hash = current.hash;
       window.location.replace(target.toString());
     })();
   </script>
 </head>
-<body>
-  <p>Открываем актуальную версию приложения…</p>
-</body>
+<body><p>Открываем актуальную версию приложения…</p></body>
 </html>
