@@ -1,0 +1,58 @@
+/* Royal CRM Mini App — admin badge vertical layout v0.5.34 */
+/* Admin is a separate row above the rank. Rank + future achievements stay on the lower row. */
+.participant-achievements-row.has-admin-badge-v0534{
+  display:grid!important;
+  grid-template-columns:minmax(0,auto) auto;
+  grid-template-rows:auto auto;
+  align-items:center;
+  justify-content:end;
+  column-gap:5px;
+  row-gap:4px;
+  margin-left:auto;
+}
+.participant-achievements-row.has-admin-badge-v0534>.participant-admin-badge-v0534{
+  grid-column:1 / -1;
+  grid-row:1;
+  justify-self:end;
+}
+.participant-achievements-row.has-admin-badge-v0534>.rank-list-slot,
+.participant-achievements-row.has-admin-badge-v0534>.hero-rank,
+.participant-achievements-row.has-admin-badge-v0534>.rank-badge--compact{
+  grid-column:1;
+  grid-row:2;
+  justify-self:end;
+  margin:0!important;
+}
+.participant-achievements-row.has-admin-badge-v0534>.participant-achievements-future-slot{
+  grid-column:2;
+  grid-row:2;
+  display:flex;
+  align-items:center;
+  gap:5px;
+  min-width:0;
+}
+.participant-admin-badge-v0534{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:24px;
+  padding:4px 10px;
+  border:1px solid rgba(255,170,170,.42);
+  border-radius:999px;
+  background:linear-gradient(135deg,#e13c3c,#8f1616);
+  color:#fff;
+  font:900 11px/1 inherit;
+  white-space:nowrap;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 3px 10px rgba(117,15,15,.30),0 0 13px rgba(238,58,58,.22);
+  text-shadow:0 1px 1px rgba(65,0,0,.75);
+  cursor:pointer;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:rgba(255,255,255,.16)
+}
+.participant-admin-badge-v0534:active{transform:scale(.97)}
+/* Never show the older directory-only admin badge in parallel. */
+.royal-directory[data-directory-key="admins"] .directory-extra>.directory-admin-badge{display:none}
+@media(max-width:430px){
+  .participant-admin-badge-v0534{min-height:22px;padding:4px 9px;font-size:10px}
+  .participant-achievements-row.has-admin-badge-v0534{row-gap:3px;column-gap:4px}
+}
