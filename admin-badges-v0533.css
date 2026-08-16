@@ -1,7 +1,7 @@
 /* Royal CRM Mini App — admin badges v0.5.33 */
 .participant-admin-rank-stack{display:inline-flex;flex-direction:column;align-items:flex-end;justify-content:flex-start;gap:5px;min-width:0;max-width:100%}
 .participant-admin-rank-stack>.rank-list-slot,.participant-admin-rank-stack>.hero-rank,.participant-admin-rank-stack>.rank-badge--compact{margin-top:0}
-.participant-admin-badge-v0533{display:inline-flex;align-items:center;justify-content:center;min-height:24px;padding:4px 10px;border:1px solid rgba(255,170,170,.42);border-radius:999px;background:linear-gradient(135deg,#e13c3c,#8f1616);color:#fff;font:900 11px/1 inherit;white-space:nowrap;box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 3px 10px rgba(117,15,15,.30),0 0 13px rgba(238,58,58,.22);text-shadow:0 1px 1px rgba(65,0,0,.75);cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:rgba(255,255,255,.16)}
+.participant-admin-badge-v0533{display:inline-flex;align-items:center;justify-content:center;min-height:24px;padding:4px 10px;border:1px solid rgba(255,170,170,.42);border-radius:999px;background:linear-gradient(135deg,#e13c3c,#8f1616);color:#fff;font-family:inherit;font-size:11px;font-weight:900;line-height:1;white-space:nowrap;box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 3px 10px rgba(117,15,15,.30),0 0 13px rgba(238,58,58,.22);text-shadow:0 1px 1px rgba(65,0,0,.75);cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:rgba(255,255,255,.16)}
 .participant-admin-badge-v0533:active{transform:scale(.97)}
 .participant-name-achievements-row .participant-admin-rank-stack{margin-left:auto}
 .directory-person-head .participant-admin-rank-stack{margin-left:auto}
