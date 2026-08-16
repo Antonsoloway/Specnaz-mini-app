@@ -1,6 +1,6 @@
 /* Royal CRM Mini App — Project MAYAK + achievement v0.5.36
  * Historical project membership is bound ONLY by raw Telegram ID.
- * v0.5.36: public Drive media, compact MAYAK pill, strict vertical achievement order,
+ * v0.5.36: protected private-media route, compact MAYAK pill, strict vertical achievement order,
  * and reliable restoration after participant -> Back navigation.
  */
 (() => {
@@ -15,12 +15,8 @@
     '6746380164','990056319','5217701700','7998301726','1516294727','948150870','5475797534','7638779670'
   ];
   const PROJECT_SET = new Set(PROJECT_IDS);
-  const MEDIA = {
-    'leaderboard-players': { type:'image', url:'https://drive.google.com/uc?export=view&id=1qP59gUe5hB7fymTk89RjJ0ks5ahc2r7e' },
-    'leaderboard-team': { type:'image', url:'https://drive.google.com/uc?export=view&id=1q-wZDOswV5D8PpqPDIHPo-4sNdwTzJAY' },
-    'audio': { type:'audio', url:'https://drive.usercontent.google.com/download?id=1I1MYbQYAnKyqGxM2y9TtufslpyYXdFaB&export=download&confirm=t' },
-    'video': { type:'video', url:'https://drive.usercontent.google.com/download?id=1MF-I4VUjAshkoVBQ2ay6SZGlRDFgeIxw&export=download&confirm=t' }
-  };
+  const MEDIA_ASSETS = new Set(['leaderboard-players','leaderboard-team','audio','video']);
+  const mediaCache = new Map();
 
   function cleanId(value) {
     const id = String(value == null ? '' : value).trim().replace(/\.0$/, '');
@@ -125,27 +121,37 @@
     showPanel(`<button type="button" class="royal-back-button" data-royal-back="1">← Назад</button><section class="mayak-projects-index-v0536"><div class="mayak-projects-head-v0536"><h2>Проекты</h2><p>История проектов Чата Победителей.</p></div><button type="button" class="mayak-project-card-v0536" data-open-mayak-project="1"><span class="mayak-project-card-icon-v0536">${lighthouseSvg('project-card')}</span><span><b>Проект «МАЯК»</b><small>8–21 июня 2026</small></span><i>›</i></button></section>`);
   }
 
-  function hydrateProjectMedia(panel) {
-    const nodes = [...(panel?.querySelectorAll?.('[data-mayak-media]') || [])];
-    nodes.forEach(node => {
-      const asset = String(node.dataset.mayakMedia || '');
-      const cfg = MEDIA[asset];
-      const status = node.closest('.mayak-media-frame-v0536')?.querySelector('.mayak-media-status-v0536');
-      if (!cfg) {
-        if (status) status.textContent = 'Файл не найден.';
-        return;
-      }
-
-      const fail = () => {
-        if (status) status.textContent = 'Не удалось загрузить файл.';
-      };
-      const ok = () => { if (status) status.remove(); };
-      node.addEventListener('error', fail, { once:true });
-      if (node.tagName === 'IMG') node.addEventListener('load', ok, { once:true });
-      else node.addEventListener('loadedmetadata', ok, { once:true });
-      node.src = cfg.url;
-      try { node.load?.(); } catch (_) {}
+  async function mediaObjectUrl(asset) {
+    if (mediaCache.has(asset)) return mediaCache.get(asset);
+    if (!MEDIA_ASSETS.has(asset)) throw new Error('PROJECT_MEDIA_UNKNOWN');
+    if (!sessionToken) throw new Error('PROJECT_MEDIA_SESSION_MISSING');
+    const response = await fetch(`${API_URL}/project-mayak-media?asset=${encodeURIComponent(asset)}`, {
+      method:'GET', mode:'cors', cache:'no-store',
+      headers:{ Authorization:`Bearer ${sessionToken}` }
     });
+    if (!response.ok) throw new Error(`PROJECT_MEDIA_HTTP_${response.status}`);
+    const blob = await response.blob();
+    if (!blob || !blob.size) throw new Error('PROJECT_MEDIA_EMPTY');
+    const objectUrl = URL.createObjectURL(blob);
+    mediaCache.set(asset, objectUrl);
+    return objectUrl;
+  }
+
+  async function hydrateProjectMedia(panel) {
+    const nodes = [...(panel?.querySelectorAll?.('[data-mayak-media]') || [])];
+    await Promise.allSettled(nodes.map(async node => {
+      const asset = String(node.dataset.mayakMedia || '');
+      const status = node.closest('.mayak-media-frame-v0536')?.querySelector('.mayak-media-status-v0536');
+      try {
+        const src = await mediaObjectUrl(asset);
+        node.src = src;
+        try { node.load?.(); } catch (_) {}
+        if (status) status.remove();
+      } catch (error) {
+        if (status) status.textContent = 'Не удалось загрузить файл.';
+        console.warn('MAYAK media:', asset, error?.message || error);
+      }
+    }));
   }
 
   function renderMayakProject() {
@@ -160,7 +166,7 @@
     const byId = new Map(all.map(p => [cleanId(p?.telegramId), p]));
     const found = PROJECT_IDS.map(id => byId.get(id)).filter(Boolean);
     const cards = typeof participantCard === 'function' ? found.map(participantCard).join('') : '';
-    const panel = showPanel(`<button type="button" class="royal-back-button" data-royal-back="1">← Назад</button><section class="mayak-participants-page-v0536"><header><span>${lighthouseSvg('participants-head')}</span><h2>Участники проекта<br>«МАЯК»</h2></header><div class="people-list">${cards || '<div class="empty-state">Участники пока недоступны.</div>'}</div></section>`);
+    const panel = showPanel(`<button type="button" class="royal-back-button" data-royal-back="1">← Назад</button><section class="mayak-participants-page-v0536"><span class="guide-head" hidden aria-hidden="true"></span><header><span>${lighthouseSvg('participants-head')}</span><h2>Участники проекта<br>«МАЯК»</h2></header><div class="people-list">${cards || '<div class="empty-state">Участники пока недоступны.</div>'}</div></section>`);
     try { setupAvatarLoading(panel); } catch (_) {}
     scheduleDecorate();
     try { window.RoyalTeamGameColors?.refresh?.(); } catch (_) {}
