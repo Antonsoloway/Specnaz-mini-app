@@ -1,0 +1,67 @@
+/* Royal CRM Mini App — Project MAYAK v0.5.36 */
+.mayak-lighthouse-svg{display:block;width:34px;height:34px;color:#ffd75e;filter:drop-shadow(0 0 7px rgba(255,204,64,.45))}
+
+/* MAYAK achievement is a compact status pill, visually parallel to Admin/rank. */
+.mayak-achievement-v0536{
+  appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:5px;
+  min-height:24px;padding:4px 9px;border:1px solid rgba(255,222,122,.55);border-radius:999px;
+  background:linear-gradient(135deg,#9a6b0a,#4a3106);color:#fff4bd;font:900 11px/1 inherit;
+  white-space:nowrap;box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 3px 10px rgba(105,69,5,.32),0 0 14px rgba(255,193,37,.24);
+  text-shadow:0 1px 1px rgba(54,32,0,.82);cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:rgba(255,255,255,.16);flex:0 0 auto
+}
+.mayak-achievement-v0536:active{transform:scale(.97)}
+.mayak-achievement-v0536 .mayak-lighthouse-svg{width:15px;height:15px;filter:drop-shadow(0 0 4px rgba(255,211,76,.45))}
+
+/* Participants with MAYAK use one strict vertical right-side stack:
+   Admin -> rank -> MAYAK. MAYAK is always the lowest current achievement. */
+.participant-achievements-row.has-mayak-v0536{
+  display:flex!important;flex-direction:column!important;align-items:flex-end!important;justify-content:flex-start!important;
+  gap:4px!important;margin-left:auto!important;max-width:62%!important;min-width:0
+}
+.participant-achievements-row.has-mayak-v0536>.participant-admin-badge-v0534,
+.participant-achievements-row.has-mayak-v0536>.participant-admin-badge-v0533{order:10;margin:0!important}
+.participant-achievements-row.has-mayak-v0536>.rank-list-slot,
+.participant-achievements-row.has-mayak-v0536>.hero-rank,
+.participant-achievements-row.has-mayak-v0536>.rank-badge--compact{order:20;margin:0!important;align-self:flex-end}
+.participant-achievements-row.has-mayak-v0536>.participant-achievements-future-slot{
+  order:30!important;display:flex!important;flex-direction:column!important;align-items:flex-end!important;justify-content:flex-start!important;
+  gap:4px!important;min-width:0!important;margin:0!important
+}
+.participant-achievements-row.has-mayak-v0536 .mayak-achievement-v0536{order:999}
+
+/* Detailed profile: title remains above premium rank, MAYAK pill is below the rank. */
+.participant-detail-achievement-strip-v0536{display:flex;justify-content:center;align-items:center;gap:8px;margin:4px 0 10px;width:100%}
+.participant-detail-achievement-strip-v0536 .mayak-achievement-v0536{min-height:28px;padding:5px 12px;font-size:12px}
+.participant-detail-achievement-strip-v0536 .mayak-lighthouse-svg{width:17px;height:17px}
+
+.mayak-projects-index-v0536,.mayak-project-page-v0536,.mayak-participants-page-v0536{display:flex;flex-direction:column;gap:18px}
+.mayak-projects-head-v0536 h2,.mayak-project-page-v0536 h2,.mayak-participants-page-v0536 h2{margin:0}
+.mayak-projects-head-v0536 p,.mayak-project-page-v0536 p{color:#aab5c2;margin:7px 0 0}
+.mayak-project-card-v0536,.mayak-participants-button-v0536{width:100%;display:flex;align-items:center;gap:14px;text-align:left;border:1px solid rgba(229,180,66,.35);border-radius:22px;background:linear-gradient(145deg,#1c2934,#111d27);padding:16px;color:#fff;box-shadow:0 10px 28px rgba(0,0,0,.14),inset 0 1px 0 rgba(255,255,255,.04);cursor:pointer}
+.mayak-project-card-v0536>span:nth-child(2),.mayak-participants-button-v0536>span:nth-child(2){display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+.mayak-project-card-v0536 b,.mayak-participants-button-v0536 b{font-size:18px}.mayak-project-card-v0536 small,.mayak-participants-button-v0536 small{font-size:14px;color:#aab5c2}
+.mayak-project-card-v0536 i,.mayak-participants-button-v0536 i{font-size:30px;color:#f4c75a;font-style:normal}
+.mayak-project-card-icon-v0536{width:58px;height:58px;display:grid;place-items:center;border-radius:17px;background:radial-gradient(circle,#44350f,#19150c)}
+.mayak-project-card-icon-v0536 .project-card{width:48px;height:48px}
+.mayak-project-hero-v0536{display:flex;align-items:center;gap:14px;padding:18px;border:1px solid rgba(240,190,62,.32);border-radius:24px;background:radial-gradient(circle at 15% 20%,rgba(112,83,20,.28),transparent 44%),#15232e}
+.mayak-project-hero-v0536 .hero-project{width:76px;height:76px;flex:0 0 auto}.mayak-project-hero-v0536 .eyebrow{font-size:12px;color:#e4bb52;letter-spacing:1.2px}
+.mayak-project-hero-v0536 h2{font-size:28px;margin-top:4px}.mayak-project-hero-v0536 p{color:#ffd866;font-weight:800}
+.mayak-participants-button-v0536{border-color:rgba(255,213,93,.45);background:linear-gradient(145deg,#3a2d0f,#1a1b18)}.mayak-participants-button-v0536>span:first-child{font-size:34px}
+.mayak-results-title-v0536 h3{margin:0;font-size:20px}.mayak-results-title-v0536 p{margin-top:5px}
+.mayak-media-frame-v0536{position:relative;margin:0;padding:11px;border-radius:22px;border:1px solid rgba(104,150,188,.28);background:#0d1923;overflow:hidden;box-shadow:0 9px 26px rgba(0,0,0,.16)}
+.mayak-media-frame-v0536 figcaption,.mayak-media-frame-v0536 h3{margin:0 0 9px;font-weight:900;font-size:16px;color:#eef5fb}
+.mayak-media-frame-v0536 img,.mayak-media-frame-v0536 video{display:block;width:100%;height:auto;max-height:none;border-radius:14px;background:#09131b}
+.mayak-media-frame-v0536 audio{display:block;width:100%;min-height:46px}.mayak-media-frame-v0536.compact{padding:14px}.mayak-media-status-v0536{padding:10px 3px;color:#8f9baa;font-size:13px}
+
+/* Requested cleaner participant header: no date/count line and no Telegram-ID explanatory panel. */
+.mayak-participants-page-v0536>header{display:flex;align-items:center;gap:13px;margin-bottom:2px}
+.mayak-participants-page-v0536>header .participants-head{width:62px;height:62px;flex:0 0 auto}
+.mayak-participants-page-v0536>header h2{font-size:27px;line-height:1.15}
+
+@media(max-width:430px){
+  .mayak-project-hero-v0536 h2{font-size:25px}.mayak-project-hero-v0536 .hero-project{width:64px;height:64px}
+  .mayak-project-card-v0536,.mayak-participants-button-v0536{padding:14px;gap:11px}
+  .mayak-achievement-v0536{min-height:22px;padding:4px 8px;font-size:10px}
+  .participant-achievements-row.has-mayak-v0536{max-width:58%!important;gap:3px!important}
+  .mayak-participants-page-v0536>header h2{font-size:25px}
+}
