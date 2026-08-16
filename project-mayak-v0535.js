@@ -30,13 +30,19 @@
     if (id && PROJECT_SET.has(id)) { if (!existing) slot.appendChild(projectBadge(false)); } else existing?.remove();
   }
   function decorateDetail() {
-    const card = document.querySelector('.participant-detail-card'); if (!card) return; const id = cleanId(card.querySelector('.participant-detail-avatar[data-telegram-id]')?.dataset?.telegramId); let strip = card.querySelector('.participant-detail-achievement-strip-v0535');
+    const card = document.querySelector('.participant-detail-card'); if (!card) return;
+    const id = cleanId(card.querySelector('.participant-detail-avatar[data-telegram-id]')?.dataset?.telegramId);
+    let strip = card.querySelector('.participant-detail-achievement-strip-v0535');
     if (!PROJECT_SET.has(id)) { strip?.remove(); return; }
-    if (!strip) { const title = card.querySelector('.participant-detail-achievements-title'); const stage = card.querySelector('.rank-premium-stage'); if (!title || !stage) return; strip = document.createElement('div'); strip.className = 'participant-detail-achievement-strip-v0535'; stage.parentElement?.insertBefore(strip, stage); }
+    const title = card.querySelector('.participant-detail-achievements-title');
+    const stage = card.querySelector('.rank-premium-stage');
+    if (!title || !stage) return;
+    if (!strip) { strip = document.createElement('div'); strip.className = 'participant-detail-achievement-strip-v0535'; }
+    stage.parentElement?.insertBefore(strip, stage);
     if (!strip.querySelector('.mayak-achievement-v0535')) strip.appendChild(projectBadge(true));
   }
   function decorateAchievements() { try { window.RoyalParticipantCardUX?.decorate?.(); } catch (_) {} document.querySelectorAll('.person-card,.team-member,.directory-person-card:not(.directory-person-card--external),.hero-card').forEach(decorateCard); decorateDetail(); }
-  function scheduleDecorate() { setTimeout(decorateAchievements,0); setTimeout(decorateAchievements,90); setTimeout(decorateAchievements,260); }
+  function scheduleDecorate() { setTimeout(decorateAchievements,0); setTimeout(decorateAchievements,90); setTimeout(decorateAchievements,260); setTimeout(decorateAchievements,360); }
   function pushCurrent() { try { window.RoyalNav?.pushCurrent?.(); } catch (_) {} }
   function showPanel(html) { document.body.classList.add('royal-section-screen'); const selfCard=document.getElementById('selfProfileCard'); if(selfCard)selfCard.hidden=true; const panel=document.getElementById('panel'); if(!panel)return null; panel.hidden=false; panel.innerHTML=html; try{window.RoyalNav?.enhanceVisibleBack?.();}catch(_){} requestAnimationFrame(()=>{try{window.scrollTo(0,0);}catch(_){}}); return panel; }
 
