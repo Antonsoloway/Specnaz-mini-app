@@ -1,0 +1,52 @@
+/* Royal CRM Mini App — participant card UX v0.5.31 */
+
+/* Detailed profile: keep only the large premium rank. The small duplicate is gone. */
+.participant-detail-card .participant-rank-inline{display:none!important}
+.participant-detail-name-row{display:flex;align-items:center;gap:10px;min-width:0;width:100%}
+.participant-detail-name-row>h2{flex:1 1 auto;min-width:0;margin:0}
+.participant-detail-future-achievements{display:flex;align-items:center;justify-content:flex-end;gap:6px;min-width:0;min-height:1px;margin-left:auto}
+
+/* Primary profile hit-area: whole participant card, except rank/team/@nick controls. */
+.person-card[data-profile-card="1"],
+.team-member[data-profile-card="1"],
+.directory-person-card[data-profile-card="1"],
+.hero-card[data-profile-card="1"]{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:rgba(84,169,235,.12)}
+
+.person-card[data-profile-card="1"]:active,
+.team-member[data-profile-card="1"]:active,
+.directory-person-card[data-profile-card="1"]:active,
+.hero-card[data-profile-card="1"]:active{filter:brightness(1.06)}
+
+/* Name on the left, achievements/rank strip on the right. Future achievements join this same strip. */
+.participant-name-achievements-row{display:flex;align-items:center;gap:10px;width:100%;min-width:0}
+.participant-name-achievements-row>.person-title,
+.participant-name-achievements-row>strong{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.participant-achievements-row{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex:0 1 auto;min-width:0;max-width:58%;margin-left:auto}
+.participant-achievements-row>.rank-list-slot,
+.participant-achievements-row>.hero-rank{display:flex;align-items:center;min-width:0;margin:0!important}
+.participant-achievements-row .rank-badge--compact{max-width:100%;flex:0 1 auto}
+.participant-achievements-future-slot{display:flex;align-items:center;gap:5px;min-width:0}
+
+/* Directory cards originally have name + rank in one head. Keep the same semantic row, but reserve a scalable achievement strip. */
+.directory-person-head .participant-name-achievements-row{width:100%}
+.directory-person-head .participant-achievements-row{max-width:62%}
+
+/* Heroes list: rank is no longer a second row under the username. */
+.hero-main>.participant-name-achievements-row{margin-bottom:2px}
+.hero-main>.participant-name-achievements-row+.hero-user{margin-top:1px}
+
+/* General/team lists: make the top row compact and finger-friendly. */
+.person-main>.participant-name-achievements-row,
+.team-member-main>.participant-name-achievements-row{margin-bottom:2px}
+
+@media (max-width:430px){
+  .participant-name-achievements-row{gap:7px}
+  .participant-achievements-row{max-width:55%;gap:4px}
+  .directory-person-head .participant-achievements-row{max-width:58%}
+  .participant-achievements-row .rank-badge--tiny{transform:scale(.94);transform-origin:right center}
+}
+
+@media (max-width:360px){
+  .participant-achievements-row{max-width:52%}
+  .participant-achievements-row .rank-label{max-width:78px}
+}
