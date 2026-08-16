@@ -74,7 +74,10 @@
     badge.setAttribute('title', 'История изменений');
   }
 
-  document.addEventListener('click', event => {
+  // v0.5.29 also has a document-level capture handler with stopImmediatePropagation().
+  // Handle the current release one level earlier (window capture), so the newest changelog
+  // always wins while keeping the full previous release chain intact.
+  window.addEventListener('click', event => {
     const badge = event.target?.closest?.('#versionBadge');
     if (!badge) return;
     event.preventDefault();
@@ -82,7 +85,7 @@
     renderChangelog();
   }, true);
 
-  document.addEventListener('keydown', event => {
+  window.addEventListener('keydown', event => {
     const badge = event.target?.closest?.('#versionBadge');
     if (!badge || (event.key !== 'Enter' && event.key !== ' ')) return;
     event.preventDefault();
