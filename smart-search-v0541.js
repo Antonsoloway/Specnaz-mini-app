@@ -96,7 +96,6 @@
     const raw = normalize(token).replace(/\s/g, '');
     const out = new Set();
 
-    // Common English silent-e pattern: Mike/like/bike/time -> майк/лайк/байк/тайм.
     const silentE = raw.match(/^([a-z]*?)i([bcdfghjklmnpqrstvwxyz])e$/);
     if (silentE) {
       const prefix = ambiguousLatinToCyr(silentE[1]).slice(0, 8);
@@ -104,18 +103,15 @@
       prefix.forEach(p => consonant.forEach(c => out.add(`${p}ай${c}`)));
     }
 
-    // j is normally heard as "дж" in English names (JoyBand -> Джойбанд).
     if (raw.includes('j')) {
       const replaced = raw.replace(/j/g, 'дж');
       ambiguousLatinToCyr(replaced).forEach(v => out.add(v));
     }
 
-    // Initial X in names is frequently intended/read as Russian Х (Xabib -> Хабиб).
     if (/^x[a-z]/.test(raw)) {
       ambiguousLatinToCyr('х' + raw.slice(1)).forEach(v => out.add(v));
     }
 
-    // "oy" is naturally searched as "ой".
     if (raw.includes('oy')) {
       ambiguousLatinToCyr(raw.replace(/oy/g, 'ой')).forEach(v => out.add(v));
     }
@@ -142,8 +138,6 @@
     add(set, keyboardSwap(key, RU_TO_EN));
     ambiguousLatinToCyr(key).forEach(v => add(set, v));
     englishReadingVariants(key).forEach(v => add(set, v));
-
-    // Run generated Cyrillic forms back through Latin once so searches work both ways.
     [...set].slice(0, 80).forEach(v => add(set, cyrToLat(v)));
 
     const result = [...set].filter(Boolean).slice(0, MAX_TOKEN_VARIANTS * 2);
@@ -176,7 +170,6 @@
         vv.forEach(v => add(variants, v));
       });
 
-      // Phrase-level combinations matter for mixed names such as Has ne dogonyat.
       let combos = [''];
       parts.forEach(part => {
         const options = tokenVariants(part).slice(0, 18);
@@ -219,7 +212,7 @@
     const q = normalize(queryVariant).replace(/\s+/g, '');
     const c = normalize(candidateVariant).replace(/\s+/g, '');
     if (!q || !c) return false;
-    if (c.includes(q) || q.includes(c) && c.length >= 3) return true;
+    if (c.includes(q)) return true;
     if (q.length < 4 || c.length < 4) return false;
     const limit = Math.min(q.length, c.length) >= 8 ? 2 : 1;
     return editDistanceAtMost(q, c, limit);
@@ -241,19 +234,22 @@
     const q = normalize(query);
     if (!q) return true;
     const data = wordsAndVariants(values);
-    const queryVariants = wordsAndVariants([q]);
+    const qTokens = q.split(' ').filter(Boolean);
 
-    // Fast phrase/substring path.
-    for (const qv of queryVariants.variants) {
-      for (const cv of data.variants) {
-        if (variantMatch(qv, cv)) return true;
+    if (qTokens.length === 1) {
+      const qVariants = tokenVariants(qTokens[0]);
+      for (const qv of qVariants) {
+        for (const cv of data.variants) {
+          if (variantMatch(qv, cv)) return true;
+        }
       }
+      return false;
     }
 
-    // Multi-word path: every entered word must be explainable by some field token.
-    const qTokens = q.split(' ').filter(Boolean);
-    if (qTokens.length > 1 && qTokens.every(token => tokenGroupMatches(token, data.tokens))) return true;
-    return false;
+    // For a phrase, every entered word must be represented somewhere in the
+    // candidate. This prevents a query like "нас не догонят" matching a random
+    // card merely because it contains "нас".
+    return qTokens.every(token => tokenGroupMatches(token, data.tokens));
   }
 
   function participantFields(p) {
@@ -290,9 +286,6 @@
     try { window.RoyalUX0539?.refreshJumpButtons?.(); } catch (_) {}
   }
 
-  // Preserve the entire existing renderer/wrapper chain. During one synchronous
-  // render we temporarily replace only the search-text function with a boolean
-  // bridge. This keeps ordering, "В чате" filtering, cards, ranks and all decorators.
   if (typeof renderParticipantsPage === 'function') {
     const nativeParticipants = renderParticipantsPage;
     renderParticipantsPage = function renderParticipantsPageV0541(query = '') {
