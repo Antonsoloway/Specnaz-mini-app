@@ -1,13 +1,13 @@
 /*
  * Royal CRM / Таблица ЧП
  * 22_MINIAPP_BOT_APP_MENU.js
- * v1.0.31
+ * v1.0.32
  *
  * Configures the bot's private-chat menu button to launch the Mini App directly.
  */
 
-var MINIAPP_BOT_APP_MENU_VERSION = '1.0.31';
-var MINIAPP_BOT_APP_URL = 'https://antonsoloway.github.io/Specnaz-mini-app/app-v0533.html';
+var MINIAPP_BOT_APP_MENU_VERSION = '1.0.32';
+var MINIAPP_BOT_APP_URL = 'https://antonsoloway.github.io/Specnaz-mini-app/app-v0534.html';
 
 function MINIAPP_setupBotAppMenu() {
   var props = PropertiesService.getScriptProperties();
@@ -15,7 +15,7 @@ function MINIAPP_setupBotAppMenu() {
   if (!token) throw new Error('Telegram bot token property is missing');
 
   var gasUrl = String(ScriptApp.getService().getUrl() || '').trim();
-  var appUrl = MINIAPP_BOT_APP_URL + '?cb=20260816-1554';
+  var appUrl = MINIAPP_BOT_APP_URL + '?cb=20260816-1620';
   if (gasUrl) appUrl += '&gas=' + encodeURIComponent(gasUrl);
 
   var api = 'https://api.telegram.org/bot' + token + '/';
