@@ -1,0 +1,89 @@
+/* Royal CRM Mini App — admin/profile achievements v0.5.34 */
+
+/* Participant lists: admin is a vertical layer ABOVE the participant rank.
+   The stack itself remains one item inside the horizontal achievements row,
+   so future achievements can continue to appear to its right. */
+.participant-achievements-row > .participant-admin-rank-stack{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:flex-end!important;
+  justify-content:flex-start!important;
+  gap:5px!important;
+  flex:0 0 auto!important;
+  min-width:0;
+  margin-left:auto;
+}
+.participant-admin-rank-stack > .participant-admin-badge-v0533{
+  order:0;
+  align-self:flex-end;
+  margin:0!important;
+}
+.participant-admin-rank-stack > .rank-list-slot,
+.participant-admin-rank-stack > .hero-rank,
+.participant-admin-rank-stack > .rank-badge--compact{
+  order:1;
+  margin:0!important;
+  align-self:flex-end;
+}
+
+/* Detailed profile: the legacy purple admin chip becomes the same red admin badge. */
+.participant-detail-card .participant-admin-chip{
+  appearance:none;
+  -webkit-appearance:none;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:42px;
+  padding:0 16px;
+  border:1px solid rgba(255,170,170,.48)!important;
+  border-radius:17px;
+  background:linear-gradient(135deg,#e13c3c,#8f1616)!important;
+  color:#fff!important;
+  font-size:14px;
+  font-weight:900;
+  letter-spacing:.15px;
+  white-space:nowrap;
+  cursor:pointer;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:rgba(255,255,255,.16);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.20),0 4px 13px rgba(117,15,15,.34),0 0 15px rgba(238,58,58,.22)!important;
+  text-shadow:0 1px 1px rgba(65,0,0,.72);
+}
+.participant-detail-card .participant-admin-chip:active{transform:scale(.97)}
+
+/* Golden heading directly above the large premium rank crest. */
+.participant-detail-achievements-title{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:9px;
+  width:100%;
+  margin:17px 0 0;
+  padding:2px 8px 0;
+  text-align:center;
+  font-size:22px;
+  line-height:1.15;
+  font-weight:1000;
+  letter-spacing:.9px;
+  text-transform:uppercase;
+  background:linear-gradient(180deg,#fff5bb 0%,#ffd86a 38%,#e8a92f 68%,#fff0a2 100%);
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+  -webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 1px 0 rgba(86,48,0,.85)) drop-shadow(0 0 9px rgba(255,194,60,.30));
+}
+.participant-detail-achievements-title::before,
+.participant-detail-achievements-title::after{
+  content:'✦';
+  font-size:13px;
+  color:#ffd86a;
+  -webkit-text-fill-color:#ffd86a;
+  text-shadow:0 0 8px rgba(255,196,70,.55);
+}
+.participant-detail-achievements-title + .rank-premium-stage{margin-top:2px!important}
+
+@media(max-width:430px){
+  .participant-detail-achievements-title{font-size:20px;margin-top:14px;letter-spacing:.7px}
+  .participant-achievements-row > .participant-admin-rank-stack{gap:4px!important}
+}
