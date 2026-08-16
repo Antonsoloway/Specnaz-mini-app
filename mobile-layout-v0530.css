@@ -1,0 +1,109 @@
+/* Royal CRM Mini App — mobile layout stabilization v0.5.30
+ * Fixes horizontal overflow from premium rank crest and locks bottom navigation to viewport width.
+ * Keeps the large rank visually premium, but reserves vertical room for future achievements.
+ */
+html,body{width:100%;max-width:100%;overflow-x:hidden}
+body{padding-bottom:calc(78px + env(safe-area-inset-bottom));overscroll-behavior-x:none}
+.app,#panel,.participant-detail-card,.self-profile-card,.royal-directory,.changelog-screen{min-width:0;max-width:100%}
+.app{width:100%;overflow-x:hidden}
+
+.bottom-nav{
+  box-sizing:border-box;
+  width:100vw;
+  max-width:100vw;
+  min-width:0;
+  left:0;
+  right:0;
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:0;
+  overflow:hidden;
+  padding-left:2px;
+  padding-right:2px;
+}
+.bottom-nav .nav{
+  min-width:0;
+  width:100%;
+  max-width:100%;
+  padding:4px 1px;
+  overflow:hidden;
+  text-align:center;
+  white-space:nowrap;
+}
+.bottom-nav .nav span{
+  display:block;
+  min-width:0;
+  max-width:100%;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:clip;
+  font-size:10px;
+  letter-spacing:-.15px;
+}
+
+/* Premium rank remains the visual centerpiece, but no longer dominates the whole phone screen. */
+.rank-premium-stage{
+  width:100%;
+  max-width:100%;
+  min-height:252px;
+  height:252px;
+  margin:0 0 6px;
+}
+.rank-badge--premium{
+  width:min(100%,350px);
+  max-width:100%;
+  height:238px;
+}
+.rank-premium-halo{width:220px;height:205px}
+.rank-premium-ring.r1{width:184px;height:184px}
+.rank-premium-ring.r2{width:222px;height:222px}
+.rank-crest--premium{
+  width:min(330px,100%);
+  max-width:100%;
+  height:198px;
+}
+.rank-crest--premium .rank-shield{width:104px;height:126px}
+.rank-crest--premium .rank-shield-inner{inset:16px}
+.rank-crest--premium .rank-glyph{font-size:47px}
+.rank-crest--premium .rank-wing{top:54px;width:128px;height:94px}
+.rank-crest--premium .rank-wing--left{left:14px}
+.rank-crest--premium .rank-wing--right{right:14px}
+.rank-crest--premium .rank-laurel{top:46px;width:58px;height:105px;border-width:9px}
+.rank-crest--premium .rank-laurel--left{left:48px}
+.rank-crest--premium .rank-laurel--right{right:48px}
+.rank-crest--premium .rank-crown{top:9px;font-size:33px}
+.rank-crest--premium .rank-lightning{font-size:33px;top:116px}
+.rank-crest--premium .rank-lightning--left{left:34px}
+.rank-crest--premium .rank-lightning--right{right:34px}
+.rank-premium-name{bottom:1px;padding:8px 18px;font-size:14px}
+.rank-tap-hint{right:22px;bottom:18px}
+
+.participant-detail-head,.participant-detail-identity,.participant-detail-stats,.participant-detail-memberships--enhanced{min-width:0;max-width:100%}
+.participant-detail-identity h2{max-width:100%;overflow-wrap:anywhere}
+.participant-profile-team-link{min-width:0;width:min(100%,260px)}
+
+@media (max-width:430px){
+  .rank-premium-stage{min-height:232px;height:232px}
+  .rank-badge--premium{height:220px;width:min(100%,320px)}
+  .rank-premium-halo{width:200px;height:186px}
+  .rank-premium-ring.r1{width:166px;height:166px}
+  .rank-premium-ring.r2{width:202px;height:202px}
+  .rank-crest--premium{width:min(300px,100%);height:180px}
+  .rank-crest--premium .rank-shield{width:96px;height:116px}
+  .rank-crest--premium .rank-shield-inner{inset:15px}
+  .rank-crest--premium .rank-glyph{font-size:43px}
+  .rank-crest--premium .rank-wing{top:50px;width:116px;height:86px}
+  .rank-crest--premium .rank-wing--left{left:13px}
+  .rank-crest--premium .rank-wing--right{right:13px}
+  .rank-premium-name{padding:7px 16px;font-size:13px}
+}
+
+@media (max-width:360px){
+  .bottom-nav .nav span{font-size:9px;letter-spacing:-.3px}
+  .rank-premium-stage{min-height:216px;height:216px}
+  .rank-badge--premium{height:205px}
+  .rank-crest--premium{width:min(276px,100%);height:166px}
+  .rank-crest--premium .rank-shield{width:88px;height:106px}
+  .rank-crest--premium .rank-glyph{font-size:39px}
+  .rank-crest--premium .rank-wing{top:47px;width:105px;height:78px}
+}
