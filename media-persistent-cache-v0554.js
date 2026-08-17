@@ -211,6 +211,7 @@
   function pump() {
     while (active < CONCURRENCY && queue.length) {
       const img = queue.shift();
+      if (img) queued.delete(img);
       if (!img || !img.isConnected) continue;
       active += 1;
       persistentLoadAvatar(img).finally(() => {
@@ -266,6 +267,7 @@
     const identity = teamIdentity(img);
     if (!identity || img.dataset.teamProxyLoaded === 'loading') return;
     const { teamName, game, key } = identity;
+    try { img.removeAttribute('src'); } catch (_) {}
     if (teamMemory.has(key)) {
       img.src = teamMemory.get(key);
       img.dataset.teamProxyLoaded = '1';
