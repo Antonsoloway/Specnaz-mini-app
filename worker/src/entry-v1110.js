@@ -1,7 +1,19 @@
 import currentWorker from './entry-v1100.js';
 
-const WRAPPER_VERSION = '1.11.0';
+const WRAPPER_VERSION = '1.11.1';
 const ALLOWED_CHAT_STATE = 'В чате';
+const CONFIRMED_ALIASES = new Map([
+  ['hepbbi b hopme', ['нервы в норме']],
+  ['hepbbl b hopme', ['нервы в норме']],
+  ['mbl pycckue', ['мы русские']],
+  ['ckazka', ['сказка']],
+  ['behom', ['веном']],
+  ['molot poka', ['молот рока']],
+  ['xaoc', ['хаос']],
+  ['topmo3ob het', ['тормозов нет']]
+]);
+const LAT_FALLBACK = {a:'а',b:'б',c:'к',d:'д',e:'е',f:'ф',g:'г',h:'х',i:'и',j:'дж',k:'к',l:'л',m:'м',n:'н',o:'о',p:'п',q:'к',r:'р',s:'с',t:'т',u:'у',v:'в',w:'в',x:'кс',y:'й',z:'з'};
+const PSEUDO_VISUAL = {a:'а',b:'в',c:'с',e:'е',h:'н',k:'к',m:'м',o:'о',p:'р',t:'т',x:'х',y:'у',u:'и',i:'и','0':'о','3':'з','4':'ч','6':'б','9':'я'};
 
 export default {
   async fetch(request, env, ctx) {
@@ -17,7 +29,7 @@ export default {
         service: 'royal-crm-miniapp-api',
         version: WRAPPER_VERSION,
         participantIdentity: 'telegramId-only',
-        snapshotSearchKeys: 'preserved'
+        snapshotSearchKeys: 'preserved+deterministic-pseudo'
       }), { status: 200, headers });
     }
 
@@ -66,7 +78,9 @@ function mergeSearchKeys(snapshot, source) {
 
   (Array.isArray(snapshot?.participants) ? snapshot.participants : []).forEach(p => {
     const raw = participantsById.get(cleanTelegramId(p?.telegramId));
-    p.searchKeys = safeKeys(raw?.searchKeys);
+    const values = [p?.name, p?.telegramName, p?.username];
+    (Array.isArray(p?.memberships) ? p.memberships : []).forEach(m => values.push(m?.team, m?.teamRaw, m?.nickname, m?.role, m?.game));
+    p.searchKeys = augmentKeys(safeKeys(raw?.searchKeys), values);
   });
 
   const teamsByKey = new Map();
@@ -80,11 +94,54 @@ function mergeSearchKeys(snapshot, source) {
 
   (Array.isArray(snapshot?.teams) ? snapshot.teams : []).forEach(t => {
     const raw = teamsByKey.get(String(t?.key || '').trim()) || teamsByNameGame.get(teamNameGameKey(t?.name, t?.game || (Array.isArray(t?.games) ? t.games[0] : '')));
-    t.searchKeys = safeKeys(raw?.searchKeys);
+    t.searchKeys = augmentKeys(safeKeys(raw?.searchKeys), [t?.name, t?.game, ...(Array.isArray(t?.games) ? t.games : [])]);
   });
 
   snapshot.searchIndexVersion = String(source?.searchIndexVersion || '');
   snapshot.unifiedSnapshotVersion = String(source?.unifiedSnapshotVersion || '');
+}
+
+function augmentKeys(existing, values) {
+  const seen = new Set((Array.isArray(existing) ? existing : []).map(item => normalize(item)).filter(Boolean));
+  const out = Array.isArray(existing) ? existing.slice() : [];
+  const add = value => {
+    const n = normalize(value);
+    if (!n || seen.has(n) || out.length >= 100) return;
+    seen.add(n);
+    out.push(n.slice(0,180));
+    const compact = n.replace(/\s+/g,'');
+    if (compact && !seen.has(compact) && out.length < 100) { seen.add(compact); out.push(compact.slice(0,180)); }
+  };
+
+  (Array.isArray(values) ? values : []).forEach(value => {
+    const n = normalize(value);
+    if (!n) return;
+    add(n);
+    const pseudo = pseudoRead(n);
+    if (pseudo && pseudo !== n) add(pseudo);
+    const aliases = CONFIRMED_ALIASES.get(n) || [];
+    aliases.forEach(add);
+  });
+  return out.slice(0,100);
+}
+
+function pseudoRead(value) {
+  const base = normalize(value);
+  if (!base || !/[a-z]/.test(base)) return '';
+  return normalize(base.split(' ').map(token => /[a-z]/.test(token) ? pseudoToken(token) : token).join(' '));
+}
+
+function pseudoToken(value) {
+  let raw = normalize(value).replace(/\s+/g,'');
+  if (!raw || !/[a-z0-9]/.test(raw) || /[а-я]/u.test(raw)) return raw;
+  raw = raw.replace(/bi/g,'ы').replace(/bl/g,'ы');
+  let out = '';
+  for (const ch of Array.from(raw)) {
+    if (/[а-я]/u.test(ch)) { out += ch; continue; }
+    if (Object.prototype.hasOwnProperty.call(PSEUDO_VISUAL,ch)) { out += PSEUDO_VISUAL[ch]; continue; }
+    out += LAT_FALLBACK[ch] ?? ch;
+  }
+  return normalize(out);
 }
 
 function safeKeys(value) {
@@ -92,8 +149,9 @@ function safeKeys(value) {
   const out = [];
   (Array.isArray(value) ? value : []).forEach(item => {
     const text = String(item == null ? '' : item).trim().slice(0, 180);
-    if (!text || seen.has(text)) return;
-    seen.add(text);
+    const n = normalize(text);
+    if (!text || !n || seen.has(n)) return;
+    seen.add(n);
     out.push(text);
   });
   return out.slice(0, 100);
