@@ -1,10 +1,10 @@
 /* Royal CRM Mini App — contact by Telegram ID v0.5.59
  * Participants without @username get a "Связаться" action.
  * Direct tg://user links from Mini App are intentionally NOT used: Telegram ID links
- * are only supported as inline links/buttons in bot messages.
+ * are delivered as inline buttons in bot messages.
  */
 (() => {
-  const VERSION = '0.5.59.1';
+  const VERSION = '0.5.59.2';
   const BOT_LINK = 'https://t.me/doveofpeace_bot';
 
   function cleanId(value) {
@@ -113,6 +113,38 @@
     try { window.location.href = BOT_LINK; return true; } catch (_) { return false; }
   }
 
+  function showContactReady(targetName) {
+    const webapp = window.Telegram?.WebApp;
+    const suffix = String(targetName || '').trim() ? ` для «${String(targetName).trim()}»` : '';
+    const message = `Голубец отправил вам кнопку «Открыть профиль»${suffix}.`;
+
+    try {
+      if (webapp?.showPopup) {
+        webapp.showPopup({
+          title: 'Ссылка готова',
+          message,
+          buttons: [
+            { id: 'open_bot', type: 'default', text: 'Открыть Голубя' },
+            { id: 'cancel', type: 'cancel' }
+          ]
+        }, buttonId => {
+          if (buttonId === 'open_bot') openBotChat();
+        });
+        return;
+      }
+    } catch (_) {}
+
+    try {
+      if (webapp?.showAlert) {
+        webapp.showAlert(`${message}\n\nСейчас откроется чат с Голубем.`, () => openBotChat());
+        return;
+      }
+    } catch (_) {}
+
+    try { window.alert(message); } catch (_) {}
+    openBotChat();
+  }
+
   async function requestContactLink(id, button) {
     if (!id || !sessionToken) {
       showMessage('Сессия приложения ещё не готова. Попробуйте ещё раз.');
@@ -140,9 +172,7 @@
       }
 
       try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success'); } catch (_) {}
-      if (!openBotChat()) {
-        showMessage('Голубец отправил вам кнопку «Открыть профиль». Откройте чат с Голубем.');
-      }
+      showContactReady(data?.targetName || '');
     } catch (error) {
       try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('error'); } catch (_) {}
       showMessage(error?.message || 'Не удалось подготовить ссылку на профиль.');
