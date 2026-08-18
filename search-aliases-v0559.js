@@ -1,16 +1,21 @@
 /* Royal CRM Mini App — confirmed search aliases hotfix v0.5.59
- * Adds exact team aliases without changing the generic search algorithm.
+ * Exact client fallback for aliases that cannot be derived safely.
  */
 (() => {
-  const VERSION = '0.5.59';
+  const VERSION = '0.5.59.2';
   const CONFIRMED_TEAM_ALIASES = [
-    { name: 'BbIIIIKA', game: 'Royal Kingdom', aliases: ['вышка'] }
+    { name: 'BbllllKA', game: 'Royal Kingdom', aliases: ['вышка'] }
   ];
 
   function normalize(value) {
     let text = String(value == null ? '' : value);
     try { text = text.normalize('NFKC'); } catch (_) {}
-    return text.toLocaleLowerCase('ru-RU').replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
+    return text
+      .toLocaleLowerCase('ru-RU')
+      .replace(/ё/g, 'е')
+      .replace(/[^a-zа-я0-9]+/giu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   function canonicalGame(value) {
@@ -53,21 +58,40 @@
   function applyConfirmedAliases() {
     const teams = Array.isArray(snapshotState?.teams) ? snapshotState.teams : [];
     const participants = Array.isArray(snapshotState?.participants) ? snapshotState.participants : [];
-    let changed = false;
+    let teamChanged = false;
+    let participantChanged = false;
 
     CONFIRMED_TEAM_ALIASES.forEach(rule => {
       teams.filter(team => isExactTeam(team, rule)).forEach(team => {
-        if (pushAliases(team, rule.aliases)) changed = true;
+        if (pushAliases(team, rule.aliases)) teamChanged = true;
       });
 
       participants.forEach(participant => {
         const memberships = Array.isArray(participant?.memberships) ? participant.memberships : [];
         if (!memberships.some(membership => membershipMatchesRule(membership, rule))) return;
-        if (pushAliases(participant, rule.aliases)) changed = true;
+        if (pushAliases(participant, rule.aliases)) participantChanged = true;
       });
     });
 
-    return changed;
+    // Hybrid search caches haystacks by snapshot array identity. Clone changed arrays so
+    // refreshMaps() invalidates those caches instead of keeping the pre-alias haystack.
+    if (teamChanged && snapshotState) snapshotState.teams = teams.slice();
+    if (participantChanged && snapshotState) snapshotState.participants = participants.slice();
+
+    if (teamChanged) {
+      try {
+        const input = document.getElementById('teamSearch');
+        window.RoyalHybridSearch?.filter?.('teams', input?.value || '');
+      } catch (_) {}
+    }
+    if (participantChanged) {
+      try {
+        const input = document.getElementById('participantSearch');
+        window.RoyalHybridSearch?.filter?.('participants', input?.value || '');
+      } catch (_) {}
+    }
+
+    return teamChanged || participantChanged;
   }
 
   if (typeof loadSnapshot === 'function') {
