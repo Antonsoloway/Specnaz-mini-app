@@ -1,0 +1,62 @@
+name: Worker production smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'worker/**'
+      - '.github/workflows/worker-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve expected wrapper version
+        id: expected
+        shell: bash
+        run: |
+          set -euo pipefail
+          main_path="$(awk -F'"' '/^main = / {print $2; exit}' worker/wrangler.toml)"
+          test -n "$main_path"
+          source_file="worker/$main_path"
+          test -f "$source_file"
+          version="$(sed -n "s/^const WRAPPER_VERSION = '\([^']*\)';/\1/p" "$source_file" | head -n1)"
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Expected Worker version: $version from $source_file"
+
+      - name: Wait for Cloudflare production deploy
+        env:
+          EXPECTED: ${{ steps.expected.outputs.version }}
+          HEALTH_URL: https://royal-crm-miniapp-api.tropical-spoon.workers.dev/health
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            body="$(curl -fsS --max-time 10 "$HEALTH_URL" 2>/dev/null || true)"
+            echo "Attempt $attempt: $body"
+            if python3 - "$EXPECTED" "$body" <<'PY'
+import json, sys
+expected = sys.argv[1]
+raw = sys.argv[2]
+try:
+    data = json.loads(raw)
+except Exception:
+    raise SystemExit(1)
+raise SystemExit(0 if data.get('ok') is True and str(data.get('version')) == expected else 1)
+PY
+            then
+              echo "SUCCESS: production Worker version $EXPECTED is live"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "ERROR: production Worker did not reach expected version $EXPECTED in time" >&2
+          exit 1
