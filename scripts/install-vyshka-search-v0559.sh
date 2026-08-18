@@ -39,8 +39,6 @@ from pathlib import Path
 p = Path('25_MINIAPP_UNIFIED_SNAPSHOT.js')
 t = p.read_text(encoding='utf-8')
 
-# Refuse to patch an unexpectedly old live writer. The team-status deployment
-# established 1.2.2 / schema 1.4.2 as the factual baseline.
 if "var MINIAPP_UNIFIED_SNAPSHOT_VERSION = '1.2.2';" in t:
     t = t.replace(
         "var MINIAPP_UNIFIED_SNAPSHOT_VERSION = '1.2.2';",
@@ -59,7 +57,6 @@ if "var MINIAPP_UNIFIED_SEARCH_INDEX_VERSION = '1.1.1';" in t:
 elif "var MINIAPP_UNIFIED_SEARCH_INDEX_VERSION = '1.1.2';" not in t:
     raise SystemExit('[ERROR] Unexpected live searchIndexVersion; refusing blind patch')
 
-# Keep the header informational version aligned when the old marker is present.
 t = t.replace(' * v1.2.1\n', ' * v1.2.3\n', 1)
 t = t.replace(' * v1.2.2\n', ' * v1.2.3\n', 1)
 
@@ -82,7 +79,6 @@ if alias_line not in t:
 else:
     print('[OK] Server alias already present')
 
-# Safety checks: team-status bridge from the previous deployment must remain.
 if "MINIAPP_attachTeamStatusesToSnapshot_" not in t:
     raise SystemExit('[ERROR] Team-status bridge is missing from live writer; refusing push')
 if "var MINIAPP_UNIFIED_SNAPSHOT_SCHEMA = '1.4.2';" not in t:
@@ -121,36 +117,34 @@ verify_snapshot() {
   command -v gh >/dev/null 2>&1 || return 2
   gh auth status >/dev/null 2>&1 || return 2
 
-  local attempt payload
+  local attempt
   for attempt in $(seq 1 14); do
     info "Waiting for 5-minute snapshot trigger: check $attempt/14"
-    if payload="$(gh api "repos/$DATA_REPO/contents/$DATA_PATH" --jq .content 2>/dev/null | tr -d '\n' | base64 -d 2>/dev/null)"; then
-      if SNAPSHOT_JSON="$payload" python3 - <<'PY'
-import json, os, sys
+    if gh api "repos/$DATA_REPO/contents/$DATA_PATH" --jq .content 2>/dev/null \
+      | tr -d '\n' \
+      | base64 -d 2>/dev/null \
+      | python3 -c '
+import json, sys
 try:
-    data = json.loads(os.environ['SNAPSHOT_JSON'])
+    data = json.load(sys.stdin)
 except Exception:
     sys.exit(1)
-
-if str(data.get('searchIndexVersion', '')) != '1.1.2':
+if str(data.get("searchIndexVersion", "")) != "1.1.2":
     sys.exit(1)
-
-for team in data.get('teams') or []:
-    name = str(team.get('name') or '').strip().lower()
-    games = [str(team.get('game') or '')] + [str(x) for x in (team.get('games') or [])]
-    game_text = ' '.join(games).lower()
-    if name == 'bbiiiika' and 'royal kingdom' in game_text:
-        keys = [str(x).strip().lower() for x in (team.get('searchKeys') or [])]
-        if 'вышка' in keys:
-            print('[OK] snapshot confirms: BbIIIIKA / Royal Kingdom contains searchKey "вышка"')
-            print('[OK] snapshot searchIndexVersion = 1.1.2')
-            print('[OK] snapshot unifiedSnapshotVersion = ' + str(data.get('unifiedSnapshotVersion', '')))
+for team in data.get("teams") or []:
+    name = str(team.get("name") or "").strip().lower()
+    games = [str(team.get("game") or "")] + [str(x) for x in (team.get("games") or [])]
+    game_text = " ".join(games).lower()
+    if name == "bbiiiika" and "royal kingdom" in game_text:
+        keys = [str(x).strip().lower() for x in (team.get("searchKeys") or [])]
+        if "вышка" in keys:
+            print("[OK] snapshot confirms: BbIIIIKA / Royal Kingdom contains searchKey \\\"вышка\\\"")
+            print("[OK] snapshot searchIndexVersion = 1.1.2")
+            print("[OK] snapshot unifiedSnapshotVersion = " + str(data.get("unifiedSnapshotVersion", "")))
             sys.exit(0)
 sys.exit(1)
-PY
-      then
-        return 0
-      fi
+'; then
+      return 0
     fi
     sleep 25
   done
