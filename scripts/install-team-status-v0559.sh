@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="${ROYAL_APPS_SCRIPT_DIR:-$HOME/table-chp-1.3}"
 REPO_RAW="https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-app/main"
 STAMP="$(date +%Y%m%d-%H%M%S)"
+BACKUP_DIR="${ROYAL_BACKUP_DIR:-$HOME/royal-crm-backups/team-status-$STAMP}"
 
 ok(){ printf '\033[32m[OK]\033[0m %s\n' "$*"; }
 info(){ printf '\033[36m[INFO]\033[0m %s\n' "$*"; }
@@ -11,12 +12,13 @@ fail(){ printf '\033[31m[ERROR]\033[0m %s\n' "$*" >&2; exit 1; }
 
 info "Royal CRM team status installer v0.5.59"
 [[ -d "$ROOT" ]] || fail "Apps Script folder not found: $ROOT"
+mkdir -p "$BACKUP_DIR"
 cd "$ROOT"
 
 for f in 19_MINIAPP_FALLBACK_API.js 25_MINIAPP_UNIFIED_SNAPSHOT.js; do
   [[ -f "$f" ]] || fail "Required live file missing: $f"
-  cp -p "$f" "$f.backup-$STAMP"
-  ok "Backup: $f.backup-$STAMP"
+  cp -p "$f" "$BACKUP_DIR/$f"
+  ok "Backup: $BACKUP_DIR/$f"
 done
 
 info "Downloading team status bridge"
@@ -54,7 +56,6 @@ old = "    var stable = MINIAPP_buildStableSnapshot_();\n    if (!stable || !Arr
 new = "    var stable = MINIAPP_buildStableSnapshot_();\n    if (typeof MINIAPP_attachTeamStatusesToSnapshot_ !== 'function') {\n      throw new Error('MINIAPP_attachTeamStatusesToSnapshot_ missing');\n    }\n    var teamStatusStats = MINIAPP_attachTeamStatusesToSnapshot_(stable);\n    if (!stable || !Array.isArray(stable.participants) || !Array.isArray(stable.teams)) {"
 t = replace_once(t, old, new, 'attach authoritative team statuses')
 
-# Add diagnostics to both unchanged/changed return paths when not already present.
 if 'teamStatusStats: teamStatusStats' not in t:
     needle = '        historySections: sections.length\n      };'
     if needle not in t:
@@ -103,6 +104,7 @@ ok "apps-script-live mirror synchronized"
 printf '\n\033[32m=============================================\033[0m\n'
 printf '\033[32m SUCCESS: TEAM STATUS CODE IS LIVE \033[0m\n'
 printf '\033[32m=============================================\033[0m\n'
+printf 'Backups: %s\n' "$BACKUP_DIR"
 printf 'Unified writer: 1.2.2\nSchema: 1.4.2\nFallback API: 1.2.1\n'
 printf 'Existing 5-minute trigger will publish team.status into snapshot.json.\n'
 printf 'No frontend entrypoint was changed by this installer.\n'
