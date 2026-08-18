@@ -1,7 +1,7 @@
 # Live Apps Script mirror
 
 > Generated from the live Apps Script project via `clasp pull`.
-> Generated at: 2026-08-18T18:12:05+00:00
+> Generated at: 2026-08-18T19:30:25+00:00
 > Local source folder: `~/table-chp-1.3`
 > `.clasp.json`, Script Properties, bot tokens, GitHub tokens and other secrets are intentionally NOT stored here.
 
@@ -31,7 +31,7 @@ a990a460c01c776c447e855e2b43969b8919a06dbb3526fcd556687c73737fa2  21_MINIAPP_STA
 4801672bf3ab4055b275c6394284f4344e8e09a92dc25f9910c136c3045bbbb5  22_MINIAPP_BOT_APP_MENU.js
 b9aba9427c1d255cf06687fa87d0b3b7726e8ccba344266cf7f9f7c58e29e965  23_MINIAPP_PROFILE_STATS.js
 f1d0ea5b88e5e8d72d737ab8dd87251a700d08eebec5718d490a7994a1f93cce  24_MINIAPP_SPECNAZ_HISTORY.js
-15b7213652baab959d201d9d2c946d0c9c2d56237fb8d82fd3174b4cdced7b6c  25_MINIAPP_UNIFIED_SNAPSHOT.js
+fb29cb41f3861634e8c745697fe36eeb1b5d6dbb2d4fd4a91bbda598744d1939  25_MINIAPP_UNIFIED_SNAPSHOT.js
 d5a4e8a35537b456519ecccbe59846b5f2d456d34260fe48f17300c049fbb8ea  26_MINIAPP_MAYAK_MEDIA_SETUP.js
 ecb5c1602a8ab814bccf262b993f2487932f1545688fec7354887481da00d1ce  27_MINIAPP_TEAM_STATUS.js
 d81026ded8b851437b932bcebf3281f850a6050a31a99028f4db22b6fdeb32c6  appsscript.json
