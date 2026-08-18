@@ -1,310 +1,316 @@
 # Royal CRM / «Таблица ЧП» — CURRENT STATE
 
-> **Статус на 18.08.2026.**
-> Этот файл — краткий технический handoff для нового чата/разработчика.
-> **GitHub и фактические файлы имеют приоритет над памятью чата.** Перед любым изменением сначала сверять этот файл, затем открывать реальные файлы, которые будут затронуты.
+> **Актуально на 18.08.2026.**
+> Это база текущего состояния проекта. Новый чат обязан сначала прочитать `START_HERE.md`, затем этот файл и последние записи `WORK_HISTORY.md`.
+> **Фактический runtime / живые Google Sheets / live Apps Script / текущий GitHub имеют приоритет над памятью чатов.**
 
-## 1. Главное правило работы
+## 1. Обязательный протокол работы
 
-1. Не менять код «по памяти» или только по описанию из старого чата.
-2. Перед правкой открыть актуальный файл в GitHub и проверить его текущий SHA/содержимое.
-3. Для существующего файла: сначала `fetch_file`, затем `update_file` с актуальным SHA.
-4. Для нового файла использовать `create_file`.
-5. После frontend-релиза проверить, что `app.html` ведёт на новый физический `app-vXYZ.html` и сохраняет `search + hash`.
-6. После Apps Script-изменений: `clasp status` **до** `clasp push`.
-7. После каждого принятого релиза обновлять этот `CURRENT_STATE.md`.
-8. `RELEASE_RULES.md` содержит подробные правила релизов; если он расходится с фактическим runtime, сначала сверить текущий entrypoint и этот файл, затем исправить документацию.
+1. Не менять код по памяти.
+2. Перед правкой открыть фактический файл и проверить текущую версию/SHA/подключение.
+3. Если задача зависит от данных — сверить актуальный `snapshot.json` и/или живую Google Sheets.
+4. Если задача относится к Apps Script таблиц — использовать `apps-script-live/` как зеркало последнего `clasp pull` и при необходимости дополнительно сверять live Apps Script.
+5. После принятой/проверенной работы обязательно обновить:
+   - `CURRENT_STATE.md`;
+   - `WORK_HISTORY.md`;
+   - `RELEASE_RULES.md`, если изменился постоянный инвариант;
+   - `docs/tables/*.md`, если изменилась структура таблиц;
+   - `apps-script-live/`, если реально менялся live Apps Script.
+6. Работа не считается полностью завершённой, пока состояние и история проекта не обновлены.
+7. Подробный порядок: `START_HERE.md`.
 
 ---
 
 ## 2. Репозитории и точки входа
 
-### Основной код
+### Основной репозиторий
 
 - GitHub: `Antonsoloway/Specnaz-mini-app`
-- Основная ветка: `main`
-- Постоянная Mini App точка входа: `app.html`
-- Публичная URL: `https://antonsoloway.github.io/Specnaz-mini-app/app.html`
+- branch: `main`
+- постоянный Mini App entrypoint: `app.html`
+- публичный URL: `https://antonsoloway.github.io/Specnaz-mini-app/app.html`
 - Telegram bot: `@doveofpeace_bot`
-- Постоянный запуск Mini App: `https://t.me/doveofpeace_bot?startapp`
+- постоянный launch link: `https://t.me/doveofpeace_bot?startapp`
 
-### Данные
+### Data repo
 
-- GitHub data repo: `Antonsoloway/royal-crm-data`
-- Основной файл данных: `snapshot.json`
-- Google Sheets / Apps Script остаются первичным источником CRM-данных.
-- `snapshot.json` — подготовленный атомарный снимок для Mini App.
+- `Antonsoloway/royal-crm-data`
+- главный файл: `snapshot.json`
+- Google Sheets / Apps Script — первичный источник CRM-данных.
+- `snapshot.json` — атомарный подготовленный снимок для Mini App.
+
+### Проектная база знаний
+
+- `START_HERE.md` — обязательная инструкция для новых чатов.
+- `CURRENT_STATE.md` — текущее состояние.
+- `WORK_HISTORY.md` — фактическая история работ/диагнозов/откатов.
+- `RELEASE_RULES.md` — постоянные правила frontend-релизов.
+- `docs/tables/ADMIN_TABLE_STRUCTURE.md` — структура живой админской таблицы.
+- `docs/tables/PUBLIC_TABLE_STRUCTURE.md` — структура живой публичной таблицы.
 
 ---
 
-## 3. Текущая версия frontend
+## 3. Полный live Apps Script mirror
 
-### Активная версия
+Полный текущий standalone Apps Script таблиц сохранён в:
+
+`apps-script-live/`
+
+Зеркало получено через `clasp pull` из рабочей папки Cloud Shell:
+
+`~/table-chp-1.3`
+
+На 18.08.2026 подтверждены **27 исходных файлов + `LIVE_MIRROR_MANIFEST.md`**.
+
+Ключевые файлы:
+
+- `01_CORE_MAIN.js`
+- `02_PUBLIC_SYNC_V4.js`
+- `04_TELEGRAM_AVATARS.js`
+- `05_RELIABLE_WEBHOOK_QUEUE.js`
+- `06_Reliable_Edit_Trigger.js`
+- `07_FINAL_ROLE_FIX.js`
+- `08_TELEGRAM_NAME_LINKS.js`
+- `09_OPTIMIZATION_SCHEDULE.js`
+- `10_DIAGNOSTICS.js`
+- `11_PERFORMANCE_OPTIMIZATION.js`
+- `12_MINI_APP_API.js` … `26_MINIAPP_MAYAK_MEDIA_SETUP.js`
+- `appsscript.json`
+- `Вспом функции.js`
+
+`apps-script-live/LIVE_MIRROR_MANIFEST.md` содержит SHA-256 каждого файла.
+
+**Не хранятся в GitHub:** `.clasp.json`, Script Properties, bot tokens, GitHub tokens, Cloudflare secrets.
+
+После любого фактического изменения/push live Apps Script заново выполнить:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-app/main/scripts/sync-live-apps-script-to-github.sh)
+```
+
+Скрипт делает backup, `clasp status`, `clasp pull`, проверку критических файлов и только затем обновляет зеркало GitHub.
+
+---
+
+## 4. Живые Google Sheets
+
+### Админская таблица
+
+Название: `Royal_CRM_GOOGLE_ПОИСК_FINAL_FIXED`.
+
+Полная структура зафиксирована в `docs/tables/ADMIN_TABLE_STRUCTURE.md`.
+
+Ключевые листы: `Главная`, `Аватары`, `База участников`, `Команды`, `Рейтинг команд`, `Рейтинг игроков`, `Поиск`, `Карточка команды`, `История спецназа`, `Справочник`, `Инструкция`, `Списки`, `Связи участников`, webhook/activity helper-листы.
+
+Ключевая participant identity: **raw Telegram ID**.
+
+### Публичная таблица
+
+Название: `🕊️ЧАТ ПОБЕДИТЕЛЕЙ🕊️`.
+
+Полная структура: `docs/tables/PUBLIC_TABLE_STRUCTURE.md`.
+
+Ключевые листы: `Главная`, `Аватары`, `Команды`, `База участников`, `Поиск`, `Карточка команды`, `История спецназа`, `Списки`, `Связи участников`, `Поиск данные`.
+
+Публичная таблица получает данные из админской; обратной записи быть не должно.
+
+---
+
+## 5. Текущий frontend
 
 - **Mini App: `v0.5.58`**
-- Физический entrypoint: `app-v0558.html`
-- `app.html` сейчас перенаправляет на `app-v0558.html` с сохранением `window.location.search` и `window.location.hash`.
-- Последняя подтверждённая GitHub Pages сборка v0.5.58: build `1157767246`, status `built`, commit `2976e87af03935758e8d1c8aa8e043722905e6c8`.
+- активный физический entrypoint: `app-v0558.html`
+- `app.html` перенаправляет на `app-v0558.html`, сохраняя `search + hash`.
+- последняя подтверждённая GitHub Pages сборка v0.5.58: build `1157767246`, status `built`, commit `2976e87af03935758e8d1c8aa8e043722905e6c8`.
 
-### Ключевые активные frontend-модули в `app-v0558.html`
+Ключевые активные модули:
 
-- `transport-v0514.js` — транспорт к Worker / GAS fallback.
-- `app.js` — базовый UI и основные render-функции.
-- `navigation-v0521.js` — стек внутренней навигации и сохранение предыдущего `scrollY`.
-- `navigation-card-restore-v0532.js` — восстановление оформления карточек после Back.
-- `search-hybrid-v0553.js` — текущий поисковый модуль.
-- `media-persistent-cache-v0554.js` — постоянный IndexedDB-кэш изображений.
-- `self-avatar-priority-v0556.js` — приоритетная своя ава + устранение мигания заглушки.
-- `navigation-scroll-top-v0558.js` — текущая логика прокрутки вперед/назад.
-- `changelog-v0558.js` — текущая запись истории.
-- `stable-v0558.js` — версия/стабилизационный guard.
+- `transport-v0514.js`
+- `app.js`
+- `navigation-v0521.js`
+- `navigation-card-restore-v0532.js`
+- `search-hybrid-v0553.js`
+- `media-persistent-cache-v0554.js`
+- `self-avatar-priority-v0556.js`
+- `navigation-scroll-top-v0558.js`
+- `changelog-v0558.js`
+- `stable-v0558.js`
 
-### Текущее обязательное поведение прокрутки
+### Навигационный инвариант
 
-**ВПЕРЁД:** любой новый экран открывается сверху (`scrollY = 0`).
+**Вперёд:** новый экран всегда открывается сверху (`scrollY=0`).
 
-**НАЗАД:** возвращает на сохранённую позицию предыдущего экрана/списка.
+**Назад:** возвращает на сохранённую позицию предыдущего экрана/списка.
 
-Пример:
+Пример: список команд пролистан вниз → открыть команду = команда сверху → `Назад` = прежнее место списка.
 
-`Команды (пролистали вниз) → команда` = карточка команды открывается сверху.
-
-`Команда → Назад` = список команд возвращается ровно к прежнему месту.
-
-**Важно:** это поведение v0.5.58. Старое правило v0.5.57 «Назад тоже наверх» больше не является актуальным.
+Не возвращать ошибочное поведение v0.5.57, где Back тоже отправлялся наверх.
 
 ---
 
-## 4. Поиск — текущая архитектура
+## 6. Поиск
 
 Активный файл: `search-hybrid-v0553.js`.
 
-Поиск — **гибридный**:
+Архитектура:
 
-1. Рабочая локальная Android-safe логика остаётся независимым fallback.
-2. Серверные `searchKeys` — дополнительный слой, а не замена локального поиска.
-3. Итоговое совпадение должно быть: `локальный поиск ИЛИ searchKeys`.
-4. `searchKeys` не имеют права уменьшать результаты старого поиска.
-5. Никакого edit-distance, fuzzy-опечаток, сотен комбинаций или тяжёлого `prewarm` на телефоне.
-6. Поле поиска не должно пересоздаваться во время набора.
-7. На Android разрешено лёгкое чтение `input.value` во время фокуса без вмешательства в IME.
+- локальная Android-safe логика остаётся независимым fallback;
+- `searchKeys` — дополнительный слой;
+- итог: **локальный поиск ИЛИ `searchKeys`**;
+- server keys не имеют права уменьшать локальные результаты;
+- нет edit-distance/fuzzy-комбинаторики/prewarm;
+- поле поиска не пересоздаётся во время ввода;
+- фильтр `Все / РМ / РК` ограничивает список и область поиска, не очищая запрос.
 
-### Фильтр игры
+Контрольные алиасы минимум:
 
-На страницах **Участники** и **Команды**:
-
-- `Все` — по умолчанию.
-- `РМ` — только Royal Match.
-- `РК` — только Royal Kingdom.
-
-При активном фильтре поиск работает только в выбранной игре. Переключение фильтра не очищает запрос.
-
-### Контрольные алиасы поиска
-
-Должны работать минимум:
-
-- `Has ne dogonyat` ↔ `нас не догонят`
-- `XAOC` ↔ `хаос`
-- `TOPMO3OB HET` ↔ `тормозов нет`
-- `MOLOT POKA` ↔ `молот рока`
-- `HEPBbI B HOPME` / `HEPBbl B HOPME` ↔ `нервы в норме`
-- `Mbl Pycckue` ↔ `мы русские`
-- `CKAZKA` ↔ `сказка`
-- `BEHOM` ↔ `веном`
-- `Aquamarine` ↔ `аквамарин`
-- `Da budet swet` ↔ `да будет свет`
-- `Mike` ↔ `майк`
-- `Xabib` ↔ `хабиб`
-- `JoyBand` ↔ `джойбанд`
-- `1BY` ↔ `1бу`
+`Has ne dogonyat ↔ нас не догонят`, `XAOC ↔ хаос`, `TOPMO3OB HET ↔ тормозов нет`, `MOLOT POKA ↔ молот рока`, `HEPBbI/HEPBbl B HOPME ↔ нервы в норме`, `Mbl Pycckue ↔ мы русские`, `CKAZKA ↔ сказка`, `BEHOM ↔ веном`, `Aquamarine ↔ аквамарин`, `Da budet swet ↔ да будет свет`, `Mike ↔ майк`, `Xabib ↔ хабиб`, `JoyBand ↔ джойбанд`, `1BY ↔ 1бу`.
 
 ---
 
-## 5. Snapshot / Apps Script
+## 7. Snapshot Writer / Apps Script
 
-Активный файл в GitHub:
+Live mirror файл:
 
-`apps-script/25_MINIAPP_UNIFIED_SNAPSHOT.js`
+`apps-script-live/25_MINIAPP_UNIFIED_SNAPSHOT.js`
+
+Также существует development/reference copy `apps-script/25_MINIAPP_UNIFIED_SNAPSHOT.js`; при расхождении сначала сверять live mirror/runtime.
 
 Текущие версии:
 
-- Unified Snapshot Writer: **`1.2.1`**
-- schemaVersion: **`1.4.1`**
-- searchIndexVersion: **`1.1.1`**
-- handler: **`MINIAPP_exportUnifiedSnapshotToGitHub`**
+- Unified Snapshot Writer: `1.2.1`
+- schemaVersion: `1.4.1`
+- searchIndexVersion: `1.1.1`
+- handler: `MINIAPP_exportUnifiedSnapshotToGitHub`
 
-Файл формирует единый `snapshot.json`:
+Snapshot включает participants, teams, роли/игры/команды, спецназ-очки/ранги, историю, `searchKeys`, `dataHash`.
 
-- participants
-- teams
-- роли/игры/команды
-- спецназ-очки и ранги
-- история спецназа
-- `searchKeys`
-- `dataHash`
+Один штатный writer trigger:
 
-### Синхронизация
+`MINIAPP_exportUnifiedSnapshotToGitHub` → каждые 5 минут.
 
-`MINIAPP_installUnifiedSnapshotTrigger_()` удаляет старые snapshot-writer triggers и создаёт один trigger:
-
-`MINIAPP_exportUnifiedSnapshotToGitHub` → **каждые 5 минут**.
-
-Последний фактически прочитанный `royal-crm-data/snapshot.json` на момент создания этого файла:
+Последний snapshot, прочитанный при первоначальной фиксации состояния:
 
 - `generatedAt`: `2026-08-18T03:38:16.470Z`
 - `schemaVersion`: `1.4.1`
 - `searchIndexVersion`: `1.1.1`
 
-Это подтверждает, что текущий Unified Snapshot Writer/trigger реально пишет актуальный формат в data repo.
+### Ручной запуск
 
-### Если нужно вручную пересобрать snapshot
+**ФАЙЛ:** `25_MINIAPP_UNIFIED_SNAPSHOT.js`  
+**ФУНКЦИЯ:** `MINIAPP_exportUnifiedSnapshotToGitHub()`  
+**РЕЗУЛЬТАТ:** актуальный unified `snapshot.json` в data repo.
 
-**ФАЙЛ Apps Script:** `25_MINIAPP_UNIFIED_SNAPSHOT.js`
+Если менялся Apps Script: backup → syntax check → `clasp status` → `clasp push` → вручную запустить нужную функцию в Apps Script UI → после подтверждения снова sync `apps-script-live/`.
 
-**ФУНКЦИЯ:** `MINIAPP_exportUnifiedSnapshotToGitHub()`
-
-Если менялся сам Apps Script-файл, локальная рабочая папка Cloud Shell: `~/table-chp-1.3`.
-
-Порядок: backup → скачать актуальный GitHub-файл → syntax check → `clasp status` → `clasp push` → вручную запустить нужную функцию в Apps Script UI.
-
-`clasp run MINIAPP_exportUnifiedSnapshotToGitHub` не считать рабочим способом, если Apps Script проект не настроен как API executable.
+`clasp run ...` не считать рабочим способом, если проект не настроен API executable.
 
 ---
 
-## 6. Worker / backend
+## 8. Worker/backend
 
-Frontend использует Worker origin:
+Frontend Worker origin:
 
 `https://royal-crm-miniapp-api.tropical-spoon.workers.dev`
 
-Конфигурация:
+Repo config:
 
 - `worker/wrangler.toml`
-- Worker name: `royal-crm-miniapp-api`
-- current main: `src/entry-v1110.js`
-- current wrapper version в файле: **`1.11.1`**
-- базируется поверх `entry-v1100.js`
+- worker: `royal-crm-miniapp-api`
+- main: `src/entry-v1110.js`
+- wrapper version: `1.11.1`
+- base: `entry-v1100.js`
 
-### Критические правила backend
+Критические правила:
 
-- Identity участника: **только raw Telegram ID**.
-- Имя / username / HMAC не использовать как идентификатор участника.
-- `/snapshot` обязан передавать `searchKeys`; не удалять их при sanitization.
-- `entry-v1110.js` добавляет/сохраняет deterministic pseudo-Cyrillic aliases для поиска.
-- `/health` в `entry-v1110.js` заявляет `participantIdentity: telegramId-only` и `snapshotSearchKeys: preserved+deterministic-pseudo`.
+- participant identity = только raw Telegram ID;
+- `/snapshot` не удаляет `searchKeys` и `searchIndexVersion`;
+- v1.11.1 восстанавливает server search keys после sanitization и добавляет одно deterministic pseudo-Cyrillic reading;
+- repo-конфиг не равен доказанному production deploy: при backend-задаче отдельно проверять production `/health`, когда это возможно.
 
-### Worker vars в репозитории
+Repo vars: `FRONTEND_ORIGIN=https://antonsoloway.github.io`, `DATA_REPO=Antonsoloway/royal-crm-data`, `DATA_BRANCH=main`, `DATA_PATH=snapshot.json`.
 
-- `FRONTEND_ORIGIN = https://antonsoloway.github.io`
-- `DATA_REPO = Antonsoloway/royal-crm-data`
-- `DATA_BRANCH = main`
-- `DATA_PATH = snapshot.json`
-- `TELEGRAM_CHAT_ID = -1002109152418`
-
-Secrets (`BOT_TOKEN`, `GITHUB_TOKEN`, `SESSION_SECRET`) находятся только в Cloudflare Variables/Secrets и не должны попадать в GitHub.
-
-Cloudflare Builds настроен из GitHub `main`, root `/worker`. Перед изменением backend желательно отдельно проверить production `/health`, а не считать repo-конфиг доказательством фактического деплоя.
+Secrets остаются только в Cloudflare Variables/Secrets.
 
 ---
 
-## 7. Изображения и локальный кэш
+## 9. Изображения и локальный кэш
 
-Активный постоянный кэш: `media-persistent-cache-v0554.js`.
+`media-persistent-cache-v0554.js`:
 
-Поведение:
+- IndexedDB `royal-crm-media-cache`;
+- cache-first;
+- аватар key = актуальный `avatarFileId`;
+- team photo key = актуальный `photoUrl`;
+- максимум 2 параллельных avatar network load;
+- lazy загрузка около viewport;
+- cleanup примерно 45 дней;
+- лимит примерно 420 изображений.
 
-- IndexedDB database: `royal-crm-media-cache`.
-- Cache-first: локальная копия → сеть.
-- Аватар привязан к актуальному `avatarFileId`.
-- Фото команды привязано к актуальному `photoUrl`.
-- Максимум **2** параллельных загрузки аватаров.
-- Аватары загружаются лениво рядом с видимой областью, а не все сразу.
-- Очистка старых записей: примерно **45 дней**.
-- Лимит: примерно **420 изображений**.
+`self-avatar-priority-v0556.js`:
 
-Своя аватарка дополнительно обслуживается `self-avatar-priority-v0556.js`:
-
-- восстанавливается приоритетно;
-- не должна ждать общей очереди;
-- уже показанный URL сохраняется в памяти текущего запуска;
-- при повторном render не должна мигать буквой-заглушкой.
+- собственная ава восстанавливается приоритетно;
+- не ждёт общей очереди;
+- уже показанный URL сохраняется в памяти запуска;
+- rerender не должен мигать буквенной заглушкой.
 
 ---
 
-## 8. Навигация
+## 10. Последние важные релизы
 
-Базовый стек: `navigation-v0521.js`.
+- `v0.5.53` — hybrid search + server `searchKeys` transport/use.
+- `v0.5.54` — IndexedDB persistent image cache.
+- `v0.5.55` — приоритетная своя ава.
+- `v0.5.56` — устранено мигание своей авы.
+- `v0.5.57` — первая попытка global top; Back ошибочно наверх.
+- `v0.5.58` — forward сверху, Back возвращает прежний `scrollY`.
 
-Он сохраняет состояние предыдущего экрана, включая `scrollY`, query поиска и HTML/тип страницы.
-
-Дополнение v0.5.58: `navigation-scroll-top-v0558.js`.
-
-**Не делать:** снова оборачивать `RoyalNav.back()` принудительным `scrollTo(0,0)`.
-
-**Правильно:** вперед → top, назад → сохранённый `scrollY` через `RoyalNav`.
-
----
-
-## 9. Последние важные релизы
-
-- **v0.5.53** — hybrid search + нормальная доставка/использование searchKeys.
-- **v0.5.54** — постоянный IndexedDB-кэш аватаров и фото команд.
-- **v0.5.55** — приоритетная загрузка собственной авы.
-- **v0.5.56** — убрано мигание буквенной заглушки своей авы при rerender.
-- **v0.5.57** — первая попытка глобального scroll-to-top; Back ошибочно тоже отправлялся вверх.
-- **v0.5.58** — исправлено: forward всегда сверху, Back восстанавливает прежнее место.
-
----
-
-## 10. Известные документационные расхождения
-
-На момент создания `CURRENT_STATE.md` файл `RELEASE_RULES.md` ещё содержит блок текущей версии `v0.5.57` и старое правило, где Back тоже отправляется вверх.
-
-**Фактический runtime уже v0.5.58.** Для навигации считать актуальным правило из этого файла:
-
-> Новый экран → сверху. Назад → точное прежнее место.
-
-При следующем изменении `RELEASE_RULES.md` это расхождение нужно убрать.
+Подробные фактические записи и важные диагнозы: `WORK_HISTORY.md`.
 
 ---
 
 ## 11. Что нельзя случайно откатить
 
-- Не возвращать старые `smart-search-v0540/v0541/v0542` в активный entrypoint.
-- Не заменять hybrid search только на `searchKeys`.
-- Не удалять `searchKeys` в Worker `/snapshot`.
-- Не использовать name/username как participant identity.
-- Не делать массовый prewarm изображений или поиска на Android.
-- Не терять Telegram `location.hash` при редиректе `app.html/index.html`.
-- Не возвращать `meta refresh` для entrypoint redirects.
-- Не заставлять Back открывать список сверху.
-- Не сбрасывать поисковый запрос при переключении `Все / РМ / РК`.
-- Не добавлять в каждую карточку changelog повторяющиеся кредиты помощников.
+- не возвращать старые smart-search модули в active entrypoint;
+- не заменять hybrid search только на `searchKeys`;
+- не удалять `searchKeys` Worker-санитизацией;
+- не использовать name/username как participant identity;
+- не делать массовый prewarm изображений/поиска;
+- не терять Telegram `location.hash` при redirects;
+- не использовать `meta refresh` для active redirect;
+- не заставлять Back открывать список сверху;
+- не очищать query при `Все / РМ / РК`;
+- не повторять credits/boilerplate в каждой карточке changelog;
+- не править Apps Script по старой копии, если можно сверить `apps-script-live/`/live проект;
+- не считать GitHub commit автоматически подтверждением production deployment.
 
 ---
 
-## 12. Проверка перед следующим релизом
+## 12. Минимальный smoke-test frontend
 
-Минимальный smoke-test:
-
-1. Открыть через `https://t.me/doveofpeace_bot?startapp`.
-2. Авторизация проходит, Telegram initData не потерян.
-3. Участники: ввод на Android без лагов/задвоений/пропавших пробелов.
-4. Команды: фильтры `Все / РМ / РК` работают вместе с поиском.
-5. Контрольные поисковые алиасы находятся.
-6. Открыть команду из середины/низа списка → команда сверху.
-7. Нажать `Назад` → список вернулся на прежнее место.
+1. Launch через `https://t.me/doveofpeace_bot?startapp`.
+2. Telegram initData/авторизация не потеряны.
+3. Android search ввод без лагов/задвоений/пропавших пробелов.
+4. `Все / РМ / РК` работают вместе с поиском.
+5. Контрольные алиасы находятся.
+6. Открытие команды из середины списка → команда сверху.
+7. `Назад` → прежнее место списка.
 8. `Участники → профиль → Назад` сохраняет карточки/ранги/ачивки.
-9. Аватары/фото после первого открытия приходят из IndexedDB-кэша.
-10. Своя ава не мигает буквенной заглушкой после прихода snapshot.
-11. Бейдж версии и History показывают одну и ту же актуальную версию.
+9. Аватары/фото после первого открытия приходят из IndexedDB.
+10. Своя ава не мигает после snapshot rerender.
+11. Бейдж версии = текущая версия changelog.
 
 ---
 
-## 13. Инструкция для нового ChatGPT-чата
+## 13. Обязательное завершение любой будущей работы
 
-Достаточно написать:
+После принятого результата следующий чат должен:
 
-> **Продолжаем Royal CRM / «Таблица ЧП». Сначала прочитай `CURRENT_STATE.md`, затем открой фактические файлы GitHub, которые относятся к задаче. GitHub — источник истины. Не предлагай и не выполняй изменения по памяти, пока не сверишь текущий код.**
+- обновить этот `CURRENT_STATE.md`;
+- добавить новую верхнюю запись в `WORK_HISTORY.md`;
+- обновить `RELEASE_RULES.md`, если изменился инвариант;
+- обновить table docs, если изменилась структура Sheets;
+- после live Apps Script изменений пересинхронизировать `apps-script-live/`;
+- явно записать, что подтверждено: repo / build / push / manual function / production.
 
-Если `CURRENT_STATE.md` и код расходятся, **код/фактический deployment проверяются первыми**, после чего `CURRENT_STATE.md` обновляется.
+Точная инструкция для нового чата находится в `START_HERE.md`.
