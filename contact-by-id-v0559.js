@@ -1,9 +1,11 @@
 /* Royal CRM Mini App — contact by Telegram ID v0.5.59
- * Participants without @username get a "Связаться" action in the same identity slot.
- * Participant identity: raw Telegram ID only.
+ * Participants without @username get a "Связаться" action.
+ * Direct tg://user links from Mini App are intentionally NOT used: Telegram ID links
+ * are only supported as inline links/buttons in bot messages.
  */
 (() => {
-  const VERSION = '0.5.59';
+  const VERSION = '0.5.59.1';
+  const BOT_LINK = 'https://t.me/doveofpeace_bot';
 
   function cleanId(value) {
     const id = String(value == null ? '' : value).trim().replace(/\.0$/, '');
@@ -20,28 +22,14 @@
     );
   }
 
-  function contactButtonHtml(id, compact = false) {
-    const clean = cleanId(id);
-    if (!clean) return '';
-    return `<button type="button" class="username-link contact-by-id-v0559${compact ? ' compact' : ''}" data-contact-telegram-id="${clean}" aria-label="Связаться с участником">Связаться</button>`;
-  }
-
-  function hasUsernameAction(root) {
-    return !!root?.querySelector?.('[data-user-menu]');
-  }
-
-  function hasContactAction(root) {
-    return !!root?.querySelector?.('[data-contact-telegram-id]');
-  }
+  function hasUsernameAction(root) { return !!root?.querySelector?.('[data-user-menu]'); }
+  function hasContactAction(root) { return !!root?.querySelector?.('[data-contact-telegram-id]'); }
 
   function insertBeforeFirst(parent, button, selectors) {
     if (!parent || !button) return;
     for (const selector of selectors) {
       const node = parent.querySelector(`:scope > ${selector}`);
-      if (node) {
-        parent.insertBefore(button, node);
-        return;
-      }
+      if (node) { parent.insertBefore(button, node); return; }
     }
     parent.appendChild(button);
   }
@@ -61,35 +49,32 @@
   function decoratePersonCard(card) {
     if (!card || hasUsernameAction(card) || hasContactAction(card)) return;
     const id = participantIdFromCard(card);
-    if (!id) return;
     const main = card.querySelector('.person-main');
-    if (!main) return;
-    insertBeforeFirst(main, makeButton(id, false), ['.telegram-name', '.membership-list']);
+    if (!id || !main) return;
+    insertBeforeFirst(main, makeButton(id), ['.telegram-name', '.membership-list']);
   }
 
   function decorateTeamMember(card) {
     if (!card || hasUsernameAction(card) || hasContactAction(card)) return;
     const id = participantIdFromCard(card);
-    if (!id) return;
     const main = card.querySelector('.team-member-main');
-    if (!main) return;
+    if (!id || !main) return;
     insertBeforeFirst(main, makeButton(id, true), ['.telegram-name', '.team-member-role', '.membership-list']);
   }
 
   function decorateDirectoryCard(card) {
     if (!card || card.classList.contains('directory-person-card--external') || hasUsernameAction(card) || hasContactAction(card)) return;
     const id = participantIdFromCard(card);
-    if (!id) return;
     const main = card.querySelector('.directory-person-main,.directory-person-body,.directory-person-head') || card;
+    if (!id || !main) return;
     insertBeforeFirst(main, makeButton(id, true), ['.telegram-name', '.directory-person-meta', '.membership-list']);
   }
 
   function decorateHeroCard(card) {
     if (!card || hasUsernameAction(card) || hasContactAction(card)) return;
     const id = participantIdFromCard(card);
-    if (!id) return;
     const main = card.querySelector('.hero-main');
-    if (!main) return;
+    if (!id || !main) return;
     insertBeforeFirst(main, makeButton(id, true), ['.hero-meta', '.membership-list']);
   }
 
@@ -99,7 +84,7 @@
     const identity = card.querySelector('.participant-detail-identity');
     const id = cleanId(card.querySelector('[data-telegram-id]')?.dataset?.telegramId);
     if (!identity || !id) return;
-    identity.appendChild(makeButton(id, false));
+    identity.appendChild(makeButton(id));
   }
 
   function decorateVisible() {
@@ -110,39 +95,59 @@
     decorateParticipantDetail();
   }
 
-  function schedule(delay = 0) {
-    window.setTimeout(decorateVisible, delay);
+  function schedule(delay = 0) { window.setTimeout(decorateVisible, delay); }
+
+  function showMessage(text) {
+    const webapp = window.Telegram?.WebApp;
+    try {
+      if (webapp?.showAlert) { webapp.showAlert(String(text || '')); return; }
+    } catch (_) {}
+    try { window.alert(String(text || '')); } catch (_) {}
   }
 
-  function openTelegramProfileById(value) {
-    const id = cleanId(value);
-    if (!id) return false;
-    const url = `tg://user?id=${encodeURIComponent(id)}`;
+  function openBotChat() {
+    const webapp = window.Telegram?.WebApp;
     try {
-      window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light');
+      if (webapp?.openTelegramLink) { webapp.openTelegramLink(BOT_LINK); return true; }
     } catch (_) {}
+    try { window.location.href = BOT_LINK; return true; } catch (_) { return false; }
+  }
 
-    // Keep this inside the real user gesture. Telegram Android WebView hands
-    // tg://user?id=... back to the Telegram client. Do not send it through
-    // WebApp.openTelegramLink(), which is for https://t.me links.
+  async function requestContactLink(id, button) {
+    if (!id || !sessionToken) {
+      showMessage('Сессия приложения ещё не готова. Попробуйте ещё раз.');
+      return;
+    }
+
+    const oldText = button?.textContent || 'Связаться';
+    if (button) { button.disabled = true; button.textContent = 'Отправляю…'; }
+    try { window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light'); } catch (_) {}
+
     try {
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.style.position = 'fixed';
-      anchor.style.left = '-10000px';
-      anchor.style.top = '-10000px';
-      anchor.setAttribute('aria-hidden', 'true');
-      document.body.appendChild(anchor);
-      anchor.click();
-      window.setTimeout(() => anchor.remove(), 250);
-      return true;
-    } catch (_) {
-      try {
-        window.location.href = url;
-        return true;
-      } catch (_) {
-        return false;
+      const response = await fetch(`${API_URL}/contact-by-id`, {
+        method: 'POST',
+        mode: 'cors',
+        cache: 'no-store',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sessionToken}`
+        },
+        body: JSON.stringify({ telegramId: id })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.ok) {
+        throw new Error(data?.message || data?.error || `HTTP ${response.status}`);
       }
+
+      try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success'); } catch (_) {}
+      if (!openBotChat()) {
+        showMessage('Голубец отправил вам кнопку «Открыть профиль». Откройте чат с Голубем.');
+      }
+    } catch (error) {
+      try { window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('error'); } catch (_) {}
+      showMessage(error?.message || 'Не удалось подготовить ссылку на профиль.');
+    } finally {
+      if (button?.isConnected) { button.disabled = false; button.textContent = oldText; }
     }
   }
 
@@ -153,7 +158,7 @@
     if (!id) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    openTelegramProfileById(id);
+    requestContactLink(id, button);
   }, true);
 
   if (typeof renderPage === 'function') {
@@ -176,15 +181,9 @@
 
   document.addEventListener('input', () => schedule(0), true);
   document.addEventListener('pointerup', () => schedule(0), true);
-
   decorateVisible();
   schedule(80);
 
-  window.RoyalContactByTelegramId = {
-    version: VERSION,
-    decorate: decorateVisible,
-    open: openTelegramProfileById,
-    buttonHtml: contactButtonHtml
-  };
+  window.RoyalContactByTelegramId = { version: VERSION, decorate: decorateVisible, request: requestContactLink };
   window.__ROYAL_CONTACT_BY_ID_VERSION__ = VERSION;
 })();
