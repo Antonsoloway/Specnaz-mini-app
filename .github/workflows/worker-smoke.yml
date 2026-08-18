@@ -9,14 +9,20 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: worker-production-smoke
+  cancel-in-progress: true
 
 jobs:
   health:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 7
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Resolve expected wrapper version
         id: expected
@@ -30,9 +36,11 @@ jobs:
           version="$(sed -n "s/^const WRAPPER_VERSION = '\([^']*\)';/\1/p" "$source_file" | head -n1)"
           test -n "$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "main_path=$main_path" >> "$GITHUB_OUTPUT"
           echo "Expected Worker version: $version from $source_file"
 
       - name: Wait for Cloudflare production deploy
+        id: health
         env:
           EXPECTED: ${{ steps.expected.outputs.version }}
           HEALTH_URL: https://royal-crm-miniapp-api.tropical-spoon.workers.dev/health
@@ -54,9 +62,46 @@ raise SystemExit(0 if data.get('ok') is True and str(data.get('version')) == exp
 PY
             then
               echo "SUCCESS: production Worker version $EXPECTED is live"
+              printf '%s' "$body" > /tmp/worker-health.json
               exit 0
             fi
             sleep 10
           done
           echo "ERROR: production Worker did not reach expected version $EXPECTED in time" >&2
           exit 1
+
+      - name: Persist production proof
+        env:
+          EXPECTED: ${{ steps.expected.outputs.version }}
+          MAIN_PATH: ${{ steps.expected.outputs.main_path }}
+          SOURCE_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          mkdir -p runtime
+          python3 - "$EXPECTED" "$MAIN_PATH" "$SOURCE_SHA" /tmp/worker-health.json > runtime/worker-health.json <<'PY'
+import json, pathlib, sys
+expected, main_path, source_sha, health_path = sys.argv[1:]
+health = json.loads(pathlib.Path(health_path).read_text())
+out = {
+    "verified": True,
+    "service": health.get("service", "royal-crm-miniapp-api"),
+    "version": str(health.get("version", "")),
+    "expectedVersion": expected,
+    "workerMain": main_path,
+    "sourceCommit": source_sha,
+    "contactById": health.get("contactById", ""),
+    "verifiedAt": __import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat()
+}
+print(json.dumps(out, ensure_ascii=False, indent=2))
+PY
+          git add runtime/worker-health.json
+          if git diff --cached --quiet; then
+            echo "Production proof unchanged"
+            exit 0
+          fi
+          git commit -m "Record verified Worker production runtime"
+          git push origin HEAD:main
