@@ -1,7 +1,7 @@
 /*
  * Royal CRM / Таблица ЧП
  * 25_MINIAPP_UNIFIED_SNAPSHOT.js
- * v1.2.3
+ * v1.2.4
  *
  * Atomic Mini App snapshot writer.
  * One source write contains base participants/teams + specnaz score/rank + specnaz history.
@@ -9,9 +9,9 @@
  * Search keys are prepared here, while the Mini App keeps its independent v0.5.47-style fallback search.
  */
 
-var MINIAPP_UNIFIED_SNAPSHOT_VERSION = '1.2.3';
+var MINIAPP_UNIFIED_SNAPSHOT_VERSION = '1.2.4';
 var MINIAPP_UNIFIED_SNAPSHOT_SCHEMA = '1.4.2';
-var MINIAPP_UNIFIED_SEARCH_INDEX_VERSION = '1.1.2';
+var MINIAPP_UNIFIED_SEARCH_INDEX_VERSION = '1.1.3';
 var MINIAPP_UNIFIED_SNAPSHOT_HANDLER = 'MINIAPP_exportUnifiedSnapshotToGitHub';
 var MINIAPP_UNIFIED_SNAPSHOT_LAST_HASH = 'MINIAPP_UNIFIED_SNAPSHOT_LAST_HASH';
 
@@ -47,7 +47,7 @@ var MINIAPP_UNIFIED_SEARCH_ALIASES = {
   'joyband': ['джойбанд'],
   'mike': ['майк'],
   'xabib': ['хабиб'],
-  'bbiiiika': ['вышка']
+  'bbllllka': ['вышка']
 };
 
 function MINIAPP_bootstrapUnifiedSnapshot() {
