@@ -48,7 +48,7 @@
 
 Полный standalone Apps Script таблиц сохранён в `apps-script-live/`.
 
-На 18.08.2026 подтверждены 28 исходных файлов + `LIVE_MIRROR_MANIFEST.md`. Последняя синхронизация зеркала: `2026-08-18T18:12:05+00:00`.
+На 18.08.2026 подтверждены 28 исходных файлов + `LIVE_MIRROR_MANIFEST.md`. После server-side исправления поиска `BbIIIIKA → вышка` live mirror был заново синхронизирован через Cloud Shell и содержит фактический writer `1.2.3` / search index `1.1.2`.
 
 Ключевые live-файлы:
 
@@ -115,7 +115,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-ap
 - `navigation-v0521.js`
 - `navigation-card-restore-v0532.js`
 - `search-hybrid-v0553.js`
-- `search-aliases-v0559.js`
+- `search-aliases-v0559.js` — legacy/client safety overlay; **не считать источником истины для `вышка`**
 - `media-persistent-cache-v0554.js`
 - `self-avatar-priority-v0556.js`
 - `navigation-scroll-top-v0558.js`
@@ -183,21 +183,32 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-ap
 - без edit-distance/fuzzy-комбинаторики и тяжёлого prewarm;
 - `Все / РМ / РК` ограничивает и список, и область поиска, не очищая query.
 
-Дополнительный слой подтверждённых алиасов: `search-aliases-v0559.js`.
+### `BbIIIIKA / Royal Kingdom ↔ вышка`
+
+Первоначальная клиентская попытка через `search-aliases-v0559.js` оказалась недостаточно надёжной: основной `search-hybrid-v0553.js` кэширует haystack карточек, а поздняя мутация `team.searchKeys` не меняет ссылку snapshot-массивов и поэтому не гарантирует сброс уже построенного WeakMap-кэша.
+
+**Правильный источник алиаса теперь server-side:**
+
+- live Apps Script `apps-script-live/25_MINIAPP_UNIFIED_SNAPSHOT.js`;
+- `MINIAPP_UNIFIED_SEARCH_ALIASES` содержит `'bbiiiika': ['вышка']`;
+- Unified Snapshot Writer: `1.2.3`;
+- `searchIndexVersion`: `1.1.2`;
+- алиас попадает в `team.searchKeys` при построении snapshot **до** загрузки данных клиентом;
+- Worker обязан сохранить эти `searchKeys` при sanitization.
+
+Точечный client overlay можно оставлять только как дополнительную страховку, но **не использовать вместо server snapshot** для подтверждённых CRM-алиасов.
 
 Контрольные алиасы минимум:
 
 `Has ne dogonyat ↔ нас не догонят`, `XAOC ↔ хаос`, `TOPMO3OB HET ↔ тормозов нет`, `MOLOT POKA ↔ молот рока`, `HEPBbI/HEPBbl B HOPME ↔ нервы в норме`, `Mbl Pycckue ↔ мы русские`, `CKAZKA ↔ сказка`, `BEHOM ↔ веном`, `Aquamarine ↔ аквамарин`, `Da budet swet ↔ да будет свет`, `Mike ↔ майк`, `Xabib ↔ хабиб`, `JoyBand ↔ джойбанд`, `1BY ↔ 1бу`, `BbIIIIKA (Royal Kingdom) ↔ вышка`.
 
-`BbIIIIKA / Royal Kingdom ↔ вышка` добавляется строго по exact identity `название + игра`.
-
 ---
 
 ## 8. Snapshot Writer / Apps Script
 
-- Unified Snapshot Writer: `1.2.2`
+- Unified Snapshot Writer: **`1.2.3`**
 - schemaVersion: `1.4.2`
-- searchIndexVersion: `1.1.1`
+- searchIndexVersion: **`1.1.2`**
 - Fallback API: `1.2.1`
 - team status bridge: `1.0.0`
 - handler: `MINIAPP_exportUnifiedSnapshotToGitHub`
@@ -206,13 +217,27 @@ Snapshot включает participants, teams, роли/игры/команды,
 
 Один штатный writer trigger: `MINIAPP_exportUnifiedSnapshotToGitHub` каждые 5 минут.
 
-Подтверждённый snapshot после установки team-status bridge:
+### Подтверждённый server snapshot после исправления `вышка`
 
-- `generatedAt=2026-08-18T18:13:21.854Z`
-- `schemaVersion=1.4.2`
-- `unifiedSnapshotVersion=1.2.2`
-- `⚡️ MOLOT POKA / Royal Kingdom`: `status=Активен`
-- контрольные paused-команды: `status=На паузе`
+- `generatedAt=2026-08-18T19:33:12.518Z` (`22:33:12` по пользовательскому UTC+3);
+- `schemaVersion=1.4.2`;
+- `searchIndexVersion=1.1.2`;
+- новый `dataHash` опубликован в `royal-crm-data/snapshot.json`;
+- live mirror подтверждает server alias `'bbiiiika': ['вышка']` до построения `searchKeys`.
+
+Предыдущий snapshot `19:28:13Z` имел `searchIndexVersion=1.1.1`; это объясняет, почему сразу после `clasp push` пользователь ещё видел старое поведение до следующего 5‑минутного trigger.
+
+### Инсталлятор
+
+`scripts/install-vyshka-search-v0559.sh`:
+
+- делает backup;
+- `clasp pull` фактического live-кода перед patch;
+- syntax check;
+- `clasp status` перед push;
+- `clasp push`;
+- sync `apps-script-live/`;
+- verifier больших `snapshot.json` теперь передаёт JSON в Python через **stdin pipe**, а не environment variable — это устраняет ошибку `/usr/bin/python3: Argument list too long`.
 
 ---
 
@@ -280,7 +305,7 @@ Repo commit не считать автоматически доказанным 
 - не связывать фильтр каталога активных команд с обычной страницей `Команды`;
 - не возвращать крота к `<img>`, внешнему JPG или SVG-обёртке;
 - источник крота для v0.5.59 — встроенный JPEG data-asset в `active-teams-v0559.css`;
-- не удалять точечный алиас `BbIIIIKA / Royal Kingdom ↔ вышка`;
+- не возвращать `BbIIIIKA / Royal Kingdom ↔ вышка` только к позднему client overlay: серверный алиас должен оставаться в Unified Snapshot Writer;
 - не заставлять Back открывать список сверху;
 - не удалять `@DmitryRoyal` из credits.
 
