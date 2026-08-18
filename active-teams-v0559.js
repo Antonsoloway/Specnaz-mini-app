@@ -140,7 +140,7 @@
     }).filter(Boolean).join('');
 
     panel.hidden = false;
-    panel.innerHTML = `<section class="active-teams-page-v0559"><button type="button" class="royal-back-button" data-royal-back="1">← Назад</button><div class="active-teams-head-v0559"><h2>Команды принимающие участие в спецназе</h2><p>Активные команды по данным Royal CRM.</p><span class="active-teams-count-v0559">${list.length} команд</span></div><div class="active-teams-list-v0559">${cards || '<div class="active-teams-empty-v0559">Активные команды пока не найдены</div>'}</div></section>`;
+    panel.innerHTML = `<section class="active-teams-page-v0559"><button type="button" class="royal-back-button" data-royal-back="1">← Назад</button><div class="active-teams-head-v0559"><h2>Команды принимающие участие в спецназе</h2><p>Команды, участвующие в спецназе и(или) регулярно выкладывающие скрины в базе спецназа.</p><span class="active-teams-count-v0559">${list.length} команд</span></div><div class="active-teams-list-v0559">${cards || '<div class="active-teams-empty-v0559">Активные команды пока не найдены</div>'}</div></section>`;
 
     try { setActiveNav('teams'); } catch (_) {}
     try { activePage = 'active-teams'; } catch (_) {}
