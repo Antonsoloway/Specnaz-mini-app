@@ -3,6 +3,57 @@
 > Краткий журнал фактически выполненных работ. Новые записи добавляются сверху.
 > Здесь фиксируются не обсуждения, а изменения, проверки, важные диагнозы и откаты, которые нужны следующему чату.
 
+## 2026-08-18 — Mini App v0.5.59: активные команды спецназа + @DmitryRoyal в credits
+
+**Задача:** визуально отличать команды, которые реально принимают участие в спецназе, используя существующий статус команды в админской таблице; добавить @DmitryRoyal в постоянный блок помощи в разработке.
+
+**Источник истины / диагноз:**
+- живой лист `Команды` админской таблицы содержит колонку L `Статус` со значениями `Активен`, `На паузе`, `Неактивен`;
+- до этой работы `MINIAPP_buildStableSnapshot_()` и Worker sanitizer не доставляли `team.status` до клиента;
+- название команды недостаточно для идентификации, потому что одинаковые названия могут существовать одновременно в Royal Match и Royal Kingdom.
+
+**Сделано в Apps Script:**
+- добавлен live-файл `27_MINIAPP_TEAM_STATUS.js`, bridge version `1.0.0`;
+- status читается из `Команды!L` и сопоставляется по точной связке `название + игра`;
+- Unified Snapshot Writer поднят до `1.2.2`, schema до `1.4.2`;
+- Fallback API поднят до `1.2.1` и сохраняет `team.status`;
+- пользователь успешно выполнил one-command installer с backup, syntax check, `clasp status`, `clasp push` и последующим sync live mirror;
+- `apps-script-live/` после pull содержит 28 исходных файлов + manifest, включая `27_MINIAPP_TEAM_STATUS.js`.
+
+**Подтверждено по данным:**
+- свежий `snapshot.json`: `generatedAt=2026-08-18T18:13:21.854Z`, `schemaVersion=1.4.2`, `unifiedSnapshotVersion=1.2.2`;
+- `⚡️ MOLOT POKA / Royal Kingdom` имеет `status="Активен"`;
+- контрольные paused-команды имеют `status="На паузе"`;
+- статус теперь входит в team objects raw snapshot.
+
+**Сделано в Worker:**
+- `worker/src/entry-v1110.js` поднят до wrapper `1.11.2`;
+- после авторизованной sanitization Worker восстанавливает `team.status` из private snapshot тем же exact identity (`team.key` / `название + игра`);
+- прежнее поведение `searchKeys` сохранено;
+- GitHub→Cloudflare build/deploy для `/worker` ранее настроен; прямой production `/health` в этом сеансе инструментально не прочитан, поэтому repo update и production runtime не смешивать в дальнейших записях.
+
+**Сделано во frontend v0.5.59:**
+- создан `app-v0559.html`, `active-teams-v0559.js`, `active-teams-v0559.css`, `stable-v0559.js`, `changelog-v0559.js`;
+- добавлен отдельный asset значка `assets/specnaz-active-team-v0559.jpg`;
+- команды со статусом `Активен` получают золотую рамку в списке команд и на командных плашках участников/профилей;
+- на странице активной команды название золотое и в золотой рамке, справа расположен специальный значок;
+- нажатие на значок открывает страницу `Команды принимающие участие в спецназе`, которая строится только из `status="Активен"`;
+- `На паузе` не получает золотой маркировки;
+- `app.html` и `index.html` переключены на `app-v0559.html` с сохранением Telegram `search + hash`;
+- в блок `Помощь в разработке, тесты` добавлен `@DmitryRoyal`; постоянный список теперь: `@sfinks_spb`, `@O_Chaplygina`, `@Yanochka_2404`, `@DmitryRoyal`.
+
+**Документация:**
+- обновлены `CURRENT_STATE.md`, `WORK_HISTORY.md`, `RELEASE_RULES.md`;
+- структура самой Google Sheets не менялась, поэтому table structure docs не требовали изменения.
+
+**Инварианты:**
+- status команды берётся только из живой админской таблицы, не вычисляется по UI;
+- identity команды для статуса = `название + игра`;
+- `Активен` = золотая маркировка + каталог активных команд; `На паузе` = обычное оформление;
+- credits @DmitryRoyal не удалять из шапки следующих changelog-релизов.
+
+---
+
 ## 2026-08-18 — Создана постоянная база контекста проекта
 
 **Задача:** убрать зависимость новых чатов от длинных handoff и памяти ChatGPT.
@@ -33,7 +84,7 @@
 - повторная синхронизация успешно отправила live-проект в `apps-script-live/`.
 
 **Подтверждено:**
-- в `apps-script-live/` присутствуют 27 исходных файлов + `LIVE_MIRROR_MANIFEST.md`;
+- в `apps-script-live/` присутствовали 27 исходных файлов + `LIVE_MIRROR_MANIFEST.md` на момент этой записи;
 - присутствуют `01_CORE_MAIN.js`, `02_PUBLIC_SYNC_V4.js`, `04_TELEGRAM_AVATARS.js`, `05_RELIABLE_WEBHOOK_QUEUE.js`, `06_Reliable_Edit_Trigger.js`, `07_FINAL_ROLE_FIX.js`, `08_TELEGRAM_NAME_LINKS.js`, `09_OPTIMIZATION_SCHEDULE.js`, `10_DIAGNOSTICS.js`, `11_PERFORMANCE_OPTIMIZATION.js`, Mini App файлы 12–26, `appsscript.json`, `Вспом функции.js`;
 - manifest содержит SHA-256 каждого сохранённого файла;
 - `.clasp.json`, Script Properties и секреты не помещаются в GitHub.
