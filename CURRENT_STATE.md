@@ -1,8 +1,8 @@
 # Royal CRM / «Таблица ЧП» — CURRENT STATE
 
 > **Актуально на 18.08.2026.**
-> Это база текущего состояния проекта. Новый чат обязан сначала прочитать `START_HERE.md`, затем этот файл и последние записи `WORK_HISTORY.md`.
-> **Фактический runtime / живые Google Sheets / live Apps Script / текущий GitHub имеют приоритет над памятью чатов.**
+> Новый чат обязан сначала прочитать `START_HERE.md`, затем этот файл и последние записи `WORK_HISTORY.md`.
+> Фактический runtime / живые Google Sheets / live Apps Script / текущий GitHub имеют приоритет над памятью чатов.
 
 ## 1. Обязательный протокол работы
 
@@ -10,14 +10,9 @@
 2. Перед правкой открыть фактический файл и проверить текущую версию/SHA/подключение.
 3. Если задача зависит от данных — сверить актуальный `snapshot.json` и/или живую Google Sheets.
 4. Если задача относится к Apps Script таблиц — использовать `apps-script-live/` как зеркало последнего `clasp pull` и при необходимости дополнительно сверять live Apps Script.
-5. После принятой/проверенной работы обязательно обновить:
-   - `CURRENT_STATE.md`;
-   - `WORK_HISTORY.md`;
-   - `RELEASE_RULES.md`, если изменился постоянный инвариант;
-   - `docs/tables/*.md`, если изменилась структура таблиц;
-   - `apps-script-live/`, если реально менялся live Apps Script.
-6. Работа не считается полностью завершённой, пока состояние и история проекта не обновлены.
-7. Подробный порядок: `START_HERE.md`.
+5. После принятой/проверенной работы обязательно обновить `CURRENT_STATE.md` и `WORK_HISTORY.md`; `RELEASE_RULES.md` обновлять при изменении постоянного инварианта.
+6. Если менялся live Apps Script — заново синхронизировать `apps-script-live/`.
+7. Если менялась структура таблиц — обновлять `docs/tables/*.md`.
 
 ---
 
@@ -37,28 +32,25 @@
 - `Antonsoloway/royal-crm-data`
 - главный файл: `snapshot.json`
 - Google Sheets / Apps Script — первичный источник CRM-данных.
-- `snapshot.json` — атомарный подготовленный снимок для Mini App.
 
 ### Проектная база знаний
 
-- `START_HERE.md` — обязательная инструкция для новых чатов.
-- `CURRENT_STATE.md` — текущее состояние.
-- `WORK_HISTORY.md` — фактическая история работ/диагнозов/откатов.
-- `RELEASE_RULES.md` — постоянные правила frontend-релизов.
-- `docs/tables/ADMIN_TABLE_STRUCTURE.md` — структура живой админской таблицы.
-- `docs/tables/PUBLIC_TABLE_STRUCTURE.md` — структура живой публичной таблицы.
+- `START_HERE.md`
+- `CURRENT_STATE.md`
+- `WORK_HISTORY.md`
+- `RELEASE_RULES.md`
+- `docs/tables/ADMIN_TABLE_STRUCTURE.md`
+- `docs/tables/PUBLIC_TABLE_STRUCTURE.md`
 
 ---
 
-## 3. Полный live Apps Script mirror
+## 3. Live Apps Script
 
-Полный текущий standalone Apps Script таблиц сохранён в `apps-script-live/`.
+Полный standalone Apps Script таблиц сохранён в `apps-script-live/`.
 
-Зеркало получено через `clasp pull` из рабочей папки Cloud Shell `~/table-chp-1.3`.
+На 18.08.2026 подтверждены 28 исходных файлов + `LIVE_MIRROR_MANIFEST.md`. Последняя синхронизация зеркала: `2026-08-18T18:12:05+00:00`.
 
-На 18.08.2026 подтверждены **28 исходных файлов + `LIVE_MIRROR_MANIFEST.md`**. Последняя синхронизация зеркала: `2026-08-18T18:12:05+00:00`.
-
-Ключевые файлы:
+Ключевые live-файлы:
 
 - `01_CORE_MAIN.js`
 - `02_PUBLIC_SYNC_V4.js`
@@ -70,23 +62,19 @@
 - `09_OPTIMIZATION_SCHEDULE.js`
 - `10_DIAGNOSTICS.js`
 - `11_PERFORMANCE_OPTIMIZATION.js`
-- `12_MINI_APP_API.js` … `27_MINIAPP_TEAM_STATUS.js`
+- Mini App-файлы 12–27
 - `appsscript.json`
 - `Вспом функции.js`
 
-`27_MINIAPP_TEAM_STATUS.js` — bridge статуса команды из живого листа `Команды`, колонка L, в Mini App snapshot.
+`27_MINIAPP_TEAM_STATUS.js` передаёт статус команды из живого листа `Команды`, колонка L, в unified snapshot.
 
-`apps-script-live/LIVE_MIRROR_MANIFEST.md` содержит SHA-256 каждого файла.
-
-**Не хранятся в GitHub:** `.clasp.json`, Script Properties, bot tokens, GitHub tokens, Cloudflare secrets.
-
-После любого фактического изменения/push live Apps Script заново выполнить:
+После любого live Apps Script push заново выполнить sync helper:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-app/main/scripts/sync-live-apps-script-to-github.sh)
 ```
 
-Скрипт делает backup вне live-папки, `clasp status`, `clasp pull`, проверку критических файлов и только затем обновляет зеркало GitHub.
+Не хранить в GitHub `.clasp.json`, Script Properties, bot tokens, GitHub tokens и Cloudflare secrets.
 
 ---
 
@@ -96,21 +84,17 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-ap
 
 Название: `Royal_CRM_GOOGLE_ПОИСК_FINAL_FIXED`.
 
-Полная структура зафиксирована в `docs/tables/ADMIN_TABLE_STRUCTURE.md`.
+На листе `Команды` колонка **L = `Статус`**. Используемые значения:
 
-Ключевые листы: `Главная`, `Аватары`, `База участников`, `Команды`, `Рейтинг команд`, `Рейтинг игроков`, `Поиск`, `Карточка команды`, `История спецназа`, `Справочник`, `Инструкция`, `Списки`, `Связи участников`, webhook/activity helper-листы.
+- `Активен`
+- `На паузе`
+- `Неактивен`
 
-Ключевая participant identity: **raw Telegram ID**.
-
-На листе `Команды` колонка **L = `Статус`**. Фактические значения: `Активен`, `На паузе`, `Неактивен`.
-
-Для Mini App статус команды определяется только по связке **название + игра**. Нельзя переносить статус между одноимёнными командами Royal Match и Royal Kingdom.
+Статус команды в Mini App определяется строго по связке **название + игра**. Нельзя переносить статус между одноимёнными командами Royal Match и Royal Kingdom.
 
 ### Публичная таблица
 
 Название: `🕊️ЧАТ ПОБЕДИТЕЛЕЙ🕊️`.
-
-Полная структура: `docs/tables/PUBLIC_TABLE_STRUCTURE.md`.
 
 Публичная таблица получает данные из админской; обратной записи быть не должно.
 
@@ -120,9 +104,8 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-ap
 
 - **Mini App: `v0.5.59`**
 - активный физический entrypoint: `app-v0559.html`
-- `app.html` перенаправляет на `app-v0559.html`, сохраняя `search + hash`.
-- `index.html` также направлен на `app-v0559.html` и сохраняет Telegram hash.
-- GitHub source переключён на v0.5.59 18.08.2026; фактический Telegram smoke-test после последних UI/search-фиксов нужно считать отдельным production-подтверждением.
+- `app.html` и `index.html` ведут на `app-v0559.html`, сохраняя Telegram `search + hash`.
+- GitHub source обновлён 18.08.2026; после последних UI-hotfix требуется отдельный Telegram Android smoke-test.
 
 Ключевые активные модули:
 
@@ -137,73 +120,80 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-ap
 - `self-avatar-priority-v0556.js`
 - `navigation-scroll-top-v0558.js`
 - `active-teams-v0559.js`
+- `active-teams-title-v0559.js`
 - `active-teams-v0559.css`
 - `changelog-v0559.js`
 - `stable-v0559.js`
 
-### Активные команды спецназа — v0.5.59
+---
 
-Источник истины: `team.status` из админской `Команды!L`, опубликованный в unified snapshot.
+## 6. Активные команды / база спецназа — v0.5.59
+
+Источник истины: `team.status` из админской `Команды!L`, опубликованный через Unified Snapshot/Worker.
 
 Для `status === "Активен"`:
 
-- командная карточка на странице `Команды` получает золотую рамку;
+- карточка команды на странице `Команды` получает золотую рамку;
 - командная плашка на странице `Участники` и в профилях получает золотую рамку;
-- на странице команды название золотое и обведено золотой рамкой;
-- чистый значок крота хранится в `assets/specnaz-active-team-clean-v0559.svg`; внутрь SVG встроен проверенный квадратный JPG без серой нижней части;
-- справа от названия на странице команды показывается этот чистый значок как CSS background кнопки, а не обычный `<img>`;
-- нажатие на значок на странице команды открывает страницу `Команды принимающие участие в спецназе`;
-- у каждой активной `.team-card` справа вместо обычной стрелки показывается такой же крот в золотой рамке; он является частью кликабельной карточки, поэтому тап по кроту открывает выбранную команду;
-- каталог строится динамически только из команд `Активен`;
-- пояснение под заголовком каталога: `Команды, участвующие в спецназе и(или) регулярно выкладывающие скрины в базе спецназа.`;
-- каталог имеет собственный фильтр `Все / РМ / РК` и собственную строку поиска `Название команды или игра…`;
-- фильтр/поиск каталога независимы от обычной страницы `Команды` и не меняют её состояние;
-- поиск каталога использует название, игру и доступные `team.searchKeys`, поле ввода не пересоздаётся на каждой букве.
+- на странице команды название золотое и в золотой рамке;
+- справа на странице команды расположен кликабельный крот, открывающий каталог активных команд;
+- справа у активной `.team-card` вместо обычной стрелки расположен тот же крот; он остаётся частью родительской карточки, поэтому тап открывает выбранную команду;
+- каталог строится только из команд `Активен`;
+- каталог имеет собственный фильтр `Все / РМ / РК` и собственный поиск;
+- фильтр/поиск каталога независимы от обычной страницы `Команды`.
 
-`На паузе` остаётся без золотой маркировки. Статус не определяется визуально/по названию и не угадывается.
+### Текущий источник изображения крота
 
-### Навигационный инвариант
+После повторных Android-артефактов **SVG и внешние image-assets больше не используются для крота**.
 
-**Вперёд:** новый экран всегда открывается сверху (`scrollY=0`).
+`active-teams-v0559.css` содержит точный присланный пользователем чистый крот как **встроенный JPEG data-asset** в CSS custom property `--royal-specnaz-mole-v0559`.
 
-**Назад:** возвращает на сохранённую позицию предыдущего экрана/списка.
+Это один и тот же raster-источник для:
 
-Не возвращать ошибочное поведение v0.5.57, где Back тоже отправлялся наверх.
+- кнопки на странице команды;
+- правой зоны активной командной карточки.
+
+Не возвращать SVG-обёртку `assets/specnaz-active-team-clean-v0559.svg` в active CSS и не возвращать обычный `<img>` для этого значка.
+
+### Текст каталога
+
+Верхний золотой заголовок должен быть визуально:
+
+**`Команды принимающие участие в базе спецназа`**
+
+Для гарантированной замены после внутреннего render подключён `active-teams-title-v0559.js`, который следит только за содержимым `#panel` и исправляет заголовок/aria-label кнопки каталога.
+
+Подзаголовок:
+
+`Команды, участвующие в спецназе и(или) регулярно выкладывающие скрины в базе спецназа.`
+
+`На паузе` остаётся без золотой маркировки.
 
 ---
 
-## 6. Поиск
+## 7. Поиск
 
-Основной активный файл: `search-hybrid-v0553.js`.
-
-Дополнительный слой подтверждённых точечных алиасов: `search-aliases-v0559.js`.
+Основной модуль: `search-hybrid-v0553.js`.
 
 Архитектура:
 
-- локальная Android-safe логика остаётся независимым fallback;
+- локальный Android-safe поиск остаётся fallback;
 - `searchKeys` — дополнительный слой;
-- итог: **локальный поиск ИЛИ `searchKeys`**;
-- server keys не имеют права уменьшать локальные результаты;
-- нет edit-distance/fuzzy-комбинаторики/prewarm;
-- поле поиска не пересоздаётся во время ввода;
-- фильтр `Все / РМ / РК` ограничивает список и область поиска, не очищая запрос;
-- точечные подтверждённые алиасы, которые нельзя корректно получить общим pseudo-Cyrillic алгоритмом, могут добавляться клиентским overlay по точной связке `название + игра` без изменения generic search.
+- итог = локальное совпадение ИЛИ `searchKeys`;
+- без edit-distance/fuzzy-комбинаторики и тяжёлого prewarm;
+- `Все / РМ / РК` ограничивает и список, и область поиска, не очищая query.
 
-`search-aliases-v0559.js` после загрузки snapshot добавляет подтверждённый алиас в `searchKeys` нужной команды и участников этой команды; generic search-код при этом не меняется.
+Дополнительный слой подтверждённых алиасов: `search-aliases-v0559.js`.
 
 Контрольные алиасы минимум:
 
 `Has ne dogonyat ↔ нас не догонят`, `XAOC ↔ хаос`, `TOPMO3OB HET ↔ тормозов нет`, `MOLOT POKA ↔ молот рока`, `HEPBbI/HEPBbl B HOPME ↔ нервы в норме`, `Mbl Pycckue ↔ мы русские`, `CKAZKA ↔ сказка`, `BEHOM ↔ веном`, `Aquamarine ↔ аквамарин`, `Da budet swet ↔ да будет свет`, `Mike ↔ майк`, `Xabib ↔ хабиб`, `JoyBand ↔ джойбанд`, `1BY ↔ 1бу`, `BbIIIIKA (Royal Kingdom) ↔ вышка`.
 
+`BbIIIIKA / Royal Kingdom ↔ вышка` добавляется строго по exact identity `название + игра`.
+
 ---
 
-## 7. Snapshot Writer / Apps Script
-
-Live mirror файл: `apps-script-live/25_MINIAPP_UNIFIED_SNAPSHOT.js`.
-
-Team-status bridge: `apps-script-live/27_MINIAPP_TEAM_STATUS.js`.
-
-Текущие версии:
+## 8. Snapshot Writer / Apps Script
 
 - Unified Snapshot Writer: `1.2.2`
 - schemaVersion: `1.4.2`
@@ -214,78 +204,58 @@ Team-status bridge: `apps-script-live/27_MINIAPP_TEAM_STATUS.js`.
 
 Snapshot включает participants, teams, роли/игры/команды, спецназ-очки/ранги, историю, `searchKeys`, `team.status`, `dataHash`.
 
-Один штатный writer trigger: `MINIAPP_exportUnifiedSnapshotToGitHub` → каждые 5 минут.
+Один штатный writer trigger: `MINIAPP_exportUnifiedSnapshotToGitHub` каждые 5 минут.
 
-Свежий подтверждённый snapshot после установки team-status bridge:
+Подтверждённый snapshot после установки team-status bridge:
 
-- `generatedAt`: `2026-08-18T18:13:21.854Z`
-- `schemaVersion`: `1.4.2`
-- `searchIndexVersion`: `1.1.1`
-- `unifiedSnapshotVersion`: `1.2.2`
-- `⚡️ MOLOT POKA / Royal Kingdom`: `status = Активен`
-- контрольные paused-команды: `status = На паузе`
-
-### Ручной запуск
-
-**ФАЙЛ:** `25_MINIAPP_UNIFIED_SNAPSHOT.js`  
-**ФУНКЦИЯ:** `MINIAPP_exportUnifiedSnapshotToGitHub()`  
-**РЕЗУЛЬТАТ:** актуальный unified `snapshot.json` в data repo.
-
-Если менялся Apps Script: backup → syntax check → `clasp status` → `clasp push` → после подтверждения снова sync `apps-script-live/`.
-
-`clasp run ...` не считать рабочим способом, если проект не настроен API executable.
+- `generatedAt=2026-08-18T18:13:21.854Z`
+- `schemaVersion=1.4.2`
+- `unifiedSnapshotVersion=1.2.2`
+- `⚡️ MOLOT POKA / Royal Kingdom`: `status=Активен`
+- контрольные paused-команды: `status=На паузе`
 
 ---
 
-## 8. Worker/backend
+## 9. Worker/backend
 
 Frontend Worker origin: `https://royal-crm-miniapp-api.tropical-spoon.workers.dev`.
 
 Repo config:
 
 - `worker/wrangler.toml`
-- worker: `royal-crm-miniapp-api`
 - main: `src/entry-v1110.js`
 - wrapper version in repo: `1.11.2`
-- base: `entry-v1100.js`
 
 Критические правила:
 
-- participant identity = только raw Telegram ID;
-- `/snapshot` не удаляет `searchKeys` и `searchIndexVersion`;
-- v1.11.2 дополнительно восстанавливает `team.status` из private source snapshot после sanitization;
-- статус сопоставляется по `team.key` или точной связке `название + игра`;
-- repo-конфиг/commit не равен доказанному production runtime: при backend-задаче отдельно проверять production `/health`, когда инструментально возможно.
+- participant identity = raw Telegram ID;
+- `/snapshot` не удаляет `searchKeys` / `searchIndexVersion` / `team.status`;
+- `team.status` восстанавливается по `team.key` или точной связке `название + игра`.
 
-GitHub→Cloudflare build для worker ранее настроен с root `/worker` и `npx wrangler deploy`; секреты остаются только в Cloudflare Variables/Secrets.
-
-Repo vars: `FRONTEND_ORIGIN=https://antonsoloway.github.io`, `DATA_REPO=Antonsoloway/royal-crm-data`, `DATA_BRANCH=main`, `DATA_PATH=snapshot.json`.
+Repo commit не считать автоматически доказанным production runtime.
 
 ---
 
-## 9. Изображения и локальный кэш
+## 10. Навигация и медиакэш
 
-`media-persistent-cache-v0554.js`:
+Навигационный инвариант:
 
-- IndexedDB `royal-crm-media-cache`;
-- cache-first;
-- аватар key = актуальный `avatarFileId`;
-- team photo key = актуальный `photoUrl`;
-- максимум 2 параллельных avatar network load;
-- lazy загрузка около viewport;
-- cleanup примерно 45 дней;
-- лимит примерно 420 изображениями.
+- **вперёд** → новый экран сверху (`scrollY=0`);
+- **назад** → точная сохранённая позиция предыдущего экрана.
 
-`self-avatar-priority-v0556.js`:
+Медиакэш:
 
-- собственная ава восстанавливается приоритетно;
-- не ждёт общей очереди;
-- уже показанный URL сохраняется в памяти запуска;
-- rerender не должен мигать буквенной заглушкой.
+- IndexedDB cache-first;
+- ключ аватара зависит от `avatarFileId`;
+- ключ фото команды зависит от `photoUrl`;
+- не более двух параллельных сетевых загрузок аватаров;
+- lazy-loading около viewport;
+- cleanup примерно через 45 дней;
+- собственная ава не должна мигать буквенной заглушкой при rerender.
 
 ---
 
-## 10. История изменений / credits
+## 11. История изменений / credits
 
 Текущий changelog: `changelog-v0559.js`.
 
@@ -300,80 +270,40 @@ Repo vars: `FRONTEND_ORIGIN=https://antonsoloway.github.io`, `DATA_REPO=Antonsol
 
 ---
 
-## 11. Последние важные релизы
-
-- `v0.5.53` — hybrid search + server `searchKeys` transport/use.
-- `v0.5.54` — IndexedDB persistent image cache.
-- `v0.5.55` — приоритетная своя ава.
-- `v0.5.56` — устранено мигание своей авы.
-- `v0.5.57` — первая попытка global top; Back ошибочно наверх.
-- `v0.5.58` — forward сверху, Back возвращает прежний `scrollY`.
-- `v0.5.59` — статус активных команд спецназа, золотая маркировка, чистый центрированный крот на странице команды и карточках активных команд, каталог активных команд с независимыми фильтрами/поиском, подтверждённый алиас `BbIIIIKA (РК) ↔ вышка`; в credits добавлен `@DmitryRoyal`.
-
-Подробные фактические записи и важные диагнозы: `WORK_HISTORY.md`.
-
----
-
 ## 12. Что нельзя случайно откатить
 
-- не возвращать старые smart-search модули в active entrypoint;
-- не заменять hybrid search только на `searchKeys`;
-- не удалять `searchKeys` Worker-санитизацией;
-- не удалять `team.status` Worker-санитизацией;
-- не определять активность команды по имени без игры;
-- не возвращать битый `assets/specnaz-active-team-v0559.jpg` как активный источник значка; использовать `assets/specnaz-active-team-clean-v0559.svg`;
-- не рендерить спецназ-значок активной команды обычным `<img>`;
-- не убирать крота из правой зоны активных командных карточек и не возвращать там обычную стрелку;
-- не связывать фильтр каталога активных команд с состоянием фильтра обычной страницы `Команды`;
-- не пересоздавать поле поиска каталога при каждой букве;
-- не удалять `search-aliases-v0559.js` и точечный алиас `BbIIIIKA / Royal Kingdom ↔ вышка`, пока название команды остаётся таким;
-- не использовать name/username как participant identity;
-- не делать массовый prewarm изображений/поиска;
 - не терять Telegram `location.hash` при redirects;
-- не использовать `meta refresh` для active redirect;
+- не возвращать `meta refresh` в active entrypoint;
+- не использовать name/username как participant identity;
+- не удалять `searchKeys` или `team.status` Worker-санитизацией;
+- не определять статус команды только по имени без игры;
+- не связывать фильтр каталога активных команд с обычной страницей `Команды`;
+- не возвращать крота к `<img>`, внешнему JPG или SVG-обёртке;
+- источник крота для v0.5.59 — встроенный JPEG data-asset в `active-teams-v0559.css`;
+- не удалять точечный алиас `BbIIIIKA / Royal Kingdom ↔ вышка`;
 - не заставлять Back открывать список сверху;
-- не очищать query при `Все / РМ / РК`;
-- не повторять credits/boilerplate в каждой карточке changelog;
-- не удалять `@DmitryRoyal` из постоянного credits-блока;
-- не править Apps Script по старой копии, если можно сверить `apps-script-live/`/live проект;
-- не считать GitHub commit автоматически подтверждением production deployment.
+- не удалять `@DmitryRoyal` из credits.
 
 ---
 
 ## 13. Минимальный smoke-test frontend
 
 1. Launch через `https://t.me/doveofpeace_bot?startapp`.
-2. Telegram initData/авторизация не потеряны.
-3. Android search ввод без лагов/задвоений/пропавших пробелов.
-4. `Все / РМ / РК` работают вместе с поиском.
-5. Контрольные алиасы находятся, включая `вышка` → `BbIIIIKA` в Royal Kingdom.
-6. При фильтре `РК` запрос `вышка` по-прежнему показывает `BbIIIIKA`.
-7. Открытие команды из середины списка → команда сверху.
-8. `Назад` → прежнее место списка.
-9. `Участники → профиль → Назад` сохраняет карточки/ранги/ачивки.
-10. Аватары/фото после первого открытия приходят из IndexedDB.
-11. Своя ава не мигает после snapshot rerender.
-12. Бейдж версии = `v0.5.59`, история открывает v0.5.59 первой.
-13. На странице `Команды` активные команды в золотой рамке, paused — без неё.
-14. На странице `Участники` плашки активных команд в золотой рамке.
-15. На странице активной команды чистый крот полностью виден и центрирован, без серой заглушки/обрезки.
-16. Нажатие на крота на странице команды открывает `Команды принимающие участие в спецназе`.
-17. На активных командных карточках справа виден чистый крот вместо стрелки; тап по нему открывает выбранную команду.
-18. В каталоге работают `Все / РМ / РК`, счётчик меняется корректно.
-19. Поиск каталога ищет по названию/игре и работает совместно с его фильтром, не меняя обычную страницу `Команды`.
-20. В credits виден `@DmitryRoyal`.
+2. Авторизация не потеряна.
+3. Бейдж версии = `v0.5.59`.
+4. Обычный поиск и `Все / РМ / РК` работают.
+5. `вышка` находит `BbIIIIKA` в Royal Kingdom, включая фильтр `РК`.
+6. Активные команды имеют золотую рамку.
+7. На странице команды крот показывает **точно чистое присланное изображение**, без серых/зелёных/красных полос.
+8. На активных командных карточках справа тот же чистый крот.
+9. Тап по кроту/правой зоне карточки открывает выбранную команду; крот на странице команды открывает каталог.
+10. Заголовок каталога: `Команды принимающие участие в базе спецназа`.
+11. В каталоге работают поиск и `Все / РМ / РК`.
+12. Forward открывает сверху; Back восстанавливает прежнюю позицию.
+13. В credits виден `@DmitryRoyal`.
 
 ---
 
-## 14. Обязательное завершение любой будущей работы
+## 14. Завершение будущей работы
 
-После принятого результата следующий чат должен:
-
-- обновить этот `CURRENT_STATE.md`;
-- добавить новую верхнюю запись в `WORK_HISTORY.md`;
-- обновить `RELEASE_RULES.md`, если изменился инвариант;
-- обновить table docs, если изменилась структура Sheets;
-- после live Apps Script изменений пересинхронизировать `apps-script-live/`;
-- явно записать, что подтверждено: repo / build / push / manual function / production.
-
-Точная инструкция для нового чата находится в `START_HERE.md`.
+После принятой правки обязательно обновлять `CURRENT_STATE.md` и добавлять новую верхнюю запись в `WORK_HISTORY.md`. При изменении постоянного инварианта обновлять `RELEASE_RULES.md`.
