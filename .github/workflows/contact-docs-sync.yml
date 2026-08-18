@@ -1,0 +1,181 @@
+name: Sync contact relay docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/contact-docs-sync.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch project documentation without dropping history
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          # CURRENT_STATE.md
+          path = Path('CURRENT_STATE.md')
+          text = path.read_text()
+          text = text.replace('> **Актуально на 18.08.2026.**', '> **Актуально на 19.08.2026.**', 1)
+
+          contact_section = '''## 6. Контакт с участниками
+
+### Участники с `@username`
+Поведение не менялось:
+- видна синяя `@username`-ссылка;
+- нажатие открывает существующее меню;
+- доступны `Написать в ЛС` и `Позвать в чате`.
+
+### Участники без `@username`
+Активен модуль `contact-by-id-v0559.js`, внутренняя версия **`0.5.59.2`**.
+
+Правильная схема:
+- если `@username` отсутствует, на его обычном месте показывается синяя кнопка **`Связаться`**;
+- identity берётся только из **raw Telegram ID**;
+- кнопка есть в списке `Участники`, составе команды и профиле участника;
+- Mini App **не открывает `tg://user?id=...` напрямую**: Telegram ID-ссылки не являются обычными клиентскими deep-link для WebView;
+- по нажатию Mini App делает авторизованный `POST /contact-by-id` в Worker;
+- Worker проверяет requester и target по raw Telegram ID и актуальному CRM snapshot;
+- Worker через `BOT_TOKEN` отправляет requester-у в ЛС от `@doveofpeace_bot` сообщение с Telegram inline-кнопкой **`👤 Открыть профиль`**, URL кнопки = `tg://user?id=<TARGET_RAW_ID>`;
+- после успешной отправки Mini App показывает popup **`Ссылка готова`** с кнопкой `Открыть Голубя`; переход в чат Голубца выполняется только после явного нажатия пользователя;
+- если Голубец не может написать requester-у, приложение показывает понятную ошибку;
+- ограничения privacy Telegram всё равно могут не позволить открыть профиль конкретного target по ID — это ограничение платформы.
+
+**Нерабочий подход, не возвращать:** скрытый `<a href="tg://user?id=...">`, `window.location.href = tg://...` или другой прямой запуск ID-link из Mini App.
+
+Наличие `@username` всегда имеет приоритет: ID-кнопка не добавляется, если уже есть обычное username-меню.
+'''
+          text = re.sub(r'## 6\. Контакт с участниками\n.*?\n---\n\n## 7\.', contact_section + '\n---\n\n## 7.', text, count=1, flags=re.S)
+
+          worker_section = '''## 11. Worker/backend
+
+Frontend Worker origin: `https://royal-crm-miniapp-api.tropical-spoon.workers.dev`.
+
+Repo config:
+- `worker/wrangler.toml`
+- main: **`src/entry-v1120.js`**
+- wrapper version в repo: **`1.12.0`**
+- base chain: `entry-v1120.js → entry-v1110.js → ...`
+
+Критические правила:
+- participant identity = raw Telegram ID;
+- `/snapshot` не удаляет `searchKeys`, `searchIndexVersion`, `team.status`;
+- `team.status` восстанавливается по `team.key` или точной связке `название + игра`;
+- `/contact-by-id` — авторизованный POST; requester берётся из session, target — из body и проверяется по актуальному snapshot;
+- `/contact-by-id` не раскрывает Bot token клиенту: `BOT_TOKEN` остаётся Cloudflare secret;
+- успешный endpoint отправляет requester-у bot message с inline-кнопкой `tg://user?id=<target>`;
+- `worker/PRODUCTION_STATUS` не угадывается по repo: production runtime подтверждать отдельно.
+
+Автоматическая runtime-проверка:
+- `.github/workflows/worker-smoke.yml` читает активный `main` из `wrangler.toml`;
+- ждёт соответствующую версию на production `/health`;
+- при успехе записывает `runtime/worker-health.json` с подтверждённой фактической версией.
+
+Repo commit не считать автоматически доказанным production runtime до появления/обновления этого proof или эквивалентной прямой проверки.
+'''
+          text = re.sub(r'## 11\. Worker/backend\n.*?\n---\n\n## 12\.', worker_section + '\n---\n\n## 12.', text, count=1, flags=re.S)
+
+          text = text.replace(
+              '- если у участника нет `@username`, не оставлять место пустым: использовать `Связаться` по raw Telegram ID;',
+              '- если у участника нет `@username`, не оставлять место пустым: использовать `Связаться` через авторизованный Worker → сообщение Голубца → inline profile button по raw Telegram ID;'
+          )
+          text = text.replace(
+              '- у участника с `@username` не заменять существующее username-меню ID-кнопкой;',
+              '- у участника с `@username` не заменять существующее username-меню ID-кнопкой;\n- не запускать `tg://user?id=...` напрямую из Mini App; ID-link допускается только внутри Telegram inline-кнопки, присланной Голубцом;'
+          )
+          text = re.sub(
+              r'14\. Тап по `Связаться`[^\n]*',
+              '14. Тап по `Связаться` → Worker отправляет в ЛС Голубца сообщение с `Открыть профиль`; Mini App показывает `Ссылка готова`, затем по кнопке `Открыть Голубя` открывает чат; внутренний participant profile вместо этого не открывается.',
+              text,
+              count=1
+          )
+          path.write_text(text)
+
+          # RELEASE_RULES.md
+          path = Path('RELEASE_RULES.md')
+          text = path.read_text()
+          replacement66 = ('66. Если у участника отсутствует `@username`, на месте username-action показывается **`Связаться`**. '
+                           'Прямой `tg://user?id=<id>` из Mini App запрещён как нерабочая схема. Правильный flow: авторизованный '
+                           '`POST /contact-by-id` → Worker проверяет requester/target по raw Telegram ID → `@doveofpeace_bot` отправляет requester-у '
+                           'сообщение с Telegram inline-кнопкой `tg://user?id=<target>` → Mini App показывает `Ссылка готова` и по явной кнопке открывает чат Голубца. '
+                           'Участники с `@username` сохраняют прежнее username-меню; имя/username не используются как ID identity.')
+          text = re.sub(r'^66\..*$', replacement66, text, count=1, flags=re.M)
+          if not re.search(r'^67\.', text, flags=re.M):
+              text = text.replace('\n## Текущая версия\n',
+                  '\n67. Изменение активного Worker entrypoint не считается production-подтверждённым только по GitHub commit. '
+                  '`.github/workflows/worker-smoke.yml` обязан сверить version из `wrangler.toml` с production `/health` и при успехе сохранить `runtime/worker-health.json`.\n\n## Текущая версия\n')
+          text = text.replace(
+              '- кнопку `Связаться` по raw Telegram ID для участников без `@username`;',
+              '- кнопку `Связаться` для участников без `@username`: Worker → Голубец → Telegram inline-кнопка профиля по raw Telegram ID; прямой ID deep-link из Mini App не используется;'
+          )
+          path.write_text(text)
+
+          # WORK_HISTORY.md — preserve all previous entries and prepend one new factual entry.
+          path = Path('WORK_HISTORY.md')
+          text = path.read_text()
+          marker = '## 2026-08-19 — v0.5.59: `Связаться` исправлено через bot inline profile button'
+          if marker not in text:
+              entry = '''## 2026-08-19 — v0.5.59: `Связаться` исправлено через bot inline profile button
+
+**Симптом:** кнопка `Связаться` у участника без `@username` отображалась, но при нажатии визуально ничего не происходило.
+
+**Точная причина:** первая реализация пыталась открыть `tg://user?id=<raw id>` непосредственно из Telegram Mini App WebView через скрытый `<a>`/`location.href`. Telegram ID-links являются Bot API abstraction и поддерживаются в inline links/buttons сообщения бота, а не как обычная универсальная ссылка из Mini App. Поэтому прямой client deep-link был неправильной архитектурой.
+
+**Исправлено:**
+- прямой `tg://user?id` из `contact-by-id-v0559.js` удалён;
+- модуль поднят до внутренней версии `0.5.59.2`;
+- добавлен Worker wrapper `worker/src/entry-v1120.js`, версия **`1.12.0`**;
+- `worker/wrangler.toml` переключён на `src/entry-v1120.js`;
+- добавлен защищённый `POST /contact-by-id`;
+- requester определяется из подписанной session и дополнительно проверяется по актуальному snapshot;
+- target берётся только как raw Telegram ID, проверяется как актуальный участник со статусом `В чате` и без `@username`;
+- Worker использует существующий Cloudflare secret `BOT_TOKEN` и Telegram Bot API `sendMessage`;
+- Голубец отправляет requester-у в ЛС сообщение с inline-кнопкой `👤 Открыть профиль`, URL которой = `tg://user?id=<targetId>`;
+- после успешной отправки Mini App показывает popup `Ссылка готова` → `Открыть Голубя`; это даёт пользователю явный результат вместо молчаливого async-navigation;
+- если бот не может написать requester-у, endpoint возвращает понятную ошибку;
+- добавлен cooldown от двойного нажатия;
+- `app-v0559.html` получил новый cache-bust `contact-by-id-v0559.js?v=20260819-0015`;
+- changelog исправлен: прежнее описание прямого `tg://` больше не считается действующим.
+
+**Backend deployment:** repo/config переключены на Worker `1.12.0`. Cloudflare Builds ранее настроены на GitHub main + `/worker`. Для отделения repo-state от production runtime добавлен `.github/workflows/worker-smoke.yml`: он ждёт нужную версию на `/health` и при успехе пишет `runtime/worker-health.json`. До такого proof нельзя объявлять runtime подтверждённым только из-за commit.
+
+**Инвариант:** `tg://user?id` не запускать напрямую из Mini App. Для участника без username схема контакта = `Mini App → авторизованный Worker → Голубец → Telegram inline-кнопка профиля`.
+
+---
+
+'''
+              m = re.search(r'^## 2026-', text, flags=re.M)
+              if not m:
+                  raise SystemExit('WORK_HISTORY first dated heading not found')
+              text = text[:m.start()] + entry + text[m.start():]
+              path.write_text(text)
+          PY
+
+      - name: Commit documentation sync
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          git add CURRENT_STATE.md WORK_HISTORY.md RELEASE_RULES.md
+          if git diff --cached --quiet; then
+            echo "Documentation already current"
+            exit 0
+          fi
+          git commit -m "Document contact-by-id bot relay fix"
+          git push origin HEAD:main
