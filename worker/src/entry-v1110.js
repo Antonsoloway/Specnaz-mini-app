@@ -1,6 +1,6 @@
 import currentWorker from './entry-v1100.js';
 
-const WRAPPER_VERSION = '1.11.1';
+const WRAPPER_VERSION = '1.11.2';
 const ALLOWED_CHAT_STATE = 'В чате';
 const CONFIRMED_ALIASES = new Map([
   ['hepbbi b hopme', ['нервы в норме']],
@@ -29,7 +29,8 @@ export default {
         service: 'royal-crm-miniapp-api',
         version: WRAPPER_VERSION,
         participantIdentity: 'telegramId-only',
-        snapshotSearchKeys: 'preserved+deterministic-pseudo'
+        snapshotSearchKeys: 'preserved+deterministic-pseudo',
+        teamStatus: 'preserved'
       }), { status: 200, headers });
     }
 
@@ -60,7 +61,7 @@ async function handleSnapshotWithSearchKeys(request, env, ctx) {
     headers.delete('ETag');
     return new Response(JSON.stringify(payload), { status: base.status, headers });
   } catch (error) {
-    console.warn('snapshot searchKeys merge failed', error?.message || 'unknown');
+    console.warn('snapshot searchKeys/status merge failed', error?.message || 'unknown');
     return base;
   }
 }
@@ -95,6 +96,7 @@ function mergeSearchKeys(snapshot, source) {
   (Array.isArray(snapshot?.teams) ? snapshot.teams : []).forEach(t => {
     const raw = teamsByKey.get(String(t?.key || '').trim()) || teamsByNameGame.get(teamNameGameKey(t?.name, t?.game || (Array.isArray(t?.games) ? t.games[0] : '')));
     t.searchKeys = augmentKeys(safeKeys(raw?.searchKeys), [t?.name, t?.game, ...(Array.isArray(t?.games) ? t.games : [])]);
+    t.status = String(raw?.status || '').trim();
   });
 
   snapshot.searchIndexVersion = String(source?.searchIndexVersion || '');
