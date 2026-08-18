@@ -10,10 +10,29 @@
   box-shadow:0 0 0 1px rgba(255,230,145,.2),0 0 12px rgba(240,185,45,.2),inset 0 1px 0 rgba(255,255,255,.08)!important;
 }
 .team-card.active-team-gold-v0559{
+  position:relative;
+  padding-right:98px!important;
   border-color:#f2c14e!important;
   box-shadow:0 0 0 1px rgba(255,230,145,.2),0 8px 22px rgba(240,185,45,.18),inset 0 1px 0 rgba(255,255,255,.08)!important;
 }
 .team-card.active-team-gold-v0559 .team-card-main>strong{color:#ffd86a!important;text-shadow:0 0 10px rgba(255,202,74,.18)}
+.team-card.active-team-gold-v0559 .chevron{display:none!important}
+.team-card.active-team-gold-v0559::after{
+  content:'';
+  position:absolute;
+  top:50%;
+  right:13px;
+  transform:translateY(-50%);
+  width:72px;
+  height:72px;
+  border:2px solid #f2c14e;
+  border-radius:15px;
+  background:
+    url('assets/specnaz-active-team-clean-v0559.svg') center center / 62px 62px no-repeat,
+    linear-gradient(145deg,rgba(73,56,19,.58),rgba(26,24,18,.9));
+  box-shadow:0 0 0 1px rgba(255,230,145,.15),0 0 14px rgba(240,185,45,.18),inset 0 1px 0 rgba(255,255,255,.08);
+  pointer-events:none;
+}
 
 .team-detail-head.active-team-detail-v0559{position:relative;min-height:86px;padding-right:94px;display:block}
 .team-detail-head.active-team-detail-v0559>h2{
@@ -38,7 +57,7 @@
   border:2px solid #f2c14e;
   border-radius:16px;
   background:
-    url('assets/specnaz-active-team-v0559.jpg') center center / 68px 68px no-repeat,
+    url('assets/specnaz-active-team-clean-v0559.svg') center center / 70px 70px no-repeat,
     linear-gradient(145deg,rgba(73,56,19,.58),rgba(26,24,18,.9));
   box-shadow:0 0 0 1px rgba(255,230,145,.18),0 0 18px rgba(240,185,45,.22),inset 0 1px 0 rgba(255,255,255,.08);
   overflow:hidden;
@@ -60,12 +79,20 @@
 .active-teams-empty-v0559{padding:22px;border:1px solid rgba(242,193,78,.28);border-radius:16px;text-align:center;color:var(--muted,#9aa9b7)}
 
 @media (max-width:420px){
+  .team-card.active-team-gold-v0559{padding-right:86px!important}
+  .team-card.active-team-gold-v0559::after{
+    right:10px;
+    width:64px;
+    height:64px;
+    border-radius:13px;
+    background-size:56px 56px,auto;
+  }
   .team-detail-head.active-team-detail-v0559{padding-right:82px;min-height:76px}
   .active-team-directory-button-v0559{
     width:72px;
     height:72px;
     border-radius:14px;
-    background-size:60px 60px,auto;
+    background-size:62px 62px,auto;
   }
   .team-detail-head.active-team-detail-v0559>h2{font-size:25px;padding:5px 8px}
   .active-teams-head-v0559 h2{font-size:24px}
