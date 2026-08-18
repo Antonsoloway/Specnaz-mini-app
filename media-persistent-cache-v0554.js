@@ -1,13 +1,15 @@
-/* Royal CRM Mini App — Persistent Media Cache v0.5.54
+/* Royal CRM Mini App — Persistent Media Cache v0.5.54.1
  * Persistent IndexedDB cache for participant avatars and team photos.
- * Cache-first, network fallback, low-concurrency loading for weak connections.
+ * Team photos use a stable team+game cache key because Google Sheets photoUrl is ephemeral.
+ * Cache-first, disk prewarm, network fallback, low-concurrency avatar loading.
  */
 (() => {
-  const VERSION = '0.5.54';
+  const VERSION = '0.5.54.1';
   const DB_NAME = 'royal-crm-media-cache';
   const DB_VERSION = 1;
   const STORE = 'images';
   const MAX_AGE_MS = 45 * 24 * 60 * 60 * 1000;
+  const TEAM_REFRESH_MS = 30 * 60 * 1000;
   const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
   const MAX_RECORDS = 420;
   const CONCURRENCY = 2;
@@ -19,6 +21,7 @@
   let active = 0;
   let observer = null;
   let dbPromise = null;
+  let teamWarmPromise = null;
 
   function openDb() {
     if (!('indexedDB' in window)) return Promise.resolve(null);
@@ -54,7 +57,7 @@
     });
   }
 
-  async function idbPut(key, blob, kind) {
+  async function idbPut(key, blob, kind, extra = {}) {
     if (!key || !(blob instanceof Blob) || !blob.size) return false;
     const db = await openDb();
     if (!db) return false;
@@ -63,7 +66,16 @@
       let tx;
       try { tx = db.transaction(STORE, 'readwrite'); }
       catch (_) { resolve(false); return; }
-      tx.objectStore(STORE).put({ key, blob, kind: String(kind || ''), createdAt: now, touchedAt: now, size: blob.size });
+      tx.objectStore(STORE).put({
+        key,
+        blob,
+        kind: String(kind || ''),
+        createdAt: Number(extra.createdAt || now),
+        touchedAt: now,
+        fetchedAt: Number(extra.fetchedAt || now),
+        size: blob.size,
+        ...extra
+      });
       tx.oncomplete = () => resolve(true);
       tx.onerror = () => resolve(false);
       tx.onabort = () => resolve(false);
@@ -86,6 +98,16 @@
     const url = URL.createObjectURL(blob);
     memory.set(key, url);
     return url;
+  }
+
+  function replaceMemoryObjectUrl(memory, key, blob) {
+    const old = memory.get(key);
+    const next = URL.createObjectURL(blob);
+    memory.set(key, next);
+    if (old && old.startsWith('blob:')) {
+      setTimeout(() => { try { URL.revokeObjectURL(old); } catch (_) {} }, 1200);
+    }
+    return next;
   }
 
   function cleanTelegramId(value) {
@@ -118,7 +140,12 @@
   }
 
   function normalizeText(value) {
-    return String(value || '').toLocaleLowerCase('ru-RU').replace(/ё/g, 'е').replace(/[^a-zа-я0-9]+/giu, ' ').replace(/\s+/g, ' ').trim();
+    return String(value || '')
+      .toLocaleLowerCase('ru-RU')
+      .replace(/ё/g, 'е')
+      .replace(/[^a-zа-я0-9]+/giu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   function teamFor(name, game) {
@@ -130,6 +157,12 @@
       || null;
   }
 
+  function stableTeamKey(teamName, game) {
+    const n = normalizeText(teamName);
+    const g = normalizeText(normalizeGame(game));
+    return n ? `team:${n}\n${g}` : '';
+  }
+
   function teamIdentity(img) {
     const panel = document.getElementById('panel');
     const title = panel?.querySelector('.team-detail-head h2');
@@ -138,9 +171,11 @@
     const game = normalizeGame(img?.dataset?.teamGame || gameNode?.textContent || '');
     if (!teamName) return null;
     const team = teamFor(teamName, game);
+    const resolvedName = String(team?.name || teamName).trim();
+    const resolvedGame = normalizeGame(team?.game || team?.games?.[0] || game);
     const photoUrl = String(team?.photoUrl || '').trim();
-    const stable = photoUrl || `${normalizeText(teamName)}\n${normalizeText(game)}`;
-    return { teamName, game, photoUrl, key: `team:${stable}` };
+    const key = stableTeamKey(resolvedName, resolvedGame);
+    return { teamName: resolvedName, game: resolvedGame, photoUrl, key, team };
   }
 
   async function fetchBlob(cacheKey, fetcher, kind) {
@@ -258,6 +293,52 @@
     }
   }
 
+  async function fetchTeamPhotoBlob(teamName, game) {
+    const url = new URL(`${API_URL}/team-photo`);
+    url.searchParams.set('team', teamName);
+    if (game) url.searchParams.set('game', game);
+    const response = await fetch(url.toString(), {
+      method: 'GET', mode: 'cors', cache: 'no-store',
+      headers: { Authorization: `Bearer ${sessionToken}` }
+    });
+    if (!response.ok) throw new Error(`team photo ${response.status}`);
+    const blob = await response.blob();
+    if (!(blob instanceof Blob) || !blob.size || !blob.type.startsWith('image/')) throw new Error('invalid team photo blob');
+    return blob;
+  }
+
+  async function refreshTeamPhotoInBackground(identity, currentRecord, img) {
+    if (!identity?.key || !identity.teamName || !sessionToken) return;
+    const refreshKey = `refresh:${identity.key}`;
+    if (pending.has(refreshKey)) return;
+    const task = (async () => {
+      try {
+        const blob = await fetchTeamPhotoBlob(identity.teamName, identity.game);
+        await idbPut(identity.key, blob, 'team', {
+          sourceUrl: identity.photoUrl || '',
+          fetchedAt: Date.now()
+        });
+        const same = currentRecord?.blob instanceof Blob
+          && currentRecord.blob.size === blob.size
+          && currentRecord.blob.type === blob.type;
+        if (!same) {
+          const objectUrl = replaceMemoryObjectUrl(teamMemory, identity.key, blob);
+          if (img?.isConnected) {
+            img.src = objectUrl;
+            img.dataset.mediaCache = 'refresh';
+            img.parentElement?.classList.remove('photo-error');
+            ensureTeamPhotoLayout(img);
+          }
+        }
+      } catch (error) {
+        console.warn('Background team photo refresh failed:', identity.teamName, error?.message || error);
+      }
+    })();
+    pending.set(refreshKey, task);
+    try { await task; }
+    finally { pending.delete(refreshKey); }
+  }
+
   async function persistentLoadTeamPhoto() {
     const panel = document.getElementById('panel');
     if (!panel || !sessionToken) return;
@@ -265,9 +346,9 @@
     if (!img) return;
     ensureTeamPhotoLayout(img);
     const identity = teamIdentity(img);
-    if (!identity || img.dataset.teamProxyLoaded === 'loading') return;
-    const { teamName, game, key } = identity;
-    try { img.removeAttribute('src'); } catch (_) {}
+    if (!identity?.key || img.dataset.teamProxyLoaded === 'loading') return;
+    const { key } = identity;
+
     if (teamMemory.has(key)) {
       img.src = teamMemory.get(key);
       img.dataset.teamProxyLoaded = '1';
@@ -275,29 +356,68 @@
       img.parentElement?.classList.remove('photo-error');
       return;
     }
+
     img.dataset.teamProxyLoaded = 'loading';
+    try { img.removeAttribute('src'); } catch (_) {}
+
     try {
-      const result = await fetchBlob(key, async () => {
-        const url = new URL(`${API_URL}/team-photo`);
-        url.searchParams.set('team', teamName);
-        if (game) url.searchParams.set('game', game);
-        const response = await fetch(url.toString(), {
-          method: 'GET', mode: 'cors', cache: 'no-store',
-          headers: { Authorization: `Bearer ${sessionToken}` }
-        });
-        if (!response.ok) throw new Error(`team photo ${response.status}`);
-        return response.blob();
-      }, 'team');
-      img.src = toObjectUrl(result.blob, teamMemory, key);
+      const cached = await idbGet(key);
+      const now = Date.now();
+      const cacheAge = cached ? now - Number(cached.touchedAt || cached.createdAt || 0) : Infinity;
+
+      if (cached?.blob instanceof Blob && cached.blob.size && cacheAge < MAX_AGE_MS) {
+        img.src = toObjectUrl(cached.blob, teamMemory, key);
+        img.dataset.teamProxyLoaded = '1';
+        img.dataset.mediaCache = 'disk';
+        img.parentElement?.classList.remove('photo-error');
+        ensureTeamPhotoLayout(img);
+        idbTouch(cached).catch(() => {});
+
+        const fetchedAt = Number(cached.fetchedAt || cached.createdAt || 0);
+        if (now - fetchedAt >= TEAM_REFRESH_MS) {
+          refreshTeamPhotoInBackground(identity, cached, img).catch(() => {});
+        }
+        return;
+      }
+
+      const blob = await fetchTeamPhotoBlob(identity.teamName, identity.game);
+      await idbPut(key, blob, 'team', {
+        sourceUrl: identity.photoUrl || '',
+        fetchedAt: Date.now()
+      });
+      img.src = toObjectUrl(blob, teamMemory, key);
       img.dataset.teamProxyLoaded = '1';
-      img.dataset.mediaCache = result.fromCache ? 'disk' : 'network';
+      img.dataset.mediaCache = 'network';
       img.parentElement?.classList.remove('photo-error');
       ensureTeamPhotoLayout(img);
     } catch (error) {
-      console.warn('Persistent team photo load failed:', error?.message || error);
+      console.warn('Persistent team photo load failed:', identity?.teamName || '', error?.message || error);
       img.dataset.teamProxyLoaded = 'error';
       img.parentElement?.classList.add('photo-error');
     }
+  }
+
+  async function warmTeamCacheFromDisk() {
+    if (teamWarmPromise) return teamWarmPromise;
+    const teams = Array.isArray(snapshotState?.teams) ? snapshotState.teams : [];
+    if (!teams.length) return;
+    teamWarmPromise = (async () => {
+      for (const team of teams) {
+        const photoUrl = String(team?.photoUrl || '').trim();
+        if (!photoUrl) continue;
+        const game = normalizeGame(team?.game || team?.games?.[0] || '');
+        const key = stableTeamKey(team?.name || '', game);
+        if (!key || teamMemory.has(key)) continue;
+        const cached = await idbGet(key);
+        if (!(cached?.blob instanceof Blob) || !cached.blob.size) continue;
+        const age = Date.now() - Number(cached.touchedAt || cached.createdAt || 0);
+        if (age >= MAX_AGE_MS) continue;
+        toObjectUrl(cached.blob, teamMemory, key);
+        idbTouch(cached).catch(() => {});
+      }
+    })();
+    try { await teamWarmPromise; }
+    finally { teamWarmPromise = null; }
   }
 
   async function cleanup() {
@@ -332,18 +452,30 @@
     } catch (_) {}
   }
 
-  // Replace the session-only media layer with a persistent cache while preserving the same global API.
+  // Replace the session-only media layer with the persistent cache while preserving the same global API.
   loadAvatarImage = persistentLoadAvatar;
   setupAvatarLoading = persistentSetupAvatarLoading;
   mediaV0517LoadTeamPhoto = persistentLoadTeamPhoto;
+
+  // Disk-only prewarm after snapshot load. No team-photo network requests are started here.
+  if (typeof loadSnapshot === 'function') {
+    const nativeLoadSnapshot = loadSnapshot;
+    loadSnapshot = async function loadSnapshotWithMediaDiskWarm(...args) {
+      const result = await nativeLoadSnapshot.apply(this, args);
+      warmTeamCacheFromDisk().catch(() => {});
+      return result;
+    };
+  }
 
   setTimeout(() => cleanup().catch(() => {}), 1500);
   window.RoyalPersistentMediaCache = {
     version: VERSION,
     dbName: DB_NAME,
     concurrency: CONCURRENCY,
+    teamRefreshMs: TEAM_REFRESH_MS,
     setup: persistentSetupAvatarLoading,
     loadTeamPhoto: persistentLoadTeamPhoto,
+    warmTeamCacheFromDisk,
     cleanup
   };
   window.__ROYAL_MEDIA_CACHE_VERSION__ = VERSION;
