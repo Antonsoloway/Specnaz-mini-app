@@ -95,7 +95,9 @@ stage "WRITE LIVE MIRROR MANIFEST"
 stage "GIT DIFF"
 cd "$TMP/repo"
 git add apps-script-live
-git diff --cached --check || fail "git diff --check нашёл ошибку"
+# Existing Apps Script files may legitimately contain blank lines at EOF.
+# Ignore only that legacy condition while keeping all other whitespace checks active.
+git -c core.whitespace=-blank-at-eof diff --cached --check || fail "git diff --check нашёл реальную whitespace-ошибку"
 if git diff --cached --quiet; then
   ok "Изменений нет — GitHub уже совпадает с живым зеркалом"
   exit 0
