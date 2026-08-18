@@ -5,7 +5,7 @@
  * Network fallback API + authenticated Project MAYAK media.
  * Participant/history association is based on Telegram-ID-derived private keys.
  */
-var MINIAPP_FALLBACK_API_VERSION = '1.2.0';
+var MINIAPP_FALLBACK_API_VERSION = '1.2.1';
 var MINIAPP_FALLBACK_IDENTITY_SECRET_PROP = 'MINIAPP_FALLBACK_IDENTITY_SECRET';
 var MINIAPP_MAYAK_MEDIA = {
   'leaderboard-players': { fileId: '1qP59gUe5hB7fymTk89RjJ0ks5ahc2r7e', mime: 'image/jpeg' },
@@ -117,7 +117,7 @@ function MINIAPP_fallbackSafeSnapshot_(snapshot) {
   var history = MINIAPP_fallbackSafeHistory_(snapshot.specnazHistory, sourceParticipants);
   return {
     schemaVersion:String(snapshot.schemaVersion || ''), generatedAt:String(snapshot.generatedAt || ''), dataHash:String(snapshot.dataHash || ''), stats:snapshot.stats || {}, participants:participants,
-    teams:(Array.isArray(snapshot.teams) ? snapshot.teams : []).map(function(t){ return { key:String(t && t.key || ''), name:String(t && t.name || ''), game:String(t && t.game || ''), games:Array.isArray(t && t.games) ? t.games : [], photoUrl:String(t && t.photoUrl || ''), memberCount:Number(t && t.memberCount || 0), leaderCount:Number(t && t.leaderCount || 0), assistantCount:Number(t && t.assistantCount || 0), playerCount:Number(t && t.playerCount || 0) }; }),
+    teams:(Array.isArray(snapshot.teams) ? snapshot.teams : []).map(function(t){ return { key:String(t && t.key || ''), name:String(t && t.name || ''), game:String(t && t.game || ''), games:Array.isArray(t && t.games) ? t.games : [], photoUrl:String(t && t.photoUrl || ''), memberCount:Number(t && t.memberCount || 0), leaderCount:Number(t && t.leaderCount || 0), assistantCount:Number(t && t.assistantCount || 0), playerCount:Number(t && t.playerCount || 0), status:String(t && t.status || '') }; }),
     specnazHistory:history, specnazHistoryVersion:String(snapshot.specnazHistoryVersion || history.version || '')
   };
 }

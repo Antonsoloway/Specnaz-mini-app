@@ -9,8 +9,8 @@
  * Search keys are prepared here, while the Mini App keeps its independent v0.5.47-style fallback search.
  */
 
-var MINIAPP_UNIFIED_SNAPSHOT_VERSION = '1.2.1';
-var MINIAPP_UNIFIED_SNAPSHOT_SCHEMA = '1.4.1';
+var MINIAPP_UNIFIED_SNAPSHOT_VERSION = '1.2.2';
+var MINIAPP_UNIFIED_SNAPSHOT_SCHEMA = '1.4.2';
 var MINIAPP_UNIFIED_SEARCH_INDEX_VERSION = '1.1.1';
 var MINIAPP_UNIFIED_SNAPSHOT_HANDLER = 'MINIAPP_exportUnifiedSnapshotToGitHub';
 var MINIAPP_UNIFIED_SNAPSHOT_LAST_HASH = 'MINIAPP_UNIFIED_SNAPSHOT_LAST_HASH';
@@ -70,6 +70,10 @@ function MINIAPP_exportUnifiedSnapshotToGitHub() {
     if (!repo || !token) throw new Error('DATA_GITHUB_REPO / DATA_GITHUB_TOKEN missing');
 
     var stable = MINIAPP_buildStableSnapshot_();
+    if (typeof MINIAPP_attachTeamStatusesToSnapshot_ !== 'function') {
+      throw new Error('MINIAPP_attachTeamStatusesToSnapshot_ missing');
+    }
+    var teamStatusStats = MINIAPP_attachTeamStatusesToSnapshot_(stable);
     if (!stable || !Array.isArray(stable.participants) || !Array.isArray(stable.teams)) {
       throw new Error('MINIAPP_buildStableSnapshot_ returned invalid data');
     }
@@ -118,7 +122,8 @@ function MINIAPP_exportUnifiedSnapshotToGitHub() {
         participantSearchKeys: searchStats.participantKeys,
         teamSearchKeys: searchStats.teamKeys,
         statsTouched: statsTouched,
-        historySections: sections.length
+        historySections: sections.length,
+        teamStatusStats: teamStatusStats
       };
     }
 
@@ -152,6 +157,7 @@ function MINIAPP_exportUnifiedSnapshotToGitHub() {
       teamSearchKeys: searchStats.teamKeys,
       statsTouched: statsTouched,
       historySections: sections.length,
+      teamStatusStats: teamStatusStats,
       github: github
     };
   } finally {
