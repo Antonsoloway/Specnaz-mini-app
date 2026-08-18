@@ -13,7 +13,7 @@ info(){ printf '\033[36m[INFO]\033[0m %s\n' "$*"; }
 warn(){ printf '\033[33m[WARN]\033[0m %s\n' "$*"; }
 fail(){ printf '\033[31m[ERROR]\033[0m %s\n' "$*" >&2; exit 1; }
 
-info "Royal CRM live search alias installer: BbIIIIKA (Royal Kingdom) -> вышка"
+info "Royal CRM live search alias installer: BbllllKA (Royal Kingdom) -> вышка"
 [[ -d "$ROOT" ]] || fail "Apps Script folder not found: $ROOT"
 mkdir -p "$BACKUP_DIR/pre-pull" "$BACKUP_DIR/live-before-patch"
 cd "$ROOT"
@@ -39,28 +39,32 @@ from pathlib import Path
 p = Path('25_MINIAPP_UNIFIED_SNAPSHOT.js')
 t = p.read_text(encoding='utf-8')
 
-if "var MINIAPP_UNIFIED_SNAPSHOT_VERSION = '1.2.2';" in t:
+if "var MINIAPP_UNIFIED_SNAPSHOT_VERSION = '1.2.3';" in t:
     t = t.replace(
-        "var MINIAPP_UNIFIED_SNAPSHOT_VERSION = '1.2.2';",
         "var MINIAPP_UNIFIED_SNAPSHOT_VERSION = '1.2.3';",
+        "var MINIAPP_UNIFIED_SNAPSHOT_VERSION = '1.2.4';",
         1,
     )
-elif "var MINIAPP_UNIFIED_SNAPSHOT_VERSION = '1.2.3';" not in t:
+elif "var MINIAPP_UNIFIED_SNAPSHOT_VERSION = '1.2.4';" not in t:
     raise SystemExit('[ERROR] Unexpected live Unified Snapshot version; refusing blind patch')
 
-if "var MINIAPP_UNIFIED_SEARCH_INDEX_VERSION = '1.1.1';" in t:
+if "var MINIAPP_UNIFIED_SEARCH_INDEX_VERSION = '1.1.2';" in t:
     t = t.replace(
-        "var MINIAPP_UNIFIED_SEARCH_INDEX_VERSION = '1.1.1';",
         "var MINIAPP_UNIFIED_SEARCH_INDEX_VERSION = '1.1.2';",
+        "var MINIAPP_UNIFIED_SEARCH_INDEX_VERSION = '1.1.3';",
         1,
     )
-elif "var MINIAPP_UNIFIED_SEARCH_INDEX_VERSION = '1.1.2';" not in t:
+elif "var MINIAPP_UNIFIED_SEARCH_INDEX_VERSION = '1.1.3';" not in t:
     raise SystemExit('[ERROR] Unexpected live searchIndexVersion; refusing blind patch')
 
-t = t.replace(' * v1.2.1\n', ' * v1.2.3\n', 1)
-t = t.replace(' * v1.2.2\n', ' * v1.2.3\n', 1)
+t = t.replace(' * v1.2.3\n', ' * v1.2.4\n', 1)
 
-alias_line = "  'bbiiiika': ['вышка']"
+# Remove the earlier misread alias if present. The factual CRM name is
+# "🗡 BbllllKA" (four lowercase L characters after Bb), normalized to bbllllka.
+t = t.replace("  'bbiiiika': ['вышка'],\n", '')
+t = t.replace("  'bbiiiika': ['вышка']\n", '')
+
+alias_line = "  'bbllllka': ['вышка']"
 if alias_line not in t:
     anchors = [
         "  'xabib': ['хабиб']\n};",
@@ -75,9 +79,9 @@ if alias_line not in t:
             break
     if not replaced:
         raise SystemExit('[ERROR] Search alias map anchor not found; refusing blind patch')
-    print('[OK] Added server alias bbiiiika -> вышка')
+    print('[OK] Added factual server alias bbllllka -> вышка')
 else:
-    print('[OK] Server alias already present')
+    print('[OK] Factual server alias already present')
 
 if "MINIAPP_attachTeamStatusesToSnapshot_" not in t:
     raise SystemExit('[ERROR] Team-status bridge is missing from live writer; refusing push')
@@ -85,8 +89,8 @@ if "var MINIAPP_UNIFIED_SNAPSHOT_SCHEMA = '1.4.2';" not in t:
     raise SystemExit('[ERROR] Expected schemaVersion 1.4.2 missing; refusing push')
 
 p.write_text(t, encoding='utf-8')
-print('[OK] Unified Snapshot Writer = 1.2.3')
-print('[OK] searchIndexVersion = 1.1.2')
+print('[OK] Unified Snapshot Writer = 1.2.4')
+print('[OK] searchIndexVersion = 1.1.3')
 print('[OK] schemaVersion preserved = 1.4.2')
 PY
 
@@ -95,9 +99,12 @@ node --check 25_MINIAPP_UNIFIED_SNAPSHOT.js
 ok "JavaScript syntax OK"
 
 info "Verifying exact patch markers"
-grep -F "var MINIAPP_UNIFIED_SNAPSHOT_VERSION = '1.2.3';" 25_MINIAPP_UNIFIED_SNAPSHOT.js >/dev/null
-grep -F "var MINIAPP_UNIFIED_SEARCH_INDEX_VERSION = '1.1.2';" 25_MINIAPP_UNIFIED_SNAPSHOT.js >/dev/null
-grep -F "'bbiiiika': ['вышка']" 25_MINIAPP_UNIFIED_SNAPSHOT.js >/dev/null
+grep -F "var MINIAPP_UNIFIED_SNAPSHOT_VERSION = '1.2.4';" 25_MINIAPP_UNIFIED_SNAPSHOT.js >/dev/null
+grep -F "var MINIAPP_UNIFIED_SEARCH_INDEX_VERSION = '1.1.3';" 25_MINIAPP_UNIFIED_SNAPSHOT.js >/dev/null
+grep -F "'bbllllka': ['вышка']" 25_MINIAPP_UNIFIED_SNAPSHOT.js >/dev/null
+if grep -F "'bbiiiika': ['вышка']" 25_MINIAPP_UNIFIED_SNAPSHOT.js >/dev/null; then
+  fail "Old misread bbiiiika alias is still present"
+fi
 grep -F "MINIAPP_attachTeamStatusesToSnapshot_" 25_MINIAPP_UNIFIED_SNAPSHOT.js >/dev/null
 ok "Patch markers verified"
 
@@ -129,17 +136,17 @@ try:
     data = json.load(sys.stdin)
 except Exception:
     sys.exit(1)
-if str(data.get("searchIndexVersion", "")) != "1.1.2":
+if str(data.get("searchIndexVersion", "")) != "1.1.3":
     sys.exit(1)
 for team in data.get("teams") or []:
-    name = str(team.get("name") or "").strip().lower()
+    name = "".join(ch.lower() for ch in str(team.get("name") or "") if ch.isalnum())
     games = [str(team.get("game") or "")] + [str(x) for x in (team.get("games") or [])]
     game_text = " ".join(games).lower()
-    if name == "bbiiiika" and "royal kingdom" in game_text:
+    if name == "bbllllka" and "royal kingdom" in game_text:
         keys = [str(x).strip().lower() for x in (team.get("searchKeys") or [])]
         if "вышка" in keys:
-            print("[OK] snapshot confirms: BbIIIIKA / Royal Kingdom contains searchKey \\\"вышка\\\"")
-            print("[OK] snapshot searchIndexVersion = 1.1.2")
+            print("[OK] snapshot confirms: 🗡 BbllllKA / Royal Kingdom contains searchKey \"вышка\"")
+            print("[OK] snapshot searchIndexVersion = 1.1.3")
             print("[OK] snapshot unifiedSnapshotVersion = " + str(data.get("unifiedSnapshotVersion", "")))
             sys.exit(0)
 sys.exit(1)
@@ -162,11 +169,11 @@ elif [[ $? -eq 2 ]]; then
   printf '\033[32m==============================================\033[0m\n'
   printf 'Wait up to 5 minutes for the existing snapshot trigger.\n'
 else
-  warn "Apps Script push succeeded but the new snapshot was not observed within the polling window"
+  warn "Apps Script push succeeded but the exact BbllllKA alias was not observed within the polling window"
   printf '\n\033[33m=====================================================\033[0m\n'
   printf '\033[33m PUSH OK; SNAPSHOT CONFIRMATION STILL PENDING \033[0m\n'
   printf '\033[33m=====================================================\033[0m\n'
 fi
 
 printf 'Backups: %s\n' "$BACKUP_DIR"
-printf 'Unified writer: 1.2.3\nSchema: 1.4.2\nSearch index: 1.1.2\nAlias: BbIIIIKA / Royal Kingdom -> вышка\n'
+printf 'Unified writer: 1.2.4\nSchema: 1.4.2\nSearch index: 1.1.3\nAlias: BbllllKA / Royal Kingdom -> вышка\n'
