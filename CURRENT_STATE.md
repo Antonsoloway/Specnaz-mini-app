@@ -1,6 +1,6 @@
 # Royal CRM / «Таблица ЧП» — CURRENT STATE
 
-> **Актуально на 18.08.2026.**
+> **Актуально на 19.08.2026.**
 > Новый чат обязан сначала прочитать `START_HERE.md`, затем этот файл и последние записи `WORK_HISTORY.md`.
 > Фактический runtime / живые Google Sheets / live Apps Script / текущий GitHub имеют приоритет над памятью чатов.
 
@@ -9,10 +9,10 @@
 1. Не менять код по памяти.
 2. Перед правкой открыть фактический файл и проверить текущую версию/SHA/подключение.
 3. Если задача зависит от данных — сверить актуальный `snapshot.json` и/или живую Google Sheets.
-4. Если задача относится к Apps Script таблиц — использовать `apps-script-live/` как зеркало последнего `clasp pull` и при необходимости дополнительно сверять live Apps Script.
-5. После принятой/проверенной работы обязательно обновить `CURRENT_STATE.md` и `WORK_HISTORY.md`; `RELEASE_RULES.md` обновлять при изменении постоянного инварианта.
-6. Если менялся live Apps Script — заново синхронизировать `apps-script-live/`.
-7. Если менялась структура таблиц — обновлять `docs/tables/*.md`.
+4. Для Apps Script использовать `apps-script-live/` как зеркало последнего `clasp pull`; после live push заново синхронизировать зеркало.
+5. После принятой/проверенной работы обязательно обновить `CURRENT_STATE.md` и `WORK_HISTORY.md`; `RELEASE_RULES.md` — если изменился постоянный инвариант.
+6. Если менялась структура Google Sheets — обновлять `docs/tables/*.md`.
+7. GitHub commit не равен production-подтверждению backend; runtime проверять отдельно.
 
 ---
 
@@ -42,32 +42,20 @@
 
 ---
 
-## 3. Live Apps Script
+## 3. Live Apps Script / данные
 
-Полный standalone Apps Script таблиц сохранён в `apps-script-live/`.
+Полный standalone Apps Script таблиц хранится зеркалом в `apps-script-live/`.
 
-На 18.08.2026 подтверждены 28 исходных файлов + `LIVE_MIRROR_MANIFEST.md`.
+Текущее подтверждённое состояние writer:
+- Unified Snapshot Writer: **`1.2.4`**
+- schemaVersion: `1.4.2`
+- searchIndexVersion: **`1.1.3`**
+- Fallback API: `1.2.1`
+- team status bridge: `27_MINIAPP_TEAM_STATUS.js`, bridge `1.0.0`
+- штатный handler: `MINIAPP_exportUnifiedSnapshotToGitHub`
+- штатный trigger: раз в 5 минут.
 
-Ключевые live-файлы:
-- `01_CORE_MAIN.js`
-- `02_PUBLIC_SYNC_V4.js`
-- `04_TELEGRAM_AVATARS.js`
-- `05_RELIABLE_WEBHOOK_QUEUE.js`
-- `06_Reliable_Edit_Trigger.js`
-- `07_FINAL_ROLE_FIX.js`
-- `08_TELEGRAM_NAME_LINKS.js`
-- `09_OPTIMIZATION_SCHEDULE.js`
-- `10_DIAGNOSTICS.js`
-- `11_PERFORMANCE_OPTIMIZATION.js`
-- Mini App-файлы 12–27
-- `appsscript.json`
-- `Вспом функции.js`
-
-Текущий Unified Snapshot Writer: **`1.2.4`**.  
-`searchIndexVersion`: **`1.1.3`**.  
-`27_MINIAPP_TEAM_STATUS.js` передаёт статус команды из живого листа `Команды`, колонка L, в unified snapshot.
-
-После любого live Apps Script push заново выполнять:
+После любого live Apps Script push:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-app/main/scripts/sync-live-apps-script-to-github.sh)
@@ -82,12 +70,12 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-ap
 ### Админская таблица
 Название: `Royal_CRM_GOOGLE_ПОИСК_FINAL_FIXED`.
 
-На листе `Команды` колонка **L = `Статус`**. Используемые значения:
+На листе `Команды` колонка **L = `Статус`**. Значения:
 - `Активен`
 - `На паузе`
 - `Неактивен`
 
-Статус команды в Mini App определяется строго по связке **название + игра**.
+Статус команды для Mini App определяется строго по связке **название + игра**.
 
 ### Публичная таблица
 Название: `🕊️ЧАТ ПОБЕДИТЕЛЕЙ🕊️`.
@@ -112,43 +100,90 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-ap
 - `navigation-card-restore-v0532.js`
 - `search-hybrid-v0553.js`
 - `search-aliases-v0559.js`
-- `media-persistent-cache-v0554.js` — фактически версия **0.5.54.1**
+- `media-persistent-cache-v0554.js` — внутренняя версия `0.5.54.1`
 - `self-avatar-priority-v0556.js`
 - `navigation-scroll-top-v0558.js`
 - `active-teams-v0559.js`
 - `active-teams-title-v0559.js`
 - `active-teams-v0559.css`
-- `contact-by-id-v0559.js`
+- `contact-by-id-v0559.js` — внутренняя версия **`0.5.59.2`**
 - `changelog-v0559.js`
 - `stable-v0559.js`
+
+Текущий cache-bust contact module: `contact-by-id-v0559.js?v=20260819-0015`.
 
 ---
 
 ## 6. Контакт с участниками
 
-### Участники с `@username`
+### Есть `@username`
 Поведение не менялось:
 - видна синяя `@username`-ссылка;
 - нажатие открывает существующее меню;
 - доступны `Написать в ЛС` и `Позвать в чате`.
 
-### Участники без `@username`
-Активен модуль `contact-by-id-v0559.js`.
+### Нет `@username`
+Показывается синяя кнопка **`Связаться`** на том же месте.
 
-Правила:
-- если `@username` отсутствует, на его обычном месте показывается синяя кнопка **`Связаться`**;
-- identity берётся только из **raw Telegram ID**;
-- кнопка появляется в списке `Участники`, составе команды и профиле участника; также модуль умеет декорировать внутренние directory/hero-карточки, если в них есть raw Telegram ID;
-- при нажатии используется deep link `tg://user?id=<RAW_TELEGRAM_ID>`;
-- deep link запускается непосредственно из пользовательского клика через скрытый `<a>`, а не через `WebApp.openTelegramLink()`, потому что `openTelegramLink()` предназначен для `https://t.me/...`;
-- privacy/ограничения Telegram могут не позволить открыть отдельного пользователя по ID; это ограничение Telegram, а не CRM;
-- наличие `@username` всегда имеет приоритет: кнопка `Связаться` не добавляется, если уже есть `[data-user-menu]`.
+Identity = только **raw Telegram ID**.
 
-Не использовать имя или `@username` как identity для ID-кнопки.
+Правильная цепочка:
+
+`Mini App → POST /contact-by-id → Worker → @doveofpeace_bot → inline-кнопка «Открыть профиль»`
+
+Подробности:
+- Mini App **не запускает `tg://user?id=...` напрямую**;
+- frontend отправляет авторизованный `POST /contact-by-id` с target raw Telegram ID;
+- Worker определяет requester из session и проверяет requester/target по актуальному snapshot;
+- target должен быть текущим участником `В чате` и без `@username`;
+- Worker использует `BOT_TOKEN` только серверно;
+- Голубец отправляет requester-у в ЛС сообщение с inline-кнопкой `👤 Открыть профиль`, URL = `tg://user?id=<targetId>`;
+- после успеха Mini App показывает popup `Ссылка готова` → `Открыть Голубя`;
+- если Голубец не может написать requester-у, приложение показывает ошибку;
+- privacy/context ограничения Telegram могут не позволить открыть конкретный профиль по ID.
+
+**Не возвращать:** скрытый `<a href="tg://user?id=...">`, `window.location.href = tg://...` или иной прямой ID deep-link из Mini App — этот подход уже проверен на Android и не сработал.
 
 ---
 
-## 7. Активные команды / база спецназа
+## 7. Worker/backend
+
+Frontend Worker origin: `https://royal-crm-miniapp-api.tropical-spoon.workers.dev`.
+
+Repo config:
+- `worker/wrangler.toml`
+- active repo main: **`src/entry-v1120.js`**
+- wrapper version в repo: **`1.12.0`**
+- base chain: `entry-v1120.js → entry-v1110.js → ...`
+
+`entry-v1120.js` добавляет:
+- `/health` с `contactById: bot-inline-profile-button`;
+- `OPTIONS /contact-by-id`;
+- авторизованный `POST /contact-by-id`;
+- проверку requester/target по raw Telegram ID;
+- Bot API `sendMessage` requester-у;
+- inline profile button `tg://user?id=<targetId>`;
+- понятные ошибки `BOT_CANNOT_MESSAGE_REQUESTER`, `TARGET_NOT_FOUND`, `USERNAME_AVAILABLE` и др.;
+- короткий duplicate cooldown.
+
+Секреты остаются только в Cloudflare:
+- `BOT_TOKEN`
+- `GITHUB_TOKEN`
+- `SESSION_SECRET`
+
+### Production proof
+
+`.github/workflows/worker-smoke.yml`:
+- читает активный source из `worker/wrangler.toml`;
+- извлекает ожидаемый `WRAPPER_VERSION`;
+- ждёт эту версию на production `/health`;
+- при успехе должен записать `runtime/worker-health.json`.
+
+**На момент этой записи repo/config уже переключены на `1.12.0`, но production runtime не считать подтверждённым, пока нет runtime proof или эквивалентной прямой проверки.**
+
+---
+
+## 8. Активные команды / база спецназа
 
 Источник истины: `team.status` из админской `Команды!L`, опубликованный через Unified Snapshot/Worker.
 
@@ -162,25 +197,19 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-ap
 - каталог имеет собственный фильтр `Все / РМ / РК` и собственный поиск;
 - фильтр/поиск каталога независимы от обычной страницы `Команды`.
 
-### Крот
-`active-teams-v0559.css` содержит присланное пользователем изображение как встроенный JPEG data-asset `--royal-specnaz-mole-v0559`.
+Крот: встроенный JPEG data-asset `--royal-specnaz-mole-v0559` в `active-teams-v0559.css`. Не возвращать SVG-wrapper, обычный `<img>` или внешний image-loader.
 
-Не возвращать SVG-wrapper, обычный `<img>` или внешний image-loader для этого значка.
-
-### Текст каталога
-Золотой заголовок:
-
+Заголовок каталога:
 **`Команды принимающие участие в базе спецназа`**
 
 Подзаголовок:
-
 `Команды, участвующие в спецназе и(или) регулярно выкладывающие скрины в базе спецназа.`
 
 `На паузе` остаётся без золотой маркировки.
 
 ---
 
-## 8. Поиск
+## 9. Поиск
 
 Основной модуль: `search-hybrid-v0553.js`.
 
@@ -201,42 +230,36 @@ Server-side источник:
 - writer `1.2.4`;
 - `searchIndexVersion=1.1.3`.
 
-Фактически подтверждено в `royal-crm-data/snapshot.json`:
-- объект `🗡 BbllllKA / Royal Kingdom` содержит `вышка` и `vyshka` в `searchKeys`;
-- участники этой команды также получают этот alias.
+Фактически подтверждено в `royal-crm-data/snapshot.json`: команда и её участники содержат `вышка` / `vyshka` в `searchKeys`.
 
 Не возвращать ошибочное написание `BbIIIIKA`.
 
 ---
 
-## 9. Медиакэш
+## 10. Медиакэш
 
-Активный файл: `media-persistent-cache-v0554.js`, внутренняя версия **`0.5.54.1`**.
+Активный файл: `media-persistent-cache-v0554.js`, внутренняя версия `0.5.54.1`.
 
 ### Аватары
-- ключ = актуальный `avatarFileId`;
+- key = стабильный `avatarFileId`;
 - IndexedDB cache-first;
-- не более двух параллельных сетевых загрузок;
 - lazy loading около viewport;
+- не более двух параллельных сетевых загрузок;
 - своя ава получает приоритетное восстановление.
 
 ### Фото команд
-Корневая проблема старой реализации: `photoUrl` из Google Sheets является временным `lh7-rt.googleusercontent.com/...` URL и меняется между snapshot даже при том же изображении. Поэтому старый ключ по `photoUrl` постоянно промахивался.
+- key = стабильная связка **нормализованное имя команды + игра**;
+- временный Google Sheets `photoUrl` не является cache identity;
+- сохранённые team blobs после загрузки CRM поднимаются из IndexedDB в `teamMemory` без сетевого prewarm;
+- cached photo показывается сразу;
+- примерно после 30 минут допускается неблокирующий background refresh;
+- cleanup около 45 дней, общий лимит около 420 изображений.
 
-Текущие правила:
-- ключ фото = стабильная связка **нормализованное имя команды + игра**;
-- `photoUrl` не является identity кэша;
-- уже сохранённые team blobs после загрузки CRM поднимаются из IndexedDB в `teamMemory` без сетевого prewarm;
-- при открытии команды сначала показывается memory/disk cache;
-- старое сохранённое фото может быть показано сразу, а после ~30 минут выполняется фоноваая проверка/refresh;
-- если команда реально сменила фото, новое изображение заменяет cached blob при refresh;
-- cleanup примерно через 45 дней, общий лимит около 420 изображений.
-
-Не возвращать ключ team cache к временному `photoUrl`.
+Не возвращать ключ team cache к временному `photoUrl` и не делать массовый сетевой prewarm.
 
 ---
 
-## 10. Навигация
+## 11. Навигация
 
 Инвариант:
 - **вперёд** → новый экран сверху (`scrollY=0`);
@@ -246,29 +269,11 @@ Server-side источник:
 
 ---
 
-## 11. Worker/backend
-
-Frontend Worker origin: `https://royal-crm-miniapp-api.tropical-spoon.workers.dev`.
-
-Repo config:
-- `worker/wrangler.toml`
-- main: `src/entry-v1110.js`
-- wrapper version в repo: `1.11.2`
-
-Критические правила:
-- participant identity = raw Telegram ID;
-- `/snapshot` не удаляет `searchKeys`, `searchIndexVersion`, `team.status`;
-- `team.status` восстанавливается по `team.key` или точной связке `название + игра`.
-
-Repo commit не считать автоматически доказанным production runtime.
-
----
-
 ## 12. История изменений / credits
 
 Текущий changelog: `changelog-v0559.js`.
 
-Шапка `Помощь в разработке, тесты` содержит:
+Шапка `Помощь в разработке, тесты`:
 - `@sfinks_spb`
 - `@O_Chaplygina`
 - `@Yanochka_2404`
@@ -281,44 +286,45 @@ Repo commit не считать автоматически доказанным 
 ## 13. Что нельзя случайно откатить
 
 - не терять Telegram `location.hash` при redirects;
-- не возвращать `meta refresh` в active entrypoint;
-- не использовать name/username как participant identity;
-- не удалять `searchKeys` или `team.status` Worker-санитизацией;
-- не определять статус команды только по имени без игры;
+- не возвращать `meta refresh`;
+- participant identity = только raw Telegram ID;
+- не удалять `searchKeys`, `searchIndexVersion` или `team.status` Worker-санитизацией;
+- team status identity = `название + игра`;
 - не связывать фильтр каталога активных команд с обычной страницей `Команды`;
-- не возвращать крота к `<img>`, внешнему JPG или SVG-обёртке;
+- не возвращать крота к `<img>`/SVG/external asset;
 - не возвращать ошибочное имя `BbIIIIKA`;
 - server alias `'bbllllka': ['вышка']` должен оставаться в Unified Snapshot Writer;
 - не возвращать team-photo cache key к временному Google `photoUrl`;
-- не массово скачивать все фото команд при старте;
-- если у участника нет `@username`, не оставлять место пустым: использовать `Связаться` по raw Telegram ID;
-- у участника с `@username` не заменять существующее username-меню ID-кнопкой;
+- не массово скачивать все фото команд на старте;
+- если у участника нет `@username`, использовать `Связаться` через Worker → Голубец → inline profile button;
+- **не запускать `tg://user?id` напрямую из Mini App**;
+- у участника с `@username` не заменять существующее username-меню;
 - не заставлять Back открывать список сверху;
-- не удалять `@DmitryRoyal` из credits.
+- не удалять `@DmitryRoyal` из credits;
+- не объявлять Worker production-подтверждённым только по GitHub commit.
 
 ---
 
-## 14. Минимальный smoke-test frontend
+## 14. Минимальный smoke-test
 
 1. Launch через `https://t.me/doveofpeace_bot?startapp`.
 2. Авторизация не потеряна.
 3. Бейдж версии = `v0.5.59`.
-4. Обычный поиск и `Все / РМ / РК` работают.
-5. `вышка` находит `🗡 BbllllKA` в Royal Kingdom, включая фильтр `РК`.
-6. Активные команды имеют золотую рамку.
-7. На странице команды крот без артефактов.
-8. На активных карточках справа тот же крот.
-9. Заголовок каталога: `Команды принимающие участие в базе спецназа`.
-10. В каталоге работают поиск и `Все / РМ / РК`.
-11. Ранее открытая команда после повторного входа показывает cached photo без прежней сетевой задержки.
-12. У участника с `@username` отображается прежняя `@`-кнопка и меню.
-13. У участника без `@username` отображается кнопка `Связаться`.
-14. Тап по `Связаться` пытается открыть Telegram-профиль через `tg://user?id=<raw id>` и не открывает карточку участника внутри Mini App вместо этого.
-15. Forward открывает сверху; Back восстанавливает прежнюю позицию.
-16. В credits виден `@DmitryRoyal`.
+4. Поиск и `Все / РМ / РК` работают.
+5. `вышка` находит `🗡 BbllllKA` в РК.
+6. Активные команды имеют золотую маркировку и правильного крота.
+7. Каталог активных команд имеет правильный заголовок, поиск и фильтры.
+8. Повторное открытие ранее загруженной команды показывает photo cache без прежней задержки.
+9. У участника с `@username` работает старое username-меню.
+10. У участника без `@username` отображается `Связаться`.
+11. Тап `Связаться` → `Отправляю…` → popup `Ссылка готова`; после `Открыть Голубя` в ЛС Голубца есть inline-кнопка `👤 Открыть профиль`.
+12. Тап по contact action не открывает внутренний participant profile вместо contact flow.
+13. Forward открывает сверху; Back восстанавливает позицию.
+14. В credits виден `@DmitryRoyal`.
+15. Для backend-задач отдельно сверяется production Worker version.
 
 ---
 
 ## 15. Завершение будущей работы
 
-После принятой правки обязательно обновлять `CURRENT_STATE.md` и добавлять новую верхнюю запись в `WORK_HISTORY.md`. При изменении постоянного инварианта обновлять `RELEASE_RULES.md`.
+После принятой правки обязательно обновлять этот файл и добавлять новую верхнюю запись в `WORK_HISTORY.md`. При изменении постоянного инварианта обновлять `RELEASE_RULES.md`.
