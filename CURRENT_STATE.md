@@ -19,22 +19,19 @@
 ## 2. Репозитории и точки входа
 
 ### Основной репозиторий
-
 - GitHub: `Antonsoloway/Specnaz-mini-app`
 - branch: `main`
 - постоянный Mini App entrypoint: `app.html`
 - публичный URL: `https://antonsoloway.github.io/Specnaz-mini-app/app.html`
 - Telegram bot: `@doveofpeace_bot`
-- постоянный launch link: `https://t.me/doveofpeace_bot?startapp`
+- launch link: `https://t.me/doveofpeace_bot?startapp`
 
 ### Data repo
-
 - `Antonsoloway/royal-crm-data`
 - главный файл: `snapshot.json`
 - Google Sheets / Apps Script — первичный источник CRM-данных.
 
 ### Проектная база знаний
-
 - `START_HERE.md`
 - `CURRENT_STATE.md`
 - `WORK_HISTORY.md`
@@ -48,10 +45,9 @@
 
 Полный standalone Apps Script таблиц сохранён в `apps-script-live/`.
 
-На 18.08.2026 подтверждены 28 исходных файлов + `LIVE_MIRROR_MANIFEST.md`. После server-side исправления поиска `BbIIIIKA → вышка` live mirror был заново синхронизирован через Cloud Shell и содержит фактический writer `1.2.3` / search index `1.1.2`.
+На 18.08.2026 подтверждены 28 исходных файлов + `LIVE_MIRROR_MANIFEST.md`. После исправления поиска команды `🗡 BbllllKA` live mirror повторно синхронизирован через Cloud Shell и содержит фактический Unified Snapshot Writer **`1.2.4`** / `searchIndexVersion` **`1.1.3`**.
 
 Ключевые live-файлы:
-
 - `01_CORE_MAIN.js`
 - `02_PUBLIC_SYNC_V4.js`
 - `04_TELEGRAM_AVATARS.js`
@@ -68,7 +64,7 @@
 
 `27_MINIAPP_TEAM_STATUS.js` передаёт статус команды из живого листа `Команды`, колонка L, в unified snapshot.
 
-После любого live Apps Script push заново выполнить sync helper:
+После любого live Apps Script push заново выполнять:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-app/main/scripts/sync-live-apps-script-to-github.sh)
@@ -81,19 +77,16 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-ap
 ## 4. Живые Google Sheets
 
 ### Админская таблица
-
 Название: `Royal_CRM_GOOGLE_ПОИСК_FINAL_FIXED`.
 
 На листе `Команды` колонка **L = `Статус`**. Используемые значения:
-
 - `Активен`
 - `На паузе`
 - `Неактивен`
 
-Статус команды в Mini App определяется строго по связке **название + игра**. Нельзя переносить статус между одноимёнными командами Royal Match и Royal Kingdom.
+Статус команды в Mini App определяется строго по связке **название + игра**.
 
 ### Публичная таблица
-
 Название: `🕊️ЧАТ ПОБЕДИТЕЛЕЙ🕊️`.
 
 Публичная таблица получает данные из админской; обратной записи быть не должно.
@@ -105,17 +98,15 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-ap
 - **Mini App: `v0.5.59`**
 - активный физический entrypoint: `app-v0559.html`
 - `app.html` и `index.html` ведут на `app-v0559.html`, сохраняя Telegram `search + hash`.
-- GitHub source обновлён 18.08.2026; после последних UI-hotfix требуется отдельный Telegram Android smoke-test.
 
 Ключевые активные модули:
-
 - `transport-v0514.js`
 - `app.js`
 - `team-identity-fix.js`
 - `navigation-v0521.js`
 - `navigation-card-restore-v0532.js`
 - `search-hybrid-v0553.js`
-- `search-aliases-v0559.js` — legacy/client safety overlay; **не считать источником истины для `вышка`**
+- `search-aliases-v0559.js` — дополнительная клиентская страховка; server snapshot остаётся источником истины для подтверждённых CRM-алиасов
 - `media-persistent-cache-v0554.js`
 - `self-avatar-priority-v0556.js`
 - `navigation-scroll-top-v0558.js`
@@ -132,36 +123,24 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-ap
 Источник истины: `team.status` из админской `Команды!L`, опубликованный через Unified Snapshot/Worker.
 
 Для `status === "Активен"`:
-
 - карточка команды на странице `Команды` получает золотую рамку;
 - командная плашка на странице `Участники` и в профилях получает золотую рамку;
 - на странице команды название золотое и в золотой рамке;
 - справа на странице команды расположен кликабельный крот, открывающий каталог активных команд;
-- справа у активной `.team-card` вместо обычной стрелки расположен тот же крот; он остаётся частью родительской карточки, поэтому тап открывает выбранную команду;
+- справа у активной `.team-card` расположен тот же крот; тап открывает выбранную команду;
 - каталог строится только из команд `Активен`;
 - каталог имеет собственный фильтр `Все / РМ / РК` и собственный поиск;
 - фильтр/поиск каталога независимы от обычной страницы `Команды`.
 
-### Текущий источник изображения крота
+### Крот
+`active-teams-v0559.css` содержит присланное пользователем изображение как встроенный JPEG data-asset `--royal-specnaz-mole-v0559`.
 
-После повторных Android-артефактов **SVG и внешние image-assets больше не используются для крота**.
-
-`active-teams-v0559.css` содержит точный присланный пользователем чистый крот как **встроенный JPEG data-asset** в CSS custom property `--royal-specnaz-mole-v0559`.
-
-Это один и тот же raster-источник для:
-
-- кнопки на странице команды;
-- правой зоны активной командной карточки.
-
-Не возвращать SVG-обёртку `assets/specnaz-active-team-clean-v0559.svg` в active CSS и не возвращать обычный `<img>` для этого значка.
+Не возвращать SVG-wrapper, обычный `<img>` или внешний image-loader для этого значка.
 
 ### Текст каталога
-
-Верхний золотой заголовок должен быть визуально:
+Золотой заголовок:
 
 **`Команды принимающие участие в базе спецназа`**
-
-Для гарантированной замены после внутреннего render подключён `active-teams-title-v0559.js`, который следит только за содержимым `#panel` и исправляет заголовок/aria-label кнопки каталога.
 
 Подзаголовок:
 
@@ -176,39 +155,43 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-ap
 Основной модуль: `search-hybrid-v0553.js`.
 
 Архитектура:
-
 - локальный Android-safe поиск остаётся fallback;
 - `searchKeys` — дополнительный слой;
 - итог = локальное совпадение ИЛИ `searchKeys`;
 - без edit-distance/fuzzy-комбинаторики и тяжёлого prewarm;
 - `Все / РМ / РК` ограничивает и список, и область поиска, не очищая query.
 
-### `BbIIIIKA / Royal Kingdom ↔ вышка`
+### `🗡 BbllllKA / Royal Kingdom ↔ вышка`
 
-Первоначальная клиентская попытка через `search-aliases-v0559.js` оказалась недостаточно надёжной: основной `search-hybrid-v0553.js` кэширует haystack карточек, а поздняя мутация `team.searchKeys` не меняет ссылку snapshot-массивов и поэтому не гарантирует сброс уже построенного WeakMap-кэша.
+**Фактическое имя команды:** `🗡 BbllllKA` — после `Bb` идут четыре строчные латинские `l`. Ранее имя было ошибочно прочитано как `BbIIIIKA`; этот вариант не является source identity.
 
-**Правильный источник алиаса теперь server-side:**
-
+Правильный server-side источник:
 - live Apps Script `apps-script-live/25_MINIAPP_UNIFIED_SNAPSHOT.js`;
-- `MINIAPP_UNIFIED_SEARCH_ALIASES` содержит `'bbiiiika': ['вышка']`;
-- Unified Snapshot Writer: `1.2.3`;
-- `searchIndexVersion`: `1.1.2`;
-- алиас попадает в `team.searchKeys` при построении snapshot **до** загрузки данных клиентом;
-- Worker обязан сохранить эти `searchKeys` при sanitization.
+- `MINIAPP_UNIFIED_SEARCH_ALIASES` содержит `'bbllllka': ['вышка']`;
+- Unified Snapshot Writer: **`1.2.4`**;
+- `searchIndexVersion`: **`1.1.3`**;
+- alias попадает в `team.searchKeys` до публикации snapshot;
+- Worker сохраняет `searchKeys` при sanitization.
 
-Точечный client overlay можно оставлять только как дополнительную страховку, но **не использовать вместо server snapshot** для подтверждённых CRM-алиасов.
+Фактически подтверждено в `royal-crm-data/snapshot.json`:
+- `generatedAt=2026-08-18T20:03:09.308Z` (`23:03:09 UTC+3`);
+- `searchIndexVersion=1.1.3`;
+- `unifiedSnapshotVersion=1.2.4`;
+- объект `🗡 BbllllKA / Royal Kingdom` имеет `searchKeys`, содержащий **`вышка`** и `vyshka`;
+- участники этой команды также получили `вышка` в participant `searchKeys`.
+
+Клиентский `search-aliases-v0559.js` исправлен на exact rule `BbllllKA + Royal Kingdom`, нормализация убирает emoji/символы, а при фактической мутации массив snapshot клонируется для сброса WeakMap haystack-кэша. Это только fallback; основной источник — server snapshot.
 
 Контрольные алиасы минимум:
-
-`Has ne dogonyat ↔ нас не догонят`, `XAOC ↔ хаос`, `TOPMO3OB HET ↔ тормозов нет`, `MOLOT POKA ↔ молот рока`, `HEPBbI/HEPBbl B HOPME ↔ нервы в норме`, `Mbl Pycckue ↔ мы русские`, `CKAZKA ↔ сказка`, `BEHOM ↔ веном`, `Aquamarine ↔ аквамарин`, `Da budet swet ↔ да будет свет`, `Mike ↔ майк`, `Xabib ↔ хабиб`, `JoyBand ↔ джойбанд`, `1BY ↔ 1бу`, `BbIIIIKA (Royal Kingdom) ↔ вышка`.
+`Has ne dogonyat ↔ нас не догонят`, `XAOC ↔ хаос`, `TOPMO3OB HET ↔ тормозов нет`, `MOLOT POKA ↔ молот рока`, `HEPBbI/HEPBbl B HOPME ↔ нервы в норме`, `Mbl Pycckue ↔ мы русские`, `CKAZKA ↔ сказка`, `BEHOM ↔ веном`, `Aquamarine ↔ аквамарин`, `Da budet swet ↔ да будет свет`, `Mike ↔ майк`, `Xabib ↔ хабиб`, `JoyBand ↔ джойбанд`, `1BY ↔ 1бу`, `BbllllKA (Royal Kingdom) ↔ вышка`.
 
 ---
 
 ## 8. Snapshot Writer / Apps Script
 
-- Unified Snapshot Writer: **`1.2.3`**
+- Unified Snapshot Writer: **`1.2.4`**
 - schemaVersion: `1.4.2`
-- searchIndexVersion: **`1.1.2`**
+- searchIndexVersion: **`1.1.3`**
 - Fallback API: `1.2.1`
 - team status bridge: `1.0.0`
 - handler: `MINIAPP_exportUnifiedSnapshotToGitHub`
@@ -217,27 +200,17 @@ Snapshot включает participants, teams, роли/игры/команды,
 
 Один штатный writer trigger: `MINIAPP_exportUnifiedSnapshotToGitHub` каждые 5 минут.
 
-### Подтверждённый server snapshot после исправления `вышка`
+### Инсталлятор `scripts/install-vyshka-search-v0559.sh`
 
-- `generatedAt=2026-08-18T19:33:12.518Z` (`22:33:12` по пользовательскому UTC+3);
-- `schemaVersion=1.4.2`;
-- `searchIndexVersion=1.1.2`;
-- новый `dataHash` опубликован в `royal-crm-data/snapshot.json`;
-- live mirror подтверждает server alias `'bbiiiika': ['вышка']` до построения `searchKeys`.
-
-Предыдущий snapshot `19:28:13Z` имел `searchIndexVersion=1.1.1`; это объясняет, почему сразу после `clasp push` пользователь ещё видел старое поведение до следующего 5‑минутного trigger.
-
-### Инсталлятор
-
-`scripts/install-vyshka-search-v0559.sh`:
-
-- делает backup;
-- `clasp pull` фактического live-кода перед patch;
+- backup;
+- `clasp pull` фактического live-кода;
+- точечный patch;
 - syntax check;
 - `clasp status` перед push;
 - `clasp push`;
 - sync `apps-script-live/`;
-- verifier больших `snapshot.json` теперь передаёт JSON в Python через **stdin pipe**, а не environment variable — это устраняет ошибку `/usr/bin/python3: Argument list too long`.
+- verifier читает большой snapshot через stdin pipe, не через environment variable;
+- success допускается только при наличии `🗡 BbllllKA / Royal Kingdom` и `вышка` в её `searchKeys`.
 
 ---
 
@@ -246,13 +219,11 @@ Snapshot включает participants, teams, роли/игры/команды,
 Frontend Worker origin: `https://royal-crm-miniapp-api.tropical-spoon.workers.dev`.
 
 Repo config:
-
 - `worker/wrangler.toml`
 - main: `src/entry-v1110.js`
 - wrapper version in repo: `1.11.2`
 
 Критические правила:
-
 - participant identity = raw Telegram ID;
 - `/snapshot` не удаляет `searchKeys` / `searchIndexVersion` / `team.status`;
 - `team.status` восстанавливается по `team.key` или точной связке `название + игра`.
@@ -264,12 +235,10 @@ Repo commit не считать автоматически доказанным 
 ## 10. Навигация и медиакэш
 
 Навигационный инвариант:
-
 - **вперёд** → новый экран сверху (`scrollY=0`);
 - **назад** → точная сохранённая позиция предыдущего экрана.
 
 Медиакэш:
-
 - IndexedDB cache-first;
 - ключ аватара зависит от `avatarFileId`;
 - ключ фото команды зависит от `photoUrl`;
@@ -285,7 +254,6 @@ Repo commit не считать автоматически доказанным 
 Текущий changelog: `changelog-v0559.js`.
 
 Шапка `Помощь в разработке, тесты` содержит:
-
 - `@sfinks_spb`
 - `@O_Chaplygina`
 - `@Yanochka_2404`
@@ -304,8 +272,9 @@ Repo commit не считать автоматически доказанным 
 - не определять статус команды только по имени без игры;
 - не связывать фильтр каталога активных команд с обычной страницей `Команды`;
 - не возвращать крота к `<img>`, внешнему JPG или SVG-обёртке;
-- источник крота для v0.5.59 — встроенный JPEG data-asset в `active-teams-v0559.css`;
-- не возвращать `BbIIIIKA / Royal Kingdom ↔ вышка` только к позднему client overlay: серверный алиас должен оставаться в Unified Snapshot Writer;
+- источник крота v0.5.59 — встроенный JPEG data-asset;
+- не возвращать ошибочное имя `BbIIIIKA`; фактическое имя = `🗡 BbllllKA`;
+- server alias `'bbllllka': ['вышка']` должен оставаться в Unified Snapshot Writer;
 - не заставлять Back открывать список сверху;
 - не удалять `@DmitryRoyal` из credits.
 
@@ -317,11 +286,11 @@ Repo commit не считать автоматически доказанным 
 2. Авторизация не потеряна.
 3. Бейдж версии = `v0.5.59`.
 4. Обычный поиск и `Все / РМ / РК` работают.
-5. `вышка` находит `BbIIIIKA` в Royal Kingdom, включая фильтр `РК`.
+5. `вышка` находит `🗡 BbllllKA` в Royal Kingdom, включая фильтр `РК`.
 6. Активные команды имеют золотую рамку.
-7. На странице команды крот показывает **точно чистое присланное изображение**, без серых/зелёных/красных полос.
+7. На странице команды крот без серых/зелёных/красных полос.
 8. На активных командных карточках справа тот же чистый крот.
-9. Тап по кроту/правой зоне карточки открывает выбранную команду; крот на странице команды открывает каталог.
+9. Тап по правой зоне карточки открывает выбранную команду; крот на странице команды открывает каталог.
 10. Заголовок каталога: `Команды принимающие участие в базе спецназа`.
 11. В каталоге работают поиск и `Все / РМ / РК`.
 12. Forward открывает сверху; Back восстанавливает прежнюю позицию.
