@@ -1,6 +1,6 @@
 /* Royal CRM Mini App — Admin Mode eligibility v0.6.0 */
 (() => {
-  const VERSION = '0.6.0-read.1';
+  const VERSION = '0.6.0-read.2';
   let eligibility = null;
   let checkPromise = null;
 
@@ -15,6 +15,14 @@
 
   function removeTile() {
     document.querySelector('[data-admin-mode="1"]')?.remove();
+  }
+
+  function markAuthAdmin(value) {
+    if (!authState) return;
+    authState.role = { ...(authState.role || {}), isChatAdmin: !!value };
+    if (value) {
+      authState.permissions = { ...(authState.permissions || {}), canManageAll: true };
+    }
   }
 
   function ensureTile() {
@@ -35,6 +43,7 @@
     const telegramId = currentTelegramId();
     if (!telegramId || !sessionToken) {
       eligibility = false;
+      markAuthAdmin(false);
       removeTile();
       return false;
     }
@@ -50,6 +59,7 @@
       } catch (_) {
         eligibility = false;
       }
+      markAuthAdmin(eligibility);
       if (eligibility) ensureTile(); else removeTile();
       return eligibility;
     })().finally(() => { checkPromise = null; });
@@ -88,5 +98,11 @@
   // until the protected /participant-role response says the current user is admin.
   setTimeout(() => { removeTile(); check(false); }, 50);
 
-  window.RoyalAdminEligibilityV0600 = { version: VERSION, check, ensureTile, removeTile };
+  window.RoyalAdminEligibilityV0600 = {
+    version: VERSION,
+    check,
+    ensureTile,
+    removeTile,
+    get isAdmin() { return eligibility === true; }
+  };
 })();
