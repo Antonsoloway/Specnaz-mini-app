@@ -8,7 +8,7 @@
   function loadAdminWrite() {
     if (window.RoyalAdminWriteV0600 || document.querySelector('script[data-admin-write-v0600="1"]')) return;
     const script = document.createElement('script');
-    script.src = 'admin-write-v0600.js?v=20260819-2318';
+    script.src = 'admin-write-v0600.js?v=20260819-2345';
     script.async = false;
     script.dataset.adminWriteV0600 = '1';
     document.body.appendChild(script);
