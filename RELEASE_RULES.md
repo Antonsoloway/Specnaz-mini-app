@@ -75,6 +75,7 @@
 67. Авторизация `/auth` не должна падать от кратковременной задержки Worker через жёсткие 5 секунд. В v0.5.59 transport ждёт до 12 секунд и делает один автоматический повтор только для transient timeout/network ошибок; Android `AbortError code 20` нормализуется в `AUTH_TIMEOUT`. Внутренний `BUILD` в `app.js` обязан совпадать с текущей Mini App версией.
 68. Не добавлять автоматические GitHub Actions smoke-workflow, которые генерируют failure-письма владельцу на обычных разработческих commits, без отдельной необходимости, проверки workflow и согласования. Worker runtime проверять напрямую по `/health` и/или функциональному smoke-test; GitHub commit сам по себе production-доказательством не является.
 69. После любого Back/rerender списка участников post-render decorators обязаны восстанавливать динамические actions. Для карточек участников порядок: сначала `RoyalParticipantCardUX.decorate()`, затем `RoyalContactByTelegramId.decorate()`. Проверять как видимую кнопку `Назад`, так и Telegram native/system Back; `Связаться` не должно исчезать после возврата из профиля или команды.
+70. На iPhone/iPad team-photo loader не имеет права очищать уже существующий рабочий `img.src` до готовности replacement из IndexedDB/proxy. iOS WebView может заметно задерживать decode; replacement должен получить время на реальный `load/decode`, а при временной ошибке кэша/прокси приложение сохраняет/возвращает исходный CRM source вместо принудительного `photo-error`/замка. Android-ветку без необходимости не менять.
 
 ## Текущая версия
 
@@ -87,6 +88,7 @@
 - каталог `Команды принимающие участие в базе спецназа` с независимыми фильтрами и поиском;
 - server alias `BbllllKA / Royal Kingdom ↔ вышка` через writer `1.2.4`, `searchIndexVersion=1.1.3`;
 - постоянный team-photo cache key `команда + игра` с disk-only prewarm;
+- iOS-safe team-photo guard, сохраняющий рабочий source до готовности кэша/proxy;
 - кнопку `Связаться` через Worker/Голубца для участников без `@username`;
 - восстановление кнопок `Связаться` после Back/rerender списка участников;
 - устойчивую `/auth`: 12 секунд + один automatic retry для временных сбоев, `AUTH_TIMEOUT` вместо Android code 20;
