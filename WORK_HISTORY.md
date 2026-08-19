@@ -3,6 +3,22 @@
 > Краткий журнал фактически выполненных работ. Новые записи добавляются сверху.
 > Здесь фиксируются изменения, проверки, диагнозы и откаты, которые нужны следующему чату.
 
+## 2026-08-19 — удалён шумный GitHub Actions worker-smoke workflow
+
+**Симптом:** во время обычной работы по проекту владелец получал письма GitHub вида `Run failed: .github/workflows/worker-smoke.yml` / `No jobs were run`, в том числе на commits, которые не меняли Worker.
+
+**Диагноз:** служебный `.github/workflows/worker-smoke.yml`, ранее добавленный для проверки production `/health`, сам стал источником ложных/пустых failure-уведомлений и почтового спама. Такая проверка не оправдывает постоянные уведомления владельцу.
+
+**Сделано:**
+- `.github/workflows/worker-smoke.yml` удалён из `main` commit `df61533043f167a773391c61c337cf65ad0a3b2a`;
+- автоматический GitHub Actions smoke-check Worker больше не используется;
+- production Worker проверяется напрямую по `/health` и/или функциональным smoke-test после backend-изменений;
+- `CURRENT_STATE.md`, `WORK_HISTORY.md`, `RELEASE_RULES.md` обновлены.
+
+**Инвариант:** не добавлять автоматические GitHub Actions проверки, которые могут генерировать почтовые failure-уведомления на обычных разработческих commits, без отдельной необходимости, предварительной проверки и согласования. Repo-state и production-runtime по-прежнему различать.
+
+---
+
 ## 2026-08-19 — v0.5.59: исправлен редкий AbortError `20` при входе
 
 **Симптом:** иногда при открытии Mini App появлялось `Не удалось войти / Сервер авторизации пока недоступен / 20 · build=0.5.0`; после закрытия и повторного открытия вход обычно проходил.
@@ -51,7 +67,7 @@
 - `app-v0559.html` подключает новый frontend с cache-bust `contact-by-id-v0559.js?v=20260819-0015`;
 - changelog исправлен: прежнее описание прямого `tg://` больше не считается действующим.
 
-**Backend deployment:** repo/config переключены на Worker `1.12.0`. Cloudflare Builds ранее настроены на GitHub main + `/worker`. Пользователь 19.08.2026 фактически подтвердил `Связаться заработало`, то есть production `/contact-by-id` + bot relay реально активны. `.github/workflows/worker-smoke.yml` остаётся дополнительным автоматическим proof через `/health`.
+**Backend deployment:** repo/config переключены на Worker `1.12.0`. Cloudflare Builds ранее настроены на GitHub main + `/worker`. Пользователь 19.08.2026 фактически подтвердил `Связаться заработало`, то есть production `/contact-by-id` + bot relay реально активны. Отдельный GitHub Actions smoke-workflow после этого удалён из-за ложных failure-писем; дальнейшие runtime-проверки делаются напрямую.
 
 **Нерабочий подход, не возвращать:** прямой скрытый `<a href="tg://user?id=...">` или `window.location.href = tg://...` из Mini App.
 
