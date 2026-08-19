@@ -77,6 +77,7 @@
 69. После любого Back/rerender списка участников post-render decorators обязаны восстанавливать динамические actions. Для карточек участников порядок: сначала `RoyalParticipantCardUX.decorate()`, затем `RoyalContactByTelegramId.decorate()`. Проверять как видимую кнопку `Назад`, так и Telegram native/system Back; `Связаться` не должно исчезать после возврата из профиля или команды.
 70. На iPhone/iPad team-photo loader не имеет права очищать уже существующий рабочий `img.src` до готовности replacement из IndexedDB/proxy. iOS WebView может заметно задерживать decode; replacement должен получить время на реальный `load/decode`, а при временной ошибке кэша/прокси приложение сохраняет/возвращает исходный CRM source вместо принудительного `photo-error`/замка. Android-ветку без необходимости не менять.
 71. **Не возвращать iOS fast-path из `stable-v0559.js 0.5.59.3`: пакетное создание session object URLs для всех team blobs и синхронная подмена `renderTeamDetail()` на реальном iPhone привели к полному исчезновению фото команд.** Любое новое ускорение iOS сначала делать изолированно, без отключения штатного loader/fallback, и проверять на реальном iPhone до публикации.
+72. Безопасное ускорение team-photo cache допускается внутри штатного `media-persistent-cache`: одним readonly-проходом можно заранее сохранить в JS-памяти **IndexedDB record/blob references**, но нельзя заранее создавать `blob:` URL для всех команд, менять DOM, перехватывать `renderTeamDetail` или отключать штатный loader/fallback. Object URL создаётся только для реально открываемой команды; сетевой prewarm запрещён.
 
 ## Текущая версия
 
@@ -88,7 +89,8 @@
 - inline JPEG-крота на detail/team cards;
 - каталог `Команды принимающие участие в базе спецназа` с независимыми фильтрами и поиском;
 - server alias `BbllllKA / Royal Kingdom ↔ вышка` через writer `1.2.4`, `searchIndexVersion=1.1.3`;
-- постоянный team-photo cache key `команда + игра` с disk-only prewarm;
+- постоянный team-photo cache key `команда + игра`;
+- safe disk-record warm в `media-persistent-cache-v0554.js 0.5.54.2`: record/blob references заранее, object URL только для открываемой команды, без сети;
 - iOS-safe team-photo guard `0.5.59.2`, сохраняющий рабочий source до готовности кэша/proxy; неудачный fast patch `0.5.59.3` откатан;
 - кнопку `Связаться` через Worker/Голубца для участников без `@username`;
 - восстановление кнопок `Связаться` после Back/rerender списка участников;
