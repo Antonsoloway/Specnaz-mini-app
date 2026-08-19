@@ -3,185 +3,144 @@
 > Краткий журнал фактически выполненных работ. Новые записи добавляются сверху.
 > Здесь фиксируются изменения, проверки, диагнозы и откаты, которые нужны следующему чату.
 
+## 2026-08-19 — v0.5.59: iPhone — фото команды мелькало и исчезало
+
+**Симптом:** на iPhone часть команд открывалась без фото; у некоторых фото было видно долю секунды сразу после входа, затем оно исчезало и оставался замок-заглушка. Пользователь прислал видео.
+
+**Подтверждено по видео:** интерфейс detail открывается нормально, затем зона фото остаётся пустой/переходит на fallback. Проблема воспроизводится именно на team photo, аватарки участников ведут себя стабильнее.
+
+**Точная причина в коде:**
+- `renderTeamDetail()` сначала создаёт `<img class="team-photo" src="<CRM photoUrl>">`, то есть рабочий исходный source уже присутствует;
+- затем `media-persistent-cache-v0554.js → persistentLoadTeamPhoto()` перед чтением IndexedDB выполняет `img.removeAttribute('src')`;
+- только после удаления source начинается асинхронный `idbGet()`/`/team-photo` fetch;
+- на Android пауза обычно незаметна, на iOS Telegram WebView становится виден flash; если cache/proxy load задерживается/ошибается, остаётся `photo-error`/замок.
+
+**Исправлено:**
+- `stable-v0559.js` поднят до stable patch **`0.5.59.2`**;
+- добавлен iOS-only team-photo guard;
+- на iPhone/iPad guard временно блокирует только попытку `removeAttribute('src')` у текущего team-photo во время синхронного префикса native async loader;
+- уже показанный CRM source остаётся на экране, пока IndexedDB/proxy готовит replacement;
+- после native load cached/proxy image получает до **900 мс** на реальный `load/decode`;
+- если replacement source не загрузился, возвращается исходный CRM `src`, а не замок;
+- если изображение реально видно, `photo-error` снимается;
+- Android-ветка не изменена;
+- `app-v0559.html` получил cache-bust `stable-v0559.js?v=20260819-1822`;
+- changelog cache-bust = `20260819-1822`.
+
+**Важно:** это frontend-исправление. Apps Script / Cloud Shell не требуются.
+
+**Инвариант:** на iOS нельзя очищать рабочий team-photo `src` до того, как replacement из IndexedDB/proxy реально готов и декодирован. При временной ошибке кэша предпочтителен уже рабочий CRM source, а не принудительный fallback.
+
+---
+
 ## 2026-08-19 — v0.5.59: кнопки «Связаться» больше не пропадают после «Назад»
 
 **Симптом:** в списке `Участники` кнопки `Связаться` у людей без `@username` были видны при первом открытии. После перехода в профиль/команду и возврата `Назад` список восстанавливался без этих кнопок.
 
-**Подтверждено по видео:** до перехода contact-actions присутствуют; после возврата в тот же участок списка они исчезают у всех карточек без username.
+**Подтверждено по видео:** до перехода contact-actions присутствуют; после возврата они исчезали.
 
-**Точная причина:**
-- `RoyalNav` при возврате на `Участники` вызывает `renderParticipantsPage()` и восстанавливает список;
-- `navigation-card-restore-v0532.js` после этого повторно запускал только `RoyalParticipantCardUX.decorate()`;
-- `participant-card-ux` может перестраивать/заменять DOM карточек;
-- `contact-by-id-v0559.js` не входил в post-restore цепочку, поэтому добавленные им кнопки терялись после rerender;
-- его `pointerup`-таймер срабатывал ещё до фактического Back-restore и не решал проблему.
+**Причина:** `navigation-card-restore-v0532.js` после rerender запускал только `RoyalParticipantCardUX.decorate()`. Этот декоратор мог заменить DOM карточек уже после того, как `contact-by-id-v0559.js` добавил кнопки.
 
 **Исправлено:**
-- `navigation-card-restore-v0532.js` поднят до внутренней версии **`0.5.32.1`**;
-- каждый post-restore pass теперь выполняет строго `RoyalParticipantCardUX.decorate()` → `RoyalContactByTelegramId.decorate()`;
-- decorators повторяются на следующих `requestAnimationFrame`, чтобы переживать поздний rerender;
-- обработан обычный `[data-royal-back]`;
-- дополнительно обёрнут `RoyalNav.back()` для Telegram native/system Back;
-- `app-v0559.html` получил cache-bust `navigation-card-restore-v0532.js?v=20260819-0848`;
-- changelog и `CURRENT_STATE.md` обновлены.
-
-**Инвариант:** любой возврат на список участников должен восстанавливать не только оформление карточек, но и все динамические actions. Для contact-action порядок обязателен: сначала card UX, затем `Связаться`.
+- `navigation-card-restore-v0532.js` → `0.5.32.1`;
+- post-restore порядок: сначала `RoyalParticipantCardUX.decorate()`, затем `RoyalContactByTelegramId.decorate()`;
+- декораторы повторяются на следующих animation frames;
+- обработан и видимый `Назад`, и Telegram native/system Back;
+- cache-bust `navigation-card-restore-v0532.js?v=20260819-0848`.
 
 ---
 
 ## 2026-08-19 — удалён шумный GitHub Actions worker-smoke workflow
 
-**Симптом:** во время обычной работы по проекту владелец получал письма GitHub вида `Run failed: .github/workflows/worker-smoke.yml` / `No jobs were run`, в том числе на commits, которые не меняли Worker.
-
-**Диагноз:** служебный `.github/workflows/worker-smoke.yml`, ранее добавленный для проверки production `/health`, сам стал источником ложных/пустых failure-уведомлений и почтового спама. Такая проверка не оправдывает постоянные уведомления владельцу.
+**Симптом:** владелец получал письма `Run failed: .github/workflows/worker-smoke.yml` / `No jobs were run` во время обычной разработки.
 
 **Сделано:**
-- `.github/workflows/worker-smoke.yml` удалён из `main` commit `df61533043f167a773391c61c337cf65ad0a3b2a`;
-- автоматический GitHub Actions smoke-check Worker больше не используется;
-- production Worker проверяется напрямую по `/health` и/или функциональным smoke-test после backend-изменений;
-- `CURRENT_STATE.md`, `WORK_HISTORY.md`, `RELEASE_RULES.md` обновлены.
-
-**Инвариант:** не добавлять автоматические GitHub Actions проверки, которые могут генерировать почтовые failure-уведомления на обычных разработческих commits, без отдельной необходимости, предварительной проверки и согласования. Repo-state и production-runtime по-прежнему различать.
+- `.github/workflows/worker-smoke.yml` удалён commit `df61533043f167a773391c61c337cf65ad0a3b2a`;
+- Worker production проверяется напрямую по `/health` и/или функциональному smoke-test;
+- обычная frontend-разработка больше не должна генерировать такие GitHub Actions failure-письма.
 
 ---
 
 ## 2026-08-19 — v0.5.59: исправлен редкий AbortError `20` при входе
 
-**Симптом:** иногда при открытии Mini App появлялось `Не удалось войти / Сервер авторизации пока недоступен / 20 · build=0.5.0`; после закрытия и повторного открытия вход обычно проходил.
+**Симптом:** иногда показывалось `Не удалось войти / 20 · build=0.5.0`, после повторного открытия вход проходил.
 
-**Точная причина:**
-- `transport-v0514.js` ставил одинаковый жёсткий timeout **5 секунд** на любой Worker request;
-- `/auth` может последовательно ждать CRM snapshot/GitHub, Telegram `getChatMember` и дополнительные auth-enrichment шаги Worker;
-- если цепочка не укладывалась в 5 секунд, transport вызывал `AbortController.abort()`;
-- Android Telegram WebView мог возвращать для этого `DOMException` с numeric `code = 20`, который `app.js` показывал как будто это серверный диагноз;
-- `app.js` при этом всё ещё содержал старый внутренний `BUILD = 0.5.0`, хотя активный frontend = v0.5.59.
+**Причина:** общий timeout 5 секунд на `/auth`; Android WebView после `AbortController.abort()` отдавал numeric code `20`; внутренний BUILD был старым.
 
 **Исправлено:**
-- `transport-v0514.js` поднят до внутренней версии **`0.5.14.1`**;
-- только для `/auth` timeout увеличен до **12 секунд**;
-- при transient timeout/network failure `/auth` автоматически повторяется **ровно один раз** после короткой паузы;
-- логические/HTTP-отказы авторизации не зацикливаются;
-- Android `AbortError` / numeric code `20` нормализуются в понятный **`AUTH_TIMEOUT`**;
-- остальные Worker routes сохраняют прежний 5-секундный timeout;
-- `app.js` теперь имеет `BUILD = 0.5.59`;
-- `app-v0559.html` получил cache-bust `transport-v0514.js?v=20260819-0833` и `app.js?v=20260819-0833`;
-- changelog, `CURRENT_STATE.md` и `RELEASE_RULES.md` обновлены.
-
-**Инвариант:** не возвращать общий 5-секундный timeout на `/auth`. Кратковременная задержка backend не должна сразу показывать fatal пользователю; первый transient сбой должен переживаться автоматическим retry.
+- `transport-v0514.js` → `0.5.14.1`;
+- `/auth` timeout = 12 секунд;
+- один automatic retry для transient timeout/network failure;
+- code 20 нормализуется в `AUTH_TIMEOUT`;
+- `app.js BUILD = 0.5.59`.
 
 ---
 
-## 2026-08-19 — v0.5.59: «Связаться» переделано через Голубца и inline-кнопку профиля
+## 2026-08-19 — v0.5.59: «Связаться» переделано через Голубца
 
-**Симптом:** кнопка `Связаться` у участника без `@username` отображалась, но при нажатии визуально ничего не происходило.
+**Первая попытка была неверной:** прямой `tg://user?id=<id>` из Mini App на Android не открывался.
 
-**Точная причина:** первая реализация пыталась открыть `tg://user?id=<raw id>` непосредственно из Telegram Mini App WebView через скрытый `<a>`/`location.href`. Такой ID-link не является обычной универсальной клиентской ссылкой. Telegram поддерживает ID-ссылку в контексте Bot API inline links/buttons; прямой запуск из Mini App был неправильной архитектурой.
+**Актуальная реализация:**
+- frontend показывает `Связаться` у участника без `@username`;
+- `POST /contact-by-id` → Worker `1.12.0`;
+- requester и target проверяются по raw Telegram ID;
+- Голубец отправляет requester-у сообщение с Telegram inline-кнопкой `👤 Открыть профиль`;
+- Mini App показывает `Ссылка готова` → `Открыть Голубя`;
+- пользователь подтвердил production flow: **«Связаться заработало»**.
+
+**Не возвращать:** прямой `tg://user?id` из Mini App.
+
+---
+
+## 2026-08-18 — v0.5.59: постоянный кэш фото команд
+
+**Симптом:** аватарки после первого использования появлялись сразу, фото команд заметно догружались.
+
+**Причина:** старый key фото = временный Google `photoUrl`; один и тот же снимок получал новый URL между snapshot.
 
 **Исправлено:**
-- прямой `tg://user?id` из `contact-by-id-v0559.js` удалён;
-- модуль поднят до внутренней версии **`0.5.59.2`**;
-- добавлен Worker wrapper `worker/src/entry-v1120.js`, версия **`1.12.0`**;
-- `worker/wrangler.toml` переключён на `src/entry-v1120.js`;
-- добавлен защищённый `POST /contact-by-id`;
-- requester определяется из session и проверяется по актуальному CRM snapshot;
-- target берётся только как raw Telegram ID и проверяется как текущий участник со статусом `В чате` без `@username`;
-- Worker использует существующий Cloudflare secret `BOT_TOKEN`; токен не попадает во frontend;
-- Голубец отправляет requester-у в ЛС сообщение с Telegram inline-кнопкой **`👤 Открыть профиль`**, URL кнопки = `tg://user?id=<targetId>`;
-- после успешной отправки Mini App показывает popup **`Ссылка готова`** → **`Открыть Голубя`**; переход выполняется после явного пользовательского нажатия, поэтому результат не зависит от async-navigation после fetch;
-- если бот не может написать requester-у, frontend получает и показывает понятную ошибку;
-- добавлен короткий cooldown от двойного нажатия;
-- `app-v0559.html` подключает новый frontend с cache-bust `contact-by-id-v0559.js?v=20260819-0015`;
-- changelog исправлен: прежнее описание прямого `tg://` больше не считается действующим.
-
-**Backend deployment:** repo/config переключены на Worker `1.12.0`. Cloudflare Builds ранее настроены на GitHub main + `/worker`. Пользователь 19.08.2026 фактически подтвердил `Связаться заработало`, то есть production `/contact-by-id` + bot relay реально активны. Отдельный GitHub Actions smoke-workflow после этого удалён из-за ложных failure-писем; дальнейшие runtime-проверки делаются напрямую.
-
-**Нерабочий подход, не возвращать:** прямой скрытый `<a href="tg://user?id=...">` или `window.location.href = tg://...` из Mini App.
-
-**Инвариант:** участник без username → `Mini App → авторизованный Worker → Голубец → Telegram inline-кнопка профиля`. У участника с `@username` остаётся прежнее username-меню.
+- team-photo key = стабильное `название команды + игра`;
+- `photoUrl` остаётся source metadata, но не identity;
+- сохранённые team blobs поднимаются из IndexedDB без массового сетевого prewarm;
+- cached photo показывается сразу; background refresh примерно после 30 минут;
+- TTL/cleanup около 45 дней, общий лимит около 420 записей.
 
 ---
 
-## 2026-08-18 — v0.5.59: кнопка «Связаться» для участников без @username — ПЕРВАЯ НЕРАБОЧАЯ ПОПЫТКА
+## 2026-08-18 — v0.5.59: `BbllllKA / Royal Kingdom ↔ вышка`
 
-**Задача:** на странице `Участники` у части людей есть кликабельный `@username`, а у части username отсутствует. Требовалось на том же месте дать способ перейти к человеку через Telegram ID.
-
-**Сверено по фактическому frontend:**
-- `identity-card-ids-v0518.js` уже привязывает карточки участников к raw Telegram ID;
-- `participant-profile-v0523.js` также хранит raw Telegram ID в detail-profile;
-- существующий `usernameButton()` показывает кнопку только при наличии `@username`;
-- существующее username-меню `openUserMenu()` оставлено без изменений.
-
-**Что было сделано:**
-- добавлен `contact-by-id-v0559.js`;
-- если у участника есть `[data-user-menu]`, новая кнопка не добавлялась;
-- если `@username` нет, на его обычном месте появлялась синяя кнопка **`Связаться`**;
-- кнопка добавлялась в `.person-card`, `.team-member`, participant detail и внутренние directory/hero-карточки при наличии raw Telegram ID;
-- ошибочно использовался прямой `tg://user?id=<RAW_TELEGRAM_ID>` через временный скрытый `<a>`.
-
-**Почему заменено:** Android Telegram WebView не открыл такой ID-link, пользователь подтвердил «нажимаешь и ничего не происходит». Актуальная реализация описана верхней записью от 19.08.2026 и использует Worker + bot inline button.
-
----
-
-## 2026-08-18 — v0.5.59: исправлен постоянный кэш фото команд
-
-**Симптом:** аватарки участников после первого использования появлялись сразу, а фото команд заметно догружались.
-
-**Точная причина:**
-- avatar cache key = стабильный `avatarFileId`;
-- старый team-photo cache key = `photoUrl`;
-- Google Sheets выдаёт для одного и того же изображения новый временный `lh7-rt.googleusercontent.com/...` URL между snapshot;
-- поэтому IndexedDB постоянно промахивался по одному и тому же фото команды.
-
-**Исправлено:**
-- `media-persistent-cache-v0554.js` внутренняя версия `0.5.54.1`;
-- team-photo key = нормализованное `название команды + игра`;
-- `photoUrl` остаётся source metadata, но больше не identity;
-- после загрузки CRM выполняется только disk-only prewarm сохранённых team blobs в память, без сетевого массового prewarm;
-- cached photo показывается сразу; примерно после 30 минут допускается неблокирующий background refresh;
-- TTL/cleanup около 45 дней, общий лимит около 420 записей сохранены.
-
-**Инвариант:** не возвращать team-photo cache key к временному `photoUrl` и не вводить массовую сетевую загрузку всех фото на старте.
-
----
-
-## 2026-08-18 — v0.5.59: `BbllllKA / Royal Kingdom ↔ вышка` подтверждено server-side
-
-**Точная причина прошлых неудач:** фактическое имя команды = **`🗡 BbllllKA`**, а не визуально прочитанное `BbIIIIKA`.
+**Причина прошлых неудач:** фактическое имя команды = `🗡 BbllllKA`, а не ошибочно прочитанное `BbIIIIKA`.
 
 **Исправлено через Cloud Shell / live Apps Script:**
 - Unified Snapshot Writer `1.2.4`;
 - `searchIndexVersion=1.1.3`;
 - server alias `'bbllllka': ['вышка']`;
-- ошибочный `'bbiiiika'` удалён;
-- после `clasp push` заново синхронизирован `apps-script-live/`;
-- новый snapshot фактически содержит `вышка` и `vyshka` в `searchKeys` команды `🗡 BbllllKA / Royal Kingdom` и её участников.
+- ошибочный alias удалён;
+- свежий snapshot содержит `вышка` / `vyshka` в `searchKeys` команды и её участников.
 
-**Инвариант:** перед точечным alias сверять exact identity из живого snapshot, особенно символы `I/l/1`. Стабильный alias должен попадать в server-side `searchKeys` до публикации snapshot.
+**Инвариант:** exact identity сверять по live snapshot, особенно `I/l/1` и emoji.
 
 ---
 
 ## 2026-08-18 — v0.5.59: активные команды / база спецназа
 
 **Сделано:**
-- статус команды берётся из живой админской `Команды!L`;
+- status берётся из живой админской `Команды!L`;
 - identity статуса = `название + игра`;
-- `Активен` получает золотую рамку; `На паузе` — обычное оформление;
-- справа на странице активной команды — крот, открывающий каталог активных команд;
-- справа на активных team cards — тот же крот, карточка остаётся кликабельной;
-- крот встроен как inline JPEG data-asset без SVG и без image-loader;
+- `Активен` получает золото; `На паузе` — обычное оформление;
+- крот справа на detail и активных team cards;
+- крот встроен как inline JPEG data-asset без SVG/image-loader;
 - каталог имеет независимые `Все / РМ / РК` и поиск;
-- заголовок каталога: `Команды принимающие участие в базе спецназа`;
+- заголовок: `Команды принимающие участие в базе спецназа`;
 - подзаголовок: `Команды, участвующие в спецназе и(или) регулярно выкладывающие скрины в базе спецназа.`
-
-**Apps Script:** `27_MINIAPP_TEAM_STATUS.js`, unified writer `1.2.2+`, schema `1.4.2`; status проходит через snapshot и Worker.
 
 ---
 
 ## 2026-08-18 — v0.5.58: навигация forward / Back
 
-- переход вперёд на новый экран → `scrollY=0`;
-- Back → точное сохранённое место предыдущего экрана;
-- не возвращать поведение v0.5.57, где Back также отправлял наверх.
+- переход вперёд → `scrollY=0`;
+- Back → сохранённое место предыдущего экрана;
+- не возвращать поведение v0.5.57, где Back отправлял список наверх.
 
 ---
 
@@ -190,7 +149,7 @@
 - IndexedDB cache-first для изображений;
 - lazy avatar loading;
 - не более 2 параллельных avatar network load;
-- собственная ава приоритетно восстанавливается из постоянного кэша;
+- собственная ава приоритетно восстанавливается;
 - устранено мигание буквенной заглушки при rerender.
 
 ---
@@ -200,7 +159,7 @@
 **Корневая причина старой проблемы:** Worker sanitizer выбрасывал `searchKeys`/`searchIndexVersion`.
 
 **Сделано:**
-- Worker wrapper `entry-v1110.js` сохраняет server `searchKeys` после sanitization;
+- Worker wrapper сохраняет server `searchKeys` после sanitization;
 - frontend hybrid search = локальный поиск ИЛИ `searchKeys`;
 - без edit-distance/fuzzy-комбинаторики и тяжёлого prewarm.
 
