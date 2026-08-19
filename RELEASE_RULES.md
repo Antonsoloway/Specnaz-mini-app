@@ -71,8 +71,8 @@
 63. Подтверждённые CRM-alias публикуются server-side через Unified Snapshot Writer; при изменении alias делать безопасный `clasp pull → patch → syntax check → clasp status → clasp push`, затем sync live mirror и проверка нового snapshot.
 64. Перед точечным alias сверять exact имя из live snapshot/CRM, включая `I/l/1` и emoji.
 65. Для фото команд разрешён только disk-only prewarm: уже сохранённые IndexedDB blobs можно поднять в память; сетево скачивать все team photos на старте запрещено. Cached photo показывается сразу, refresh выполняется неблокирующе; текущий interval v0.5.59 = 30 минут.
-66. Если у участника отсутствует `@username`, на месте username-action показывается **`Связаться`**. Прямой `tg://user?id=<id>` из Mini App запрещён как проверенная нерабочая схема. Правильный flow: авторизованный `POST /contact-by-id` → Worker проверяет requester/target по raw Telegram ID → `@doveofpeace_bot` отправляет requester-у сообщение с Telegram inline-кнопкой `tg://user?id=<target>` → Mini App показывает `Ссылка готова` и по явной кнопке открывает чат Голубца. Участники с `@username` сохраняют прежнее username-меню; имя/username не используются как ID identity.
-67. Изменение активного Worker entrypoint не считается production-подтверждённым только по GitHub commit. `.github/workflows/worker-smoke.yml` сверяет version из `wrangler.toml` с production `/health` и при успехе сохраняет `runtime/worker-health.json`; до proof или эквивалентной прямой проверки runtime считается непроверенным.
+66. Если у участника отсутствует `@username`, на месте username-action показывается **`Связаться`**. Правильная цепочка: Mini App → авторизованный `POST /contact-by-id` → Worker → @doveofpeace_bot → Telegram inline-кнопка `Открыть профиль` по raw Telegram ID. Прямой `tg://user?id=...` из Mini App запрещён как нерабочий подход. Если `@username` есть, сохраняется прежнее username-меню.
+67. Авторизация `/auth` не должна падать от кратковременной задержки Worker через жёсткие 5 секунд. В v0.5.59 transport ждёт до 12 секунд и делает один автоматический повтор только для transient timeout/network ошибок; Android `AbortError code 20` нормализуется в `AUTH_TIMEOUT`. Внутренний `BUILD` в `app.js` обязан совпадать с текущей Mini App версией.
 
 ## Текущая версия
 
@@ -85,7 +85,8 @@
 - каталог `Команды принимающие участие в базе спецназа` с независимыми фильтрами и поиском;
 - server alias `BbllllKA / Royal Kingdom ↔ вышка` через writer `1.2.4`, `searchIndexVersion=1.1.3`;
 - постоянный team-photo cache key `команда + игра` с disk-only prewarm;
-- кнопку `Связаться` для участников без `@username`: Worker → Голубец → Telegram inline-кнопка профиля по raw Telegram ID; прямой ID deep-link из Mini App не используется;
+- кнопку `Связаться` через Worker/Голубца для участников без `@username`;
+- устойчивую `/auth`: 12 секунд + один automatic retry для временных сбоев, `AUTH_TIMEOUT` вместо Android code 20;
 - credits `@sfinks_spb`, `@O_Chaplygina`, `@Yanochka_2404`, `@DmitryRoyal`.
 
 Все предыдущие версии сохраняются в истории изменений без удаления.
