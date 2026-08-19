@@ -1,7 +1,7 @@
 /*
  * Royal CRM / Таблица ЧП
  * 25_MINIAPP_UNIFIED_SNAPSHOT.js
- * v1.2.4
+ * v1.2.5
  *
  * Atomic Mini App snapshot writer.
  * One source write contains base participants/teams + specnaz score/rank + specnaz history.
@@ -9,7 +9,7 @@
  * Search keys are prepared here, while the Mini App keeps its independent v0.5.47-style fallback search.
  */
 
-var MINIAPP_UNIFIED_SNAPSHOT_VERSION = '1.2.4';
+var MINIAPP_UNIFIED_SNAPSHOT_VERSION = '1.2.5';
 var MINIAPP_UNIFIED_SNAPSHOT_SCHEMA = '1.4.2';
 var MINIAPP_UNIFIED_SEARCH_INDEX_VERSION = '1.1.3';
 var MINIAPP_UNIFIED_SNAPSHOT_HANDLER = 'MINIAPP_exportUnifiedSnapshotToGitHub';
@@ -101,6 +101,23 @@ function MINIAPP_exportUnifiedSnapshotToGitHub() {
     });
 
     var searchStats = MINIAPP_unifiedAttachSearchKeys_(stable);
+
+
+    // v1.2.5 / Mini App v0.6: build a separate PRIVATE admin snapshot using
+    // the same existing 5-minute trigger. Failure here must never break the
+    // stable participant snapshot used by v0.5.59.
+    var adminSnapshotResult = { ok: false, skipped: true, reason: 'ADMIN_EXPORTER_MISSING' };
+    if (typeof MINIAPP_exportAdminSnapshotUnlocked_ === 'function') {
+      try {
+        adminSnapshotResult = MINIAPP_exportAdminSnapshotUnlocked_(props, repo, token, branch);
+      } catch (adminSnapshotError) {
+        adminSnapshotResult = {
+          ok: false,
+          error: String(adminSnapshotError && adminSnapshotError.message ? adminSnapshotError.message : adminSnapshotError || 'UNKNOWN')
+        };
+        console.error('MINIAPP admin snapshot export failed', adminSnapshotResult.error);
+      }
+    }
 
     var sections = MINIAPP_readSpecnazHistorySections_();
     var nowIso = new Date().toISOString();
