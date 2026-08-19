@@ -1,10 +1,10 @@
-/* Royal CRM Mini App — Persistent Media Cache v0.5.54.1
+/* Royal CRM Mini App — Persistent Media Cache v0.5.54.2
  * Persistent IndexedDB cache for participant avatars and team photos.
  * Team photos use a stable team+game cache key because Google Sheets photoUrl is ephemeral.
- * Cache-first, disk prewarm, network fallback, low-concurrency avatar loading.
+ * Cache-first, disk-record prewarm, network fallback, low-concurrency avatar loading.
  */
 (() => {
-  const VERSION = '0.5.54.1';
+  const VERSION = '0.5.54.2';
   const DB_NAME = 'royal-crm-media-cache';
   const DB_VERSION = 1;
   const STORE = 'images';
@@ -15,6 +15,7 @@
   const CONCURRENCY = 2;
   const avatarMemory = new Map();
   const teamMemory = new Map();
+  const teamDiskMemory = new Map();
   const pending = new Map();
   const queue = [];
   const queued = new WeakSet();
@@ -22,6 +23,7 @@
   let observer = null;
   let dbPromise = null;
   let teamWarmPromise = null;
+  let teamWarmReady = false;
 
   function openDb() {
     if (!('indexedDB' in window)) return Promise.resolve(null);
@@ -62,21 +64,27 @@
     const db = await openDb();
     if (!db) return false;
     const now = Date.now();
+    const record = {
+      key,
+      blob,
+      kind: String(kind || ''),
+      createdAt: Number(extra.createdAt || now),
+      touchedAt: now,
+      fetchedAt: Number(extra.fetchedAt || now),
+      size: blob.size,
+      ...extra
+    };
     return new Promise(resolve => {
       let tx;
       try { tx = db.transaction(STORE, 'readwrite'); }
       catch (_) { resolve(false); return; }
-      tx.objectStore(STORE).put({
-        key,
-        blob,
-        kind: String(kind || ''),
-        createdAt: Number(extra.createdAt || now),
-        touchedAt: now,
-        fetchedAt: Number(extra.fetchedAt || now),
-        size: blob.size,
-        ...extra
-      });
-      tx.oncomplete = () => resolve(true);
+      tx.objectStore(STORE).put(record);
+      tx.oncomplete = () => {
+        if (record.kind === 'team' || String(record.key || '').startsWith('team:')) {
+          teamDiskMemory.set(record.key, record);
+        }
+        resolve(true);
+      };
       tx.onerror = () => resolve(false);
       tx.onabort = () => resolve(false);
     });
@@ -90,6 +98,7 @@
       const tx = db.transaction(STORE, 'readwrite');
       record.touchedAt = Date.now();
       tx.objectStore(STORE).put(record);
+      if (String(record.key || '').startsWith('team:')) teamDiskMemory.set(record.key, record);
     } catch (_) {}
   }
 
@@ -176,6 +185,12 @@
     const photoUrl = String(team?.photoUrl || '').trim();
     const key = stableTeamKey(resolvedName, resolvedGame);
     return { teamName: resolvedName, game: resolvedGame, photoUrl, key, team };
+  }
+
+  function validTeamRecord(record, now = Date.now()) {
+    if (!(record?.blob instanceof Blob) || !record.blob.size) return false;
+    const age = now - Number(record.touchedAt || record.createdAt || 0);
+    return age < MAX_AGE_MS;
   }
 
   async function fetchBlob(cacheKey, fetcher, kind) {
@@ -357,6 +372,23 @@
       return;
     }
 
+    const warmRecord = teamDiskMemory.get(key);
+    if (validTeamRecord(warmRecord)) {
+      img.src = toObjectUrl(warmRecord.blob, teamMemory, key);
+      img.dataset.teamProxyLoaded = '1';
+      img.dataset.mediaCache = 'disk-memory';
+      img.parentElement?.classList.remove('photo-error');
+      ensureTeamPhotoLayout(img);
+
+      const now = Date.now();
+      const fetchedAt = Number(warmRecord.fetchedAt || warmRecord.createdAt || 0);
+      if (now - fetchedAt >= TEAM_REFRESH_MS) {
+        refreshTeamPhotoInBackground(identity, warmRecord, img).catch(() => {});
+      }
+      idbTouch(warmRecord).catch(() => {});
+      return;
+    }
+
     img.dataset.teamProxyLoaded = 'loading';
     try { img.removeAttribute('src'); } catch (_) {}
 
@@ -366,6 +398,7 @@
       const cacheAge = cached ? now - Number(cached.touchedAt || cached.createdAt || 0) : Infinity;
 
       if (cached?.blob instanceof Blob && cached.blob.size && cacheAge < MAX_AGE_MS) {
+        teamDiskMemory.set(key, cached);
         img.src = toObjectUrl(cached.blob, teamMemory, key);
         img.dataset.teamProxyLoaded = '1';
         img.dataset.mediaCache = 'disk';
@@ -398,25 +431,36 @@
   }
 
   async function warmTeamCacheFromDisk() {
+    if (teamWarmReady) return true;
     if (teamWarmPromise) return teamWarmPromise;
-    const teams = Array.isArray(snapshotState?.teams) ? snapshotState.teams : [];
-    if (!teams.length) return;
+
     teamWarmPromise = (async () => {
-      for (const team of teams) {
-        const photoUrl = String(team?.photoUrl || '').trim();
-        if (!photoUrl) continue;
-        const game = normalizeGame(team?.game || team?.games?.[0] || '');
-        const key = stableTeamKey(team?.name || '', game);
-        if (!key || teamMemory.has(key)) continue;
-        const cached = await idbGet(key);
-        if (!(cached?.blob instanceof Blob) || !cached.blob.size) continue;
-        const age = Date.now() - Number(cached.touchedAt || cached.createdAt || 0);
-        if (age >= MAX_AGE_MS) continue;
-        toObjectUrl(cached.blob, teamMemory, key);
-        idbTouch(cached).catch(() => {});
-      }
+      const db = await openDb();
+      if (!db) return false;
+      const now = Date.now();
+      await new Promise(resolve => {
+        let tx;
+        try { tx = db.transaction(STORE, 'readonly'); }
+        catch (_) { resolve(); return; }
+        const req = tx.objectStore(STORE).openCursor();
+        req.onsuccess = () => {
+          const cursor = req.result;
+          if (!cursor) { resolve(); return; }
+          const record = cursor.value;
+          const key = String(record?.key || cursor.key || '');
+          if ((record?.kind === 'team' || key.startsWith('team:')) && validTeamRecord(record, now)) {
+            teamDiskMemory.set(key, record);
+          }
+          cursor.continue();
+        };
+        req.onerror = () => resolve();
+        tx.onabort = () => resolve();
+      });
+      teamWarmReady = true;
+      return true;
     })();
-    try { await teamWarmPromise; }
+
+    try { return await teamWarmPromise; }
     finally { teamWarmPromise = null; }
   }
 
@@ -448,7 +492,15 @@
     try {
       const tx = db.transaction(STORE, 'readwrite');
       const store = tx.objectStore(STORE);
-      [...new Set(stale)].forEach(key => store.delete(key));
+      [...new Set(stale)].forEach(key => {
+        store.delete(key);
+        teamDiskMemory.delete(key);
+        const old = teamMemory.get(key);
+        if (old && old.startsWith('blob:')) {
+          try { URL.revokeObjectURL(old); } catch (_) {}
+        }
+        teamMemory.delete(key);
+      });
     } catch (_) {}
   }
 
@@ -457,7 +509,11 @@
   setupAvatarLoading = persistentSetupAvatarLoading;
   mediaV0517LoadTeamPhoto = persistentLoadTeamPhoto;
 
-  // Disk-only prewarm after snapshot load. No team-photo network requests are started here.
+  // Start a disk-only record warm immediately. This reads existing IndexedDB records only;
+  // it does not create object URLs for every team and never starts network requests.
+  warmTeamCacheFromDisk().catch(() => {});
+
+  // Repeat after snapshot load in case IndexedDB was temporarily unavailable during startup.
   if (typeof loadSnapshot === 'function') {
     const nativeLoadSnapshot = loadSnapshot;
     loadSnapshot = async function loadSnapshotWithMediaDiskWarm(...args) {
@@ -476,6 +532,8 @@
     setup: persistentSetupAvatarLoading,
     loadTeamPhoto: persistentLoadTeamPhoto,
     warmTeamCacheFromDisk,
+    get teamDiskEntries() { return teamDiskMemory.size; },
+    get teamObjectUrls() { return teamMemory.size; },
     cleanup
   };
   window.__ROYAL_MEDIA_CACHE_VERSION__ = VERSION;
