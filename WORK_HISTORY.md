@@ -3,6 +3,32 @@
 > Краткий журнал фактически выполненных работ. Новые записи добавляются сверху.
 > Здесь фиксируются изменения, проверки, диагнозы и откаты, которые нужны следующему чату.
 
+## 2026-08-19 — v0.5.59: исправлен редкий AbortError `20` при входе
+
+**Симптом:** иногда при открытии Mini App появлялось `Не удалось войти / Сервер авторизации пока недоступен / 20 · build=0.5.0`; после закрытия и повторного открытия вход обычно проходил.
+
+**Точная причина:**
+- `transport-v0514.js` ставил одинаковый жёсткий timeout **5 секунд** на любой Worker request;
+- `/auth` может последовательно ждать CRM snapshot/GitHub, Telegram `getChatMember` и дополнительные auth-enrichment шаги Worker;
+- если цепочка не укладывалась в 5 секунд, transport вызывал `AbortController.abort()`;
+- Android Telegram WebView мог возвращать для этого `DOMException` с numeric `code = 20`, который `app.js` показывал как будто это серверный диагноз;
+- `app.js` при этом всё ещё содержал старый внутренний `BUILD = 0.5.0`, хотя активный frontend = v0.5.59.
+
+**Исправлено:**
+- `transport-v0514.js` поднят до внутренней версии **`0.5.14.1`**;
+- только для `/auth` timeout увеличен до **12 секунд**;
+- при transient timeout/network failure `/auth` автоматически повторяется **ровно один раз** после короткой паузы;
+- логические/HTTP-отказы авторизации не зацикливаются;
+- Android `AbortError` / numeric code `20` нормализуются в понятный **`AUTH_TIMEOUT`**;
+- остальные Worker routes сохраняют прежний 5-секундный timeout;
+- `app.js` теперь имеет `BUILD = 0.5.59`;
+- `app-v0559.html` получил cache-bust `transport-v0514.js?v=20260819-0833` и `app.js?v=20260819-0833`;
+- changelog, `CURRENT_STATE.md` и `RELEASE_RULES.md` обновлены.
+
+**Инвариант:** не возвращать общий 5-секундный timeout на `/auth`. Кратковременная задержка backend не должна сразу показывать fatal пользователю; первый transient сбой должен переживаться автоматическим retry.
+
+---
+
 ## 2026-08-19 — v0.5.59: «Связаться» переделано через Голубца и inline-кнопку профиля
 
 **Симптом:** кнопка `Связаться` у участника без `@username` отображалась, но при нажатии визуально ничего не происходило.
@@ -25,7 +51,7 @@
 - `app-v0559.html` подключает новый frontend с cache-bust `contact-by-id-v0559.js?v=20260819-0015`;
 - changelog исправлен: прежнее описание прямого `tg://` больше не считается действующим.
 
-**Backend deployment:** repo/config переключены на Worker `1.12.0`. Cloudflare Builds ранее настроены на GitHub main + `/worker`. Для отделения repo-state от фактического runtime добавлен `.github/workflows/worker-smoke.yml`, который сверяет active wrapper version с production `/health` и при успехе должен сохранить `runtime/worker-health.json`. До появления такого proof или прямой проверки не объявлять production runtime подтверждённым только по commit.
+**Backend deployment:** repo/config переключены на Worker `1.12.0`. Cloudflare Builds ранее настроены на GitHub main + `/worker`. Пользователь 19.08.2026 фактически подтвердил `Связаться заработало`, то есть production `/contact-by-id` + bot relay реально активны. `.github/workflows/worker-smoke.yml` остаётся дополнительным автоматическим proof через `/health`.
 
 **Нерабочий подход, не возвращать:** прямой скрытый `<a href="tg://user?id=...">` или `window.location.href = tg://...` из Mini App.
 
