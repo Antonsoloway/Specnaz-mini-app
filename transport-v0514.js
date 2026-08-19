@@ -1,11 +1,15 @@
-/* Royal CRM Mini App — transport v0.5.14
+/* Royal CRM Mini App — transport v0.5.14.1
  * No DOM observers and no version rewriting.
+ * /auth gets a longer timeout and one automatic retry for transient failures.
  */
 (() => {
   const WORKER_ORIGIN = 'https://royal-crm-miniapp-api.tropical-spoon.workers.dev';
   const params = new URLSearchParams(window.location.search);
   const GAS_URL = String(params.get('gas') || '').trim();
   const nativeFetch = window.fetch.bind(window);
+  const DEFAULT_TIMEOUT_MS = 5000;
+  const AUTH_TIMEOUT_MS = 12000;
+  const AUTH_RETRY_DELAY_MS = 350;
   let callbackSeq = 0;
   let gasMode = false;
 
@@ -47,22 +51,68 @@
     });
   }
 
-  async function fetchWithTimeout(input, init, ms) {
+  function timeoutError(code) {
+    const error = new Error(code);
+    error.code = code;
+    error.name = 'TimeoutError';
+    return error;
+  }
+
+  function isTimeoutish(error) {
+    const code = String(error?.code || '');
+    const message = String(error?.message || '');
+    return error?.name === 'AbortError' ||
+      error?.name === 'TimeoutError' ||
+      Number(error?.code) === 20 ||
+      code === 'WORKER_TIMEOUT' ||
+      code === 'AUTH_TIMEOUT' ||
+      message === 'WORKER_TIMEOUT' ||
+      message === 'AUTH_TIMEOUT';
+  }
+
+  function isTransientWorkerError(error) {
+    const code = String(error?.code || '');
+    const message = String(error?.message || '').toLowerCase();
+    return isTimeoutish(error) ||
+      error instanceof TypeError ||
+      code === 'HTTP_502' || code === 'HTTP_503' || code === 'HTTP_504' ||
+      message.includes('failed to fetch') ||
+      message.includes('networkerror') ||
+      message.includes('load failed');
+  }
+
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async function fetchWithTimeout(input, init, ms, timeoutCode = 'WORKER_TIMEOUT') {
     const options = { ...(init || {}) };
     let controller = null;
     if (!options.signal && 'AbortController' in window) {
       controller = new AbortController();
       options.signal = controller.signal;
     }
+
+    let timedOut = false;
     let timeoutId = null;
     const timeout = new Promise((_, reject) => {
       timeoutId = setTimeout(() => {
+        timedOut = true;
         try { controller?.abort(); } catch (_) {}
-        reject(new Error('WORKER_TIMEOUT'));
+        reject(timeoutError(timeoutCode));
       }, ms);
     });
+
+    const request = nativeFetch(input, options).catch(error => {
+      if (timedOut || isTimeoutish(error)) throw timeoutError(timeoutCode);
+      throw error;
+    });
+
     try {
-      return await Promise.race([nativeFetch(input, options), timeout]);
+      return await Promise.race([request, timeout]);
+    } catch (error) {
+      if (timedOut || isTimeoutish(error)) throw timeoutError(timeoutCode);
+      throw error;
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
     }
@@ -134,14 +184,33 @@
     const urlString = typeof input === 'string' ? input : String(input?.url || '');
     if (!urlString.startsWith(WORKER_ORIGIN)) return nativeFetch(input, init);
     if (gasMode) return fallbackFor(urlString, init);
-    try {
-      return await fetchWithTimeout(input, init, 5000);
-    } catch (workerError) {
-      if (!GAS_URL) throw workerError;
-      console.warn('Worker unavailable; using GAS fallback:', workerError?.message || workerError);
-      return fallbackFor(urlString, init);
+
+    let pathname = '';
+    try { pathname = new URL(urlString).pathname; } catch (_) {}
+    const isAuth = pathname === '/auth';
+    const attempts = isAuth ? 2 : 1;
+    const timeoutMs = isAuth ? AUTH_TIMEOUT_MS : DEFAULT_TIMEOUT_MS;
+    const timeoutCode = isAuth ? 'AUTH_TIMEOUT' : 'WORKER_TIMEOUT';
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        return await fetchWithTimeout(input, init, timeoutMs, timeoutCode);
+      } catch (workerError) {
+        lastError = workerError;
+        if (isAuth && attempt < attempts && isTransientWorkerError(workerError)) {
+          console.warn(`Auth attempt ${attempt} failed; retrying once:`, workerError?.code || workerError?.message || workerError);
+          await sleep(AUTH_RETRY_DELAY_MS);
+          continue;
+        }
+        break;
+      }
     }
+
+    if (!GAS_URL) throw lastError || timeoutError(timeoutCode);
+    console.warn('Worker unavailable; using GAS fallback:', lastError?.message || lastError);
+    return fallbackFor(urlString, init);
   };
 
-  window.__ROYAL_TRANSPORT_VERSION__ = '0.5.14';
+  window.__ROYAL_TRANSPORT_VERSION__ = '0.5.14.1';
 })();
