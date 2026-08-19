@@ -1,7 +1,7 @@
 /* Royal CRM Mini App — stability/version guard v0.5.59 */
 (() => {
   const VERSION = '0.5.59';
-  const STABLE_PATCH = '0.5.59.1';
+  const STABLE_PATCH = '0.5.59.2';
 
   function applyVersion() {
     const badge = document.getElementById('versionBadge');
@@ -12,6 +12,26 @@
     const ua = String(navigator.userAgent || '');
     return /iPad|iPhone|iPod/.test(ua)
       || (navigator.platform === 'MacIntel' && Number(navigator.maxTouchPoints || 0) > 1);
+  }
+
+  function waitForImage(img, timeoutMs = 900) {
+    if (!img?.isConnected) return Promise.resolve(false);
+    if (Number(img.naturalWidth || 0) > 0) return Promise.resolve(true);
+    return new Promise(resolve => {
+      let settled = false;
+      const finish = value => {
+        if (settled) return;
+        settled = true;
+        try { img.removeEventListener('load', onLoad); } catch (_) {}
+        try { img.removeEventListener('error', onError); } catch (_) {}
+        resolve(!!value);
+      };
+      const onLoad = () => finish(Number(img.naturalWidth || 0) > 0);
+      const onError = () => finish(false);
+      img.addEventListener('load', onLoad, { once: true });
+      img.addEventListener('error', onError, { once: true });
+      setTimeout(() => finish(Number(img.naturalWidth || 0) > 0), timeoutMs);
+    });
   }
 
   function installIosTeamPhotoGuard() {
@@ -81,10 +101,11 @@
 
       try {
         await task;
-        // If cached/proxy image decoded successfully, keep it. Otherwise restore
-        // the original CRM source instead of leaving the castle fallback.
-        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        if (img.isConnected && Number(img.naturalWidth || 0) > 0) {
+        // iOS may need hundreds of milliseconds to decode a blob URL restored
+        // from IndexedDB. Wait for a real load/error signal before deciding that
+        // the cached/proxy image failed and falling back to the original CRM src.
+        const loaded = await waitForImage(img, 900);
+        if (loaded && img.isConnected) {
           parent?.classList.remove('photo-error');
         } else {
           restoreOriginal();
@@ -94,7 +115,7 @@
       } finally {
         setTimeout(() => {
           try { img.removeEventListener('error', onError); } catch (_) {}
-        }, 2500);
+        }, 3000);
       }
     };
 
