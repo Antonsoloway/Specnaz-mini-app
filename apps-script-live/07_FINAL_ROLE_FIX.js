@@ -194,6 +194,37 @@ function finalRoleHandleTeamsSheetEdit_(e) {
   const lastColumn = range.getLastColumn();
   if (firstColumn > 2 || lastColumn < 1) return;
 
+  // Для одиночного изменения названия запоминаем старое/новое значение ДО
+  // сортировки строк. Это позволяет каскадно заменить название во всех 5
+  // слотах «Базы участников» строго в рамках той же игры.
+  let renameContext = null;
+  if (
+    range.getNumRows() === 1 &&
+    range.getNumColumns() === 1 &&
+    range.getColumn() === 2 &&
+    range.getRow() >= 2
+  ) {
+    const oldTeam = finalRoleStripTeamSuffix_(e.oldValue);
+    const newTeam = finalRoleStripTeamSuffix_(
+      e.value == null ? range.getDisplayValue() : e.value
+    );
+    const game = finalRoleCanonicalGame_(
+      sheet.getRange(range.getRow(), 1).getDisplayValue(),
+      newTeam
+    );
+
+    if (
+      oldTeam && newTeam && game &&
+      finalRoleExactTeamKey_(oldTeam) !== finalRoleExactTeamKey_(newTeam)
+    ) {
+      renameContext = {
+        game: game,
+        oldTeam: oldTeam,
+        newTeam: newTeam
+      };
+    }
+  }
+
   const lock = LockService.getScriptLock();
   let mutationStarted = false;
 
@@ -205,9 +236,30 @@ function finalRoleHandleTeamsSheetEdit_(e) {
       mutationStarted = true;
     }
 
+    let renamedMemberships = 0;
+    if (renameContext) {
+      renamedMemberships = finalRoleCascadeTeamRename_(
+        sheet.getParent(),
+        renameContext.game,
+        renameContext.oldTeam,
+        renameContext.newTeam
+      );
+    }
+
+    // Страховка для уже существующих рассинхронизаций после добавления
+    // декоративного префикса/эмодзи (например BUNTARb -> ⚡ BUNTARb).
+    // Работает только если в той же игре найден ровно один кандидат.
+    const repaired = finalRoleRepairDecoratedTeamMemberships_(
+      sheet.getParent(),
+      { skipMark: true, source: 'teams_edit' }
+    );
+
     const movedRows = finalRoleNormalizeTeamsOrder_(sheet);
     markPublicSyncPending_(
-      'teams_edit:' + range.getA1Notation() + ':moved=' + movedRows
+      'teams_edit:' + range.getA1Notation() +
+      ':renamed=' + renamedMemberships +
+      ':repaired=' + Number(repaired && repaired.changed || 0) +
+      ':moved=' + movedRows
     );
   } finally {
     if (mutationStarted && typeof finishPublicDataMutation_ === 'function') {
@@ -217,6 +269,193 @@ function finalRoleHandleTeamsSheetEdit_(e) {
     }
     try { lock.releaseLock(); } catch (error) {}
   }
+}
+
+/**
+ * Каскадное переименование команды в «Базе участников».
+ * Identity = старое название + игра. Меняются только 5 team-колонок,
+ * роли/ники/игры и остальные данные не трогаются.
+ */
+function finalRoleCascadeTeamRename_(ss, game, oldTeam, newTeam) {
+  const base = ss.getSheetByName(FINALROLE_BASE_SHEET_);
+  if (!base) throw new Error('Не найден лист «' + FINALROLE_BASE_SHEET_ + '»');
+
+  const canonicalGame = finalRoleCanonicalGame_(game, '');
+  const oldKey = finalRoleExactTeamKey_(oldTeam);
+  const cleanNewTeam = finalRoleStripTeamSuffix_(newTeam);
+  if (!canonicalGame || !oldKey || !cleanNewTeam) return 0;
+
+  const firstRow = FINALROLE_FIRST_ROW_;
+  const lastRow = Math.min(base.getLastRow(), FINALROLE_LAST_ROW_);
+  if (lastRow < firstRow) return 0;
+  const count = lastRow - firstRow + 1;
+  let changed = 0;
+
+  FINALROLE_SLOTS_.forEach(function(slot) {
+    const teamValues = base.getRange(firstRow, slot.teamCol, count, 1).getDisplayValues();
+    const gameCol = 22 + slot.number; // W:AA = игра 1..5
+    const gameValues = base.getRange(firstRow, gameCol, count, 1).getDisplayValues();
+
+    for (let i = 0; i < count; i++) {
+      const rawTeam = finalRoleClean_(teamValues[i][0]);
+      if (!rawTeam) continue;
+
+      const existingName = finalRoleStripTeamSuffix_(rawTeam);
+      if (finalRoleExactTeamKey_(existingName) !== oldKey) continue;
+
+      const membershipGame = finalRoleCanonicalGame_(gameValues[i][0], rawTeam);
+      if (membershipGame !== canonicalGame) continue;
+
+      const row = firstRow + i;
+      const nextValue = finalRoleFormatMembershipTeam_(cleanNewTeam, rawTeam, canonicalGame);
+      if (nextValue === rawTeam) continue;
+      base.getRange(row, slot.teamCol).setValue(nextValue);
+      changed++;
+    }
+  });
+
+  if (changed) SpreadsheetApp.flush();
+  return changed;
+}
+
+/**
+ * Безопасно лечит рассинхронизацию, когда в «Командах» к названию только
+ * добавили/изменили ведущий декоративный знак/эмодзи, а «База участников»
+ * ещё хранит старое название. Автоматическая замена делается только если
+ * в той же игре после удаления ведущего декора есть ровно один кандидат.
+ */
+function finalRoleRepairDecoratedTeamMemberships_(ss, options) {
+  options = options || {};
+  ss = ss || SpreadsheetApp.openById(FINALROLE_SPREADSHEET_ID_);
+
+  const teamsSheet = ss.getSheetByName(FINALROLE_TEAMS_SHEET_);
+  const base = ss.getSheetByName(FINALROLE_BASE_SHEET_);
+  if (!teamsSheet || !base) {
+    return { changed: 0, checked: 0, reason: 'SHEET_MISSING' };
+  }
+
+  const teamLastRow = teamsSheet.getLastRow();
+  if (teamLastRow < 2) return { changed: 0, checked: 0, reason: 'NO_TEAMS' };
+
+  const rows = teamsSheet.getRange(2, 1, teamLastRow - 1, 2).getDisplayValues();
+  const exact = {};
+  const decorated = {};
+
+  rows.forEach(function(row) {
+    const game = finalRoleCanonicalGame_(row[0], row[1]);
+    const team = finalRoleStripTeamSuffix_(row[1]);
+    if (!game || !team) return;
+
+    exact[finalRoleGameTeamKey_(game, team)] = team;
+    const decorKey = finalRoleGameDecorKey_(game, team);
+    if (!decorated[decorKey]) decorated[decorKey] = [];
+    if (decorated[decorKey].indexOf(team) === -1) decorated[decorKey].push(team);
+  });
+
+  const firstRow = FINALROLE_FIRST_ROW_;
+  const lastRow = Math.min(base.getLastRow(), FINALROLE_LAST_ROW_);
+  if (lastRow < firstRow) return { changed: 0, checked: 0, reason: 'NO_BASE_ROWS' };
+  const count = lastRow - firstRow + 1;
+
+  let checked = 0;
+  let changed = 0;
+  const repaired = [];
+
+  FINALROLE_SLOTS_.forEach(function(slot) {
+    const teamValues = base.getRange(firstRow, slot.teamCol, count, 1).getDisplayValues();
+    const gameCol = 22 + slot.number;
+    const gameValues = base.getRange(firstRow, gameCol, count, 1).getDisplayValues();
+
+    for (let i = 0; i < count; i++) {
+      const rawTeam = finalRoleClean_(teamValues[i][0]);
+      if (!rawTeam) continue;
+      checked++;
+
+      const teamName = finalRoleStripTeamSuffix_(rawTeam);
+      const game = finalRoleCanonicalGame_(gameValues[i][0], rawTeam);
+      if (!game || !teamName) continue;
+
+      if (exact[finalRoleGameTeamKey_(game, teamName)]) continue;
+
+      const candidates = decorated[finalRoleGameDecorKey_(game, teamName)] || [];
+      if (candidates.length !== 1) continue;
+
+      const canonicalTeam = candidates[0];
+      if (finalRoleExactTeamKey_(canonicalTeam) === finalRoleExactTeamKey_(teamName)) continue;
+
+      const rowNumber = firstRow + i;
+      const nextValue = finalRoleFormatMembershipTeam_(canonicalTeam, rawTeam, game);
+      base.getRange(rowNumber, slot.teamCol).setValue(nextValue);
+      changed++;
+
+      if (repaired.length < 20) {
+        repaired.push({
+          row: rowNumber,
+          slot: slot.number,
+          game: game,
+          from: rawTeam,
+          to: nextValue
+        });
+      }
+    }
+  });
+
+  if (changed) {
+    SpreadsheetApp.flush();
+    if (!options.skipMark && typeof markPublicSyncPending_ === 'function') {
+      markPublicSyncPending_(
+        'team_name_repair:' + String(options.source || 'manual') + ':changed=' + changed
+      );
+    }
+  }
+
+  return { changed: changed, checked: checked, repaired: repaired };
+}
+
+function finalRoleStripTeamSuffix_(value) {
+  return finalRoleClean_(value).replace(/\s+—\s+(РМ|РК)$/u, '').trim();
+}
+
+function finalRoleCanonicalGame_(value, teamRaw) {
+  const text = finalRoleClean_(value).toLocaleLowerCase('ru-RU');
+  if (text === 'рм' || text.indexOf('royal match') >= 0) return 'Royal Match';
+  if (text === 'рк' || text.indexOf('royal kingdom') >= 0) return 'Royal Kingdom';
+
+  const suffix = finalRoleClean_(teamRaw).match(/\s+—\s+(РМ|РК)$/u);
+  if (suffix) return suffix[1] === 'РМ' ? 'Royal Match' : 'Royal Kingdom';
+  return '';
+}
+
+function finalRoleExactTeamKey_(value) {
+  let text = finalRoleStripTeamSuffix_(value);
+  try { text = text.normalize('NFKC'); } catch (error) {}
+  return text.replace(/\s+/g, ' ').trim().toLocaleLowerCase('ru-RU');
+}
+
+function finalRoleDecorTeamKey_(value) {
+  return finalRoleExactTeamKey_(value)
+    .replace(/^[^0-9a-zа-яё]+/iu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function finalRoleGameTeamKey_(game, team) {
+  return finalRoleCanonicalGame_(game, team) + '\n' + finalRoleExactTeamKey_(team);
+}
+
+function finalRoleGameDecorKey_(game, team) {
+  return finalRoleCanonicalGame_(game, team) + '\n' + finalRoleDecorTeamKey_(team);
+}
+
+function finalRoleFormatMembershipTeam_(team, previousRaw, game) {
+  const cleanTeam = finalRoleStripTeamSuffix_(team);
+  const oldRaw = finalRoleClean_(previousRaw);
+  const oldSuffix = oldRaw.match(/\s+—\s+(РМ|РК)$/u);
+  if (oldSuffix) return cleanTeam + ' — ' + oldSuffix[1];
+
+  // Если старое значение почему-то было без суффикса, сохраняем этот формат.
+  // Игра остаётся в W:AA и не переписывается.
+  return cleanTeam;
 }
 
 function finalRoleNormalizeTeamsOrder_(sheet) {

@@ -70,6 +70,14 @@ function MINIAPP_exportUnifiedSnapshotToGitHub() {
     var path = String(props.getProperty('DATA_GITHUB_PATH') || 'snapshot.json').trim();
     if (!repo || !token) throw new Error('DATA_GITHUB_REPO / DATA_GITHUB_TOKEN missing');
 
+    var teamNameRepair = { changed: 0, checked: 0 };
+    if (typeof finalRoleRepairDecoratedTeamMemberships_ === 'function') {
+      teamNameRepair = finalRoleRepairDecoratedTeamMemberships_(null, {
+        source: 'unified_snapshot'
+      }) || teamNameRepair;
+      if (Number(teamNameRepair.changed || 0) > 0) SpreadsheetApp.flush();
+    }
+
     var stable = MINIAPP_buildStableSnapshot_();
     if (typeof MINIAPP_attachTeamStatusesToSnapshot_ !== 'function') {
       throw new Error('MINIAPP_attachTeamStatusesToSnapshot_ missing');
