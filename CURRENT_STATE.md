@@ -186,13 +186,10 @@ Repo config:
 
 ### Production proof
 
-`.github/workflows/worker-smoke.yml`:
-- читает активный source из `worker/wrangler.toml`;
-- извлекает ожидаемый `WRAPPER_VERSION`;
-- ждёт эту версию на production `/health`;
-- при успехе должен записать `runtime/worker-health.json`.
-
-**19.08.2026 пользователь фактически подтвердил, что `Связаться` заработало: production `/contact-by-id` и бот-relay реально активны.** Это является функциональным production-подтверждением contact flow, даже если отдельный `runtime/worker-health.json` не был получен.
+- Автоматический `.github/workflows/worker-smoke.yml` **удалён 19.08.2026**: он создавал ложные/пустые GitHub Actions failure-уведомления `Run failed / No jobs were run` во время обычных правок и засорял почту владельца.
+- Production Worker проверяется напрямую по `/health` и/или функциональным smoke-test после backend-изменений.
+- Не добавлять автоматический GitHub Actions smoke-workflow обратно без отдельной необходимости, предварительной проверки YAML и согласования — обычная разработка не должна генерировать служебный почтовый спам.
+- **19.08.2026 пользователь фактически подтвердил, что `Связаться` заработало:** production `/contact-by-id` и bot relay реально активны.
 
 ---
 
@@ -314,9 +311,10 @@ Server-side источник:
 - у участника с `@username` не заменять существующее username-меню;
 - **не возвращать общий 5-секундный timeout для `/auth` и не показывать Android code 20 как диагноз**;
 - внутренний `BUILD` в `app.js` держать синхронным с текущей Mini App версией;
+- не добавлять обратно автоматический `worker-smoke.yml`, создающий почтовые failure-уведомления;
+- Worker production проверять напрямую по runtime, а не считать GitHub commit доказательством;
 - не заставлять Back открывать список сверху;
-- не удалять `@DmitryRoyal` из credits;
-- не объявлять Worker production-подтверждённым только по GitHub commit.
+- не удалять `@DmitryRoyal` из credits.
 
 ---
 
@@ -336,7 +334,7 @@ Server-side источник:
 12. Тап по contact action не открывает внутренний participant profile вместо contact flow.
 13. Forward открывает сверху; Back восстанавливает позицию.
 14. В credits виден `@DmitryRoyal`.
-15. Для backend-задач отдельно сверяется production Worker version.
+15. Для backend-задач production Worker проверяется напрямую по `/health`/функциональному тесту; автоматического GitHub Actions smoke-workflow нет.
 
 ---
 
