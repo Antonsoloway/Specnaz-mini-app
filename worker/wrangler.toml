@@ -1,5 +1,5 @@
 name = "royal-crm-miniapp-api"
-main = "src/entry-v1120.js"
+main = "src/entry-v1200.js"
 compatibility_date = "2026-08-15"
 
 [vars]
@@ -7,6 +7,7 @@ FRONTEND_ORIGIN = "https://antonsoloway.github.io"
 DATA_REPO = "Antonsoloway/royal-crm-data"
 DATA_BRANCH = "main"
 DATA_PATH = "snapshot.json"
+ADMIN_DATA_PATH = "admin-snapshot.json"
 TELEGRAM_CHAT_ID = "-1002109152418"
 
 [observability]
