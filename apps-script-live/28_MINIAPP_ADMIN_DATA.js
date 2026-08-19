@@ -1,15 +1,94 @@
 /*
  * Royal CRM / Таблица ЧП
  * 28_MINIAPP_ADMIN_DATA.js
- * v0.6.0-read.1
+ * v0.6.0-read.2
  *
- * PRIVATE admin payload builder for Mini App v0.6.
- * This data is written only into the private GitHub snapshot and MUST NOT be
- * exposed by the normal /snapshot route. Worker /admin-data performs a fresh
- * Telegram chat-admin check before returning it.
+ * PRIVATE admin snapshot for Mini App v0.6.
+ * - Does NOT change the stable user snapshot.json contract.
+ * - Writes a separate private admin-snapshot.json.
+ * - Normal users never receive this file.
+ * - Worker /admin-data must perform a fresh Telegram administrator/creator check.
  */
 
-var MINIAPP_ADMIN_DATA_VERSION = '0.6.0-read.1';
+var MINIAPP_ADMIN_DATA_VERSION = '0.6.0-read.2';
+var MINIAPP_ADMIN_DATA_HANDLER = 'MINIAPP_exportAdminSnapshotToGitHub';
+var MINIAPP_ADMIN_DATA_DEFAULT_PATH = 'admin-snapshot.json';
+var MINIAPP_ADMIN_DATA_LAST_HASH = 'MINIAPP_ADMIN_DATA_LAST_HASH';
+
+function MINIAPP_exportAdminSnapshotToGitHub() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(25000)) return { ok: false, skipped: true, reason: 'LOCK_BUSY' };
+
+  try {
+    if (typeof MINIAPP_putPrivateGitHubFile_ !== 'function') {
+      throw new Error('Admin snapshot: MINIAPP_putPrivateGitHubFile_ missing');
+    }
+
+    var props = PropertiesService.getScriptProperties();
+    var repo = String(props.getProperty('DATA_GITHUB_REPO') || '').trim();
+    var token = String(props.getProperty('DATA_GITHUB_TOKEN') || '').trim();
+    var branch = String(props.getProperty('DATA_GITHUB_BRANCH') || 'main').trim();
+    var path = String(props.getProperty('DATA_GITHUB_ADMIN_PATH') || MINIAPP_ADMIN_DATA_DEFAULT_PATH).trim();
+    if (!repo || !token) throw new Error('Admin snapshot: DATA_GITHUB_REPO / DATA_GITHUB_TOKEN missing');
+
+    var adminData = MINIAPP_buildAdminData_();
+    var hash = MINIAPP_adminSha256_(JSON.stringify(adminData));
+    var lastHash = String(props.getProperty(MINIAPP_ADMIN_DATA_LAST_HASH) || '').trim();
+
+    if (lastHash && lastHash === hash) {
+      return {
+        ok: true,
+        changed: false,
+        version: MINIAPP_ADMIN_DATA_VERSION,
+        participants: adminData.participants.length,
+        teams: adminData.teams.length,
+        hash: hash
+      };
+    }
+
+    var payload = {
+      schemaVersion: '0.6.0-admin.1',
+      generatedAt: new Date().toISOString(),
+      source: 'Royal CRM / Таблица ЧП / ADMIN PRIVATE',
+      dataHash: hash,
+      adminData: adminData
+    };
+
+    var github = MINIAPP_putPrivateGitHubFile_(repo, branch, path, JSON.stringify(payload), token, hash);
+    props.setProperty(MINIAPP_ADMIN_DATA_LAST_HASH, hash);
+
+    return {
+      ok: true,
+      changed: true,
+      version: MINIAPP_ADMIN_DATA_VERSION,
+      participants: adminData.participants.length,
+      teams: adminData.teams.length,
+      hash: hash,
+      github: github
+    };
+  } finally {
+    try { lock.releaseLock(); } catch (_) {}
+  }
+}
+
+function MINIAPP_installAdminSnapshotTrigger5m() {
+  var removed = [];
+  ScriptApp.getProjectTriggers().forEach(function(trigger) {
+    if (String(trigger.getHandlerFunction() || '') !== MINIAPP_ADMIN_DATA_HANDLER) return;
+    ScriptApp.deleteTrigger(trigger);
+    removed.push(MINIAPP_ADMIN_DATA_HANDLER);
+  });
+  ScriptApp.newTrigger(MINIAPP_ADMIN_DATA_HANDLER).timeBased().everyMinutes(5).create();
+  var first = MINIAPP_exportAdminSnapshotToGitHub();
+  return {
+    ok: true,
+    version: MINIAPP_ADMIN_DATA_VERSION,
+    installed: MINIAPP_ADMIN_DATA_HANDLER,
+    everyMinutes: 5,
+    removed: removed,
+    firstExport: first
+  };
+}
 
 function MINIAPP_buildAdminData_() {
   if (typeof SPREADSHEET_ID === 'undefined' || typeof SHEET_BASE === 'undefined' || typeof SHEET_TEAMS === 'undefined') {
@@ -214,6 +293,14 @@ function MINIAPP_adminTelegramId_(value) {
   var text = MINIAPP_adminValue_(value).replace(/^'/, '').replace(/\.0$/, '');
   var match = text.match(/\d{5,20}/);
   return match ? match[0] : '';
+}
+
+function MINIAPP_adminSha256_(text) {
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(text || ''), Utilities.Charset.UTF_8);
+  return bytes.map(function(b) {
+    var n = b < 0 ? b + 256 : b;
+    return ('0' + n.toString(16)).slice(-2);
+  }).join('');
 }
 
 function MINIAPP_adminValue_(value) {
