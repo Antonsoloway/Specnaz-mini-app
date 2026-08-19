@@ -96,7 +96,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-ap
 - `navigation-card-restore-v0532.js` — внутренняя версия `0.5.32.1`
 - `search-hybrid-v0553.js`
 - `search-aliases-v0559.js`
-- `media-persistent-cache-v0554.js` — внутренняя версия `0.5.54.1`
+- `media-persistent-cache-v0554.js` — внутренняя версия **`0.5.54.2`**, safe disk-record warm
 - `contact-by-id-v0559.js` — внутренняя версия `0.5.59.2`
 - `active-teams-v0559.js`
 - `active-teams-title-v0559.js`
@@ -106,8 +106,9 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-ap
 Текущие важные cache-bust:
 - auth: `transport-v0514.js?v=20260819-0833`, `app.js?v=20260819-0833`
 - Back/contact restore: `navigation-card-restore-v0532.js?v=20260819-0848`
-- iPhone team-photo guard after rollback: `stable-v0559.js?v=20260819-2003`
-- changelog: `changelog-v0559.js?v=20260819-2003`
+- media cache safe warm: `media-persistent-cache-v0554.js?v=20260819-2012`
+- iPhone team-photo guard: `stable-v0559.js?v=20260819-2003`
+- changelog: `changelog-v0559.js?v=20260819-2012`
 
 ### Устойчивая авторизация
 - `/auth` timeout = 12 секунд;
@@ -213,8 +214,7 @@ Repo config:
 ### Фото команд — общий путь
 - cache key = **нормализованное имя команды + игра**;
 - временный Google `photoUrl` не является cache identity;
-- disk-only prewarm сохранённых фото;
-- cached photo показывается сразу;
+- cached photo показывается cache-first;
 - примерно после 30 минут допускается background refresh;
 - cleanup около 45 дней, общий лимит около 420 изображений.
 
@@ -222,24 +222,34 @@ Repo config:
 
 Первый подтверждённый iOS-дефект: фото команды могло мелькнуть, затем исчезнуть и замениться замком.
 
-Причина: `persistentLoadTeamPhoto()` выполняет `img.removeAttribute('src')` **до** асинхронного `idbGet()`/proxy fetch. На iOS Telegram WebView это создаёт заметный flash.
-
 Активный stable patch **`0.5.59.2`**:
-- не позволяет удалить уже существующий `src` до готовности replacement;
+- не позволяет persistent-loader удалить уже существующий `src` до готовности replacement;
 - даёт cached/proxy image до 900 мс на реальный decode/load;
 - при ошибке возвращает исходный CRM `src`;
 - Android-ветку не меняет.
 
-Сравнение iPhone/Android показало, что на iPhone кэшированное фото появляется примерно через 0,4–0,6 сек, тогда как на Android почти сразу. Была сделана попытка ускорения stable patch `0.5.59.3`: пакетно поднимать все IndexedDB team blobs в object URLs и назначать их синхронно при render.
+Неудачная попытка `stable-v0559.js 0.5.59.3` полностью откатана: она заранее создавала object URL для всех team blobs и перехватывала `renderTeamDetail`; на реальном iPhone это привело к полному исчезновению фото. Этот подход не возвращать.
 
-**Эта попытка признана неудачной и полностью откатана.** Пользовательское видео после `0.5.59.3` подтвердило тяжёлый регресс: на iPhone реальные фото команд перестали появляться вообще и detail оставался с замком. Поэтому `0.5.59.3` нельзя возвращать.
+### Текущее безопасное ускорение — media cache `0.5.54.2`
 
-После регрессии:
-- `stable-v0559.js` возвращён к `0.5.59.2`;
-- `app-v0559.html` получил новый cache-bust `20260819-2003`, чтобы iPhone не держал сломанный fast-path;
-- ускорение iOS откладывается до отдельной безопасной реализации, которая не подменяет штатный loader и сначала проверяется на реальном iPhone.
+Причина задержки 0,4–0,6 сек на iPhone была в том, что старый `warmTeamCacheFromDisk()` ждал snapshot и затем делал отдельный `idbGet()` для каждой команды. На iOS последовательные IndexedDB-транзакции заметно медленнее Android.
 
-Это frontend fix/rollback; Apps Script / Cloud Shell не нужен.
+Новая реализация **не подменяет render и не обходит loader**:
+- сразу при загрузке `media-persistent-cache-v0554.js` выполняется один readonly `openCursor()` по существующему IndexedDB store;
+- в `teamDiskMemory` сохраняются только валидные **записи Blob** команд младше 45 дней;
+- во время warm **не создаются `blob:` URL**, не меняется DOM и не запускается сеть;
+- при открытии конкретной команды штатный `persistentLoadTeamPhoto()` сначала проверяет свой родной `teamMemory`, затем `teamDiskMemory`;
+- если запись уже прогрета, только для этой открываемой команды синхронно создаётся object URL и назначается штатному `<img>`;
+- если записи нет, остаётся прежний рабочий путь `idbGet → /team-photo → fallback`;
+- background refresh, stable iOS guard `0.5.59.2` и Android-путь сохранены;
+- новые/обновлённые team blobs автоматически попадают в `teamDiskMemory` после `idbPut`;
+- никакого сетевого prewarm нет.
+
+Диагностика: `window.RoyalPersistentMediaCache.teamDiskEntries` и `teamObjectUrls`.
+
+**Статус проверки:** GitHub `main` обновлён, активный cache-bust установлен. Реальная скорость/стабильность на iPhone должна быть подтверждена пользователем после полного перезапуска Mini App.
+
+Apps Script / Cloud Shell для этого изменения не нужен.
 
 ---
 
@@ -275,7 +285,8 @@ Repo config:
 - не возвращать ошибочное `BbIIIIKA`;
 - не возвращать team-photo cache key к временному `photoUrl`;
 - на iOS **не стирать существующий team-photo `src` до готовности replacement source**;
-- **не возвращать stable patch `0.5.59.3` / массовое создание session object URL для всех team blobs как iOS fast-path: на реальном iPhone это полностью убрало фото**;
+- **не возвращать stable patch `0.5.59.3` / массовое создание session object URL для всех team blobs и перехват `renderTeamDetail`**;
+- безопасный disk warm может хранить Blob-records в памяти, но object URL создавать только для реально открываемой команды;
 - не превращать disk-only cache warm в сетевой prewarm;
 - `Связаться` только через Worker → Голубец → inline button;
 - не запускать `tg://user?id` напрямую из Mini App;
@@ -295,12 +306,13 @@ Repo config:
 4. `вышка` находит `🗡 BbllllKA` в РК.
 5. Активные команды имеют золото и правильного крота.
 6. Повторное открытие ранее загруженной команды использует photo cache.
-7. **На iPhone фото команды должно отображаться; не допускается состояние, когда после открытия всех команд остаётся только замок.**
+7. На iPhone фото команды должно отображаться; не допускается состояние, когда после открытия остаётся только замок.
 8. На iPhone фото не должно исчезать после краткого появления; при проблеме replacement остаётся рабочий CRM photo.
-9. У участника без `@` есть `Связаться` и оно работает через Голубца.
-10. После `Участники → профиль/команда → Назад` кнопки `Связаться` остаются.
-11. Forward открывает сверху, Back восстанавливает позицию.
-12. В credits есть `@DmitryRoyal`.
+9. **На iPhone ранее кэшированная команда должна открывать фото без прежней задержки ~0,4–0,6 сек; проверить несколько команд подряд и после полного перезапуска Mini App.**
+10. У участника без `@` есть `Связаться` и оно работает через Голубца.
+11. После `Участники → профиль/команда → Назад` кнопки `Связаться` остаются.
+12. Forward открывает сверху, Back восстанавливает позицию.
+13. В credits есть `@DmitryRoyal`.
 
 ---
 
