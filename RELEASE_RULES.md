@@ -76,6 +76,7 @@
 68. Не добавлять автоматические GitHub Actions smoke-workflow, которые генерируют failure-письма владельцу на обычных разработческих commits, без отдельной необходимости, проверки workflow и согласования. Worker runtime проверять напрямую по `/health` и/или функциональному smoke-test; GitHub commit сам по себе production-доказательством не является.
 69. После любого Back/rerender списка участников post-render decorators обязаны восстанавливать динамические actions. Для карточек участников порядок: сначала `RoyalParticipantCardUX.decorate()`, затем `RoyalContactByTelegramId.decorate()`. Проверять как видимую кнопку `Назад`, так и Telegram native/system Back; `Связаться` не должно исчезать после возврата из профиля или команды.
 70. На iPhone/iPad team-photo loader не имеет права очищать уже существующий рабочий `img.src` до готовности replacement из IndexedDB/proxy. iOS WebView может заметно задерживать decode; replacement должен получить время на реальный `load/decode`, а при временной ошибке кэша/прокси приложение сохраняет/возвращает исходный CRM source вместо принудительного `photo-error`/замка. Android-ветку без необходимости не менять.
+71. На iPhone/iPad уже сохранённые team-photo blobs должны подниматься из IndexedDB в session memory **пакетным readonly-чтением при старте**, а не только последовательными per-team `idbGet()` после загрузки snapshot. Допускается точечный disk preload на `pointerdown` конкретной команды. Этот fast path не имеет права превращаться в сетевой prewarm; Android-ветку без необходимости не менять.
 
 ## Текущая версия
 
@@ -89,6 +90,7 @@
 - server alias `BbllllKA / Royal Kingdom ↔ вышка` через writer `1.2.4`, `searchIndexVersion=1.1.3`;
 - постоянный team-photo cache key `команда + игра` с disk-only prewarm;
 - iOS-safe team-photo guard, сохраняющий рабочий source до готовности кэша/proxy;
+- iOS fast team-photo warm: пакетное IndexedDB-чтение в session memory + point preload на касании;
 - кнопку `Связаться` через Worker/Голубца для участников без `@username`;
 - восстановление кнопок `Связаться` после Back/rerender списка участников;
 - устойчивую `/auth`: 12 секунд + один automatic retry для временных сбоев, `AUTH_TIMEOUT` вместо Android code 20;
