@@ -1,92 +1,89 @@
 /*
  * Royal CRM / Таблица ЧП
  * 28_MINIAPP_ADMIN_DATA.js
- * v0.6.0-read.2
+ * v0.6.0-read.3
  *
  * PRIVATE admin snapshot for Mini App v0.6.
  * - Does NOT change the stable user snapshot.json contract.
  * - Writes a separate private admin-snapshot.json.
  * - Normal users never receive this file.
  * - Worker /admin-data must perform a fresh Telegram administrator/creator check.
+ * - Existing Unified Snapshot trigger may call MINIAPP_exportAdminSnapshotUnlocked_()
+ *   while it already owns the ScriptLock; no second time trigger is required.
  */
 
-var MINIAPP_ADMIN_DATA_VERSION = '0.6.0-read.2';
-var MINIAPP_ADMIN_DATA_HANDLER = 'MINIAPP_exportAdminSnapshotToGitHub';
+var MINIAPP_ADMIN_DATA_VERSION = '0.6.0-read.3';
 var MINIAPP_ADMIN_DATA_DEFAULT_PATH = 'admin-snapshot.json';
 var MINIAPP_ADMIN_DATA_LAST_HASH = 'MINIAPP_ADMIN_DATA_LAST_HASH';
 
 function MINIAPP_exportAdminSnapshotToGitHub() {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(25000)) return { ok: false, skipped: true, reason: 'LOCK_BUSY' };
-
   try {
-    if (typeof MINIAPP_putPrivateGitHubFile_ !== 'function') {
-      throw new Error('Admin snapshot: MINIAPP_putPrivateGitHubFile_ missing');
-    }
-
     var props = PropertiesService.getScriptProperties();
     var repo = String(props.getProperty('DATA_GITHUB_REPO') || '').trim();
     var token = String(props.getProperty('DATA_GITHUB_TOKEN') || '').trim();
     var branch = String(props.getProperty('DATA_GITHUB_BRANCH') || 'main').trim();
-    var path = String(props.getProperty('DATA_GITHUB_ADMIN_PATH') || MINIAPP_ADMIN_DATA_DEFAULT_PATH).trim();
-    if (!repo || !token) throw new Error('Admin snapshot: DATA_GITHUB_REPO / DATA_GITHUB_TOKEN missing');
-
-    var adminData = MINIAPP_buildAdminData_();
-    var hash = MINIAPP_adminSha256_(JSON.stringify(adminData));
-    var lastHash = String(props.getProperty(MINIAPP_ADMIN_DATA_LAST_HASH) || '').trim();
-
-    if (lastHash && lastHash === hash) {
-      return {
-        ok: true,
-        changed: false,
-        version: MINIAPP_ADMIN_DATA_VERSION,
-        participants: adminData.participants.length,
-        teams: adminData.teams.length,
-        hash: hash
-      };
-    }
-
-    var payload = {
-      schemaVersion: '0.6.0-admin.1',
-      generatedAt: new Date().toISOString(),
-      source: 'Royal CRM / Таблица ЧП / ADMIN PRIVATE',
-      dataHash: hash,
-      adminData: adminData
-    };
-
-    var github = MINIAPP_putPrivateGitHubFile_(repo, branch, path, JSON.stringify(payload), token, hash);
-    props.setProperty(MINIAPP_ADMIN_DATA_LAST_HASH, hash);
-
-    return {
-      ok: true,
-      changed: true,
-      version: MINIAPP_ADMIN_DATA_VERSION,
-      participants: adminData.participants.length,
-      teams: adminData.teams.length,
-      hash: hash,
-      github: github
-    };
+    return MINIAPP_exportAdminSnapshotUnlocked_(props, repo, token, branch);
   } finally {
     try { lock.releaseLock(); } catch (_) {}
   }
 }
 
-function MINIAPP_installAdminSnapshotTrigger5m() {
-  var removed = [];
-  ScriptApp.getProjectTriggers().forEach(function(trigger) {
-    if (String(trigger.getHandlerFunction() || '') !== MINIAPP_ADMIN_DATA_HANDLER) return;
-    ScriptApp.deleteTrigger(trigger);
-    removed.push(MINIAPP_ADMIN_DATA_HANDLER);
-  });
-  ScriptApp.newTrigger(MINIAPP_ADMIN_DATA_HANDLER).timeBased().everyMinutes(5).create();
-  var first = MINIAPP_exportAdminSnapshotToGitHub();
+function MINIAPP_exportAdminSnapshotUnlocked_(props, repo, token, branch) {
+  if (typeof MINIAPP_putPrivateGitHubFile_ !== 'function') {
+    throw new Error('Admin snapshot: MINIAPP_putPrivateGitHubFile_ missing');
+  }
+  props = props || PropertiesService.getScriptProperties();
+  repo = String(repo || props.getProperty('DATA_GITHUB_REPO') || '').trim();
+  token = String(token || props.getProperty('DATA_GITHUB_TOKEN') || '').trim();
+  branch = String(branch || props.getProperty('DATA_GITHUB_BRANCH') || 'main').trim();
+  var path = String(props.getProperty('DATA_GITHUB_ADMIN_PATH') || MINIAPP_ADMIN_DATA_DEFAULT_PATH).trim();
+  if (!repo || !token) throw new Error('Admin snapshot: DATA_GITHUB_REPO / DATA_GITHUB_TOKEN missing');
+
+  var adminData = MINIAPP_buildAdminData_();
+  var hashBasis = {
+    version: adminData.version,
+    participants: adminData.participants,
+    teams: adminData.teams,
+    stats: adminData.stats,
+    journal: adminData.journal
+  };
+  var hash = MINIAPP_adminSha256_(JSON.stringify(hashBasis));
+  var lastHash = String(props.getProperty(MINIAPP_ADMIN_DATA_LAST_HASH) || '').trim();
+
+  if (lastHash && lastHash === hash) {
+    return {
+      ok: true,
+      changed: false,
+      version: MINIAPP_ADMIN_DATA_VERSION,
+      participants: adminData.participants.length,
+      teams: adminData.teams.length,
+      hash: hash
+    };
+  }
+
+  var nowIso = new Date().toISOString();
+  adminData.generatedAt = nowIso;
+  var payload = {
+    schemaVersion: '0.6.0-admin.1',
+    generatedAt: nowIso,
+    source: 'Royal CRM / Таблица ЧП / ADMIN PRIVATE',
+    dataHash: hash,
+    adminData: adminData
+  };
+
+  var github = MINIAPP_putPrivateGitHubFile_(repo, branch, path, JSON.stringify(payload), token, hash);
+  props.setProperty(MINIAPP_ADMIN_DATA_LAST_HASH, hash);
+
   return {
     ok: true,
+    changed: true,
     version: MINIAPP_ADMIN_DATA_VERSION,
-    installed: MINIAPP_ADMIN_DATA_HANDLER,
-    everyMinutes: 5,
-    removed: removed,
-    firstExport: first
+    participants: adminData.participants.length,
+    teams: adminData.teams.length,
+    hash: hash,
+    github: github
   };
 }
 
@@ -127,7 +124,6 @@ function MINIAPP_buildAdminData_() {
 
   return {
     version: MINIAPP_ADMIN_DATA_VERSION,
-    generatedAt: new Date().toISOString(),
     participants: participants,
     teams: teams,
     stats: {
@@ -193,8 +189,9 @@ function MINIAPP_adminReadParticipants_(sheet) {
       });
     });
 
-    var hasAdminData = name || telegramName || username || telegramId || memberships.length || status || chatState ||
-      MINIAPP_adminValue_(row[20]) || MINIAPP_adminValue_(row[27]) || MINIAPP_adminValue_(row[28]) || MINIAPP_adminValue_(row[29]);
+    // Do not include padded technical rows where formulas leave only zero counters.
+    // A real CRM participant must have identity/status/chat-state/membership data.
+    var hasAdminData = !!(name || telegramName || username || telegramId || memberships.length || status || chatState);
     if (!hasAdminData) return;
 
     out.push({
@@ -245,7 +242,9 @@ function MINIAPP_adminReadTeams_(ss, sheet) {
       : gameRaw;
     var status = MINIAPP_adminValue_(row[11]);
 
-    var hasData = name || game || status || row.slice(3, 11).some(function(v) { return MINIAPP_adminValue_(v); });
+    // A real team row always has at least game/name/status. This also preserves
+    // intentionally empty/inactive teams while excluding padded blank rows.
+    var hasData = !!(name || game || status);
     if (!hasData) return;
 
     var key = name && typeof MINIAPP_snapshotTeamKey_ === 'function'
