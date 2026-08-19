@@ -97,7 +97,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-ap
 - `navigation-v0521.js`
 - `participant-profile-v0523.js`
 - `participant-card-ux-v0531.js`
-- `navigation-card-restore-v0532.js`
+- `navigation-card-restore-v0532.js` — внутренняя версия **`0.5.32.1`**
 - `search-hybrid-v0553.js`
 - `search-aliases-v0559.js`
 - `media-persistent-cache-v0554.js` — внутренняя версия `0.5.54.1`
@@ -111,6 +111,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-ap
 - `stable-v0559.js`
 
 Текущий cache-bust contact module: `contact-by-id-v0559.js?v=20260819-0015`.
+Текущий cache-bust navigation restore: `navigation-card-restore-v0532.js?v=20260819-0848`.
 Текущий cache-bust auth transport/core: `transport-v0514.js?v=20260819-0833`, `app.js?v=20260819-0833`.
 
 ### Устойчивая авторизация
@@ -154,6 +155,14 @@ Identity = только **raw Telegram ID**.
 - после успеха Mini App показывает popup `Ссылка готова` → `Открыть Голубя`;
 - если Голубец не может написать requester-у, приложение показывает ошибку;
 - privacy/context ограничения Telegram могут не позволить открыть конкретный профиль по ID.
+
+### Восстановление после навигации
+
+- `navigation-card-restore-v0532.js` после `Назад` сначала повторно применяет `RoyalParticipantCardUX.decorate()`, а **затем** `RoyalContactByTelegramId.decorate()`;
+- порядок обязателен: карточный UX может заменить DOM, поэтому contact-action накладывается последним;
+- восстановление повторяется через `requestAnimationFrame`, чтобы кнопки не исчезали при позднем rerender;
+- обработаны и видимая кнопка `Назад`, и Telegram native/system Back;
+- возврат `Участники → профиль/команда → Назад` обязан сохранять `Связаться` у всех участников без `@username`.
 
 **Не возвращать:** скрытый `<a href="tg://user?id=...">`, `window.location.href = tg://...` или иной прямой ID deep-link из Mini App — этот подход уже проверен на Android и не сработал.
 
@@ -273,7 +282,8 @@ Server-side источник:
 
 Инвариант:
 - **вперёд** → новый экран сверху (`scrollY=0`);
-- **назад** → точная сохранённая позиция предыдущего экрана.
+- **назад** → точная сохранённая позиция предыдущего экрана;
+- после восстановления списка запускаются все post-render decorators; для участников порядок: card UX → contact buttons.
 
 Не возвращать ошибочное поведение v0.5.57, где Back тоже отправлял список наверх.
 
@@ -307,6 +317,7 @@ Server-side источник:
 - не возвращать team-photo cache key к временному Google `photoUrl`;
 - не массово скачивать все фото команд на старте;
 - если у участника нет `@username`, использовать `Связаться` через Worker → Голубец → inline profile button;
+- **после Back/rerender обязательно повторно накладывать `Связаться` после participant-card UX**;
 - **не запускать `tg://user?id` напрямую из Mini App**;
 - у участника с `@username` не заменять существующее username-меню;
 - **не возвращать общий 5-секундный timeout для `/auth` и не показывать Android code 20 как диагноз**;
@@ -332,9 +343,10 @@ Server-side источник:
 10. У участника без `@username` отображается `Связаться`.
 11. Тап `Связаться` → `Отправляю…` → popup `Ссылка готова`; после `Открыть Голубя` в ЛС Голубца есть inline-кнопка `👤 Открыть профиль`.
 12. Тап по contact action не открывает внутренний participant profile вместо contact flow.
-13. Forward открывает сверху; Back восстанавливает позицию.
-14. В credits виден `@DmitryRoyal`.
-15. Для backend-задач production Worker проверяется напрямую по `/health`/функциональному тесту; автоматического GitHub Actions smoke-workflow нет.
+13. `Участники → профиль/команда → Назад` возвращает на прежнее место и кнопки `Связаться` остаются у всех участников без `@username`; отдельно проверить Telegram native Back.
+14. Forward открывает сверху; Back восстанавливает позицию.
+15. В credits виден `@DmitryRoyal`.
+16. Для backend-задач production Worker проверяется напрямую по `/health`/функциональному тесту; автоматического GitHub Actions smoke-workflow нет.
 
 ---
 
