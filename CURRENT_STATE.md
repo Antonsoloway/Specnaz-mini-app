@@ -90,8 +90,8 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-ap
 - `app.html` и `index.html` ведут на `app-v0559.html`, сохраняя Telegram `search + hash`.
 
 Ключевые активные модули:
-- `transport-v0514.js`
-- `app.js`
+- `transport-v0514.js` — внутренняя версия **`0.5.14.1`**
+- `app.js` — внутренний `BUILD = 0.5.59`
 - `team-identity-fix.js`
 - `identity-card-ids-v0518.js`
 - `navigation-v0521.js`
@@ -111,6 +111,19 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-ap
 - `stable-v0559.js`
 
 Текущий cache-bust contact module: `contact-by-id-v0559.js?v=20260819-0015`.
+Текущий cache-bust auth transport/core: `transport-v0514.js?v=20260819-0833`, `app.js?v=20260819-0833`.
+
+### Устойчивая авторизация
+
+Причина редкой ошибки `20 · build=0.5.0`: старый transport обрывал любой Worker request через 5 секунд; Android WebView при `AbortController.abort()` мог отдавать `DOMException code 20`, а старый `app.js` показывал устаревший внутренний build `0.5.0`.
+
+Текущие правила:
+- для `/auth` timeout = **12 секунд**;
+- при transient timeout/network error выполняется **ровно один автоматический повтор** после короткой паузы;
+- HTTP/логические отказы авторизации не повторяются бесконечно;
+- Android `AbortError` / numeric code `20` нормализуются в **`AUTH_TIMEOUT`**;
+- остальные Worker routes сохраняют штатный timeout 5 секунд;
+- пользователь видит fatal auth error только после исчерпания обеих попыток.
 
 ---
 
@@ -179,7 +192,7 @@ Repo config:
 - ждёт эту версию на production `/health`;
 - при успехе должен записать `runtime/worker-health.json`.
 
-**На момент этой записи repo/config уже переключены на `1.12.0`, но production runtime не считать подтверждённым, пока нет runtime proof или эквивалентной прямой проверки.**
+**19.08.2026 пользователь фактически подтвердил, что `Связаться` заработало: production `/contact-by-id` и бот-relay реально активны.** Это является функциональным production-подтверждением contact flow, даже если отдельный `runtime/worker-health.json` не был получен.
 
 ---
 
@@ -299,6 +312,8 @@ Server-side источник:
 - если у участника нет `@username`, использовать `Связаться` через Worker → Голубец → inline profile button;
 - **не запускать `tg://user?id` напрямую из Mini App**;
 - у участника с `@username` не заменять существующее username-меню;
+- **не возвращать общий 5-секундный timeout для `/auth` и не показывать Android code 20 как диагноз**;
+- внутренний `BUILD` в `app.js` держать синхронным с текущей Mini App версией;
 - не заставлять Back открывать список сверху;
 - не удалять `@DmitryRoyal` из credits;
 - не объявлять Worker production-подтверждённым только по GitHub commit.
@@ -308,8 +323,8 @@ Server-side источник:
 ## 14. Минимальный smoke-test
 
 1. Launch через `https://t.me/doveofpeace_bot?startapp`.
-2. Авторизация не потеряна.
-3. Бейдж версии = `v0.5.59`.
+2. Авторизация не потеряна; кратковременная задержка Worker не должна сразу давать fatal после 5 секунд, первый transient сбой повторяется автоматически.
+3. Бейдж версии = `v0.5.59` и auth error details при необходимости показывают `build=0.5.59`, а не `0.5.0`.
 4. Поиск и `Все / РМ / РК` работают.
 5. `вышка` находит `🗡 BbllllKA` в РК.
 6. Активные команды имеют золотую маркировку и правильного крота.
