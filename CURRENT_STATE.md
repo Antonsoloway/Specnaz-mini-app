@@ -90,81 +90,55 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-ap
 - `app.html` и `index.html` ведут на `app-v0559.html`, сохраняя Telegram `search + hash`.
 
 Ключевые активные модули:
-- `transport-v0514.js` — внутренняя версия **`0.5.14.1`**
-- `app.js` — внутренний `BUILD = 0.5.59`
-- `team-identity-fix.js`
-- `identity-card-ids-v0518.js`
+- `transport-v0514.js` — внутренняя версия `0.5.14.1`
+- `app.js` — `BUILD = 0.5.59`
 - `navigation-v0521.js`
-- `participant-profile-v0523.js`
-- `participant-card-ux-v0531.js`
-- `navigation-card-restore-v0532.js` — внутренняя версия **`0.5.32.1`**
+- `navigation-card-restore-v0532.js` — внутренняя версия `0.5.32.1`
 - `search-hybrid-v0553.js`
 - `search-aliases-v0559.js`
 - `media-persistent-cache-v0554.js` — внутренняя версия `0.5.54.1`
-- `self-avatar-priority-v0556.js`
-- `navigation-scroll-top-v0558.js`
+- `contact-by-id-v0559.js` — внутренняя версия `0.5.59.2`
 - `active-teams-v0559.js`
 - `active-teams-title-v0559.js`
-- `active-teams-v0559.css`
-- `contact-by-id-v0559.js` — внутренняя версия **`0.5.59.2`**
+- `stable-v0559.js` — stable patch **`0.5.59.2`**, в том числе iOS team-photo guard
 - `changelog-v0559.js`
-- `stable-v0559.js`
 
-Текущий cache-bust contact module: `contact-by-id-v0559.js?v=20260819-0015`.
-Текущий cache-bust navigation restore: `navigation-card-restore-v0532.js?v=20260819-0848`.
-Текущий cache-bust auth transport/core: `transport-v0514.js?v=20260819-0833`, `app.js?v=20260819-0833`.
+Текущие важные cache-bust:
+- auth: `transport-v0514.js?v=20260819-0833`, `app.js?v=20260819-0833`
+- Back/contact restore: `navigation-card-restore-v0532.js?v=20260819-0848`
+- iPhone team-photo guard: `stable-v0559.js?v=20260819-1822`
+- changelog: `changelog-v0559.js?v=20260819-1822`
 
 ### Устойчивая авторизация
-
-Причина редкой ошибки `20 · build=0.5.0`: старый transport обрывал любой Worker request через 5 секунд; Android WebView при `AbortController.abort()` мог отдавать `DOMException code 20`, а старый `app.js` показывал устаревший внутренний build `0.5.0`.
-
-Текущие правила:
-- для `/auth` timeout = **12 секунд**;
-- при transient timeout/network error выполняется **ровно один автоматический повтор** после короткой паузы;
-- HTTP/логические отказы авторизации не повторяются бесконечно;
-- Android `AbortError` / numeric code `20` нормализуются в **`AUTH_TIMEOUT`**;
-- остальные Worker routes сохраняют штатный timeout 5 секунд;
-- пользователь видит fatal auth error только после исчерпания обеих попыток.
+- `/auth` timeout = 12 секунд;
+- один автоматический retry только для transient timeout/network ошибки;
+- Android `AbortError code 20` нормализуется в `AUTH_TIMEOUT`;
+- остальные Worker routes сохраняют обычный timeout;
+- внутренний build совпадает с v0.5.59.
 
 ---
 
 ## 6. Контакт с участниками
 
 ### Есть `@username`
-Поведение не менялось:
-- видна синяя `@username`-ссылка;
-- нажатие открывает существующее меню;
-- доступны `Написать в ЛС` и `Позвать в чате`.
+Сохраняется прежнее меню username: `Написать в ЛС` / `Позвать в чате`.
 
 ### Нет `@username`
-Показывается синяя кнопка **`Связаться`** на том же месте.
+На том же месте показывается **`Связаться`**.
 
-Identity = только **raw Telegram ID**.
+Identity = только raw Telegram ID.
 
 Правильная цепочка:
 
 `Mini App → POST /contact-by-id → Worker → @doveofpeace_bot → inline-кнопка «Открыть профиль»`
 
-Подробности:
-- Mini App **не запускает `tg://user?id=...` напрямую**;
-- frontend отправляет авторизованный `POST /contact-by-id` с target raw Telegram ID;
-- Worker определяет requester из session и проверяет requester/target по актуальному snapshot;
-- target должен быть текущим участником `В чате` и без `@username`;
-- Worker использует `BOT_TOKEN` только серверно;
-- Голубец отправляет requester-у в ЛС сообщение с inline-кнопкой `👤 Открыть профиль`, URL = `tg://user?id=<targetId>`;
-- после успеха Mini App показывает popup `Ссылка готова` → `Открыть Голубя`;
-- если Голубец не может написать requester-у, приложение показывает ошибку;
-- privacy/context ограничения Telegram могут не позволить открыть конкретный профиль по ID.
+Прямой `tg://user?id=...` из Mini App не использовать: этот вариант уже проверен и не работает стабильно.
 
-### Восстановление после навигации
+После возврата из профиля/команды post-restore порядок обязателен:
+1. `RoyalParticipantCardUX.decorate()`;
+2. `RoyalContactByTelegramId.decorate()`.
 
-- `navigation-card-restore-v0532.js` после `Назад` сначала повторно применяет `RoyalParticipantCardUX.decorate()`, а **затем** `RoyalContactByTelegramId.decorate()`;
-- порядок обязателен: карточный UX может заменить DOM, поэтому contact-action накладывается последним;
-- восстановление повторяется через `requestAnimationFrame`, чтобы кнопки не исчезали при позднем rerender;
-- обработаны и видимая кнопка `Назад`, и Telegram native/system Back;
-- возврат `Участники → профиль/команда → Назад` обязан сохранять `Связаться` у всех участников без `@username`.
-
-**Не возвращать:** скрытый `<a href="tg://user?id=...">`, `window.location.href = tg://...` или иной прямой ID deep-link из Mini App — этот подход уже проверен на Android и не сработал.
+Проверять и видимую кнопку `Назад`, и Telegram native/system Back. Кнопки `Связаться` не должны исчезать после возврата.
 
 ---
 
@@ -174,57 +148,36 @@ Frontend Worker origin: `https://royal-crm-miniapp-api.tropical-spoon.workers.de
 
 Repo config:
 - `worker/wrangler.toml`
-- active repo main: **`src/entry-v1120.js`**
-- wrapper version в repo: **`1.12.0`**
-- base chain: `entry-v1120.js → entry-v1110.js → ...`
+- active repo main: `src/entry-v1120.js`
+- wrapper version: `1.12.0`
 
-`entry-v1120.js` добавляет:
-- `/health` с `contactById: bot-inline-profile-button`;
-- `OPTIONS /contact-by-id`;
-- авторизованный `POST /contact-by-id`;
-- проверку requester/target по raw Telegram ID;
-- Bot API `sendMessage` requester-у;
-- inline profile button `tg://user?id=<targetId>`;
-- понятные ошибки `BOT_CANNOT_MESSAGE_REQUESTER`, `TARGET_NOT_FOUND`, `USERNAME_AVAILABLE` и др.;
-- короткий duplicate cooldown.
+`entry-v1120.js` добавляет `/contact-by-id`, Bot API relay и inline profile button.
 
-Секреты остаются только в Cloudflare:
-- `BOT_TOKEN`
-- `GITHUB_TOKEN`
-- `SESSION_SECRET`
+Пользователь 19.08.2026 фактически подтвердил, что `Связаться` работает в production.
 
-### Production proof
-
-- Автоматический `.github/workflows/worker-smoke.yml` **удалён 19.08.2026**: он создавал ложные/пустые GitHub Actions failure-уведомления `Run failed / No jobs were run` во время обычных правок и засорял почту владельца.
-- Production Worker проверяется напрямую по `/health` и/или функциональным smoke-test после backend-изменений.
-- Не добавлять автоматический GitHub Actions smoke-workflow обратно без отдельной необходимости, предварительной проверки YAML и согласования — обычная разработка не должна генерировать служебный почтовый спам.
-- **19.08.2026 пользователь фактически подтвердил, что `Связаться` заработало:** production `/contact-by-id` и bot relay реально активны.
+Автоматический `.github/workflows/worker-smoke.yml` удалён: он создавал ложные/пустые GitHub Actions failure-письма. Worker production проверять напрямую по `/health` и/или функциональному smoke-test.
 
 ---
 
 ## 8. Активные команды / база спецназа
 
-Источник истины: `team.status` из админской `Команды!L`, опубликованный через Unified Snapshot/Worker.
+Источник истины: `team.status` из `Команды!L` через snapshot/Worker.
 
 Для `status === "Активен"`:
-- карточка команды на странице `Команды` получает золотую рамку;
-- командная плашка на странице `Участники` и в профилях получает золотую рамку;
-- на странице команды название золотое и в золотой рамке;
-- справа на странице команды расположен кликабельный крот, открывающий каталог активных команд;
-- справа у активной `.team-card` расположен тот же крот; тап открывает выбранную команду;
-- каталог строится только из команд `Активен`;
-- каталог имеет собственный фильтр `Все / РМ / РК` и собственный поиск;
-- фильтр/поиск каталога независимы от обычной страницы `Команды`.
+- золотая рамка team cards;
+- золотая рамка командных плашек участников;
+- золотое название на detail;
+- кликабельный крот справа;
+- каталог строится только из активных команд;
+- каталог имеет собственные `Все / РМ / РК` и поиск.
 
-Крот: встроенный JPEG data-asset `--royal-specnaz-mole-v0559` в `active-teams-v0559.css`. Не возвращать SVG-wrapper, обычный `<img>` или внешний image-loader.
+Крот: inline JPEG data-asset в `active-teams-v0559.css`; не возвращать SVG-wrapper/обычный `<img>`.
 
 Заголовок каталога:
 **`Команды принимающие участие в базе спецназа`**
 
 Подзаголовок:
 `Команды, участвующие в спецназе и(или) регулярно выкладывающие скрины в базе спецназа.`
-
-`На паузе` остаётся без золотой маркировки.
 
 ---
 
@@ -233,23 +186,16 @@ Repo config:
 Основной модуль: `search-hybrid-v0553.js`.
 
 Архитектура:
-- локальный Android-safe поиск остаётся fallback;
-- `searchKeys` — дополнительный слой;
-- итог = локальное совпадение ИЛИ `searchKeys`;
-- без edit-distance/fuzzy-комбинаторики и тяжёлого prewarm;
-- `Все / РМ / РК` ограничивает и список, и область поиска, не очищая query.
+- локальный Android-safe поиск + server `searchKeys`;
+- итог = локальный поиск ИЛИ `searchKeys`;
+- без fuzzy/edit-distance;
+- фильтр `Все / РМ / РК` ограничивает список и поиск, не очищая query.
 
-### `🗡 BbllllKA / Royal Kingdom ↔ вышка`
-
-Фактическое имя: **`🗡 BbllllKA`** — после `Bb` четыре строчные латинские `l`.
-
-Server-side источник:
-- `apps-script-live/25_MINIAPP_UNIFIED_SNAPSHOT.js`;
-- alias `'bbllllka': ['вышка']`;
-- writer `1.2.4`;
-- `searchIndexVersion=1.1.3`.
-
-Фактически подтверждено в `royal-crm-data/snapshot.json`: команда и её участники содержат `вышка` / `vyshka` в `searchKeys`.
+Подтверждённый alias:
+- фактическая команда: `🗡 BbllllKA / Royal Kingdom`;
+- server alias: `'bbllllka': ['вышка']`;
+- writer `1.2.4`, `searchIndexVersion=1.1.3`;
+- свежий snapshot содержит `вышка` и `vyshka` в `searchKeys`.
 
 Не возвращать ошибочное написание `BbIIIIKA`.
 
@@ -257,35 +203,45 @@ Server-side источник:
 
 ## 10. Медиакэш
 
-Активный файл: `media-persistent-cache-v0554.js`, внутренняя версия `0.5.54.1`.
-
 ### Аватары
-- key = стабильный `avatarFileId`;
 - IndexedDB cache-first;
-- lazy loading около viewport;
-- не более двух параллельных сетевых загрузок;
-- своя ава получает приоритетное восстановление.
+- key = стабильный `avatarFileId`;
+- lazy loading;
+- network concurrency ≤ 2;
+- собственная ава восстанавливается приоритетно.
 
-### Фото команд
-- key = стабильная связка **нормализованное имя команды + игра**;
-- временный Google Sheets `photoUrl` не является cache identity;
-- сохранённые team blobs после загрузки CRM поднимаются из IndexedDB в `teamMemory` без сетевого prewarm;
+### Фото команд — общий путь
+- cache key = **нормализованное имя команды + игра**;
+- временный Google `photoUrl` не является cache identity;
+- disk-only prewarm сохранённых фото;
 - cached photo показывается сразу;
-- примерно после 30 минут допускается неблокирующий background refresh;
+- примерно после 30 минут допускается background refresh;
 - cleanup около 45 дней, общий лимит около 420 изображений.
 
-Не возвращать ключ team cache к временному `photoUrl` и не делать массовый сетевой prewarm.
+### iPhone / iPad — исправление 19.08.2026
+
+По пользовательскому видео подтверждён симптом: при открытии detail фото команды могло мелькнуть, затем исчезнуть и замениться замком.
+
+Точная причина в текущем media cache: `persistentLoadTeamPhoto()` выполняет `img.removeAttribute('src')` **до** асинхронного `idbGet()`/proxy fetch. На Android это почти незаметно, на iOS WebView это создаёт видимый flash и при задержке/ошибке оставляет fallback.
+
+Активный `stable-v0559.js` patch `0.5.59.2` устанавливает **iOS-only guard**:
+- не позволяет persistent-loader удалить уже существующий `src` перед первым await;
+- даёт cached/proxy image до 900 мс на реальный decode/load;
+- если новый source не декодировался, возвращает исходный CRM `src`;
+- если исходное фото реально видно, снимает `photo-error` вместо замка;
+- Android-ветку не меняет.
+
+Это frontend fix; Apps Script / Cloud Shell для него не нужен.
 
 ---
 
 ## 11. Навигация
 
 Инвариант:
-- **вперёд** → новый экран сверху (`scrollY=0`);
-- **назад** → точная сохранённая позиция предыдущего экрана;
-- после восстановления списка запускаются все post-render decorators; для участников порядок: card UX → contact buttons.
+- вперёд → новый экран сверху (`scrollY=0`);
+- назад → точная сохранённая позиция предыдущего экрана.
 
-Не возвращать ошибочное поведение v0.5.57, где Back тоже отправлял список наверх.
+Не возвращать поведение v0.5.57, где Back отправлял список наверх.
 
 ---
 
@@ -293,38 +249,31 @@ Server-side источник:
 
 Текущий changelog: `changelog-v0559.js`.
 
-Шапка `Помощь в разработке, тесты`:
+`Помощь в разработке, тесты`:
 - `@sfinks_spb`
 - `@O_Chaplygina`
 - `@Yanochka_2404`
 - `@DmitryRoyal`
 
-Кредиты не повторяются внутри карточек отдельных версий.
-
 ---
 
-## 13. Что нельзя случайно откатить
+## 13. Что нельзя откатить
 
-- не терять Telegram `location.hash` при redirects;
-- не возвращать `meta refresh`;
-- participant identity = только raw Telegram ID;
-- не удалять `searchKeys`, `searchIndexVersion` или `team.status` Worker-санитизацией;
+- не терять Telegram `location.hash`;
+- participant identity = raw Telegram ID;
+- не удалять `searchKeys`, `searchIndexVersion`, `team.status` Worker-санитизацией;
 - team status identity = `название + игра`;
-- не связывать фильтр каталога активных команд с обычной страницей `Команды`;
-- не возвращать крота к `<img>`/SVG/external asset;
-- не возвращать ошибочное имя `BbIIIIKA`;
-- server alias `'bbllllka': ['вышка']` должен оставаться в Unified Snapshot Writer;
-- не возвращать team-photo cache key к временному Google `photoUrl`;
-- не массово скачивать все фото команд на старте;
-- если у участника нет `@username`, использовать `Связаться` через Worker → Голубец → inline profile button;
-- **после Back/rerender обязательно повторно накладывать `Связаться` после participant-card UX**;
-- **не запускать `tg://user?id` напрямую из Mini App**;
-- у участника с `@username` не заменять существующее username-меню;
-- **не возвращать общий 5-секундный timeout для `/auth` и не показывать Android code 20 как диагноз**;
-- внутренний `BUILD` в `app.js` держать синхронным с текущей Mini App версией;
-- не добавлять обратно автоматический `worker-smoke.yml`, создающий почтовые failure-уведомления;
-- Worker production проверять напрямую по runtime, а не считать GitHub commit доказательством;
-- не заставлять Back открывать список сверху;
+- не возвращать крота к SVG/`<img>`;
+- не возвращать ошибочное `BbIIIIKA`;
+- не возвращать team-photo cache key к временному `photoUrl`;
+- на iOS **не стирать существующий team-photo `src` до готовности replacement source**;
+- не массово скачивать все фото на старте;
+- `Связаться` только через Worker → Голубец → inline button;
+- не запускать `tg://user?id` напрямую из Mini App;
+- после Back обязательно восстанавливать contact actions;
+- `/auth` не возвращать к 5 секундам без retry;
+- не добавлять обратно шумный `worker-smoke.yml`;
+- Back не должен сбрасывать scroll вверх;
 - не удалять `@DmitryRoyal` из credits.
 
 ---
@@ -332,21 +281,16 @@ Server-side источник:
 ## 14. Минимальный smoke-test
 
 1. Launch через `https://t.me/doveofpeace_bot?startapp`.
-2. Авторизация не потеряна; кратковременная задержка Worker не должна сразу давать fatal после 5 секунд, первый transient сбой повторяется автоматически.
-3. Бейдж версии = `v0.5.59` и auth error details при необходимости показывают `build=0.5.59`, а не `0.5.0`.
-4. Поиск и `Все / РМ / РК` работают.
-5. `вышка` находит `🗡 BbllllKA` в РК.
-6. Активные команды имеют золотую маркировку и правильного крота.
-7. Каталог активных команд имеет правильный заголовок, поиск и фильтры.
-8. Повторное открытие ранее загруженной команды показывает photo cache без прежней задержки.
-9. У участника с `@username` работает старое username-меню.
-10. У участника без `@username` отображается `Связаться`.
-11. Тап `Связаться` → `Отправляю…` → popup `Ссылка готова`; после `Открыть Голубя` в ЛС Голубца есть inline-кнопка `👤 Открыть профиль`.
-12. Тап по contact action не открывает внутренний participant profile вместо contact flow.
-13. `Участники → профиль/команда → Назад` возвращает на прежнее место и кнопки `Связаться` остаются у всех участников без `@username`; отдельно проверить Telegram native Back.
-14. Forward открывает сверху; Back восстанавливает позицию.
-15. В credits виден `@DmitryRoyal`.
-16. Для backend-задач production Worker проверяется напрямую по `/health`/функциональному тесту; автоматического GitHub Actions smoke-workflow нет.
+2. Авторизация переживает краткий transient backend delay.
+3. Поиск и `Все / РМ / РК` работают.
+4. `вышка` находит `🗡 BbllllKA` в РК.
+5. Активные команды имеют золото и правильного крота.
+6. Повторное открытие ранее загруженной команды использует photo cache.
+7. **На iPhone фото команды не должно исчезать после краткого появления; если cache/proxy не готов, остаётся рабочий исходный CRM photo вместо замка.**
+8. У участника без `@` есть `Связаться` и оно работает через Голубца.
+9. После `Участники → профиль/команда → Назад` кнопки `Связаться` остаются.
+10. Forward открывает сверху, Back восстанавливает позицию.
+11. В credits есть `@DmitryRoyal`.
 
 ---
 
