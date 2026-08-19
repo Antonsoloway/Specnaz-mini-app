@@ -1,0 +1,33 @@
+/* Royal CRM Mini App — protected Admin Write UI v0.6.0 */
+.royal-admin-action.is-editing{border-color:#d26d77;background:linear-gradient(135deg,#7b2f3a,#4b222a);color:#fff}
+.royal-admin-write-toolbar{display:flex;gap:8px;margin:-5px 0 13px;overflow-x:auto;scrollbar-width:none}
+.royal-admin-write-toolbar::-webkit-scrollbar{display:none}
+.royal-admin-write-add{flex:0 0 auto;min-height:42px;padding:0 14px;border-radius:12px;border:1px solid rgba(112,199,255,.45);background:#183047;color:#cfeeff;font-weight:800}
+.royal-admin-edit-record{width:100%;margin-top:7px;min-height:42px;border:1px solid rgba(255,116,126,.46);border-radius:12px;background:#351d24;color:#ffd7da;font-weight:800}
+.royal-admin-edit-hint{margin:2px 0 12px;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,116,126,.24);background:rgba(91,29,38,.2);color:#c9a8ad;font-size:12px;line-height:1.4}
+.royal-admin-modal-backdrop{position:fixed;inset:0;z-index:99999;background:rgba(3,8,12,.76);display:flex;align-items:flex-end;justify-content:center;padding-top:max(16px,env(safe-area-inset-top));backdrop-filter:blur(3px)}
+.royal-admin-modal{width:min(680px,100%);max-height:94dvh;overflow:auto;background:#101b24;border:1px solid #334958;border-radius:22px 22px 0 0;padding:18px 16px calc(20px + env(safe-area-inset-bottom));box-shadow:0 -20px 60px rgba(0,0,0,.38)}
+.royal-admin-modal-head{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;margin-bottom:14px}
+.royal-admin-modal-head h3{margin:3px 0 0;font-size:22px;color:#fff}
+.royal-admin-modal-close{width:40px;height:40px;border-radius:50%;border:1px solid #3b5262;background:#1a2a36;color:#dbe9f2;font-size:22px}
+.royal-admin-form{display:grid;gap:12px}
+.royal-admin-form-grid{display:grid;grid-template-columns:1fr;gap:10px}
+.royal-admin-input{display:grid;gap:6px}
+.royal-admin-input>span{font-size:12px;font-weight:800;color:#8fa3b1}
+.royal-admin-input input,.royal-admin-input select{width:100%;min-height:46px;border:1px solid #334957;border-radius:12px;background:#0a151e;color:#eef7fc;padding:0 12px;font-size:15px;outline:none}
+.royal-admin-input input:focus,.royal-admin-input select:focus{border-color:#6da7c9;box-shadow:0 0 0 2px rgba(80,158,204,.12)}
+.royal-admin-input input[readonly]{opacity:.65;background:#111d26}
+.royal-admin-form-note{font-size:12px;color:#788c9a;line-height:1.45}
+.royal-admin-slot-editor{border:1px solid #294251;border-radius:15px;background:#12232f;padding:11px;display:grid;gap:9px}
+.royal-admin-slot-title{font-size:12px;font-weight:900;color:#b8d8e9}
+.royal-admin-slot-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.royal-admin-slot-grid .royal-admin-input.is-wide{grid-column:1/-1}
+.royal-admin-form-actions{display:grid;grid-template-columns:1fr 1.4fr;gap:9px;position:sticky;bottom:0;padding-top:10px;background:linear-gradient(to bottom,rgba(16,27,36,0),#101b24 22%)}
+.royal-admin-form-button{min-height:50px;border-radius:14px;border:1px solid #3a5262;background:#1a2a36;color:#d8e8f2;font-weight:900;font-size:14px}
+.royal-admin-form-button.is-save{border-color:#a9545f;background:linear-gradient(135deg,#74303a,#4d222a);color:#fff}
+.royal-admin-form-button:disabled{opacity:.48}
+.royal-admin-write-status{padding:11px 12px;border-radius:12px;background:#132430;border:1px solid #2d4656;color:#a9c0ce;font-size:12px;line-height:1.4}
+.royal-admin-write-status.is-error{border-color:rgba(255,95,105,.45);background:rgba(105,28,37,.24);color:#ffc5ca}
+.royal-admin-write-status.is-ok{border-color:rgba(87,201,137,.38);background:rgba(27,94,58,.24);color:#bdf5d5}
+.royal-admin-danger-note{padding:10px 12px;border:1px dashed rgba(255,119,128,.35);border-radius:12px;color:#be969b;font-size:11px;line-height:1.45}
+@media (min-width:560px){.royal-admin-modal{align-self:center;border-radius:22px;max-height:90dvh}.royal-admin-form-grid{grid-template-columns:1fr 1fr}.royal-admin-form-grid .is-wide{grid-column:1/-1}}
