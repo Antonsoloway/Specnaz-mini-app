@@ -1,6 +1,6 @@
 const tg = window.Telegram?.WebApp;
 const API_URL = 'https://royal-crm-miniapp-api.tropical-spoon.workers.dev';
-const BUILD = '0.5.0';
+const BUILD = '0.5.59';
 
 let authState = null;
 let snapshotState = null;
