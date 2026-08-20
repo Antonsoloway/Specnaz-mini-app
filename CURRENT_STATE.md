@@ -22,13 +22,15 @@
 - постоянный entrypoint: `app.html`;
 - обычный запуск → **`app-v0559.html` / v0.5.59**;
 - `startapp=v0600` / `tgWebAppStartParam=v0600` → **`app-v0600.html` / v0.6.0 admin preview**;
+- временный cache-forced preview для проверки текущего фикса: `startapp=v0600-2328` → тот же `app-v0600.html`, но с уникальным start parameter;
 - обычных пользователей пока не переводить на v0.6;
 - bot: `@doveofpeace_bot`.
 
 Текущий preview delivery:
-- `version-v0600.js` cache-bust: **`20260820-2242`**;
-- `app-v0600.html` → `version-v0600.js?v=20260820-2242`;
-- `app.html` previewBuild: **`20260820-2242`**.
+- `version-v0600.js` cache-bust: **`20260820-2328`**;
+- `app-v0600.html` → `version-v0600.js?v=20260820-2328`;
+- `app.html` previewBuild: **`20260820-2328`**;
+- `app.html` принимает `v0600` и временный cache-forced alias `v0600-2328`.
 
 ---
 
@@ -48,7 +50,7 @@ Live modules:
 - `29_MINIAPP_ADMIN_WRITE.js` — validation/helpers;
 - `30_MINIAPP_ADMIN_WRITE_BACKEND.js` — signed gateway;
 - `31_MINIAPP_ADMIN_WRITE_HARDENED.js` — hardened mutations/policies;
-- `32_MINIAPP_ADMIN_MEDIA.js`, `33_MINIAPP_ADMIN_WRITE_FINAL.js` — team photo/final integration.
+- `32_MINIAPP_ADMIN_TEAM_PHOTO.js`, `33_MINIAPP_ADMIN_WRITE_FINAL.js` — team photo/final integration.
 
 Public snapshot:
 - Unified Snapshot Writer `1.2.4`;
@@ -115,7 +117,8 @@ Public snapshot:
 - `admin-team-detail-v0600.js` = `0.6.0-admin-team-detail.3`;
 - **`admin-participant-detail-v0600.js` = `0.6.0-admin-participant-detail.1`**;
 - **`admin-participant-nav-guard-v0600.js` = `0.6.0-admin-participant-nav-guard.1`**;
-- **`admin-participant-memberships-v0600.js` = `0.6.0-admin-participant-memberships.1`**.
+- **`admin-participant-memberships-v0600.js` = `0.6.0-admin-participant-memberships.1`**;
+- **`admin-navigation-guard-v0600.js` = `0.6.0-admin-navigation-guard.3`**.
 
 ### Admin search / avatars
 - поиск по participants/teams должен сохранять deterministic hybrid behavior обычного режима;
@@ -166,7 +169,13 @@ Participant metric rankings:
 - detail дополнительно показывает private поля `D:L`: лидер/подпись, игроков, общий спецназ, сортировка, скрины, активность в базе, активность вне базы, среднее, статус + source row;
 - кнопка **`✏️ Редактировать команду`** использует существующий hardened editor, второй write-flow не создаётся;
 - текущий team write: `name + leader`; photo — через photo module; E:L пока read-only, статус L пока только просмотр;
-- large photo и thumbnail используют один team key `team:<normalized name>\n<normalized game>`.
+- large photo и thumbnail используют один team key `team:<normalized name>\n<normalized game>`;
+- участники внутри `Состав команды` остаются визуально ordinary-style, но **любая навигация из admin team detail должна оставаться admin**;
+- подтверждённый legacy-конфликт ordinary mode: `participant-profile-v0523.js` открывает public participant profile по avatar `pointerdown/pointerup`, а `participant-card-ux-v0531.js` открывает public profile по click всей `.team-member`;
+- `admin-navigation-guard-v0600.js .3` перехватывает admin roster `pointerdown/pointerup` на `window` capture до document-level ordinary router, а click всей строки также маршрутизирует в `RoyalAdminParticipantDetailV0600.open(rawTelegramId)`;
+- дополнительно ordinary `RoyalOpenParticipantByTelegramId` обёрнут защитой: при видимом admin context participant переход не должен открыть public detail;
+- `@username` / `data-user-menu` остаётся самостоятельным contact action и не маршрутизируется в participant detail;
+- Telegram WebView повторная проверка этого конкретного пути после build `2328` ещё pending.
 
 ### Admin team metric rankings — repo ready, smoke pending
 
@@ -188,7 +197,7 @@ Participant metric rankings:
 - без 128 thumbnails/network prewarm;
 - Back → предыдущий detail/list state.
 
-**Статус frontend:** GitHub `main` фактически на preview delivery `20260820-2242`; поверх participant detail/nav guard добавлен read-only `admin-participant-memberships-v0600.js`, который возвращает списку участников ordinary-style membership pills с существующими RM/RK и active-team decorators. Apps Script/Worker/Sheets/data этой правкой не менялись; Cloud Shell не нужен. Telegram WebView visual smoke для новых плашек и ранее pending participant detail/rankings/nav guard ещё требуется.
+**Статус frontend:** GitHub `main` фактически на preview delivery **`20260820-2328`**. После пользовательского видео `1000238605.mp4` подтверждён конкретный регресс: tap participant в составе admin team detail открывал ordinary/public participant page с `ДОСТИЖЕНИЯ`. Корень — два legacy ordinary router (`avatar pointerup` + `.team-member click`). В repo исправлено `admin-navigation-guard-v0600.js .3`, добавлен cache-forced start alias `v0600-2328`. Apps Script/Worker/Sheets/data этой правкой не менялись; Cloud Shell не нужен. **Telegram WebView re-smoke build 2328 ещё требуется; production/runtime не объявлять подтверждённым только по commit.**
 
 ---
 
@@ -234,7 +243,7 @@ Repo config:
 
 ## 10. Минимальный smoke v0.6 перед общим релизом
 
-1. Обычный `startapp` остаётся v0.5.59; `startapp=v0600` открывает v0.6.
+1. Обычный `startapp` остаётся v0.5.59; `startapp=v0600` открывает v0.6. Для принудительно свежей проверки текущего admin-navigation fix использовать `startapp=v0600-2328`.
 2. Не-админ не получает admin-data/write.
 3. Existing participant editor: только имя + memberships; прямой system-field write отклоняется.
 4. Разрешённое test write читается обратно и появляется в журнале; stale revision не перезаписывает новое.
@@ -244,7 +253,7 @@ Repo config:
 8. `Вышел` сравнить с physical order таблицы.
 9. Admin participant list: visible ID отсутствует; каждая membership показана отдельной ordinary-style плашкой `команда + роль + игра`; РМ/РК окраска и золото `Активен` совпадают с обычной страницей; tap по summary, аватару и области плашек → именно admin participant detail, не accordion/public profile/team route.
 10. Admin participant detail: все private поля, persistent avatar, memberships → team detail, editor; U/AB/AC/AD → rankings descending; tap row → participant; Back state.
-11. Admin team detail: фото, D:L, editor, состав, включая минимум одну `Неактивен`.
+11. Admin team detail: фото, D:L, editor, состав, включая минимум одну `Неактивен`; **tap по аватару, имени и свободной области строки участника состава → admin participant detail с private data/editor, не ordinary `ДОСТИЖЕНИЯ`; tap по `@username` остаётся contact action.**
 12. Нажать E/F/H/I/J/K и проверить каждый team ranking: all teams, descending, нули внизу, tap team → detail, Back.
 13. Проверить Android и iPhone/iPad Telegram WebView.
 
@@ -270,6 +279,7 @@ Repo config:
 - admin participant list without visible Telegram ID;
 - admin participant list memberships use ordinary `membership-list` / `membership-pill` visuals with existing RM/RK and active-team decorators; не возвращать одну текстовую строку команд;
 - admin participant summary/avatar/membership area navigation must resolve to admin participant detail before ordinary public-profile/team handlers;
+- **admin team roster participant navigation must resolve to admin participant detail before legacy ordinary avatar-pointer and `.team-member` click routers; `@username` remains an independent action;**
 - admin participant detail from private snapshot + U/AB/AC/AD rankings;
 - admin team detail from private snapshot including inactive;
 - admin team metric rankings E/F/H/I/J/K from full private team set.
