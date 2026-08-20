@@ -24,7 +24,7 @@
 16. После успешной авторизации Mini App обеспечивает право @doveofpeace_bot писать пользователю через `WebApp.requestWriteAccess()`.
 17. `write_access_allowed` считается началом личного диалога с Голубем и приводит к приветственному сообщению.
 18. Счётчики команды считаются из того же актуального состава, который реально выводится в карточке.
-19. Если у команды нет фото, клиент не делает запрос изображения и показывает штатную заглушку.
+19. В обычном public UI, если источник данных однозначно подтверждает отсутствие фото команды, показывается штатная заглушка без бессмысленного сетевого запроса. В v0.6 admin UI текстовое `Фото C = —` **не является достаточным доказательством отсутствия private media**: сначала разрешён disk/SHA-256 media lookup по identity `команда + игра`.
 20. Поиск должен быть быстрым и предсказуемым: без комбинаторных переборов, расстояний опечаток и тяжёлой обработки на каждой букве.
 21. Каждый релиз проверяется минимум на Android и iPhone/iPad в Telegram WebView.
 22. Длинные списки имеют быстрые кнопки вверх/вниз, не перекрывающие нижнюю навигацию и не сбрасывающие поиск.
@@ -52,9 +52,9 @@
 44. Для подтверждённого псевдорусского названия, которое generic parser читает неверно, допускается точечный alias.
 45. Worker `/snapshot` обязан сохранять `searchKeys` и `searchIndexVersion`.
 46. Кэш поискового haystack сбрасывается при смене snapshot object; новые server keys не должны требовать перезапуска приложения.
-47. Аватары и фото команд кэшируются в IndexedDB. Avatar key = `avatarFileId`. Team-photo key = стабильная identity `нормализованное название команды + игра`; временный Google `photoUrl` запрещён как cache identity.
+47. Аватары и фото команд кэшируются в IndexedDB. Avatar primary key = `avatar:<avatarFileId>`. Team-photo key = стабильная identity `team:<нормализованное название команды>\n<нормализованная игра>`; временный Google `photoUrl` запрещён как cache identity.
 48. Изображения работают cache-first: локальный кэш → сеть; отказ IndexedDB не ломает изображения.
-49. На слабом интернете запрещено массово скачивать все изображения одновременно; avatar network concurrency ≤ 2.
+49. На слабом интернете запрещено массово скачивать все изображения одновременно; avatar network concurrency ≤ 2 в stable flow; v0.6 admin не должен устраивать массовый prewarm.
 50. Медиакэш очищает старые записи примерно через 45 дней и ограничивается примерно 420 изображениями.
 51. Собственная ава после восстановления из постоянного кэша не должна мигать буквенной заглушкой при rerender.
 52. Forward navigation → `scrollY=0`; Back → сохранённая позиция предыдущего экрана.
@@ -70,7 +70,7 @@
 62. Заголовок каталога: **`Команды принимающие участие в базе спецназа`**.
 63. Подтверждённые CRM-alias публикуются server-side через Unified Snapshot Writer; при изменении alias делать безопасный `clasp pull → patch → syntax check → clasp status → clasp push`, затем sync live mirror и проверка нового snapshot.
 64. Перед точечным alias сверять exact имя из live snapshot/CRM, включая `I/l/1` и emoji.
-65. Для фото команд разрешён только disk-only prewarm: уже сохранённые IndexedDB blobs можно поднять в память; сетево скачивать все team photos на старте запрещено. Cached photo показывается сразу, refresh выполняется неблокирующе; текущий interval v0.5.59 = 30 минут.
+65. Для фото команд разрешён только disk-only prewarm: уже сохранённые IndexedDB blobs можно поднять в память; сетево скачивать все team photos на старте запрещено. Cached photo показывается сразу, refresh выполняется неблокирующе; текущий interval = 30 минут.
 66. Если у участника отсутствует `@username`, на месте username-action показывается **`Связаться`**. Правильная цепочка: Mini App → авторизованный `POST /contact-by-id` → Worker → @doveofpeace_bot → Telegram inline-кнопка `Открыть профиль` по raw Telegram ID. Прямой `tg://user?id=...` из Mini App запрещён как нерабочий подход. Если `@username` есть, сохраняется прежнее username-меню.
 67. Авторизация `/auth` не должна падать от кратковременной задержки Worker через жёсткие 5 секунд. В v0.5.59 transport ждёт до 12 секунд и делает один автоматический повтор только для transient timeout/network ошибок; Android `AbortError code 20` нормализуется в `AUTH_TIMEOUT`. Внутренний `BUILD` в `app.js` обязан совпадать с текущей Mini App версией.
 68. Не добавлять автоматические GitHub Actions smoke-workflow, которые генерируют failure-письма владельцу на обычных разработческих commits, без отдельной необходимости, проверки workflow и согласования. Worker runtime проверять напрямую по `/health` и/или функциональному smoke-test; GitHub commit сам по себе production-доказательством не является.
@@ -81,8 +81,10 @@
 73. **Переименование существующей команды в `Команды!B` — каскадная операция.** До public/snapshot sync необходимо обновить все пять membership team-слотов `База участников` по identity `старое название + игра`. Ник, роль и game-columns не менять. Автоматический repair допустим только для однозначного decorative-prefix/emoji drift; полное/неоднозначное переименование без подтверждённого mapping не угадывать. Строгую public validation сохранять.
 74. **v0.6 existing-participant write policy:** администратор вручную изменяет только CRM `Имя` и пять membership slots (`команда / роль / игровой ник`). Telegram ID, состояние чата, Telegram name, `@username`, дата V, U/AB/AC/AD и вычисляемые/system поля принадлежат боту/системе и должны быть **SERVER READ-ONLY**. Frontend обязан скрывать/блокировать их, но безопасность обеспечивается серверным whitelist: `updateParticipant` принимает только `name` и `memberships`; любое другое поле отклоняется до записи (`PARTICIPANT_FIELD_READ_ONLY`).
 75. **v0.6 admin search:** админ-поиск по участникам и командам не должен деградировать до простого raw lowercase `.includes()`. Он использует deterministic hybrid forms, как обычный поиск: normalize/compact, кириллица↔латиница, human-read, один pseudo-read, confirmed aliases и доступные `searchKeys`. Для admin-only записей local search обязан работать без public snapshot. Поле ввода не перерисовывать на каждую букву и не блокировать IME.
-76. **v0.6 admin avatars:** participant avatar identity = raw Telegram ID → существующий public `avatarFileId`; использовать тот же `.person-avatar` / `setupAvatarLoading()` / avatar cache path, что и обычный список. Не вводить отдельный backend или второй формат аватаров только для admin mode.
+76. **v0.6 admin avatars:** participant identity = raw Telegram ID, но persistent cache primary identity = существующий public `avatarFileId`. Admin и normal mode используют **один IndexedDB `royal-crm-media-cache`** и primary key `avatar:<avatarFileId>`. `avatar:tg-<id>` разрешён только как fallback/migration bridge для admin-only/startup cases; когда `avatarFileId` становится известен, blob мигрируется в primary key. Не заводить второй IndexedDB/отдельный долгоживущий admin avatar cache.
 77. **v0.6 `Вышел` ordering:** порядок должен повторять физическую группу `База участников`, где стабильная `sortBaseByChatState_()` держит новые выходы выше старых. В admin UI при фильтре `Вышел` сортировать по source `row` по возрастанию. `AE Дата изменения` не считать датой выхода. После ухода из фильтра восстановить исходный list order; DOM-sort не должен запускать бесконечный MutationObserver/rerender цикл.
+78. **v0.6 admin team media:** thumbnail и большая фотография team-detail обязаны использовать тот же IndexedDB `royal-crm-media-cache` и тот же stable key `team:<normalized name>\n<normalized game>`, что ordinary team-photo cache. Admin network fallback идёт через authenticated `/admin-team-photo`; route сначала ищет private `media/teams/<sha256(name+game)>.bin`, и только затем может использовать ephemeral `photoUrl` как compatibility fallback. `photoUrl` не является identity и его пустота не должна блокировать SHA-256 lookup.
+79. **v0.6 admin team navigation:** тап по строке команды открывает normal-style team detail (`team-photo-box`, `team-detail-head`, `team-stats`, `team-members-list`) с данными из private admin snapshot, чтобы работали `Активен`, `На паузе` и `Неактивен`. Состав определяется по exact `team + game`. Back должен восстанавливать предыдущий admin list/search/filter/scroll state, а не сбрасывать пользователя на главную или новый пустой список.
 
 ## Текущая версия
 
@@ -112,7 +114,8 @@ Admin-preview `v0.6.0` дополнительно использует:
 - admin journal;
 - existing-participant server whitelist `name + memberships`;
 - deterministic admin hybrid search + public `searchKeys` when available;
-- participant avatars через существующий `avatarFileId`/cache path;
+- единую persistent media DB с ordinary mode: avatar primary `avatar:<avatarFileId>`, team `team:<name+game>`;
+- normal-style admin team detail с private participants, включая inactive teams;
 - `Вышел` ordering по physical source row, newest first;
 - delete operations выключены.
 
