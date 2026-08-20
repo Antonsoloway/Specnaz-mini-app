@@ -1,5 +1,5 @@
 name = "royal-crm-miniapp-api"
-main = "src/entry-v1230.js"
+main = "src/entry-v1240.js"
 compatibility_date = "2026-08-15"
 
 [vars]
@@ -25,6 +25,7 @@ invocation_logs = true
 # admin-write requests and short-lived Google Sheets CellImage source URLs.
 # It is never exposed to the browser or GitHub.
 #
-# entry-v1230 keeps canEdit=false until admin-snapshot proves final write.4,
-# HMAC transport, team-photo upload capability, and renameCleanup=true.
+# entry-v1240 keeps the stable public /team-photo route and adds an admin-only
+# private snapshot fallback for inactive/hidden teams. Media identity remains
+# SHA-256(name + game), while browser persistence stays in royal-crm-media-cache.
 # Cloudflare Builds source: GitHub main, root path /worker.
