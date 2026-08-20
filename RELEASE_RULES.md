@@ -86,6 +86,7 @@
 78. **v0.6 admin team media:** thumbnail и большая фотография team-detail обязаны использовать тот же IndexedDB `royal-crm-media-cache` и тот же stable key `team:<normalized name>\n<normalized game>`, что ordinary team-photo cache. Admin network fallback идёт через authenticated `/admin-team-photo`; route сначала ищет private `media/teams/<sha256(name+game)>.bin`, и только затем может использовать ephemeral `photoUrl` как compatibility fallback. `photoUrl` не является identity и его пустота не должна блокировать SHA-256 lookup.
 79. **v0.6 admin team navigation:** тап по строке команды открывает normal-style team detail (`team-photo-box`, `team-detail-head`, `team-stats`, `team-members-list`) с данными из private admin snapshot, чтобы работали `Активен`, `На паузе` и `Неактивен`. Состав определяется по exact `team + game`. Back должен восстанавливать предыдущий admin list/search/filter/scroll state, а не сбрасывать пользователя на главную или новый пустой список.
 80. **v0.6 admin team detail:** detail обязан показывать не только public-style фото/состав, но и полный private блок команды из листа `Команды`: `D лидер/подпись`, `E игроки`, `F общий спецназ`, `G сортировка`, `H скрины`, `I активность в базе`, `J активность вне базы`, `K среднее`, `L статус` и source row. Кнопка `Редактировать команду` должна переиспользовать существующий hardened `admin-write-v0600-v3.js` + photo bridge/optimistic revision; не создавать второй frontend write route. Пока серверный whitelist не расширен отдельно, E:L остаются read-only, а updateTeam меняет только разрешённые поля (`name + leader`, photo через photo bridge).
+81. **v0.6 admin team metric rankings:** карточки `E игроки`, `F общий спецназ`, `H скрины`, `I активность в базе`, `J активность вне базы`, `K среднее` на admin team-detail открывают рейтинг **всех private admin teams** по соответствующему numeric field от большего к меньшему. Источник рейтинга = `adminData.teams`, не public snapshot, поэтому `Неактивен` и нулевые значения не отбрасываются. При равенстве tie-break детерминированный по team name/game. Строка рейтинга открывает team-detail этой команды; Back восстанавливает ranking/detail state. Не добавлять thumbnails/массовый media prewarm в список всех команд.
 
 ## Текущая версия
 
@@ -117,6 +118,7 @@ Admin-preview `v0.6.0` дополнительно использует:
 - deterministic admin hybrid search + public `searchKeys` when available;
 - единую persistent media DB с ordinary mode: avatar primary `avatar:<avatarFileId>`, team `team:<name+game>`;
 - normal-style admin team detail с private participants, полным D:L блоком и кнопкой hardened editor;
+- team metric rankings E/F/H/I/J/K по полному private team set;
 - `Вышел` ordering по physical source row, newest first;
 - delete operations выключены.
 
