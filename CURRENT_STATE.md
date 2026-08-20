@@ -110,6 +110,9 @@
 - membership slots = 1..5: команда, роль, игровой ник, игра;
 - role/team validation должна проходить через существующую final-role архитектуру.
 
+### Порядок `Вышел`
+`sortBaseByChatState_()` в живой таблице использует стабильную сортировку: `В чате` остаются первой группой, `Вышел` — следующей, и сохраняется физический порядок строк внутри группы. Когда новый участник получает `Вышел`, после штатной сортировки он оказывается **выше ранее вышедших**. Поэтому эквивалентный порядок v0.6 admin UI для фильтра `Вышел` — по фактическому `row` базы по возрастанию: недавно вышедшие сверху, старые снизу. **Не использовать AE `Дата изменения` как дату выхода**: AE может меняться не только из-за выхода.
+
 ### Public sync
 Публичная таблица `🕊️ЧАТ ПОБЕДИТЕЛЕЙ🕊️` получает данные из админской; обратной записи быть не должно.
 Строгую validation `02_PUBLIC_SYNC_V4.js` не ослаблять.
@@ -143,10 +146,26 @@
 - `admin-write-v0600-v3.js` — CRUD UI/transport через Worker;
 - `admin-team-photo-v0600.js` — загрузка/сжатие фото команды;
 - `admin-participant-edit-policy-v0600.js` — UI policy существующего участника;
-- `version-v0600.js` cache-bust: **`20260820-1712`**;
-- `app-v0600.html` подключает `version-v0600.js?v=20260820-1712`.
+- **`admin-search-media-sort-v0600.js` (`0.6.0-admin-search-media-sort.2`)** — admin hybrid search, participant avatars, exited ordering;
+- `version-v0600.js` cache-bust: **`20260820-1908`**;
+- `app-v0600.html` подключает `version-v0600.js?v=20260820-1908`.
 
-Пользователь фактически открыл v0.6 в Telegram и открыл редактор участника. Полный write smoke после последнего participant-policy ещё не считать завершённым, пока пользователь не сохранит разрешённое тестовое изменение и не подтвердит результат.
+Пользователь фактически открыл v0.6 в Telegram и подтвердил обновлённый existing-participant editor как правильный. Полный write smoke ещё не считать завершённым, пока пользователь не сохранит разрешённое тестовое изменение и не подтвердит результат.
+
+### v0.6 admin search / avatars / exited sort — repo ready 20.08.2026
+
+Новый frontend-only слой:
+- поиск по участникам и командам использует те же детерминированные формы, что обычный hybrid search: нормализация, compact, кириллица↔латиница, human-read, один pseudo-read, подтверждённые aliases;
+- для записей, которые есть в обычном snapshot, дополнительно используются их готовые `searchKeys`;
+- admin-only записи (`Неактивен` и т.п.) всё равно ищутся локально по полным private полям;
+- контрольный alias `BbllllKA ↔ вышка` включён;
+- поиск не перерисовывает input и не блокирует IME;
+- аватар участника берётся по raw Telegram ID из обычного snapshot `avatarFileId` и загружается тем же `setupAvatarLoading()`/cache path; если фото нет — буквенная заглушка;
+- фильтр `Вышел` переставляет DOM только при реальной необходимости и сортирует по physical source row по возрастанию;
+- при выходе из фильтра `Вышел` восстанавливается исходный admin-list order;
+- DOM observer игнорирует простое перемещение уже существующих participant records, чтобы не создавать цикл rerender/sort.
+
+**Статус:** GitHub `main` и cache-bust обновлены. Apps Script / Cloud Shell не нужны. Реальный Telegram smoke-test нового слоя ещё требуется.
 
 ---
 
@@ -238,12 +257,15 @@ Repo config на 20.08.2026:
 
 ## 10. Поиск / активные команды
 
-### Поиск
+### Обычный поиск
 - `search-hybrid-v0553.js`;
 - local search OR `searchKeys`;
 - фильтр `Все / РМ / РК` ограничивает список и область поиска, query не очищает;
 - контрольный alias: фактическая `🗡 BbllllKA / Royal Kingdom` находится по `вышка`/`vyshka`;
 - не возвращать ошибочное `BbIIIIKA`.
+
+### Админ-поиск v0.6
+Не возвращать простой `.includes()` как единственный механизм. Итоговый admin matcher должен сохранять deterministic hybrid behavior и работать по полному private record, включая имя, Telegram name, username, ID, все memberships/ники/роли/игры, team leader/status/stat fields и доступные public `searchKeys`.
 
 ### Активные команды
 Источник истины: `team.status` из `Команды!L`.
@@ -263,7 +285,8 @@ Repo config на 20.08.2026:
 - IndexedDB cache-first;
 - key = `avatarFileId`;
 - lazy loading;
-- network concurrency ≤ 2.
+- network concurrency ≤ 2;
+- v0.6 admin participants должны использовать тот же avatar loader/cache, а не отдельную сеть/новый формат.
 
 ### Фото команд
 - cache identity = нормализованное **имя команды + игра**;
@@ -306,7 +329,10 @@ Repo config на 20.08.2026:
 - credits с `@DmitryRoyal`;
 - **v0.6 existing-participant manual write whitelist = только `name` + `memberships`; Telegram/system/counter fields = SERVER READ-ONLY**;
 - v0.6 admin write transport = Worker-signed HMAC, не прямой browser→Apps Script;
-- v0.6 delete operations остаются выключенными до отдельного решения.
+- v0.6 delete operations остаются выключенными до отдельного решения;
+- v0.6 admin `Вышел`: порядок как физическая группа в `База участников`, недавно вышедшие сверху; не подменять это сортировкой AE;
+- v0.6 admin avatars используют существующий `avatarFileId`/avatar cache path;
+- v0.6 admin search не деградировать обратно до raw lowercase `.includes()` без hybrid forms/searchKeys.
 
 ---
 
@@ -332,6 +358,10 @@ Repo config на 20.08.2026:
 8. Team photo upload отображается после refresh; rename переносит фото и очищает старый media-key.
 9. Устаревшая revision не перезаписывает более новое изменение.
 10. Удаление отсутствует/запрещено.
+11. Admin participant list показывает те же аватарки, что обычный participant list; записи без фото имеют fallback.
+12. Admin search проверяется минимум по CRM имени, Telegram имени, `@username`, ID, команде, роли, игровому нику и aliases; контрольные `нас не догонят` и `вышка` должны находить соответствующие команды/участников.
+13. В фильтре `Вышел` порядок сравнить с физической `База участников`: самый свежий выход сверху, старые ниже.
+14. После `Вышел → Все` исходный порядок списка восстанавливается без зависаний/циклической перерисовки.
 
 ---
 
