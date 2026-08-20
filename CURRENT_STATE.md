@@ -1,6 +1,6 @@
 # Royal CRM / «Таблица ЧП» — CURRENT STATE
 
-> **Актуально на 19.08.2026.**
+> **Актуально на 20.08.2026.**
 > Новый чат обязан сначала прочитать `START_HERE.md`, затем этот файл и последние записи `WORK_HISTORY.md`.
 > Фактический runtime / живые Google Sheets / live Apps Script / текущий GitHub имеют приоритет над памятью чатов.
 
@@ -8,11 +8,13 @@
 
 1. Не менять код по памяти.
 2. Перед правкой открыть фактический файл и проверить текущую версию/SHA/подключение.
-3. Если задача зависит от данных — сверить актуальный `snapshot.json` и/или живую Google Sheets.
+3. Если задача зависит от данных — сверить актуальный `snapshot.json`, `admin-snapshot.json` и/или живую Google Sheets.
 4. Для Apps Script использовать `apps-script-live/` как зеркало последнего `clasp pull`; после live push заново синхронизировать зеркало.
-5. После принятой/проверенной работы обязательно обновить `CURRENT_STATE.md` и `WORK_HISTORY.md`; `RELEASE_RULES.md` — если изменился постоянный инвариант.
-6. Если менялась структура Google Sheets — обновлять `docs/tables/*.md`.
-7. GitHub commit не равен production-подтверждению backend; runtime проверять отдельно.
+5. Перед `clasp push` обязательно делать `clasp status` и backup/pull фактического live source.
+6. Не создавать новый Apps Script deployment, если задача должна обновить существующий `Таблица ЧП 1.3`.
+7. После принятой/проверенной работы обязательно обновить `CURRENT_STATE.md` и `WORK_HISTORY.md`; `RELEASE_RULES.md` — если изменился постоянный инвариант.
+8. Если менялась структура Google Sheets — обновлять `docs/tables/*.md`.
+9. GitHub commit не равен production-подтверждению backend; runtime проверять отдельно.
 
 ---
 
@@ -22,14 +24,20 @@
 - GitHub: `Antonsoloway/Specnaz-mini-app`
 - branch: `main`
 - постоянный Mini App entrypoint: `app.html`
-- активный физический entrypoint: `app-v0559.html`
+- стабильный frontend: **`app-v0559.html` / v0.5.59**
+- admin preview: **`app-v0600.html` / v0.6.0**
 - публичный URL: `https://antonsoloway.github.io/Specnaz-mini-app/app.html`
 - Telegram bot: `@doveofpeace_bot`
-- launch link: `https://t.me/doveofpeace_bot?startapp`
+
+### Launch routing
+- обычный `https://t.me/doveofpeace_bot?startapp` → стабильная **v0.5.59**;
+- специальный `startapp=v0600` / `tgWebAppStartParam=v0600` → отдельная **v0.6 preview**;
+- обычных пользователей пока не переводить на v0.6 до завершения admin smoke-test.
 
 ### Data repo
 - `Antonsoloway/royal-crm-data`
-- главный файл: `snapshot.json`
+- публичный snapshot: `snapshot.json`
+- приватный admin snapshot: `admin-snapshot.json`
 - Google Sheets / Apps Script — первичный источник CRM-данных.
 
 ### Проектная база знаний
@@ -42,258 +50,236 @@
 
 ---
 
-## 3. Live Apps Script / данные
+## 3. Live Apps Script / snapshot
 
 Полный standalone Apps Script таблиц хранится зеркалом в `apps-script-live/`.
 
-Текущее подтверждённое состояние writer:
+### Public snapshot
 - Unified Snapshot Writer: **`1.2.4`**
 - schemaVersion: `1.4.2`
 - searchIndexVersion: **`1.1.3`**
 - Fallback API: `1.2.1`
-- team status bridge: `27_MINIAPP_TEAM_STATUS.js`, bridge `1.0.0`
-- штатный handler: `MINIAPP_exportUnifiedSnapshotToGitHub`
-- штатный trigger: раз в 5 минут.
+- team status bridge: `27_MINIAPP_TEAM_STATUS.js`
+- штатный trigger snapshot: раз в 5 минут.
 
-### Каскадное переименование команд — live с 19.08.2026
+### v0.6 private admin snapshot / write backend — live
 
-`apps-script-live/07_FINAL_ROLE_FIX.js` теперь считает изменение существующего `Команды!B` каскадной операцией:
-- при одиночном edit названия берутся `e.oldValue`, новое значение и игра **до сортировки**;
-- `finalRoleCascadeTeamRename_()` проходит все пять team-слотов `База участников` (`E/H/K/N/Q`);
-- совпадение строго по identity **старое название + игра**;
-- меняется только team-cell; ник, роль, game-columns и прочие данные не трогаются;
-- после этого запускается repair старых декоративных рассинхронизаций и ставится public sync pending.
+На 20.08.2026 подтверждены:
+- `adminData.version = 0.6.0-write.4`;
+- участники и команды имеют optimistic `revision`;
+- transport записи: **Mini App → Worker → HMAC → Apps Script → Google Sheets**;
+- HMAC secret не попадает в браузер/GitHub;
+- existing Apps Script deployment **`Таблица ЧП 1.3`** сохранён, новый deployment не создавался;
+- server route write.4 подтверждён non-mutating HTTP check;
+- team photo capability подтверждена;
+- rename cleanup фото подтверждён;
+- delete operations в v0.6 отключены.
 
-`apps-script-live/25_MINIAPP_UNIFIED_SNAPSHOT.js` перед построением snapshot дополнительно вызывает `finalRoleRepairDecoratedTeamMemberships_()` как страховку. Автоматический repair разрешён только для однозначного случая: в той же игре после удаления ведущего decorative prefix/emoji найден ровно один кандидат.
+Ключевые live модули:
+- `28_MINIAPP_ADMIN_DATA.js` — private admin read snapshot;
+- `29_MINIAPP_ADMIN_WRITE.js` — общие write helpers/validation;
+- `30_MINIAPP_ADMIN_WRITE_BACKEND.js` — signed Worker→Apps Script gateway;
+- `31_MINIAPP_ADMIN_WRITE_HARDENED.js` — hardened mutations и participant field policy;
+- `32_MINIAPP_ADMIN_MEDIA.js`, `33_MINIAPP_ADMIN_WRITE_FINAL.js` — team photo/final write integration.
 
-Строгую validation `02_PUBLIC_SYNC_V4.js` **не ослаблять**: если membership ссылается на реально отсутствующую/неоднозначную команду, sync должен остановиться и показать источник ошибки. Не угадывать полное переименование без подтверждённого mapping.
-
-После любого live Apps Script push:
-
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-app/main/scripts/sync-live-apps-script-to-github.sh)
-```
-
-Не хранить в GitHub `.clasp.json`, Script Properties, bot tokens, GitHub tokens и Cloudflare secrets.
+После любого live Apps Script push синхронизировать factual mirror штатным script. Не хранить в GitHub `.clasp.json`, Script Properties, bot/GitHub tokens и Cloudflare secrets.
 
 ---
 
-## 4. Живые Google Sheets
+## 4. Google Sheets и identity
 
 ### Админская таблица
-Название: `Royal_CRM_GOOGLE_ПОИСК_FINAL_FIXED`.
+`Royal_CRM_GOOGLE_ПОИСК_FINAL_FIXED`.
 
-На листе `Команды` колонка **L = `Статус`**. Значения:
-- `Активен`
-- `На паузе`
-- `Неактивен`
+Основные листы:
+- `База участников`;
+- `Команды`;
+- история/служебные листы из существующей архитектуры.
 
-Статус команды для Mini App определяется строго по связке **название + игра**.
+### Команды
+- identity команды = **название + игра**;
+- `Команды!L` = статус: `Активен`, `На паузе`, `Неактивен`;
+- фото команды хранится штатно в `Команды!C` (CellImage / поддерживаемый существующий формат);
+- существующая игра команды является частью identity и не меняется через редактор;
+- переименование команды каскадно обновляет все 5 membership-слотов участников в той же игре;
+- при переименовании фото/media identity переносится, старый media-key очищается.
 
-### Публичная таблица
-Название: `🕊️ЧАТ ПОБЕДИТЕЛЕЙ🕊️`.
+### Участники
+- identity участника = **raw Telegram ID**;
+- Telegram ID существующего участника неизменяем;
+- membership slots = 1..5: команда, роль, игровой ник, игра;
+- role/team validation должна проходить через существующую final-role архитектуру.
 
-Публичная таблица получает данные из админской; обратной записи быть не должно.
+### Public sync
+Публичная таблица `🕊️ЧАТ ПОБЕДИТЕЛЕЙ🕊️` получает данные из админской; обратной записи быть не должно.
+Строгую validation `02_PUBLIC_SYNC_V4.js` не ослаблять.
 
-### Последняя подтверждённая repair/sync-проверка 19.08.2026
-
-Исходный случай: админ изменил `BUNTARb` → `⚡️ BUNTARb` только в `Команды`, из-за чего membership Андрея оставался старым и публичная sync блокировалась.
-
-После live patch:
-- snapshot-trigger автоматически исправил **6** старых декоративных рассинхронизаций, включая `BUNTARb → ⚡️ BUNTARb`;
-- отдельный старый blocker у Светланы не угадывался автоматически: `Rossia Liger1 — РМ` больше отсутствовал на `Команды`;
-- после уточнения пользователя `База участников!E24` исправлена на **`🇷🇺 CCCP ROSSIA 1 — РМ`**;
-- public sync от **19.08.2026 21:51:32** завершилась `SYNCED`, без validation errors;
-- публичная `Команды` подтверждённо содержит `⚡️ BUNTARb — РК` с Андреем OgAyO;
-- публичная `Команды` подтверждённо содержит `🇷🇺 CCCP ROSSIA 1 — РМ` со Светланой `@SvetlanaRusKyzbass`;
-- snapshot от `2026-08-19T18:48:33.093Z` содержит у Светланы membership `🇷🇺 CCCP ROSSIA 1 — РМ`.
-
-Старые названия в исторических секциях спецназа не переписывать задним числом: история отражает состояние на дату события.
+Каскадное переименование `Команды!B` остаётся обязательным инвариантом. Полное/неоднозначное переименование без подтверждённого mapping не угадывать.
 
 ---
 
 ## 5. Текущий frontend
 
-- **Mini App: `v0.5.59`**
-- `app.html` и `index.html` ведут на `app-v0559.html`, сохраняя Telegram `search + hash`.
+### Стабильная версия
+- **v0.5.59** остаётся основной для обычных пользователей.
+- `app.html` без preview-параметра ведёт на `app-v0559.html` с сохранением Telegram `search + hash`.
 
-Ключевые активные модули:
-- `transport-v0514.js` — внутренняя версия `0.5.14.1`
-- `app.js` — `BUILD = 0.5.59`
-- `navigation-v0521.js`
-- `navigation-card-restore-v0532.js` — внутренняя версия `0.5.32.1`
-- `search-hybrid-v0553.js`
-- `search-aliases-v0559.js`
-- `media-persistent-cache-v0554.js` — внутренняя версия **`0.5.54.2`**, safe disk-record warm
-- `contact-by-id-v0559.js` — внутренняя версия `0.5.59.2`
-- `active-teams-v0559.js`
-- `active-teams-title-v0559.js`
-- `stable-v0559.js` — stable patch **`0.5.59.2`**, iOS team-photo guard; broken fast warm `0.5.59.3` rolled back
-- `changelog-v0559.js`
+Ключевые стабильные механизмы:
+- устойчивый `/auth`: timeout 12 сек + один transient retry;
+- `Связаться` через Worker/Голубца для участников без `@username`;
+- восстановление contact actions после Back;
+- hybrid search + server `searchKeys`;
+- `BbllllKA / Royal Kingdom ↔ вышка`;
+- active-team gold + каталог базы спецназа + inline JPEG крот;
+- persistent avatar/team-photo cache;
+- iOS-safe team-photo guard `0.5.59.2`;
+- safe disk-record warm `media-persistent-cache-v0554.js 0.5.54.2`.
 
-Текущие важные cache-bust:
-- auth: `transport-v0514.js?v=20260819-0833`, `app.js?v=20260819-0833`
-- Back/contact restore: `navigation-card-restore-v0532.js?v=20260819-0848`
-- media cache safe warm: `media-persistent-cache-v0554.js?v=20260819-2012`
-- iPhone team-photo guard: `stable-v0559.js?v=20260819-2003`
-- changelog: `changelog-v0559.js?v=20260819-2012`
+### v0.6 admin preview
+- физический entrypoint: `app-v0600.html`;
+- бейдж: `v0.6.0`;
+- `admin-v0600.js` / `admin-eligibility-v0600.js` — admin read UI/eligibility;
+- `admin-write-gate-v0600.js` — включает write только при подтверждённом final capability snapshot;
+- `admin-write-v0600-v3.js` — CRUD UI/transport через Worker;
+- `admin-team-photo-v0600.js` — загрузка/сжатие фото команды;
+- `admin-participant-edit-policy-v0600.js` — UI policy существующего участника;
+- `version-v0600.js` cache-bust: **`20260820-1712`**;
+- `app-v0600.html` подключает `version-v0600.js?v=20260820-1712`.
 
-### Устойчивая авторизация
-- `/auth` timeout = 12 секунд;
-- один автоматический retry только для transient timeout/network ошибки;
-- Android `AbortError code 20` нормализуется в `AUTH_TIMEOUT`;
-- остальные Worker routes сохраняют обычный timeout;
-- внутренний build совпадает с v0.5.59.
+Пользователь фактически открыл v0.6 в Telegram и открыл редактор участника. Полный write smoke после последнего participant-policy ещё не считать завершённым, пока пользователь не сохранит разрешённое тестовое изменение и не подтвердит результат.
 
 ---
 
-## 6. Контакт с участниками
+## 6. v0.6 — права админа и редактор участника
 
-### Есть `@username`
-Сохраняется прежнее меню username: `Написать в ЛС` / `Позвать в чате`.
+### Кто получает admin mode
+Admin read/write доступ разрешать только после серверной проверки Telegram admin status и CRM membership. Нельзя определять админа только по frontend-флагу.
 
-### Нет `@username`
-На том же месте показывается **`Связаться`**.
+### Existing participant — постоянная policy с 20.08.2026
 
-Identity = только raw Telegram ID.
+Админ вручную может менять **только**:
+1. `Имя` CRM;
+2. пять membership-слотов: `команда / роль / игровой ник` (игра следует существующей slot/team validation).
 
-Правильная цепочка:
+Админ **НЕ должен вручную менять** системные/ботовые поля существующего участника:
+- Telegram ID;
+- `Состояние чата`;
+- `Имя Telegram`;
+- `@username`;
+- дата V;
+- походы спецназа U;
+- скрины AB;
+- активность в базе AC;
+- активность вне базы AD;
+- вычисляемые статус/игры/last change и другие system/formula fields.
 
-`Mini App → POST /contact-by-id → Worker → @doveofpeace_bot → inline-кнопка «Открыть профиль»`
+Это закрыто в двух слоях:
+- frontend `admin-participant-edit-policy-v0600.js` скрывает/блокирует system fields в update-form;
+- live Apps Script `31_MINIAPP_ADMIN_WRITE_HARDENED.js` разрешает `requestedChanges` только `name` и `memberships`; попытка прислать другое поле → `PARTICIPANT_FIELD_READ_ONLY` без записи.
 
-Прямой `tg://user?id=...` из Mini App не использовать: этот вариант уже проверен и не работает стабильно.
+**Важно:** UI-only блокировка недостаточна; серверный whitelist обязателен и не должен откатываться.
 
-После возврата из профиля/команды post-restore порядок обязателен:
-1. `RoyalParticipantCardUX.decorate()`;
-2. `RoyalContactByTelegramId.decorate()`.
-
-Проверять и видимую кнопку `Назад`, и Telegram native/system Back. Кнопки `Связаться` не должны исчезать после возврата.
+### Create participant
+Текущий UI create-participant технически существует, но policy этого раздела относится к **существующему участнику**. Не расширять create-flow без отдельного согласования бизнес-правил бот-заполнения.
 
 ---
 
-## 7. Worker/backend
+## 7. v0.6 — команды и фото
+
+Админский write-flow команд поддерживает:
+- создание команды: игра + название + данные, разрешённые текущей формой;
+- редактирование существующей команды;
+- каскадное переименование membership по `старое имя + игра`;
+- загрузку фото с телефона;
+- клиентское сжатие перед отправкой;
+- серверное сохранение штатного team photo source;
+- обновление media identity;
+- cleanup старого media-key при rename;
+- journal записи ручных изменений;
+- optimistic revision, чтобы устаревшая карточка не перезаписала более новое изменение другого админа.
+
+Удаление участников и команд пока отключено.
+
+---
+
+## 8. Worker/backend
 
 Frontend Worker origin: `https://royal-crm-miniapp-api.tropical-spoon.workers.dev`.
 
-Repo config:
-- `worker/wrangler.toml`
-- active repo main: `src/entry-v1120.js`
-- wrapper version: `1.12.0`
+Repo config на 20.08.2026:
+- `worker/wrangler.toml` → **`src/entry-v1230.js`**;
+- final admin-write gate требует private snapshot `write.4`, HMAC transport, photo capability и `renameCleanup=true`;
+- `/admin-data` — только для подтверждённого администратора;
+- `/admin-write` — authenticated admin mutation route;
+- existing `/contact-by-id`, `/snapshot`, media/auth routes не должны регрессировать.
 
-`entry-v1120.js` добавляет `/contact-by-id`, Bot API relay и inline profile button.
-
-Пользователь 19.08.2026 фактически подтвердил, что `Связаться` работает в production.
-
-Автоматический `.github/workflows/worker-smoke.yml` удалён: он создавал ложные/пустые GitHub Actions failure-письма. Worker production проверять напрямую по `/health` и/или функциональному smoke-test.
+Не возвращать шумный `.github/workflows/worker-smoke.yml`. Runtime проверять напрямую и функционально.
 
 ---
 
-## 8. Активные команды / база спецназа
+## 9. Контакт с участниками
 
-Источник истины: `team.status` из `Команды!L` через snapshot/Worker.
+### Есть `@username`
+Сохраняется меню `Написать в ЛС` / `Позвать в чате`.
 
+### Нет `@username`
+Показывается **`Связаться`**.
+
+Правильная цепочка:
+`Mini App → POST /contact-by-id → Worker → @doveofpeace_bot → inline-кнопка «Открыть профиль»`.
+
+Прямой `tg://user?id=...` из Mini App не использовать.
+
+После Back/rerender порядок:
+1. `RoyalParticipantCardUX.decorate()`;
+2. `RoyalContactByTelegramId.decorate()`.
+
+---
+
+## 10. Поиск / активные команды
+
+### Поиск
+- `search-hybrid-v0553.js`;
+- local search OR `searchKeys`;
+- фильтр `Все / РМ / РК` ограничивает список и область поиска, query не очищает;
+- контрольный alias: фактическая `🗡 BbllllKA / Royal Kingdom` находится по `вышка`/`vyshka`;
+- не возвращать ошибочное `BbIIIIKA`.
+
+### Активные команды
+Источник истины: `team.status` из `Команды!L`.
 Для `status === "Активен"`:
-- золотая рамка team cards;
-- золотая рамка командных плашек участников;
-- золотое название на detail;
-- кликабельный крот справа;
-- каталог строится только из активных команд;
-- каталог имеет собственные `Все / РМ / РК` и поиск.
+- золото на team cards/participant team chips/detail;
+- кликабельный крот;
+- каталог активных команд с `Все / РМ / РК` и поиском.
 
-Крот: inline JPEG data-asset в `active-teams-v0559.css`; не возвращать SVG-wrapper/обычный `<img>`.
-
-Заголовок каталога:
-**`Команды принимающие участие в базе спецназа`**
-
-Подзаголовок:
-`Команды, участвующие в спецназе и(или) регулярно выкладывающие скрины в базе спецназа.`
+Заголовок каталога: **`Команды принимающие участие в базе спецназа`**.
+Подзаголовок: `Команды, участвующие в спецназе и(или) регулярно выкладывающие скрины в базе спецназа.`
 
 ---
 
-## 9. Поиск
-
-Основной модуль: `search-hybrid-v0553.js`.
-
-Архитектура:
-- локальный Android-safe поиск + server `searchKeys`;
-- итог = локальный поиск ИЛИ `searchKeys`;
-- без fuzzy/edit-distance;
-- фильтр `Все / РМ / РК` ограничивает список и поиск, не очищая query.
-
-Подтверждённый alias:
-- фактическая команда: `🗡 BbllllKA / Royal Kingdom`;
-- server alias: `'bbllllka': ['вышка']`;
-- writer `1.2.4`, `searchIndexVersion=1.1.3`;
-- свежий snapshot содержит `вышка` и `vyshka` в `searchKeys`.
-
-Не возвращать ошибочное написание `BbIIIIKA`.
-
----
-
-## 10. Медиакэш
+## 11. Медиакэш
 
 ### Аватары
 - IndexedDB cache-first;
-- key = стабильный `avatarFileId`;
+- key = `avatarFileId`;
 - lazy loading;
-- network concurrency ≤ 2;
-- собственная ава восстанавливается приоритетно.
+- network concurrency ≤ 2.
 
-### Фото команд — общий путь
-- cache key = **нормализованное имя команды + игра**;
-- временный Google `photoUrl` не является cache identity;
-- cached photo показывается cache-first;
-- примерно после 30 минут допускается background refresh;
-- cleanup около 45 дней, общий лимит около 420 изображений.
-
-### iPhone / iPad — актуальное состояние 19.08.2026
-
-Первый подтверждённый iOS-дефект: фото команды могло мелькнуть, затем исчезнуть и замениться замком.
-
-Активный stable patch **`0.5.59.2`**:
-- не позволяет persistent-loader удалить уже существующий `src` до готовности replacement;
-- даёт cached/proxy image до 900 мс на реальный decode/load;
-- при ошибке возвращает исходный CRM `src`;
-- Android-ветку не меняет.
-
-Неудачная попытка `stable-v0559.js 0.5.59.3` полностью откатана: она заранее создавала object URL для всех team blobs и перехватывала `renderTeamDetail`; на реальном iPhone это привело к полному исчезновению фото. Этот подход не возвращать.
-
-### Текущее безопасное ускорение — media cache `0.5.54.2`
-
-Причина задержки 0,4–0,6 сек на iPhone была в том, что старый `warmTeamCacheFromDisk()` ждал snapshot и затем делал отдельный `idbGet()` для каждой команды. На iOS последовательные IndexedDB-транзакции заметно медленнее Android.
-
-Новая реализация **не подменяет render и не обходит loader**:
-- сразу при загрузке `media-persistent-cache-v0554.js` выполняется один readonly `openCursor()` по существующему IndexedDB store;
-- в `teamDiskMemory` сохраняются только валидные **записи Blob** команд младше 45 дней;
-- во время warm **не создаются `blob:` URL**, не меняется DOM и не запускается сеть;
-- при открытии конкретной команды штатный `persistentLoadTeamPhoto()` сначала проверяет свой родной `teamMemory`, затем `teamDiskMemory`;
-- если запись уже прогрета, только для этой открываемой команды синхронно создаётся object URL и назначается штатному `<img>`;
-- если записи нет, остаётся прежний рабочий путь `idbGet → /team-photo → fallback`;
-- background refresh, stable iOS guard `0.5.59.2` и Android-путь сохранены;
-- новые/обновлённые team blobs автоматически попадают в `teamDiskMemory` после `idbPut`;
-- никакого сетевого prewarm нет.
-
-Диагностика: `window.RoyalPersistentMediaCache.teamDiskEntries` и `teamObjectUrls`.
-
-**Статус проверки:** GitHub `main` обновлён, активный cache-bust установлен. Реальная скорость/стабильность на iPhone должна быть подтверждена пользователем после полного перезапуска Mini App.
-
-Apps Script / Cloud Shell для этого изменения не нужен.
+### Фото команд
+- cache identity = нормализованное **имя команды + игра**;
+- временный Google `photoUrl` не использовать как identity;
+- safe disk warm хранит record/blob references, object URL создаётся только для открываемой команды;
+- сетевой массовый prewarm запрещён;
+- iOS не имеет права очищать рабочий `img.src` до готовности replacement;
+- не возвращать сломанный fast-path `stable-v0559.js 0.5.59.3`.
 
 ---
 
-## 11. Навигация
+## 12. Навигация / credits
 
-Инвариант:
-- вперёд → новый экран сверху (`scrollY=0`);
-- назад → точная сохранённая позиция предыдущего экрана.
-
-Не возвращать поведение v0.5.57, где Back отправлял список наверх.
-
----
-
-## 12. История изменений / credits
-
-Текущий changelog: `changelog-v0559.js`.
+Навигация:
+- forward → `scrollY=0`;
+- Back → сохранённая позиция предыдущего экрана.
 
 `Помощь в разработке, тесты`:
 - `@sfinks_spb`
@@ -305,45 +291,47 @@ Apps Script / Cloud Shell для этого изменения не нужен.
 
 ## 13. Что нельзя откатить
 
-- не терять Telegram `location.hash`;
+- Telegram `location.hash`/launch params при redirect;
 - participant identity = raw Telegram ID;
-- не удалять `searchKeys`, `searchIndexVersion`, `team.status` Worker-санитизацией;
-- team status identity = `название + игра`;
-- **переименование `Команды!B` обязано каскадно обновлять все пять membership-слотов `База участников` по identity `старое название + игра` до public/snapshot sync**;
-- строгую public validation не ослаблять ради старых рассинхронизаций: неоднозначные/полные переименования требуют подтверждённого mapping;
-- не возвращать крота к SVG/`<img>`;
-- не возвращать ошибочное `BbIIIIKA`;
-- не возвращать team-photo cache key к временному `photoUrl`;
-- на iOS **не стирать существующий team-photo `src` до готовности replacement source**;
-- **не возвращать stable patch `0.5.59.3` / массовое создание session object URL для всех team blobs и перехват `renderTeamDetail`**;
-- безопасный disk warm может хранить Blob-records в памяти, но object URL создавать только для реально открываемой команды;
-- не превращать disk-only cache warm в сетевой prewarm;
-- `Связаться` только через Worker → Голубец → inline button;
-- не запускать `tg://user?id` напрямую из Mini App;
-- после Back обязательно восстанавливать contact actions;
-- `/auth` не возвращать к 5 секундам без retry;
-- не добавлять обратно шумный `worker-smoke.yml`;
-- Back не должен сбрасывать scroll вверх;
-- не удалять `@DmitryRoyal` из credits.
+- team identity = `название + игра`;
+- cascade rename всех 5 participant membership slots;
+- строгую public validation;
+- `searchKeys`, `searchIndexVersion`, `team.status` в Worker/snapshot;
+- `BbllllKA ↔ вышка`;
+- стабильный team-photo cache identity;
+- iOS source-preservation guard;
+- `Связаться` только через Worker/Голубца;
+- contact actions после Back;
+- устойчивый auth timeout/retry;
+- credits с `@DmitryRoyal`;
+- **v0.6 existing-participant manual write whitelist = только `name` + `memberships`; Telegram/system/counter fields = SERVER READ-ONLY**;
+- v0.6 admin write transport = Worker-signed HMAC, не прямой browser→Apps Script;
+- v0.6 delete operations остаются выключенными до отдельного решения.
 
 ---
 
 ## 14. Минимальный smoke-test
 
-1. Launch через `https://t.me/doveofpeace_bot?startapp`.
-2. Авторизация переживает краткий transient backend delay.
-3. Поиск и `Все / РМ / РК` работают.
-4. `вышка` находит `🗡 BbllllKA` в РК.
-5. Активные команды имеют золото и правильного крота.
-6. Повторное открытие ранее загруженной команды использует photo cache.
-7. На iPhone фото команды должно отображаться; не допускается состояние, когда после открытия остаётся только замок.
-8. На iPhone фото не должно исчезать после краткого появления; при проблеме replacement остаётся рабочий CRM photo.
-9. **На iPhone ранее кэшированная команда должна открывать фото без прежней задержки ~0,4–0,6 сек; проверить несколько команд подряд и после полного перезапуска Mini App.**
-10. У участника без `@` есть `Связаться` и оно работает через Голубца.
-11. После `Участники → профиль/команда → Назад` кнопки `Связаться` остаются.
-12. Forward открывает сверху, Back восстанавливает позицию.
-13. После переименования тестовой команды проверить три точки: `Команды`, membership участника и публичную таблицу/snapshot должны иметь одно новое имя.
-14. В credits есть `@DmitryRoyal`.
+### Stable v0.5.59
+1. Обычный `startapp` открывает v0.5.59.
+2. Авторизация переживает transient backend delay.
+3. Поиск/фильтры работают; `вышка` находит `BbllllKA` в РК.
+4. Active teams имеют золото/крота.
+5. Фото команд не исчезают на iPhone и повторное открытие использует cache.
+6. `Связаться` работает и остаётся после Back.
+7. Forward открывает сверху, Back возвращает позицию.
+
+### Admin preview v0.6
+1. `startapp=v0600` открывает v0.6.0; обычный startapp остаётся v0.5.59.
+2. Не-админ не получает admin-data/write.
+3. Админ видит admin mode и private data, включая `Вышел`/`Неактивен` согласно admin view.
+4. Existing participant editor показывает для ручного изменения только `Имя` + membership slots.
+5. Попытка отправить system field напрямую должна получить `PARTICIPANT_FIELD_READ_ONLY` и ничего не изменить.
+6. Тестовое разрешённое изменение имени или membership сохраняется, после refresh читается обратно и появляется в admin journal.
+7. Team rename каскадно меняет memberships той же игры.
+8. Team photo upload отображается после refresh; rename переносит фото и очищает старый media-key.
+9. Устаревшая revision не перезаписывает более новое изменение.
+10. Удаление отсутствует/запрещено.
 
 ---
 
