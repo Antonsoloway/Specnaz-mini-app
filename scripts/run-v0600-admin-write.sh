@@ -9,12 +9,12 @@ trap cleanup EXIT
 
 printf '[INFO] Royal CRM v0.6 FINAL write.4 installer\n'
 printf '[INFO] This runner does not mutate participant/team rows during installation checks.\n'
-printf '[INFO] Downloading v0.6 FINAL admin-write installer...\n'
+printf '[INFO] Downloading final launcher...\n'
 curl -fsSL "$RAW_INSTALLER" -o "$TMP"
 
 printf '[INFO] BASH SYNTAX PREFLIGHT\n'
 bash -n "$TMP"
-printf '✅ FINAL INSTALLER SYNTAX OK\n'
+printf '✅ FINAL LAUNCHER SYNTAX OK\n'
 
 bash "$TMP"
 
