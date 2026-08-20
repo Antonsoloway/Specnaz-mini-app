@@ -1,8 +1,11 @@
 import currentWorker from './entry-v1220.js';
 
-const WRAPPER_VERSION = '1.23.1-dev';
+const WRAPPER_VERSION = '1.23.2-dev';
 const TEAM_MEDIA_PREFIX = 'media/teams/';
 const FINAL_WRITE_VERSION = '0.6.0-write.4';
+const TEAM_PHOTO_SOURCE_PREFIX = 'ROYAL_CRM_TEAM_PHOTO_SOURCE_V1';
+const TEAM_PHOTO_MAX_FUTURE_SEC = 20 * 60;
+const TEAM_PHOTO_CLOCK_SKEW_SEC = 30;
 
 export default {
   async fetch(request, env, ctx) {
@@ -20,7 +23,7 @@ export default {
         service: 'royal-crm-miniapp-api',
         version: WRAPPER_VERSION,
         adminWrite: 'worker-signed-hmac-final-write4',
-        teamPhotoBridge: 'public-hash-only-private-github'
+        teamPhotoBridge: 'expiring-hmac-private-github'
       }), { status: 200, headers });
     }
 
@@ -31,10 +34,10 @@ export default {
     }
 
     // Google Sheets CellImage cannot attach the Mini App bearer session.
-    // This endpoint exposes ONLY one already-known team image by its stable
-    // 64-hex identity hash. It cannot read arbitrary private repository paths.
-    if (url.pathname === '/team-photo-public' && request.method === 'GET') {
-      return handlePublicTeamPhoto(request, env, url);
+    // Apps Script therefore gives it a short-lived URL signed with the same
+    // server secret used by the Worker->Apps Script write transport.
+    if (url.pathname === '/team-photo-source' && request.method === 'GET') {
+      return handleSignedTeamPhotoSource(env, url);
     }
 
     return currentWorker.fetch(request, env, ctx);
@@ -82,31 +85,45 @@ async function handleFinalAdminData(request, env, ctx) {
   return new Response(JSON.stringify(data), { status:200, headers });
 }
 
-async function handlePublicTeamPhoto(request, env, url) {
+async function handleSignedTeamPhotoSource(env, url) {
   const key = String(url.searchParams.get('key') || '').trim().toLowerCase();
   const version = String(url.searchParams.get('v') || '').trim().toLowerCase();
-  if (!/^[0-9a-f]{64}$/.test(key)) {
-    return new Response('Not found', {
-      status: 404,
-      headers: { 'Cache-Control': 'public, max-age=60', 'X-Content-Type-Options': 'nosniff' }
-    });
+  const expiresText = String(url.searchParams.get('exp') || '').trim();
+  const signature = String(url.searchParams.get('sig') || '').trim().toLowerCase();
+
+  if (!/^[0-9a-f]{64}$/.test(key) ||
+      !/^[0-9a-f]{64}$/.test(version) ||
+      !/^\d{10,13}$/.test(expiresText) ||
+      !/^[0-9a-f]{64}$/.test(signature)) {
+    return sourceError('Not found',404);
   }
-  if (version && !/^[0-9a-f]{8,64}$/.test(version)) {
-    return new Response('Not found', {
-      status: 404,
-      headers: { 'Cache-Control': 'public, max-age=60', 'X-Content-Type-Options': 'nosniff' }
-    });
+
+  const now = Math.floor(Date.now()/1000);
+  const expires = Number(expiresText);
+  if (!Number.isFinite(expires) ||
+      expires < now - TEAM_PHOTO_CLOCK_SKEW_SEC ||
+      expires > now + TEAM_PHOTO_MAX_FUTURE_SEC) {
+    return sourceError('Expired',403);
+  }
+
+  const botToken = String(env.BOT_TOKEN || '').trim();
+  if (!botToken) return sourceError('Unavailable',503);
+
+  const canonical = [
+    TEAM_PHOTO_SOURCE_PREFIX,
+    key,
+    version,
+    expiresText
+  ].join('\n');
+  const expected = await hmacSha256Hex(botToken,canonical);
+  if (!constantTimeEqual(expected,signature)) {
+    return sourceError('Forbidden',403);
   }
 
   const repo = String(env.DATA_REPO || '').trim();
   const branch = String(env.DATA_BRANCH || 'main').trim();
   const token = String(env.GITHUB_TOKEN || '').trim();
-  if (!repo || !token) {
-    return new Response('Unavailable', {
-      status: 503,
-      headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }
-    });
-  }
+  if (!repo || !token) return sourceError('Unavailable',503);
 
   const path = `${TEAM_MEDIA_PREFIX}${key}.bin`;
   const encodedPath = path.split('/').map(encodeURIComponent).join('/');
@@ -115,68 +132,91 @@ async function handlePublicTeamPhoto(request, env, url) {
     github = await fetch(
       `https://api.github.com/repos/${repo}/contents/${encodedPath}?ref=${encodeURIComponent(branch)}`,
       {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/vnd.github.raw+json',
-          'X-GitHub-Api-Version': '2022-11-28',
-          'User-Agent': 'Royal-CRM-Team-Photo-Bridge'
+        method:'GET',
+        headers:{
+          Authorization:`Bearer ${token}`,
+          Accept:'application/vnd.github.raw+json',
+          'X-GitHub-Api-Version':'2022-11-28',
+          'User-Agent':'Royal-CRM-Team-Photo-Source'
         },
-        cache: 'no-store'
+        cache:'no-store'
       }
     );
   } catch (error) {
-    console.warn('public team photo GitHub fetch failed', error?.message || 'unknown');
-    return new Response('Unavailable', {
-      status: 502,
-      headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }
-    });
+    console.warn('signed team photo GitHub fetch failed',error?.message || 'unknown');
+    return sourceError('Unavailable',502);
   }
 
-  if (github.status === 404) {
-    return new Response('Not found', {
-      status: 404,
-      headers: { 'Cache-Control': 'public, max-age=60', 'X-Content-Type-Options': 'nosniff' }
-    });
-  }
-  if (!github.ok) {
-    return new Response('Unavailable', {
-      status: 502,
-      headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }
-    });
-  }
+  if (github.status === 404) return sourceError('Not found',404);
+  if (!github.ok) return sourceError('Unavailable',502);
 
   const bytes = new Uint8Array(await github.arrayBuffer());
+  if (!bytes.length || bytes.length > 8*1024*1024) return sourceError('Invalid image',415);
+  const contentHash = await sha256Hex(bytes);
+  if (!constantTimeEqual(contentHash,version)) return sourceError('Version mismatch',409);
   const contentType = detectImageType(bytes);
-  if (!contentType || !bytes.length || bytes.length > 8 * 1024 * 1024) {
-    return new Response('Invalid image', {
-      status: 415,
-      headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }
-    });
-  }
+  if (!contentType) return sourceError('Invalid image',415);
 
   const headers = new Headers();
-  headers.set('Content-Type', contentType);
-  headers.set('X-Content-Type-Options', 'nosniff');
-  headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
-  headers.set(
-    'Cache-Control',
-    version ? 'public, max-age=31536000, immutable' : 'public, max-age=300'
+  headers.set('Content-Type',contentType);
+  headers.set('Cache-Control','no-store');
+  headers.set('X-Content-Type-Options','nosniff');
+  headers.set('Cross-Origin-Resource-Policy','cross-origin');
+  return new Response(bytes,{status:200,headers});
+}
+
+function sourceError(text,status) {
+  return new Response(text,{
+    status,
+    headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}
+  });
+}
+
+async function hmacSha256Hex(secret,text) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(String(secret || '')),
+    {name:'HMAC',hash:'SHA-256'},
+    false,
+    ['sign']
   );
-  return new Response(bytes, { status:200, headers });
+  const signature = await crypto.subtle.sign(
+    'HMAC',
+    key,
+    new TextEncoder().encode(String(text || ''))
+  );
+  return bytesToHex(new Uint8Array(signature));
+}
+
+async function sha256Hex(bytes) {
+  const digest = await crypto.subtle.digest('SHA-256',bytes);
+  return bytesToHex(new Uint8Array(digest));
+}
+
+function bytesToHex(bytes) {
+  return [...bytes].map(byte=>byte.toString(16).padStart(2,'0')).join('');
+}
+
+function constantTimeEqual(a,b) {
+  a=String(a || '');
+  b=String(b || '');
+  if (a.length !== b.length) return false;
+  let diff=0;
+  for (let i=0;i<a.length;i+=1) diff |= a.charCodeAt(i)^b.charCodeAt(i);
+  return diff===0;
 }
 
 function detectImageType(bytes) {
-  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
-  if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 && bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a) return 'image/png';
-  if (bytes.length >= 6) {
-    const signature = String.fromCharCode(...bytes.subarray(0,6));
-    if (signature === 'GIF87a' || signature === 'GIF89a') return 'image/gif';
+  if (bytes.length>=3 && bytes[0]===0xff && bytes[1]===0xd8 && bytes[2]===0xff) return 'image/jpeg';
+  if (bytes.length>=8 && bytes[0]===0x89 && bytes[1]===0x50 && bytes[2]===0x4e && bytes[3]===0x47 && bytes[4]===0x0d && bytes[5]===0x0a && bytes[6]===0x1a && bytes[7]===0x0a) return 'image/png';
+  if (bytes.length>=6) {
+    const signature=String.fromCharCode(...bytes.subarray(0,6));
+    if (signature==='GIF87a' || signature==='GIF89a') return 'image/gif';
   }
-  if (bytes.length >= 12) {
-    const riff = String.fromCharCode(...bytes.subarray(0,4));
-    const webp = String.fromCharCode(...bytes.subarray(8,12));
-    if (riff === 'RIFF' && webp === 'WEBP') return 'image/webp';
+  if (bytes.length>=12) {
+    const riff=String.fromCharCode(...bytes.subarray(0,4));
+    const webp=String.fromCharCode(...bytes.subarray(8,12));
+    if (riff==='RIFF' && webp==='WEBP') return 'image/webp';
   }
   return '';
 }
