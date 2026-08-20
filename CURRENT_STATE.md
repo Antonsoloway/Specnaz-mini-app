@@ -146,26 +146,35 @@
 - `admin-write-v0600-v3.js` — CRUD UI/transport через Worker;
 - `admin-team-photo-v0600.js` — загрузка/сжатие фото команды;
 - `admin-participant-edit-policy-v0600.js` — UI policy существующего участника;
-- **`admin-search-media-sort-v0600.js` (`0.6.0-admin-search-media-sort.2`)** — admin hybrid search, participant avatars, exited ordering;
-- `version-v0600.js` cache-bust: **`20260820-1908`**;
-- `app-v0600.html` подключает `version-v0600.js?v=20260820-1908`.
+- `admin-search-media-sort-v0600.js` (`0.6.0-admin-search-media-sort.2`) — admin hybrid search + exited ordering;
+- **`admin-media-cache-v0600-v2.js` (`0.6.0-admin-media-cache.2`)** — единый persistent media layer для admin avatars + team photos;
+- **`admin-team-detail-v0600.js` (`0.6.0-admin-team-detail.1`)** — тап по команде открывает обычноподобную страницу команды с фото и составом из private admin snapshot;
+- `version-v0600.js` cache-bust: **`20260820-2024`**;
+- `app-v0600.html` подключает `version-v0600.js?v=20260820-2024`;
+- `app.html` previewBuild: **`20260820-2024`**.
 
-Пользователь фактически открыл v0.6 в Telegram и подтвердил обновлённый existing-participant editor как правильный. Полный write smoke ещё не считать завершённым, пока пользователь не сохранит разрешённое тестовое изменение и не подтвердит результат.
+Пользователь фактически открыл v0.6 в Telegram и подтвердил updated existing-participant editor; admin avatars ранее появились. Полный write smoke ещё не считать завершённым, пока пользователь не сохранит разрешённое тестовое изменение и не подтвердит результат.
 
-### v0.6 admin search / avatars / exited sort — repo ready 20.08.2026
+### v0.6 admin search / avatars / exited sort
 
-Новый frontend-only слой:
-- поиск по участникам и командам использует те же детерминированные формы, что обычный hybrid search: нормализация, compact, кириллица↔латиница, human-read, один pseudo-read, подтверждённые aliases;
-- для записей, которые есть в обычном snapshot, дополнительно используются их готовые `searchKeys`;
-- admin-only записи (`Неактивен` и т.п.) всё равно ищутся локально по полным private полям;
+- поиск по участникам и командам использует deterministic hybrid forms + public `searchKeys` где они доступны;
+- admin-only записи ищутся локально по полным private fields;
 - контрольный alias `BbllllKA ↔ вышка` включён;
-- поиск не перерисовывает input и не блокирует IME;
-- аватар участника берётся по raw Telegram ID из обычного snapshot `avatarFileId` и загружается тем же `setupAvatarLoading()`/cache path; если фото нет — буквенная заглушка;
-- фильтр `Вышел` переставляет DOM только при реальной необходимости и сортирует по physical source row по возрастанию;
-- при выходе из фильтра `Вышел` восстанавливается исходный admin-list order;
-- DOM observer игнорирует простое перемещение уже существующих participant records, чтобы не создавать цикл rerender/sort.
+- фильтр `Вышел` сортирует по physical source row по возрастанию и восстанавливает исходный порядок после выхода из фильтра;
+- DOM reorder не должен создавать MutationObserver loop.
 
-**Статус:** GitHub `main` и cache-bust обновлены. Apps Script / Cloud Shell не нужны. Реальный Telegram smoke-test нового слоя ещё требуется.
+### v0.6 admin team navigation/media — repo ready 20.08.2026
+
+Новый ожидаемый UX:
+- админский список команд остаётся searchable/filterable;
+- у строки команды есть lazy thumbnail, который пытается загрузить защищённое фото независимо от отображаемого `Фото C`;
+- тап по самой команде не раскрывает A:L как основной UX, а открывает team-detail экран по шаблону обычного режима: большое фото, название/игра, количество участников/лидеров/помощников и состав;
+- данные team-detail берутся из private admin snapshot, поэтому `Неактивен` и вышедшие участники не теряются;
+- Back должен возвращать полный предыдущий admin DOM/search/filter/scroll state через RoyalNav capture marker;
+- large team photo и thumbnail используют один и тот же stable cache key `team:<normalized team>\n<normalized game>`;
+- member avatars используют тот же `royal-crm-media-cache` и primary key `avatar:<avatarFileId>`; `avatar:tg-<id>` разрешён только как fallback/migration bridge.
+
+**Статус:** GitHub `main` готов. Apps Script/Cloud Shell для этой правки не нужны. Telegram smoke-test и фактический Worker runtime после Cloudflare auto-deploy ещё требуется.
 
 ---
 
@@ -226,11 +235,16 @@ Admin read/write доступ разрешать только после сер�
 Frontend Worker origin: `https://royal-crm-miniapp-api.tropical-spoon.workers.dev`.
 
 Repo config на 20.08.2026:
-- `worker/wrangler.toml` → **`src/entry-v1230.js`**;
-- final admin-write gate требует private snapshot `write.4`, HMAC transport, photo capability и `renameCleanup=true`;
+- `worker/wrangler.toml` → **`src/entry-v1241.js`**;
+- `entry-v1241.js` version **1.24.1**;
+- final admin-write gate сохраняется из `entry-v1230.js` chain;
 - `/admin-data` — только для подтверждённого администратора;
 - `/admin-write` — authenticated admin mutation route;
-- existing `/contact-by-id`, `/snapshot`, media/auth routes не должны регрессировать.
+- `/admin-team-photo` — admin-only media route: fresh `/admin-data` authorization, team lookup in private admin snapshot, затем primary `media/teams/<sha256(name+game)>.bin`; `photoUrl` используется только как compatibility fallback;
+- route не должен требовать `photoUrl` до попытки SHA-256 media read;
+- existing `/contact-by-id`, `/snapshot`, public `/team-photo`, media/auth routes не должны регрессировать.
+
+**Runtime status:** `entry-v1241.js` и `wrangler.toml` закоммичены в `main`; Cloudflare Builds настроен на GitHub main. В этой сессии прямой health-check среды был недоступен из-за DNS ограничений инструмента, поэтому production runtime 1.24.1 считать **pending smoke**, пока Telegram/health не подтвердит.
 
 Не возвращать шумный `.github/workflows/worker-smoke.yml`. Runtime проверять напрямую и функционально.
 
@@ -282,16 +296,21 @@ Repo config на 20.08.2026:
 ## 11. Медиакэш
 
 ### Аватары
-- IndexedDB cache-first;
-- key = `avatarFileId`;
-- lazy loading;
-- network concurrency ≤ 2;
-- v0.6 admin participants должны использовать тот же avatar loader/cache, а не отдельную сеть/новый формат.
+- один IndexedDB: **`royal-crm-media-cache / images`**;
+- обычный и admin режим должны использовать одинаковый primary key **`avatar:<avatarFileId>`**;
+- `avatar:tg-<telegramId>` — только fallback для admin-only records/миграции; если позже появляется `avatarFileId`, blob мигрируется в primary key;
+- admin v2 ждёт public snapshot перед выбором primary key, чтобы не создавать сетевой miss из-за startup race;
+- durable `idbPut` должен завершиться до того, как network load считается успешно сохранённым;
+- lazy loading сохраняется.
 
 ### Фото команд
+- один IndexedDB: **`royal-crm-media-cache / images`**;
 - cache identity = нормализованное **имя команды + игра**;
-- временный Google `photoUrl` не использовать как identity;
-- safe disk warm хранит record/blob references, object URL создаётся только для открываемой команды;
+- key = `team:<normalized team>\n<normalized game>`;
+- thumbnail и большая team-detail фотография обязаны читать один и тот же record;
+- admin network fallback = authenticated `/admin-team-photo`, public normal flow остаётся `/team-photo`;
+- временный Google `photoUrl` не использовать как cache identity;
+- safe disk-first; network refresh team photo не чаще 30 минут;
 - сетевой массовый prewarm запрещён;
 - iOS не имеет права очищать рабочий `img.src` до готовности replacement;
 - не возвращать сломанный fast-path `stable-v0559.js 0.5.59.3`.
@@ -302,7 +321,8 @@ Repo config на 20.08.2026:
 
 Навигация:
 - forward → `scrollY=0`;
-- Back → сохранённая позиция предыдущего экрана.
+- Back → сохранённая позиция предыдущего экрана;
+- admin team-detail должен возвращать прежний admin list/search/filter state, а не просто заново открывать вкладку.
 
 `Помощь в разработке, тесты`:
 - `@sfinks_spb`
@@ -331,8 +351,11 @@ Repo config на 20.08.2026:
 - v0.6 admin write transport = Worker-signed HMAC, не прямой browser→Apps Script;
 - v0.6 delete operations остаются выключенными до отдельного решения;
 - v0.6 admin `Вышел`: порядок как физическая группа в `База участников`, недавно вышедшие сверху; не подменять это сортировкой AE;
-- v0.6 admin avatars используют существующий `avatarFileId`/avatar cache path;
-- v0.6 admin search не деградировать обратно до raw lowercase `.includes()` без hybrid forms/searchKeys.
+- v0.6 admin search не деградировать обратно до raw lowercase `.includes()` без hybrid forms/searchKeys;
+- v0.6 admin avatars используют один persistent cache с обычным режимом и primary `avatar:<avatarFileId>`;
+- v0.6 admin team thumbnail + detail используют тот же `team:<name+game>` IndexedDB key, без отдельного admin media cache;
+- тап по admin team должен вести на normal-style team detail с фото и составом, включая inactive team data из private snapshot;
+- `/admin-team-photo` не должен зависеть от наличия ephemeral `photoUrl` перед SHA-256 media lookup.
 
 ---
 
@@ -358,10 +381,12 @@ Repo config на 20.08.2026:
 8. Team photo upload отображается после refresh; rename переносит фото и очищает старый media-key.
 9. Устаревшая revision не перезаписывает более новое изменение.
 10. Удаление отсутствует/запрещено.
-11. Admin participant list показывает те же аватарки, что обычный participant list; записи без фото имеют fallback.
+11. Admin participant list показывает те же аватарки, что обычный participant list; на повторном входе ранее виденные авы читаются с `royal-crm-media-cache`, без новой сети.
 12. Admin search проверяется минимум по CRM имени, Telegram имени, `@username`, ID, команде, роли, игровому нику и aliases; контрольные `нас не догонят` и `вышка` должны находить соответствующие команды/участников.
 13. В фильтре `Вышел` порядок сравнить с физической `База участников`: самый свежий выход сверху, старые ниже.
 14. После `Вышел → Все` исходный порядок списка восстанавливается без зависаний/циклической перерисовки.
+15. Во вкладке admin `Команды`: thumbnail появляется для команды с существующим private media; тап по `Da budet swet`/другой команде открывает normal-style team detail с большой фотографией и составом; повторное открытие использует тот же `team:<name+game>` disk cache; Back возвращает прежний список/позицию.
+16. Проверить минимум одну `Неактивен`: team-detail должен открываться из private admin snapshot даже если команды нет в public snapshot.
 
 ---
 
