@@ -1,7 +1,7 @@
 /* Royal CRM Mini App — v0.6.0 version guard + final admin-write loader */
 (() => {
   const VERSION = '0.6.0';
-  const CACHE = '20260820-2024';
+  const CACHE = '20260820-2049';
 
   function apply() {
     const badge = document.getElementById('versionBadge');
