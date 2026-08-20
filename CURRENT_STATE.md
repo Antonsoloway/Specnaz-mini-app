@@ -26,9 +26,9 @@
 - bot: `@doveofpeace_bot`.
 
 Текущий preview delivery:
-- `version-v0600.js` cache-bust: **`20260820-2105`**;
-- `app-v0600.html` → `version-v0600.js?v=20260820-2105`;
-- `app.html` previewBuild: **`20260820-2105`**.
+- `version-v0600.js` cache-bust: **`20260820-2142`**;
+- `app-v0600.html` → `version-v0600.js?v=20260820-2142`;
+- `app.html` previewBuild: **`20260820-2142`**.
 
 ---
 
@@ -74,6 +74,7 @@ Public snapshot:
 - identity = **raw Telegram ID**;
 - существующий Telegram ID неизменяем;
 - 5 membership slots: игра / команда / роль / игровой ник;
+- private participant record: `row`, `telegramId`, `name`, `telegramName`, `username`, `memberships`, `status`, `specnaz`, `date`, `screens`, `activityBase`, `activityOutside`, `lastChange`, `chatState`, `revision`;
 - существующий участник v0.6 вручную: **только CRM `name` + memberships**;
 - Telegram name, `@username`, chat state, date, U/AB/AC/AD и остальные bot/system fields = **SERVER READ-ONLY**; попытка ручной записи → `PARTICIPANT_FIELD_READ_ONLY`.
 
@@ -111,13 +112,45 @@ Public snapshot:
 - `admin-participant-edit-policy-v0600.js`;
 - `admin-search-media-sort-v0600.js` = `0.6.0-admin-search-media-sort.2`;
 - `admin-media-cache-v0600-v2.js` = `0.6.0-admin-media-cache.2`;
-- **`admin-team-detail-v0600.js` = `0.6.0-admin-team-detail.3`**.
+- `admin-team-detail-v0600.js` = `0.6.0-admin-team-detail.3`;
+- **`admin-participant-detail-v0600.js` = `0.6.0-admin-participant-detail.1`**.
 
 ### Admin search / avatars
 - поиск по participants/teams должен сохранять deterministic hybrid behavior обычного режима;
 - ищет по CRM имени, Telegram имени, `@username`, ID, memberships, игровым никам, ролям, team leader/status/stat fields и доступным `searchKeys`;
 - `BbllllKA ↔ вышка` сохранён;
 - admin avatars используют один persistent cache с ordinary mode; primary key `avatar:<avatarFileId>`, `avatar:tg-<id>` только fallback/migration.
+
+### Admin participant list/detail — repo ready, smoke pending
+
+В списке участников:
+- raw Telegram ID **не показывается визуально**;
+- ID остаётся только скрытым техническим identity для search/avatar/editor;
+- под именем показывается `@username` при наличии и список всех текущих memberships/команд;
+- tap по карточке больше не раскрывает старый `<details>` с техническими полями — открывает отдельный normal-style participant detail.
+
+Admin participant detail:
+- источник = private `adminData.participants`, поэтому работает для `В чате`, `Вышел` и других admin-only записей;
+- шапка использует обычный participant visual language: persistent avatar, имя, username/contact, rank visual когда public participant/rank доступен;
+- показываются memberships с ролью, игровым ником и игрой;
+- команда в membership кликабельна → `RoyalAdminTeamDetailV0600.open(name, game)`;
+- полный admin block показывает row, CRM name, Telegram name, `@username`, raw Telegram ID, status T, date V, lastChange AE, chatState AF;
+- числовые карточки: `Спецназ U`, `Скрины AB`, `Активность в базе AC`, `Активность вне базы AD`;
+- кнопка **`✏️ Редактировать участника`** переиспользует существующий hardened editor; второго write-flow нет;
+- server whitelist не расширен: edit по-прежнему только `name + memberships`.
+
+Participant metric rankings:
+- U → `specnaz`;
+- AB → `screens`;
+- AC → `activityBase`;
+- AD → `activityOutside`;
+- источник = полный private `adminData.participants`;
+- сортировка numeric descending, нули остаются внизу, tie-break по display name/Telegram ID;
+- row показывает место, имя, chat/status, первые memberships и выбранное значение;
+- текущий участник подсвечивается;
+- tap по строке рейтинга → admin participant detail;
+- avatars намеренно не грузятся для всех 207 ranking rows, чтобы не делать media prewarm;
+- Back использует существующий `RoyalNav` capture.
 
 ### Admin team list/detail
 - список команд включает `Активен`, `На паузе`, `Неактивен` из private admin snapshot;
@@ -129,8 +162,8 @@ Public snapshot:
 
 ### Admin team metric rankings — repo ready, smoke pending
 
-В `admin-team-detail-v0600.js .3` шесть карточек статистики стали кликабельными:
-- `Игроков E` → ranking by `players`;
+В `admin-team-detail-v0600.js .3` шесть карточек статистики кликабельны:
+- `Игроков E` → `players`;
 - `Общий спецназ F` → `specnazTrips`;
 - `Скрины H` → `screens`;
 - `Активность в базе I` → `activityBase`;
@@ -138,16 +171,16 @@ Public snapshot:
 - `Среднее K` → `average`.
 
 Поведение рейтинга:
-- источник = **тот же private `adminData.teams`**, без нового backend/API;
+- источник = private `adminData.teams`, без нового backend/API;
 - входят все admin-команды, включая `Неактивен` и нулевые значения;
-- сортировка numeric descending, tie-break = team name/game;
-- отображаются место, команда, игра, статус и значение выбранной метрики;
-- команда, из которой открыт рейтинг, подсвечивается;
-- tap по строке рейтинга открывает admin team-detail этой команды;
-- ranking intentionally не грузит 128 thumbnails, чтобы не создавать массовый media/network prewarm;
-- Back должен возвращать предыдущий detail/list state через существующий `RoyalNav` capture.
+- numeric descending, tie-break = team name/game;
+- место, команда, игра, статус, значение;
+- исходная команда подсвечивается;
+- tap по строке → admin team-detail;
+- без 128 thumbnails/network prewarm;
+- Back → предыдущий detail/list state.
 
-**Статус:** GitHub `main` обновлён, Apps Script/Sheets не менялись, Cloud Shell не нужен. Нужен Telegram smoke: открыть MOLOT POKA → нажать каждую из E/F/H/I/J/K → проверить descending order, все команды, переход по строке и Back.
+**Статус frontend:** GitHub `main` обновлён; Apps Script/Sheets для participant-detail не менялись; Cloud Shell не нужен. Participant detail/rankings требуют Telegram smoke.
 
 ---
 
@@ -160,7 +193,7 @@ Public snapshot:
 - cache-first: memory/disk → network;
 - team photo background refresh не чаще ~30 мин;
 - без массового сетевого prewarm;
-- admin `/admin-team-photo` должен сначала искать private SHA-256 media по identity `name + game`, а `photoUrl` использовать только fallback;
+- admin `/admin-team-photo` сначала ищет private SHA-256 media по identity `name + game`, `photoUrl` только fallback;
 - пустой `Фото C` в admin UI не является доказательством отсутствия private media.
 
 ---
@@ -201,9 +234,11 @@ Repo config:
 6. Admin avatars/team photos повторно читаются из общего persistent cache.
 7. Admin search проверяется по имени/@/ID/role/nickname/team + `вышка`.
 8. `Вышел` сравнить с physical order таблицы.
-9. Admin team detail: фото, D:L, editor, состав, включая минимум одну `Неактивен`.
-10. **Нажать E/F/H/I/J/K и проверить каждый ranking: all teams, descending numeric order, нули внизу, tap team → detail, Back → ranking/detail state.**
-11. Проверить Android и iPhone/iPad Telegram WebView.
+9. Admin participant list: visible ID отсутствует, memberships видны; tap → participant detail, не accordion.
+10. Admin participant detail: все private поля, persistent avatar, memberships → team detail, editor; U/AB/AC/AD → rankings descending; tap row → participant; Back state.
+11. Admin team detail: фото, D:L, editor, состав, включая минимум одну `Неактивен`.
+12. Нажать E/F/H/I/J/K и проверить каждый team ranking: all teams, descending, нули внизу, tap team → detail, Back.
+13. Проверить Android и iPhone/iPad Telegram WebView.
 
 ---
 
@@ -224,6 +259,8 @@ Repo config:
 - delete off;
 - exited physical-row ordering;
 - admin hybrid search;
+- admin participant list without visible Telegram ID;
+- admin participant detail from private snapshot + U/AB/AC/AD rankings;
 - admin team detail from private snapshot including inactive;
 - admin team metric rankings E/F/H/I/J/K from full private team set.
 
