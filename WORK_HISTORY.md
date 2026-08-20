@@ -3,6 +3,46 @@
 > Краткий журнал фактически выполненных работ. Новые записи добавляются сверху.
 > Здесь фиксируются изменения, проверки, диагнозы и откаты, которые нужны следующему чату.
 
+## 2026-08-20 21:42 — v0.6 preview: normal-style admin participant detail + U/AB/AC/AD rankings
+
+**Запрос пользователя:** в admin `Участники` убрать видимый Telegram ID и вместо него показывать команды; тап по участнику должен открывать отдельную страницу как в обычном режиме, а не раскрывать технический `<details>`; на странице нужны все admin-данные, переходы в рейтинги по принципу team-detail и кнопка редактирования участника.
+
+**Фактическая сверка:**
+- private `28_MINIAPP_ADMIN_DATA.js` participant record содержит `row`, `telegramId`, `name`, `telegramName`, `username`, `memberships`, `status`, `specnaz`, `date`, `screens`, `activityBase`, `activityOutside`, `lastChange`, `chatState`, `revision`;
+- корректные numeric ranking fields участника = `U specnaz`, `AB screens`, `AC activityBase`, `AD activityOutside`;
+- ID нельзя просто удалить из DOM: `admin-search-media-sort-v0600.js` и `admin-write-v0600-v3.js` используют raw Telegram ID как identity;
+- существующий hardened editor уже умеет редактировать только `name + memberships` и должен быть переиспользован;
+- existing admin team detail экспортирует `RoyalAdminTeamDetailV0600.open(name, game)`, поэтому membership можно связать с полноценной страницей команды без нового team route.
+
+**Что добавлено:**
+- новый `admin-participant-detail-v0600.js` → **`0.6.0-admin-participant-detail.1`**;
+- admin participant list после private-data load показывает `@username` и memberships/команды вместо видимого ID;
+- raw Telegram ID сохраняется только в hidden technical span/data attribute, чтобы не ломать hybrid search, avatar identity и hardened editor;
+- tap по `[data-admin-participant] > summary` теперь перехватывается и открывает отдельный participant detail; native `<details>` больше не используется как основной просмотр;
+- detail использует ordinary participant visual language: persistent avatar, имя, username/contact и rank visual, когда public rank доступен;
+- memberships показывают team / role / nickname / game; team-button открывает `RoyalAdminTeamDetailV0600.open()`;
+- private admin block показывает row, CRM name, Telegram name, @username, Telegram ID, status T, date V, lastChange AE, chatState AF;
+- четыре numeric admin cards кликабельны: U/AB/AC/AD;
+- U/AB/AC/AD rankings строятся из полного private `adminData.participants`, numeric descending, нули не отбрасываются, tie-break = display name + Telegram ID;
+- ranking row показывает место, участника, состояние/status, первые memberships и выбранное значение; исходный участник подсвечивается;
+- tap ranking row → participant detail;
+- rankings намеренно не грузят 207 avatar thumbnails, чтобы не создавать media/network prewarm;
+- кнопка **`✏️ Редактировать участника`** вызывает существующий `admin-write-v0600-v3.js`; второго write-flow нет;
+- Back использует существующий `RoyalNav` capture для list/detail/ranking state.
+
+**Доставка preview:**
+- `version-v0600.js` cache-bust → **`20260820-2142`**;
+- loader order: admin media → search/list → team detail → participant detail;
+- `app-v0600.html` → `version-v0600.js?v=20260820-2142`;
+- `app.html` previewBuild → **`20260820-2142`**;
+- stable v0.5.59 не менялся.
+
+**Backend / Sheets:** Apps Script, Worker API и Google Sheets этой правкой не менялись. Server participant whitelist остаётся `name + memberships`; bot/system fields остаются read-only. Cloud Shell не нужен.
+
+**Статус:** GitHub `main` / frontend ready, Telegram smoke pending. Проверить: список без видимого ID и с командами; tap participant → отдельная страница; avatar/cache; все private fields; team links; U/AB/AC/AD rankings descending; tap ranking participant; Back; `Редактировать участника` открывает существующую форму.
+
+---
+
 ## 2026-08-20 21:05 — v0.6 preview: рейтинги команд по E/F/H/I/J/K
 
 **Запрос пользователя:** на admin team-detail каждая из шести карточек `Игроков`, `Общий спецназ`, `Скрины`, `Активность в базе`, `Активность вне базы`, `Среднее` должна открывать рейтинг всех команд от большего значения к меньшему.
