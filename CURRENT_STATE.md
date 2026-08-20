@@ -26,9 +26,9 @@
 - bot: `@doveofpeace_bot`.
 
 Текущий preview delivery:
-- `version-v0600.js` cache-bust: **`20260820-2142`**;
-- `app-v0600.html` → `version-v0600.js?v=20260820-2142`;
-- `app.html` previewBuild: **`20260820-2142`**.
+- `version-v0600.js` cache-bust: **`20260820-2220`**;
+- `app-v0600.html` → `version-v0600.js?v=20260820-2220`;
+- `app.html` previewBuild: **`20260820-2220`**.
 
 ---
 
@@ -113,7 +113,8 @@ Public snapshot:
 - `admin-search-media-sort-v0600.js` = `0.6.0-admin-search-media-sort.2`;
 - `admin-media-cache-v0600-v2.js` = `0.6.0-admin-media-cache.2`;
 - `admin-team-detail-v0600.js` = `0.6.0-admin-team-detail.3`;
-- **`admin-participant-detail-v0600.js` = `0.6.0-admin-participant-detail.1`**.
+- **`admin-participant-detail-v0600.js` = `0.6.0-admin-participant-detail.1`**;
+- **`admin-participant-nav-guard-v0600.js` = `0.6.0-admin-participant-nav-guard.1`**.
 
 ### Admin search / avatars
 - поиск по participants/teams должен сохранять deterministic hybrid behavior обычного режима;
@@ -127,7 +128,8 @@ Public snapshot:
 - raw Telegram ID **не показывается визуально**;
 - ID остаётся только скрытым техническим identity для search/avatar/editor;
 - под именем показывается `@username` при наличии и список всех текущих memberships/команд;
-- tap по карточке больше не раскрывает старый `<details>` с техническими полями — открывает отдельный normal-style participant detail.
+- tap по карточке больше не раскрывает старый `<details>` с техническими полями — открывает отдельный normal-style participant detail;
+- `admin-participant-nav-guard-v0600.js` отключает pointer-events у ordinary avatar subtree внутри admin summary, чтобы тап по аватару не успевал открыть public participant profile раньше admin detail; весь summary остаётся единым navigation target.
 
 Admin participant detail:
 - источник = private `adminData.participants`, поэтому работает для `В чате`, `Вышел` и других admin-only записей;
@@ -180,7 +182,7 @@ Participant metric rankings:
 - без 128 thumbnails/network prewarm;
 - Back → предыдущий detail/list state.
 
-**Статус frontend:** GitHub `main` обновлён; Apps Script/Sheets для participant-detail не менялись; Cloud Shell не нужен. Participant detail/rankings требуют Telegram smoke.
+**Статус frontend:** GitHub `main` фактически на preview delivery `20260820-2220`; после документационной записи `21:42` добавлен participant navigation guard. Apps Script/Sheets для этой guard-правки не менялись; Cloud Shell не нужен. Participant detail/rankings/nav guard требуют Telegram smoke.
 
 ---
 
@@ -234,7 +236,7 @@ Repo config:
 6. Admin avatars/team photos повторно читаются из общего persistent cache.
 7. Admin search проверяется по имени/@/ID/role/nickname/team + `вышка`.
 8. `Вышел` сравнить с physical order таблицы.
-9. Admin participant list: visible ID отсутствует, memberships видны; tap → participant detail, не accordion.
+9. Admin participant list: visible ID отсутствует, memberships видны; tap по summary и по аватару → именно admin participant detail, не accordion и не public profile.
 10. Admin participant detail: все private поля, persistent avatar, memberships → team detail, editor; U/AB/AC/AD → rankings descending; tap row → participant; Back state.
 11. Admin team detail: фото, D:L, editor, состав, включая минимум одну `Неактивен`.
 12. Нажать E/F/H/I/J/K и проверить каждый team ranking: all teams, descending, нули внизу, tap team → detail, Back.
@@ -260,6 +262,7 @@ Repo config:
 - exited physical-row ordering;
 - admin hybrid search;
 - admin participant list without visible Telegram ID;
+- admin participant summary/avatar navigation must resolve to admin participant detail before ordinary public-profile handlers;
 - admin participant detail from private snapshot + U/AB/AC/AD rankings;
 - admin team detail from private snapshot including inactive;
 - admin team metric rankings E/F/H/I/J/K from full private team set.
