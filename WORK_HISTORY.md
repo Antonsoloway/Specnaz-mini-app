@@ -3,6 +3,34 @@
 > Краткий журнал фактически выполненных работ. Новые записи добавляются сверху.
 > Здесь фиксируются изменения, проверки, диагнозы и откаты, которые нужны следующему чату.
 
+## 2026-08-20 22:24 — factual resync: preview build 2220 + participant nav guard
+
+**Задача:** новый чат восстановил состояние по `START_HERE.md`, `CURRENT_STATE.md`, последним `WORK_HISTORY.md` и сверил документацию с фактическим `main` и свежим public snapshot.
+
+**Найденное расхождение:**
+- `CURRENT_STATE.md` и запись `21:42` ещё указывали preview delivery `20260820-2142`;
+- после той записи в `main` вышли ещё 4 frontend-коммита: добавлен participant navigation guard и cache/build поднят до `20260820-2220`;
+- frontend, Apps Script и Google Sheets в этой сессии не менялись — исправляется только база состояния проекта.
+
+**Фактический `main`:**
+- `app.html` обычный запуск по-прежнему ведёт на `app-v0559.html`, preview `v0600` — на `app-v0600.html`;
+- `app.html` previewBuild = **`20260820-2220`**;
+- `app-v0600.html` подключает `version-v0600.js?v=20260820-2220`;
+- `version-v0600.js` имеет `CACHE = 20260820-2220` и после participant detail грузит `admin-participant-nav-guard-v0600.js`;
+- `admin-participant-nav-guard-v0600.js` = **`0.6.0-admin-participant-nav-guard.1`**: ordinary avatar subtree в admin participant summary не перехватывает tap, весь summary остаётся единым navigation target для admin participant detail;
+- stable `v0.5.59` не менялся.
+
+**Данные:**
+- свежий `royal-crm-data/snapshot.json`: `schemaVersion=1.4.2`, `searchIndexVersion=1.1.3`, `generatedAt=2026-08-20T19:23:34.890Z`, `dataHash=a762b56e1a507535817fab00cfd0a1f5855ab822bef0df4782a1a1e006ed71dd`.
+
+**Что обновлено:**
+- `CURRENT_STATE.md` синхронизирован с factual preview delivery `2220`, active nav guard и актуальным smoke-критерием;
+- `WORK_HISTORY.md` получает эту запись, чтобы следующий чат не откатился на `2142`.
+
+**Deployment / verification:** новых frontend/backend/data изменений в этой сессии нет; это documentation resync. Telegram smoke participant detail/nav guard всё ещё pending; production runtime не объявлять подтверждённым только из-за GitHub commits.
+
+---
+
 ## 2026-08-20 21:42 — v0.6 preview: normal-style admin participant detail + U/AB/AC/AD rankings
 
 **Запрос пользователя:** в admin `Участники` убрать видимый Telegram ID и вместо него показывать команды; тап по участнику должен открывать отдельную страницу как в обычном режиме, а не раскрывать технический `<details>`; на странице нужны все admin-данные, переходы в рейтинги по принципу team-detail и кнопка редактирования участника.
@@ -78,7 +106,7 @@
 - `app.html` previewBuild → **`20260820-2105`**;
 - stable v0.5.59 не менялся.
 
-**Backend / Sheets:** Apps Script, Worker API и Google Sheets не менялись. Новых write routes нет. Cloud Shell не нужен. Ни одна CRM-запись этой правкой не изменялась.
+**Backend / Sheets:** Apps Script, Worker API и Google Sheets не менялись. Новых write routes нет. Cloud Shell не нужен. Ни одна CRM-запись участника/команды этой правкой не изменялась.
 
 **Статус:** repo/frontend ready, Telegram smoke pending. Проверить на реальной команде: нажать все 6 карточек E/F/H/I/J/K; убедиться, что рейтинг идёт сверху вниз по значению, присутствуют все команды включая нули/неактивные, tap по команде открывает detail, Back возвращает рейтинг/исходную страницу.
 
