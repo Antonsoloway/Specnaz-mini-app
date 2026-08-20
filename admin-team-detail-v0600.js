@@ -1,10 +1,11 @@
 /* Royal CRM Mini App — v0.6 admin team detail
- * Tap an admin team -> the SAME visual team page as normal mode:
- * photo, title/game, participant/leader/helper counters and member cards.
- * Data comes from protected private admin snapshot so inactive teams work too.
+ * Admin team page keeps the normal team-detail visual language, but reads the
+ * protected private admin snapshot so paused/inactive teams work too.
+ * It additionally shows every team counter from Команды D:L and exposes the
+ * existing hardened team editor (name / leader / photo; computed E:L read-only).
  */
 (() => {
-  const VERSION = '0.6.0-admin-team-detail.1';
+  const VERSION = '0.6.0-admin-team-detail.2';
   let payload = null;
   let loading = null;
 
@@ -38,6 +39,10 @@
     if (value === 'Помощник') return 1;
     if (value === 'Игрок') return 2;
     return 3;
+  }
+  function show(value) {
+    if (value === 0 || value === '0') return '0';
+    return clean(value) || '—';
   }
 
   async function adminData(force=false) {
@@ -105,8 +110,6 @@
   function captureAdminForBack() {
     const panel = document.getElementById('panel');
     if (!panel) return;
-    // RoyalNav classifies rich internal pages by descendants. Add a temporary
-    // hidden marker so the complete admin DOM/search/filter state is captured.
     const marker = document.createElement('i');
     marker.className = 'participant-detail-card';
     marker.hidden = true;
@@ -114,6 +117,54 @@
     panel.appendChild(marker);
     try { window.RoyalNav?.pushCurrent?.(); } catch (_) {}
     marker.remove();
+  }
+
+  function counter(label, value, extra='') {
+    return `<div class="royal-admin-team-counter"><strong>${html(show(value))}</strong><span>${html(label)}</span>${extra ? `<small>${html(extra)}</small>` : ''}</div>`;
+  }
+
+  function adminStats(team) {
+    return `
+      <section class="royal-admin-team-data">
+        <div class="royal-admin-team-data-head">
+          <div><span>🔒 Данные админской таблицы</span><small>Лист «Команды», поля D:L</small></div>
+          <span class="royal-admin-team-status">${html(show(team?.status))}</span>
+        </div>
+        <div class="royal-admin-team-counters">
+          ${counter('Игроков E', team?.players)}
+          ${counter('Общий спецназ F', team?.specnazTrips)}
+          ${counter('Скрины H', team?.screens)}
+          ${counter('Активность в базе I', team?.activityBase)}
+          ${counter('Активность вне базы J', team?.activityOutside)}
+          ${counter('Среднее K', team?.average)}
+        </div>
+        <div class="royal-admin-team-meta">
+          <div><span>Лидер / подпись D</span><strong>${html(show(team?.leader))}</strong></div>
+          <div><span>Сортировка G</span><strong>${html(show(team?.sort))}</strong></div>
+          <div><span>Статус L</span><strong>${html(show(team?.status))}</strong></div>
+          <div><span>Строка таблицы</span><strong>${html(show(team?.row))}</strong></div>
+        </div>
+      </section>`;
+  }
+
+  function installCss() {
+    if (document.querySelector('style[data-admin-team-detail-v0600="2"]')) return;
+    const style = document.createElement('style');
+    style.dataset.adminTeamDetailV0600 = '2';
+    style.textContent = `
+      .royal-admin-team-detail-shell{display:block}
+      .royal-admin-team-edit{width:100%;margin:18px 0 10px;border:1px solid #a34855;border-radius:18px;padding:15px 18px;background:linear-gradient(135deg,#5a202b,#7a2c3a);color:#fff;font:800 17px/1.1 inherit;box-shadow:0 10px 30px rgba(77,19,30,.18)}
+      .royal-admin-team-data{margin:18px 0 20px;padding:16px;border:1px solid #274657;border-radius:20px;background:#0f202b}
+      .royal-admin-team-data-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+      .royal-admin-team-data-head>div{display:flex;flex-direction:column;gap:3px}.royal-admin-team-data-head span{font-weight:800}.royal-admin-team-data-head small{color:#8fa3b1}
+      .royal-admin-team-status{padding:7px 10px;border-radius:999px;background:#1c3546;color:#d7e7f2;font-size:12px;white-space:nowrap}
+      .royal-admin-team-counters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+      .royal-admin-team-counter{min-width:0;padding:13px 10px;border-radius:15px;background:#0b1821;border:1px solid #203b4c;text-align:center}
+      .royal-admin-team-counter strong{display:block;font-size:25px;line-height:1;color:#fff}.royal-admin-team-counter span{display:block;margin-top:6px;color:#a9bbc7;font-size:12px;line-height:1.2}
+      .royal-admin-team-meta{display:grid;gap:8px;margin-top:12px}.royal-admin-team-meta>div{display:flex;justify-content:space-between;gap:12px;padding:10px 2px;border-bottom:1px solid rgba(113,147,167,.14)}
+      .royal-admin-team-meta>div:last-child{border-bottom:0}.royal-admin-team-meta span{color:#8fa3b1}.royal-admin-team-meta strong{text-align:right;color:#e9f1f6;overflow-wrap:anywhere}
+    `;
+    document.head.appendChild(style);
   }
 
   async function openTeam(name, teamGame) {
@@ -141,14 +192,19 @@
 
       panel.innerHTML = `
         <button type="button" class="royal-back-button" data-royal-back="1">← Назад</button>
-        <div class="team-photo-box photo-error">
-          <img class="team-photo" alt="${html(team.name)}" data-admin-media-kind="team" data-team-name="${html(team.name)}" data-team-game="${html(team.game)}">
-          <div class="team-photo-fallback">🏰</div>
-        </div>
-        <div class="team-detail-head"><h2>${html(team.name)}</h2><div class="muted">${html(team.game)}</div></div>
-        <div class="team-stats"><span><b>${members.length}</b><small>участников</small></span><span><b>${leaders}</b><small>лидеров</small></span><span><b>${assistants}</b><small>помощников</small></span></div>
-        <h3 class="subheading">Состав команды</h3>
-        <div class="team-members-list">${members.length ? members.map(p => memberCard(p, team.name, team.game)).join('') : '<div class="empty-state">Участники не найдены</div>'}</div>`;
+        <section class="royal-admin-team-detail-shell" data-admin-team="1" data-admin-team-name="${html(team.name)}" data-admin-team-full-game="${html(team.game)}">
+          <div class="royal-admin-summary-main" hidden><strong>${html(team.name)}</strong><small>${html(team.game)}</small></div>
+          <div class="team-photo-box photo-error">
+            <img class="team-photo" alt="${html(team.name)}" data-admin-media-kind="team" data-team-name="${html(team.name)}" data-team-game="${html(team.game)}">
+            <div class="team-photo-fallback">🏰</div>
+          </div>
+          <div class="team-detail-head"><h2>${html(team.name)}</h2><div class="muted">${html(team.game)}</div></div>
+          <div class="team-stats"><span><b>${members.length}</b><small>участников</small></span><span><b>${leaders}</b><small>лидеров</small></span><span><b>${assistants}</b><small>помощников</small></span></div>
+          ${adminStats(team)}
+          <button type="button" class="royal-admin-team-edit" data-admin-edit-team="1">✏️ Редактировать команду</button>
+          <h3 class="subheading">Состав команды</h3>
+          <div class="team-members-list">${members.length ? members.map(p => memberCard(p, team.name, team.game)).join('') : '<div class="empty-state">Участники не найдены</div>'}</div>
+        </section>`;
 
       const photo = panel.querySelector('.team-photo');
       const box = photo?.closest?.('.team-photo-box');
@@ -180,5 +236,6 @@
     openTeam(identity.name, identity.game);
   }, true);
 
+  installCss();
   window.RoyalAdminTeamDetailV0600 = { version:VERSION, open:openTeam, clear:() => { payload = null; } };
 })();
