@@ -6,9 +6,7 @@
  * IMPORTANT: no writes. This module only decorates/filter/sorts rendered admin DOM.
  */
 (() => {
-  const VERSION = '0.6.0-admin-search-media-sort.1';
-  const GAME_RM = 'rm';
-  const GAME_RK = 'rk';
+  const VERSION = '0.6.0-admin-search-media-sort.2';
   let scheduled = 0;
   let decorating = false;
   let publicParticipantSource = null;
@@ -299,7 +297,12 @@
       }
       return Number(a.dataset.adminOriginalOrder || 0) - Number(b.dataset.adminOriginalOrder || 0);
     });
-    ordered.forEach(record => list.appendChild(record));
+    const current = [...list.querySelectorAll(':scope > [data-admin-participant="1"]')];
+    const changed = ordered.length === current.length && ordered.some((record, index) => current[index] !== record);
+    if (!changed) return;
+    const fragment = document.createDocumentFragment();
+    ordered.forEach(record => fragment.appendChild(record));
+    list.appendChild(fragment);
   }
 
   function applyParticipantFilters() {
@@ -396,15 +399,20 @@
     .royal-admin-participant-avatar{flex:0 0 46px;width:46px!important;height:46px!important;margin:0!important;border-radius:50%;overflow:hidden}
     .royal-admin-participant-avatar>span{font-size:16px}
     .royal-admin-participant-avatar .person-avatar{width:100%!important;height:100%!important;object-fit:cover;border-radius:50%}
-    .royal-admin-record summary .royal-admin-participant-avatar+ .royal-admin-summary-main{min-width:0}
+    .royal-admin-record summary .royal-admin-participant-avatar+.royal-admin-summary-main{min-width:0}
   `;
   document.head.appendChild(style);
 
   const observer = new MutationObserver(records => {
     if (decorating) return;
-    if (records.some(record => [...record.addedNodes].some(node => node instanceof Element && (node.matches?.('.royal-admin-screen,.royal-admin-record') || node.querySelector?.('.royal-admin-screen,.royal-admin-record'))))) {
-      scheduleDecorate();
-    }
+    const needsDecoration = records.some(record => [...record.addedNodes].some(node => {
+      if (!(node instanceof Element)) return false;
+      // A moved .royal-admin-record is deliberately ignored. Re-rendering the
+      // admin screen/tab adds a screen/container that CONTAINS records.
+      if (node.matches?.('.royal-admin-screen')) return true;
+      return !!node.querySelector?.('.royal-admin-screen,.royal-admin-record');
+    }));
+    if (needsDecoration) scheduleDecorate();
   });
   observer.observe(document.body, { childList:true, subtree:true });
 
