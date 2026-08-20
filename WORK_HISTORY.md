@@ -3,6 +3,41 @@
 > Краткий журнал фактически выполненных работ. Новые записи добавляются сверху.
 > Здесь фиксируются изменения, проверки, диагнозы и откаты, которые нужны следующему чату.
 
+## 2026-08-20 23:28 — v0.6 admin team roster: ordinary participant route blocked at pointer + click level
+
+**Запрос / подтверждённый симптом:** пользователь показал, что внутри admin team detail в блоке `Состав команды` тап по участнику всё ещё открывает обычный/public participant profile с экраном `ДОСТИЖЕНИЯ`, хотя в admin mode должен открываться private admin participant detail с admin-данными и редактором. После первой попытки с click-guard пользователь прислал видео `1000238605.mp4`, где регресс сохранился.
+
+**Почему первая попытка build 2312 была недостаточной:**
+- `admin-navigation-guard-v0600.js .2` перехватывал click на `window` capture и казался достаточным для whole-card route;
+- фактический legacy ordinary код имеет **два независимых маршрута**:
+  - `participant-profile-v0523.js` слушает `pointerdown/pointerup` на avatar selector и напрямую вызывает lexical `renderByTelegramId()`, то есть вообще не ждёт обычный click;
+  - `participant-card-ux-v0531.js` декорирует `.team-member` как `data-profile-card=1` и на document capture открывает ordinary profile по click всей строки;
+- поэтому защита только click-level не гарантировала admin route при тапе на avatar и не описывала весь реальный конфликт.
+
+**Что исправлено в repo:**
+- `admin-navigation-guard-v0600.js` → **`0.6.0-admin-navigation-guard.3`**;
+- для `.royal-admin-team-detail-shell .team-member[data-telegram-id]` добавлен `window` capture на `pointerdown` до legacy document handler;
+- admin guard сохраняет raw Telegram ID + pointer identity/координаты, не мешает скроллу и отсекает drag/long gesture;
+- `pointerup` того же roster member перехватывается до ordinary avatar router и открывает `RoyalAdminParticipantDetailV0600.open(rawTelegramId)`;
+- click whole-row остаётся отдельным fallback и также маршрутизируется в admin participant detail;
+- добавлен anti-double-route window на 450 мс, чтобы pointerup + возможный subsequent click не пушили два одинаковых navigation state;
+- `@username` / `[data-user-menu]`, button/link/input controls остаются independent actions и не переводятся в participant detail;
+- дополнительно защищён глобальный `RoyalOpenParticipantByTelegramId`: если на экране видим admin context, ordinary opener не должен открыть public participant detail;
+- shared stable modules `participant-profile-v0523.js` и `participant-card-ux-v0531.js` **не менялись**; stable v0.5.59 не затронут.
+
+**Доставка / кэш:**
+- `version-v0600.js` cache-bust → **`20260820-2328`**;
+- `app-v0600.html` → `version-v0600.js?v=20260820-2328`;
+- `app.html` previewBuild → **`20260820-2328`**;
+- добавлен временный cache-forced preview alias `startapp=v0600-2328`, чтобы Telegram не мог переиспользовать прежний `v0600` entry/cache во время проверки текущего фикса;
+- обычный `startapp` по-прежнему ведёт на v0.5.59; `startapp=v0600` остаётся v0.6 preview.
+
+**Backend / data:** Apps Script, Worker, Google Sheets, snapshots и write whitelist не менялись. Cloud Shell не нужен.
+
+**Verification:** после commit повторно прочитан `admin-navigation-guard-v0600.js` из `main`: версия `.3`, pointerdown/pointerup capture и ordinary opener fallback присутствуют; `version-v0600.js` подтверждён с `CACHE=20260820-2328`. **Реальный Telegram WebView smoke build 2328 ещё pending**: `Команды → admin team detail → Состав команды`; тап по avatar/name/free row area должен открыть admin participant detail, а tap `@username` — contact action. Не объявлять runtime подтверждённым до этого smoke.
+
+---
+
 ## 2026-08-20 22:47 — v0.6 admin participants: ordinary-style membership pills
 
 **Запрос пользователя:** в admin mode на странице `Участники` команды у каждого участника должны выглядеть так же, как на обычной странице участников: отдельные цветные плашки с названием команды, ролью и игрой, а не одной строкой текста.
@@ -157,7 +192,7 @@
 
 **Что изменено в frontend `main`:**
 - `admin-team-detail-v0600.js` → **`0.6.0-admin-team-detail.2`**;
-- normal-style верх страницы сохранён: большое фото, название/игра, `участников / лидеров / помощников`, затем состав;
+- normal-style верх страницы сохранён: большое фото, название/игру, `участников / лидеров / помощников`, затем состав;
 - добавлен защищённый блок `Данные админской таблицы` с полями:
   - `Лидер / подпись D`;
   - `Игроков E`;
