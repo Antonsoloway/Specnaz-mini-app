@@ -1,20 +1,31 @@
 /* Royal CRM Mini App — v0.6.0 version guard + final admin-write loader */
 (() => {
   const VERSION = '0.6.0';
-  const CACHE = '20260820-1238';
+  const CACHE = '20260820-1712';
 
   function apply() {
     const badge = document.getElementById('versionBadge');
     if (badge && badge.textContent !== `v${VERSION} ›`) badge.textContent = `v${VERSION} ›`;
   }
 
+  function loadParticipantPolicy() {
+    if (window.RoyalAdminParticipantEditPolicyV0600 || document.querySelector('script[data-admin-participant-policy-v0600="1"]')) return;
+    const policy = document.createElement('script');
+    policy.src = `admin-participant-edit-policy-v0600.js?v=${CACHE}`;
+    policy.async = false;
+    policy.dataset.adminParticipantPolicyV0600 = '1';
+    document.body.appendChild(policy);
+  }
+
   function loadPhotoModule() {
-    if (window.RoyalAdminTeamPhotoV0600 || document.querySelector('script[data-admin-team-photo-v0600="1"]')) return;
-    const photo = document.createElement('script');
-    photo.src = `admin-team-photo-v0600.js?v=${CACHE}`;
-    photo.async = false;
-    photo.dataset.adminTeamPhotoV0600 = '1';
-    document.body.appendChild(photo);
+    if (!window.RoyalAdminTeamPhotoV0600 && !document.querySelector('script[data-admin-team-photo-v0600="1"]')) {
+      const photo = document.createElement('script');
+      photo.src = `admin-team-photo-v0600.js?v=${CACHE}`;
+      photo.async = false;
+      photo.dataset.adminTeamPhotoV0600 = '1';
+      document.body.appendChild(photo);
+    }
+    loadParticipantPolicy();
   }
 
   function loadAdminWriteCore() {
@@ -22,7 +33,10 @@
       loadPhotoModule();
       return;
     }
-    if (document.querySelector('script[data-admin-write-v0600-v3="1"]')) return;
+    if (document.querySelector('script[data-admin-write-v0600-v3="1"]')) {
+      loadParticipantPolicy();
+      return;
+    }
     const script = document.createElement('script');
     script.src = `admin-write-v0600-v3.js?v=${CACHE}`;
     script.async = false;
