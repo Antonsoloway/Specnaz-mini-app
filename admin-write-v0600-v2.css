@@ -1,0 +1,12 @@
+/* Royal CRM Mini App — Admin Write v0.6.0-write.2 additions */
+.royal-admin-write-section-title{margin:6px 0 0;font-size:13px;font-weight:900;color:#b9d7e8}
+.royal-admin-journal-summary{display:grid;gap:5px}
+.royal-admin-journal-summary strong{color:#eef8ff;font-size:15px}
+.royal-admin-journal-summary small{color:#8ea4b2;line-height:1.4}
+.royal-admin-journal-chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px}
+.royal-admin-journal-chip{padding:5px 8px;border:1px solid #304957;border-radius:999px;background:#132530;color:#b9d5e5;font-size:11px;font-weight:800}
+.royal-admin-journal-json{margin-top:8px;border:1px solid #293f4d;border-radius:12px;background:#0d1820;overflow:hidden}
+.royal-admin-journal-json>summary{padding:10px 12px;cursor:pointer;color:#9db3c0;font-size:12px;font-weight:800;list-style:none}
+.royal-admin-journal-json>summary::-webkit-details-marker{display:none}
+.royal-admin-journal-json pre{margin:0;padding:10px 12px;border-top:1px solid #293f4d;white-space:pre-wrap;overflow-wrap:anywhere;color:#aec2ce;font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.royal-admin-edit-stale{padding:10px 12px;border:1px solid rgba(255,186,73,.35);border-radius:12px;background:rgba(95,66,19,.23);color:#f2d69b;font-size:12px;line-height:1.45}

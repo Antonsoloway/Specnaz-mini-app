@@ -1,5 +1,5 @@
 name = "royal-crm-miniapp-api"
-main = "src/entry-v1200.js"
+main = "src/entry-v1230.js"
 compatibility_date = "2026-08-15"
 
 [vars]
@@ -21,4 +21,10 @@ invocation_logs = true
 # BOT_TOKEN
 # GITHUB_TOKEN
 # SESSION_SECRET
+# BOT_TOKEN is also used server-side as the HMAC key for Worker -> Apps Script
+# admin-write requests and short-lived Google Sheets CellImage source URLs.
+# It is never exposed to the browser or GitHub.
+#
+# entry-v1230 keeps canEdit=false until admin-snapshot proves final write.4,
+# HMAC transport, team-photo upload capability, and renameCleanup=true.
 # Cloudflare Builds source: GitHub main, root path /worker.

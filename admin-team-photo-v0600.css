@@ -1,0 +1,16 @@
+/* Royal CRM Mini App — admin team photo picker v0.6 */
+.royal-admin-photo-box{grid-column:1/-1;display:grid;gap:10px;padding:12px;border:1px solid #2b4656;border-radius:14px;background:#0e1c25}
+.royal-admin-photo-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.royal-admin-photo-head strong{font-size:13px;color:#dcecf5}
+.royal-admin-photo-head small{font-size:11px;color:#7f9aaa}
+.royal-admin-photo-picker{display:flex;align-items:center;gap:12px;min-height:72px}
+.royal-admin-photo-preview{width:72px;height:72px;flex:0 0 72px;border:1px solid #355366;border-radius:14px;background:#122632;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#7692a3;font-size:28px}
+.royal-admin-photo-preview img{display:block;width:100%;height:100%;object-fit:cover}
+.royal-admin-photo-controls{display:grid;gap:7px;min-width:0;flex:1}
+.royal-admin-photo-button{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:8px 12px;border:1px solid #45687b;border-radius:11px;background:#18303e;color:#d9edf8;font-weight:800;font-size:12px;cursor:pointer}
+.royal-admin-photo-button input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.royal-admin-photo-status{font-size:11px;line-height:1.4;color:#8ea7b6;overflow-wrap:anywhere}
+.royal-admin-photo-status.is-ok{color:#8ed6ae}
+.royal-admin-photo-status.is-error{color:#ff9a9a}
+.royal-admin-photo-status.is-working{color:#f0cf87}
+.royal-admin-photo-note{font-size:11px;line-height:1.45;color:#819aa9}
