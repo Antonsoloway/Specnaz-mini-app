@@ -1,45 +1,45 @@
 /* Royal CRM Mini App — v0.6.0 version guard + final admin-write loader */
 (() => {
   const VERSION = '0.6.0';
-  const CACHE = '20260820-1955';
+  const CACHE = '20260820-2004';
 
   function apply() {
     const badge = document.getElementById('versionBadge');
     if (badge && badge.textContent !== `v${VERSION} ›`) badge.textContent = `v${VERSION} ›`;
   }
 
-  function loadAdminAvatarRefresh() {
-    if (window.RoyalAdminAvatarRefreshV0600 || document.querySelector('script[data-admin-avatar-refresh-v0600="1"]')) return;
-    const script = document.createElement('script');
-    script.src = `admin-avatar-refresh-v0600.js?v=${CACHE}`;
-    script.async = false;
-    script.dataset.adminAvatarRefreshV0600 = '1';
-    document.body.appendChild(script);
-  }
-
   function loadAdminEnhancements() {
-    if (window.RoyalAdminSearchMediaSortV0600 || document.querySelector('script[data-admin-search-media-sort-v0600="1"]')) {
-      loadAdminAvatarRefresh();
-      return;
-    }
+    if (window.RoyalAdminSearchMediaSortV0600 || document.querySelector('script[data-admin-search-media-sort-v0600="1"]')) return;
     const script = document.createElement('script');
     script.src = `admin-search-media-sort-v0600.js?v=${CACHE}`;
     script.async = false;
     script.dataset.adminSearchMediaSortV0600 = '1';
-    script.addEventListener('load', loadAdminAvatarRefresh, { once:true });
     document.body.appendChild(script);
+  }
+
+  function loadAdminPersistentMedia() {
+    if (window.RoyalAdminPersistentMediaV0600 || document.querySelector('script[data-admin-persistent-media-v0600="1"]')) {
+      loadAdminEnhancements();
+      return;
+    }
+    const media = document.createElement('script');
+    media.src = `admin-media-cache-v0600.js?v=${CACHE}`;
+    media.async = false;
+    media.dataset.adminPersistentMediaV0600 = '1';
+    media.addEventListener('load', loadAdminEnhancements, { once:true });
+    document.body.appendChild(media);
   }
 
   function loadParticipantPolicy() {
     if (window.RoyalAdminParticipantEditPolicyV0600 || document.querySelector('script[data-admin-participant-policy-v0600="1"]')) {
-      loadAdminEnhancements();
+      loadAdminPersistentMedia();
       return;
     }
     const policy = document.createElement('script');
     policy.src = `admin-participant-edit-policy-v0600.js?v=${CACHE}`;
     policy.async = false;
     policy.dataset.adminParticipantPolicyV0600 = '1';
-    policy.addEventListener('load', loadAdminEnhancements, { once:true });
+    policy.addEventListener('load', loadAdminPersistentMedia, { once:true });
     document.body.appendChild(policy);
   }
 
@@ -92,7 +92,7 @@
   const badge = document.getElementById('versionBadge');
   if (badge && 'MutationObserver' in window) {
     const observer = new MutationObserver(apply);
-    observer.observe(badge, { childList: true, characterData: true, subtree: true });
+    observer.observe(badge, { childList:true, characterData:true, subtree:true });
   }
   window.__ROYAL_UI_VERSION__ = VERSION;
   loadFinalGate();
