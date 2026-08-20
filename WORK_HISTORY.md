@@ -3,6 +3,43 @@
 > Краткий журнал фактически выполненных работ. Новые записи добавляются сверху.
 > Здесь фиксируются изменения, проверки, диагнозы и откаты, которые нужны следующему чату.
 
+## 2026-08-20 18:51 — v0.6 preview: existing participant editor ограничен именем + membership
+
+**Уточнение пользователя после открытия v0.6 editor в Telegram:** поля `Имя Telegram`, `@username`, дата V, походы спецназа U, скрины AB, активность AC/AD, состояние чата и Telegram ID заполняются ботом/системой и администратор не должен менять их вручную. Из верхней части карточки участника вручную меняется только CRM `Имя`; ниже остаются пять слотов `команда / роль / игровой ник`.
+
+**Проблема в первой реализации v0.6:** `admin-write-v0600-v3.js` показывал и собирал вместе с разрешёнными полями также Telegram/profile/counter/system поля. Простое скрытие интерфейса было бы недостаточно, потому что запрос можно сформировать вручную.
+
+**Исправлено в frontend `main`:**
+- добавлен `admin-participant-edit-policy-v0600.js` (`0.6.0-participant-policy.1`);
+- для `data-write-mode="update"` скрываются/блокируются `telegramId`, `chatState`, `telegramName`, `username`, `date`, `specnaz`, `screens`, `activityBase`, `activityOutside`;
+- остаются доступными `name` и блок пяти membership slots;
+- `version-v0600.js` загружает policy module;
+- cache-bust v0.6 поднят до `20260820-1712`;
+- `app-v0600.html` подключает `version-v0600.js?v=20260820-1712`.
+
+**Исправлено на сервере:**
+- live `apps-script-live/31_MINIAPP_ADMIN_WRITE_HARDENED.js` получил whitelist `allowedManualFields = { name, memberships }` для `updateParticipant`;
+- любая попытка передать другое поле существующего участника возвращает `PARTICIPANT_FIELD_READ_ONLY` до записи в Sheets;
+- Telegram/system/counter поля считаются server read-only;
+- UI-блокировка является только удобством; источником безопасности является server whitelist.
+
+**Установка через Cloud Shell подтверждена пользователем:**
+- Apps Script source pushed;
+- factual live mirror синхронизирован обратно в `apps-script-live/`;
+- финал установщика: **`V0.6 PARTICIPANT EDIT POLICY READY`**;
+- `Existing participant manual fields: NAME + MEMBERSHIPS`;
+- `Bot/system fields: SERVER-READ-ONLY`;
+- стабильный deployment **`Таблица ЧП 1.3`** сохранён;
+- установщик не изменил ни одной participant/team записи.
+
+**Фактическая сверка после установки:** в `main/apps-script-live/31_MINIAPP_ADMIN_WRITE_HARDENED.js` присутствует `PARTICIPANT_BOT_FIELDS_READ_ONLY_V0600` и server whitelist. Private `admin-snapshot.json` продолжает публиковаться как `adminData.version = 0.6.0-write.4` с optimistic revisions.
+
+**Инвариант:** для существующего участника v0.6 админ вручную изменяет только CRM `Имя` и membership slots. Telegram ID, Telegram name/username, chat state, date и U/AB/AC/AD — bot/system owned и должны быть запрещены сервером, а не только скрыты UI.
+
+**Статус smoke-test:** пользователь открыл v0.6 preview и редактор участника. Финальное тестовое сохранение разрешённого изменения после установки policy ещё предстоит; обычный запуск пользователей остаётся на v0.5.59.
+
+---
+
 ## 2026-08-19 21:52 — v0.5.59: каскадное переименование команд и восстановлена публичная синхронизация
 
 **Симптом:** админ изменил название команды `BUNTARb` на `⚡️ BUNTARb` на листе `Команды`, но изменение не появилось в Mini App и публичной таблице.
