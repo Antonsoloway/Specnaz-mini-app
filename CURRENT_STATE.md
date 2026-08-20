@@ -148,10 +148,10 @@
 - `admin-participant-edit-policy-v0600.js` — UI policy существующего участника;
 - `admin-search-media-sort-v0600.js` (`0.6.0-admin-search-media-sort.2`) — admin hybrid search + exited ordering;
 - **`admin-media-cache-v0600-v2.js` (`0.6.0-admin-media-cache.2`)** — единый persistent media layer для admin avatars + team photos;
-- **`admin-team-detail-v0600.js` (`0.6.0-admin-team-detail.1`)** — тап по команде открывает обычноподобную страницу команды с фото и составом из private admin snapshot;
-- `version-v0600.js` cache-bust: **`20260820-2024`**;
-- `app-v0600.html` подключает `version-v0600.js?v=20260820-2024`;
-- `app.html` previewBuild: **`20260820-2024`**.
+- **`admin-team-detail-v0600.js` (`0.6.0-admin-team-detail.2`)** — тап по команде открывает обычноподобную страницу команды с фото/составом, полным admin D:L блоком и кнопкой существующего hardened editor;
+- `version-v0600.js` cache-bust: **`20260820-2049`**;
+- `app-v0600.html` подключает `version-v0600.js?v=20260820-2049`;
+- `app.html` previewBuild: **`20260820-2049`**.
 
 Пользователь фактически открыл v0.6 в Telegram и подтвердил updated existing-participant editor; admin avatars ранее появились. Полный write smoke ещё не считать завершённым, пока пользователь не сохранит разрешённое тестовое изменение и не подтвердит результат.
 
@@ -169,12 +169,15 @@
 - админский список команд остаётся searchable/filterable;
 - у строки команды есть lazy thumbnail, который пытается загрузить защищённое фото независимо от отображаемого `Фото C`;
 - тап по самой команде не раскрывает A:L как основной UX, а открывает team-detail экран по шаблону обычного режима: большое фото, название/игра, количество участников/лидеров/помощников и состав;
+- detail дополнительно показывает полный private team data: `Лидер D`, `Игроков E`, `Походы спецназа F`, `Сортировка G`, `Скрины H`, `Сумма в базе I`, `Сумма вне базы J`, `Среднее K`, `Статус L` и source row;
+- на detail есть `✏️ Редактировать команду`, который использует уже существующий `admin-write-v0600-v3.js`, optimistic revision и `admin-team-photo-v0600.js`; отдельный write route не создаётся;
+- текущий hardened updateTeam разрешает `name + leader`, а photo добавляется photo-модулем; E:L остаются server/read-only в этом этапе; `Статус L` пока только просмотр;
 - данные team-detail берутся из private admin snapshot, поэтому `Неактивен` и вышедшие участники не теряются;
 - Back должен возвращать полный предыдущий admin DOM/search/filter/scroll state через RoyalNav capture marker;
 - large team photo и thumbnail используют один и тот же stable cache key `team:<normalized team>\n<normalized game>`;
 - member avatars используют тот же `royal-crm-media-cache` и primary key `avatar:<avatarFileId>`; `avatar:tg-<id>` разрешён только как fallback/migration bridge.
 
-**Статус:** GitHub `main` готов. Apps Script/Cloud Shell для этой правки не нужны. Telegram smoke-test и фактический Worker runtime после Cloudflare auto-deploy ещё требуется.
+**Статус:** GitHub `main` готов. Apps Script/Cloud Shell для этой UI-правки не нужны. Telegram smoke-test нового detail `.2` ещё требуется.
 
 ---
 
@@ -216,7 +219,7 @@ Admin read/write доступ разрешать только после сер�
 
 Админский write-flow команд поддерживает:
 - создание команды: игра + название + данные, разрешённые текущей формой;
-- редактирование существующей команды;
+- редактирование существующей команды: `name + leader`, фото через отдельный photo bridge;
 - каскадное переименование membership по `старое имя + игра`;
 - загрузку фото с телефона;
 - клиентское сжатие перед отправкой;
@@ -225,6 +228,8 @@ Admin read/write доступ разрешать только после сер�
 - cleanup старого media-key при rename;
 - journal записи ручных изменений;
 - optimistic revision, чтобы устаревшая карточка не перезаписала более новое изменение другого админа.
+
+Поля E:L detail отображает, но текущий hardened updateTeam их не перезаписывает. Не расширять этот whitelist скрытно: статус/счётчики менять только после отдельного решения и серверной реализации.
 
 Удаление участников и команд пока отключено.
 
@@ -354,7 +359,8 @@ Repo config на 20.08.2026:
 - v0.6 admin search не деградировать обратно до raw lowercase `.includes()` без hybrid forms/searchKeys;
 - v0.6 admin avatars используют один persistent cache с обычным режимом и primary `avatar:<avatarFileId>`;
 - v0.6 admin team thumbnail + detail используют тот же `team:<name+game>` IndexedDB key, без отдельного admin media cache;
-- тап по admin team должен вести на normal-style team detail с фото и составом, включая inactive team data из private snapshot;
+- тап по admin team должен вести на normal-style team detail с фото, полным private D:L блоком, edit button и составом, включая inactive team data из private snapshot;
+- admin team detail edit button использует существующий hardened write/photo flow, не второй frontend-only write path;
 - `/admin-team-photo` не должен зависеть от наличия ephemeral `photoUrl` перед SHA-256 media lookup.
 
 ---
@@ -385,8 +391,9 @@ Repo config на 20.08.2026:
 12. Admin search проверяется минимум по CRM имени, Telegram имени, `@username`, ID, команде, роли, игровому нику и aliases; контрольные `нас не догонят` и `вышка` должны находить соответствующие команды/участников.
 13. В фильтре `Вышел` порядок сравнить с физической `База участников`: самый свежий выход сверху, старые ниже.
 14. После `Вышел → Все` исходный порядок списка восстанавливается без зависаний/циклической перерисовки.
-15. Во вкладке admin `Команды`: thumbnail появляется для команды с существующим private media; тап по `Da budet swet`/другой команде открывает normal-style team detail с большой фотографией и составом; повторное открытие использует тот же `team:<name+game>` disk cache; Back возвращает прежний список/позицию.
-16. Проверить минимум одну `Неактивен`: team-detail должен открываться из private admin snapshot даже если команды нет в public snapshot.
+15. Во вкладке admin `Команды`: thumbnail появляется; тап открывает normal-style team detail с большой фотографией, 3 счётчиками состава, полным D:L private-блоком, кнопкой `Редактировать команду` и составом; повторное открытие использует тот же `team:<name+game>` disk cache; Back возвращает прежний список/позицию.
+16. На detail кнопка `Редактировать команду` открывает существующую форму, где доступны название/лидер и фото; E:L не должны стать записываемыми из-за detail UI.
+17. Проверить минимум одну `Неактивен`: team-detail должен открываться из private admin snapshot даже если команды нет в public snapshot.
 
 ---
 
