@@ -1,9 +1,9 @@
 /* Royal CRM Mini App — v0.6 admin participant list memberships
  * Makes team memberships in the admin participant list use the same visual pills
- * as the ordinary participants page. Read-only DOM decoration; no writes.
+ * as the ordinary participants page. Admin team pills stay inside admin navigation.
  */
 (() => {
-  const VERSION = '0.6.0-admin-participant-memberships.1';
+  const VERSION = '0.6.0-admin-participant-memberships.2';
   let scheduled = 0;
 
   const clean = value => String(value == null ? '' : value).trim();
@@ -40,8 +40,8 @@
     const team = clean(m.team);
     const role = clean(m.role || 'Без роли');
     const game = canonicalGame(m.game);
-    if (!team) return `<span class="membership-pill no-team royal-admin-participant-list-membership">Без команды — ${html(role)}</span>`;
-    return `<span class="membership-pill team-link royal-admin-participant-list-membership" data-team="${encodeURIComponent(team)}"><span>${html(team)}</span><small>${html(role)}${game ? ` · ${html(game)}` : ''}</small></span>`;
+    if (!team) return `<span class="membership-pill no-team royal-admin-participant-list-membership-static">Без команды — ${html(role)}</span>`;
+    return `<button type="button" class="membership-pill royal-admin-participant-list-membership" data-admin-route-team="1" data-team-name="${html(team)}" data-team-game="${html(game)}" data-team="${encodeURIComponent(team)}"><span>${html(team)}</span><small>${html(role)}${game ? ` · ${html(game)}` : ''}</small></button>`;
   }
 
   function signature(list) {
@@ -97,13 +97,15 @@
   }
 
   function installCss() {
-    if (document.querySelector('style[data-admin-participant-memberships-v0600="1"]')) return;
+    if (document.querySelector('style[data-admin-participant-memberships-v0600="2"]')) return;
+    document.querySelector('style[data-admin-participant-memberships-v0600="1"]')?.remove();
     const style = document.createElement('style');
-    style.dataset.adminParticipantMembershipsV0600 = '1';
+    style.dataset.adminParticipantMembershipsV0600 = '2';
     style.textContent = `
       details[data-admin-participant="1"] .royal-admin-participant-list-teams{display:none!important}
       details[data-admin-participant="1"] .royal-admin-participant-list-memberships{margin-top:8px}
-      details[data-admin-participant="1"] .royal-admin-participant-list-membership{pointer-events:none}
+      details[data-admin-participant="1"] .royal-admin-participant-list-membership{appearance:none;-webkit-appearance:none;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:rgba(84,169,235,.14)}
+      details[data-admin-participant="1"] .royal-admin-participant-list-membership>*{pointer-events:none!important}
       details[data-admin-participant="1"] .royal-admin-participant-list-no-team{font-size:12px}
     `;
     document.head.appendChild(style);
