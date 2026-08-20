@@ -1,23 +1,26 @@
 /*
  * Royal CRM / Таблица ЧП
  * 32_MINIAPP_ADMIN_TEAM_PHOTO.js
- * v0.6.0-photo.1
+ * v0.6.0-photo.2
  *
  * Team-photo bridge for the protected v0.6 admin-write path.
  *
  * Storage stays inside the EXISTING private media architecture:
  *   royal-crm-data/media/teams/<sha256(normalized team + game)>.bin
  *
- * Google Sheets column Команды!C remains a real CellImage. Its source URL is a
- * narrow public Worker bridge that can read ONLY a 64-hex team-media key. The
- * Mini App itself keeps using the existing authenticated /team-photo identity
+ * Google Sheets column Команды!C remains a real CellImage. To create that
+ * CellImage, Apps Script generates a SHORT-LIVED HMAC-signed Worker URL.
+ * The URL expires after a few minutes and never exposes repository credentials.
+ * Mini App itself still uses the existing authenticated /team-photo identity
  * route and the existing iOS/Android cache.
  */
 
-var MINIAPP_ADMIN_TEAM_PHOTO_VERSION = '0.6.0-photo.1';
+var MINIAPP_ADMIN_TEAM_PHOTO_VERSION = '0.6.0-photo.2';
 var MINIAPP_ADMIN_TEAM_PHOTO_MAX_UPLOAD_BYTES = 650000;
 var MINIAPP_ADMIN_TEAM_PHOTO_MAX_EXISTING_BYTES = 8 * 1024 * 1024;
-var MINIAPP_ADMIN_TEAM_PHOTO_PUBLIC_BASE = 'https://royal-crm-miniapp-api.tropical-spoon.workers.dev/team-photo-public';
+var MINIAPP_ADMIN_TEAM_PHOTO_SOURCE_BASE = 'https://royal-crm-miniapp-api.tropical-spoon.workers.dev/team-photo-source';
+var MINIAPP_ADMIN_TEAM_PHOTO_SOURCE_TTL_SEC = 15 * 60;
+var MINIAPP_ADMIN_TEAM_PHOTO_SOURCE_PREFIX = 'ROYAL_CRM_TEAM_PHOTO_SOURCE_V1';
 
 function MINIAPP_adminTeamPhotoPrepareUpload_(teamName, game, rawPhoto) {
   if (!rawPhoto || typeof rawPhoto !== 'object' || Array.isArray(rawPhoto)) {
@@ -115,6 +118,11 @@ function MINIAPP_adminTeamPhotoStoreBytes_(teamName, game, bytes, contentType, r
     return MINIAPP_adminWriteError_('TEAM_PHOTO_STORE_FAILED', 'Не удалось сохранить фото команды. Данные команды не изменены.');
   }
 
+  var sourceUrl = MINIAPP_adminTeamPhotoSignedSourceUrl_(stableHash, contentHash);
+  if (!sourceUrl) {
+    return MINIAPP_adminWriteError_('TEAM_PHOTO_SOURCE_SIGN_FAILED', 'Фото сохранено, но не удалось подготовить защищённый источник для Google Sheets.');
+  }
+
   return {
     ok: true,
     changed: true,
@@ -122,26 +130,63 @@ function MINIAPP_adminTeamPhotoStoreBytes_(teamName, game, bytes, contentType, r
     contentHash: contentHash,
     contentType: contentType,
     bytes: bytes.length,
-    publicUrl: MINIAPP_ADMIN_TEAM_PHOTO_PUBLIC_BASE +
-      '?key=' + encodeURIComponent(stableHash) +
-      '&v=' + encodeURIComponent(contentHash)
+    sourceUrl: sourceUrl
   };
 }
 
 function MINIAPP_adminTeamPhotoApplyCell_(sheet, row, prepared) {
   if (!prepared || !prepared.changed) return { ok: true, changed: false };
-  if (!prepared.publicUrl) return MINIAPP_adminWriteError_('TEAM_PHOTO_URL_MISSING', 'Не удалось сформировать адрес фото команды.');
+  if (!prepared.sourceUrl) return MINIAPP_adminWriteError_('TEAM_PHOTO_URL_MISSING', 'Не удалось сформировать защищённый адрес фото команды.');
 
   try {
     var image = SpreadsheetApp.newCellImage()
-      .setSourceUrl(prepared.publicUrl)
+      .setSourceUrl(prepared.sourceUrl)
       .build();
     sheet.getRange(row, 3).setValue(image);
+    SpreadsheetApp.flush();
     return { ok: true, changed: true };
   } catch (error) {
     console.error('Admin team photo CellImage failed', error && error.stack ? error.stack : error);
     return MINIAPP_adminWriteError_('TEAM_PHOTO_CELL_FAILED', 'Фото сохранено в медиахранилище, но не удалось записать его в Команды!C.');
   }
+}
+
+function MINIAPP_adminTeamPhotoSignedSourceUrl_(stableHash, contentHash) {
+  var key = String(stableHash || '').trim().toLowerCase();
+  var version = String(contentHash || '').trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(key) || !/^[0-9a-f]{64}$/.test(version)) return '';
+
+  var tokenProperty = typeof MINIAPP_TOKEN_PROPERTY !== 'undefined'
+    ? MINIAPP_TOKEN_PROPERTY : 'TELEGRAM_BOT_TOKEN';
+  var botToken = String(
+    PropertiesService.getScriptProperties().getProperty(tokenProperty) || ''
+  ).trim();
+  if (!botToken) return '';
+
+  var expires = String(Math.floor(Date.now() / 1000) + MINIAPP_ADMIN_TEAM_PHOTO_SOURCE_TTL_SEC);
+  var canonical = [
+    MINIAPP_ADMIN_TEAM_PHOTO_SOURCE_PREFIX,
+    key,
+    version,
+    expires
+  ].join('\n');
+  var signature = MINIAPP_adminTeamPhotoHmacHex_(botToken, canonical);
+  if (!signature) return '';
+
+  return MINIAPP_ADMIN_TEAM_PHOTO_SOURCE_BASE +
+    '?key=' + encodeURIComponent(key) +
+    '&v=' + encodeURIComponent(version) +
+    '&exp=' + encodeURIComponent(expires) +
+    '&sig=' + encodeURIComponent(signature);
+}
+
+function MINIAPP_adminTeamPhotoHmacHex_(secret, text) {
+  var bytes = Utilities.computeHmacSha256Signature(
+    String(text || ''),
+    String(secret || ''),
+    Utilities.Charset.UTF_8
+  );
+  return MINIAPP_adminTeamPhotoDigestHex_(bytes);
 }
 
 function MINIAPP_adminTeamPhotoExistingSource_(sheet, row) {
