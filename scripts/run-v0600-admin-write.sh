@@ -7,6 +7,8 @@ TMP="$(mktemp /tmp/royal-v0600-admin-write-final.XXXXXX.sh)"
 cleanup(){ rm -f "$TMP"; }
 trap cleanup EXIT
 
+printf '[INFO] Royal CRM v0.6 FINAL write.4 installer\n'
+printf '[INFO] This runner does not mutate participant/team rows during installation checks.\n'
 printf '[INFO] Downloading v0.6 FINAL admin-write installer...\n'
 curl -fsSL "$RAW_INSTALLER" -o "$TMP"
 
