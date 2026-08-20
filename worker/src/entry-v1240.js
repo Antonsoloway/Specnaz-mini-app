@@ -1,6 +1,6 @@
 import currentWorker from './entry-v1230.js';
 
-const WRAPPER_VERSION = '1.24.0-dev';
+const WRAPPER_VERSION = '1.24.1-dev';
 const MEDIA_ROOT = 'media/teams';
 
 export default {
@@ -19,7 +19,7 @@ export default {
         service:'royal-crm-miniapp-api',
         version:WRAPPER_VERSION,
         adminWrite:'worker-signed-hmac-final-write4',
-        adminTeamPhoto:'private-admin-snapshot+sha256-media'
+        adminTeamPhoto:'public-first+private-admin-fallback+sha256-media'
       }),{status:200,headers});
     }
 
@@ -31,21 +31,30 @@ export default {
       return handleAdminTeamPhoto(request, env, ctx, url);
     }
 
+    // Preserve the normal /team-photo path for everyone. If the normal worker
+    // cannot find the team because it is hidden from the public snapshot, an
+    // authenticated Telegram admin gets the private-admin fallback below.
+    if (url.pathname === '/team-photo' && request.method === 'GET') {
+      const normal = await currentWorker.fetch(request, env, ctx);
+      if (normal.ok || normal.status !== 404) return normal;
+      return handleAdminTeamPhoto(request, env, ctx, url, normal);
+    }
+
     return currentWorker.fetch(request, env, ctx);
   }
 };
 
-async function handleAdminTeamPhoto(request, env, ctx, url) {
+async function handleAdminTeamPhoto(request, env, ctx, url, normal404=null) {
   // Reuse the protected /admin-data route itself as authorization. It performs
   // session validation + a fresh Telegram getChatMember admin check.
   const adminResponse = await forwardAdminData(request, env, ctx, 'GET');
-  if (!adminResponse.ok) return adminResponse;
+  if (!adminResponse.ok) return normal404 || adminResponse;
 
   let payload;
   try { payload = await adminResponse.clone().json(); }
-  catch { return imageError(adminResponse,'ADMIN_DATA_INVALID',502); }
+  catch { return normal404 || imageError(adminResponse,'ADMIN_DATA_INVALID',502); }
   if (!payload?.ok || !payload?.permissions?.isAdmin || !payload?.adminData) {
-    return imageError(adminResponse,'ADMIN_REQUIRED',403);
+    return normal404 || imageError(adminResponse,'ADMIN_REQUIRED',403);
   }
 
   const name = String(url.searchParams.get('team') || '').trim();
@@ -59,7 +68,7 @@ async function handleAdminTeamPhoto(request, env, ctx, url) {
     canonicalGame(item?.game) === game
   ) || null;
 
-  if (!team) return imageError(adminResponse,'TEAM_NOT_FOUND',404);
+  if (!team) return normal404 || imageError(adminResponse,'TEAM_NOT_FOUND',404);
   const photoUrl = String(team?.photoUrl || '').trim();
   if (!photoUrl) return imageError(adminResponse,'TEAM_PHOTO_NOT_FOUND',404);
 
