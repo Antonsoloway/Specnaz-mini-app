@@ -1,7 +1,7 @@
 /*
  * Royal CRM / Таблица ЧП
  * 30_MINIAPP_ADMIN_WRITE_BACKEND.js
- * v0.6.0-write.2
+ * v0.6.0-write.3
  *
  * Server-to-server write gateway for Mini App v0.6.
  * The browser NEVER sends CRM mutation payloads directly to Apps Script.
@@ -10,10 +10,10 @@
  *   Worker checks session + fresh Telegram admin status
  *   Worker signs the mutation with BOT_TOKEN (already secret on both servers)
  *   Apps Script verifies HMAC + timestamp + CRM membership + fresh Telegram admin
- *   then calls the guarded mutation helpers from 29_MINIAPP_ADMIN_WRITE.js.
+ *   then calls hardened mutation helpers from 31_MINIAPP_ADMIN_WRITE_HARDENED.js.
  */
 
-var MINIAPP_ADMIN_WRITE_BACKEND_VERSION = '0.6.0-write.2';
+var MINIAPP_ADMIN_WRITE_BACKEND_VERSION = '0.6.0-write.3';
 var MINIAPP_ADMIN_WRITE_BACKEND_MAX_AGE_SEC = 90;
 var MINIAPP_ADMIN_WRITE_BACKEND_FUTURE_SKEW_SEC = 30;
 var MINIAPP_ADMIN_WRITE_BACKEND_ALLOWED_OPS = {
@@ -46,6 +46,7 @@ function MINIAPP_adminWriteBackendMaybeHandle_(e) {
 function MINIAPP_adminWriteBackendExecute_(e) {
   if (typeof MINIAPP_adminWriteDecodePayload_ !== 'function' ||
       typeof MINIAPP_adminWriteFindJournalRequest_ !== 'function' ||
+      typeof MINIAPP_adminWriteHardenedDispatch_ !== 'function' ||
       typeof MINIAPP_findCrmProfile_ !== 'function' ||
       typeof MINIAPP_getTelegramAdminInfo_ !== 'function') {
     return MINIAPP_adminWriteError_('WRITE_HELPERS_MISSING', 'Сервер редактирования установлен не полностью.');
@@ -106,11 +107,13 @@ function MINIAPP_adminWriteBackendExecute_(e) {
       var cachedResult = JSON.parse(cached);
       cachedResult.duplicate = true;
       cachedResult.idempotency = 'CACHE';
+      cachedResult.version = MINIAPP_ADMIN_WRITE_BACKEND_VERSION;
       return cachedResult;
     } catch (_) {}
   }
 
   var lock = LockService.getScriptLock();
+  var mutationStarted = false;
   try {
     if (!lock.tryLock(20000)) {
       return MINIAPP_adminWriteError_('WRITE_BUSY', 'База занята другой операцией. Повторите через несколько секунд.');
@@ -127,8 +130,10 @@ function MINIAPP_adminWriteBackendExecute_(e) {
         entityType: journalDuplicate.entityType || '',
         entityKey: journalDuplicate.entityKey || '',
         row: Number(journalDuplicate.row || 0),
+        version: MINIAPP_ADMIN_WRITE_BACKEND_VERSION,
         message: 'Эта операция уже была сохранена ранее.'
       };
+      duplicateResult.adminSnapshot = MINIAPP_adminWriteRefreshAdminSnapshot_();
       MINIAPP_adminWriteCacheResult_(requestId, duplicateResult);
       return duplicateResult;
     }
@@ -154,26 +159,14 @@ function MINIAPP_adminWriteBackendExecute_(e) {
       payload: payload
     };
 
-    var mutationStarted = false;
     if (typeof beginPublicDataMutation_ === 'function') {
       try {
-        beginPublicDataMutation_('miniapp_admin_write:' + op + ':' + requestId);
+        beginPublicDataMutation_('miniapp_admin_write_hardened:' + op + ':' + requestId);
         mutationStarted = true;
       } catch (_) {}
     }
 
-    var result;
-    try {
-      if (op === 'updateParticipant') result = MINIAPP_adminWriteUpdateParticipant_(context);
-      else if (op === 'createParticipant') result = MINIAPP_adminWriteCreateParticipant_(context);
-      else if (op === 'updateTeam') result = MINIAPP_adminWriteUpdateTeam_(context);
-      else if (op === 'createTeam') result = MINIAPP_adminWriteCreateTeam_(context);
-    } finally {
-      if (mutationStarted && typeof finishPublicDataMutation_ === 'function') {
-        try { finishPublicDataMutation_('miniapp_admin_write:' + op + ':' + requestId); } catch (_) {}
-      }
-    }
-
+    var result = MINIAPP_adminWriteHardenedDispatch_(context);
     if (!result || !result.ok) {
       return result || MINIAPP_adminWriteError_('WRITE_FAILED', 'Изменение не сохранено.');
     }
@@ -186,6 +179,11 @@ function MINIAPP_adminWriteBackendExecute_(e) {
     MINIAPP_adminWriteCacheResult_(requestId, result);
     return result;
   } finally {
+    if (mutationStarted && typeof finishPublicDataMutation_ === 'function') {
+      try {
+        finishPublicDataMutation_('miniapp_admin_write_hardened:' + op + ':' + requestId);
+      } catch (_) {}
+    }
     try { lock.releaseLock(); } catch (_) {}
   }
 }
@@ -235,18 +233,27 @@ function MINIAPP_adminWritePreflight() {
   var base = ss.getSheetByName(SHEET_BASE);
   var teams = ss.getSheetByName(SHEET_TEAMS);
   var helper = ss.getSheetByName(typeof FINALROLE_HELPER_SHEET_ !== 'undefined' ? FINALROLE_HELPER_SHEET_ : 'Списки');
+
   if (!base) issues.push('BASE_SHEET_MISSING');
   if (!teams) issues.push('TEAMS_SHEET_MISSING');
   if (!helper) issues.push('HELPER_SHEET_MISSING');
   if (typeof MINIAPP_validateInitData_ !== 'function') issues.push('MINIAPP_API_MISSING');
-  if (typeof MINIAPP_adminWriteCreateParticipant_ !== 'function') issues.push('WRITE_29_MISSING');
+  if (typeof MINIAPP_adminWriteCreateParticipant_ !== 'function') issues.push('WRITE_29_HELPERS_MISSING');
+  if (typeof MINIAPP_adminWriteHardenedDispatch_ !== 'function') issues.push('WRITE_31_HARDENED_MISSING');
+  if (typeof MINIAPP_adminWriteHardenedDecorateRevisions_ !== 'function') issues.push('WRITE_31_REVISION_MISSING');
+  if (typeof MINIAPP_adminWriteHardenedMeta_ !== 'function') issues.push('WRITE_31_META_MISSING');
+  if (typeof MINIAPP_adminWriteHardenedJournalData_ !== 'function') issues.push('WRITE_31_JOURNAL_MISSING');
+  if (typeof processManualCounterEdits_ !== 'function') issues.push('MANUAL_COUNTER_INVARIANT_MISSING');
+  if (typeof sortBaseByChatState_ !== 'function') issues.push('BASE_SORT_INVARIANT_MISSING');
   if (typeof finalRoleNormalizeRowSlot_ !== 'function') issues.push('FINAL_ROLE_NORMALIZER_MISSING');
   if (typeof finalRoleCascadeTeamRename_ !== 'function') issues.push('TEAM_CASCADE_MISSING');
   if (typeof MINIAPP_exportAdminSnapshotUnlocked_ !== 'function') issues.push('ADMIN_SNAPSHOT_EXPORTER_MISSING');
 
   var tokenProperty = typeof MINIAPP_TOKEN_PROPERTY !== 'undefined'
     ? MINIAPP_TOKEN_PROPERTY : 'TELEGRAM_BOT_TOKEN';
-  if (!PropertiesService.getScriptProperties().getProperty(tokenProperty)) issues.push('BOT_TOKEN_MISSING');
+  if (!PropertiesService.getScriptProperties().getProperty(tokenProperty)) {
+    issues.push('BOT_TOKEN_MISSING');
+  }
 
   var endpoint = '';
   try { endpoint = String(ScriptApp.getService().getUrl() || '').trim(); } catch (_) {}
@@ -255,12 +262,17 @@ function MINIAPP_adminWritePreflight() {
   var result = {
     ok: issues.length === 0,
     version: MINIAPP_ADMIN_WRITE_BACKEND_VERSION,
+    hardenedVersion: typeof MINIAPP_ADMIN_WRITE_HARDENED_VERSION !== 'undefined'
+      ? MINIAPP_ADMIN_WRITE_HARDENED_VERSION : '',
     issues: issues,
     endpointPresent: !!endpoint,
     firstEmptyParticipantRow: base ? MINIAPP_adminWriteFindEmptyParticipantRow_(base) : 0,
     firstEmptyTeamRow: teams ? MINIAPP_adminWriteFindEmptyTeamRow_(teams) : 0,
     deleteEnabled: false,
-    transport: 'worker-signed-hmac'
+    transport: 'worker-signed-hmac',
+    counterHistoryInvariant: typeof processManualCounterEdits_ === 'function',
+    baseSortInvariant: typeof sortBaseByChatState_ === 'function',
+    teamRenameCascadeInvariant: typeof finalRoleCascadeTeamRename_ === 'function'
   };
   console.log(JSON.stringify(result, null, 2));
   return result;
