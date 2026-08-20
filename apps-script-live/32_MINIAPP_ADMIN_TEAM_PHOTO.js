@@ -1,7 +1,7 @@
 /*
  * Royal CRM / Таблица ЧП
  * 32_MINIAPP_ADMIN_TEAM_PHOTO.js
- * v0.6.0-photo.2
+ * v0.6.0-photo.3
  *
  * Team-photo bridge for the protected v0.6 admin-write path.
  *
@@ -15,7 +15,7 @@
  * route and the existing iOS/Android cache.
  */
 
-var MINIAPP_ADMIN_TEAM_PHOTO_VERSION = '0.6.0-photo.2';
+var MINIAPP_ADMIN_TEAM_PHOTO_VERSION = '0.6.0-photo.3';
 var MINIAPP_ADMIN_TEAM_PHOTO_MAX_UPLOAD_BYTES = 650000;
 var MINIAPP_ADMIN_TEAM_PHOTO_MAX_EXISTING_BYTES = 8 * 1024 * 1024;
 var MINIAPP_ADMIN_TEAM_PHOTO_SOURCE_BASE = 'https://royal-crm-miniapp-api.tropical-spoon.workers.dev/team-photo-source';
@@ -148,6 +148,47 @@ function MINIAPP_adminTeamPhotoApplyCell_(sheet, row, prepared) {
   } catch (error) {
     console.error('Admin team photo CellImage failed', error && error.stack ? error.stack : error);
     return MINIAPP_adminWriteError_('TEAM_PHOTO_CELL_FAILED', 'Фото сохранено в медиахранилище, но не удалось записать его в Команды!C.');
+  }
+}
+
+/**
+ * Removes the obsolete private-media identity only AFTER a rename committed.
+ * This prevents a future team reusing the old name from inheriting stale media.
+ * Failure is non-fatal for the already committed CRM mutation and is returned as
+ * a cleanup warning to the journal/result.
+ */
+function MINIAPP_adminTeamPhotoCleanupOldIdentity_(oldName, game, keepStableHash) {
+  var identityKey = MINIAPP_adminTeamPhotoIdentityKey_(oldName, game);
+  if (!identityKey) return { ok: true, changed: false, skipped: 'IDENTITY_EMPTY' };
+
+  var stableHash = MINIAPP_adminTeamPhotoSha256Text_(identityKey);
+  var keep = String(keepStableHash || '').trim().toLowerCase();
+  if (keep && stableHash === keep) {
+    return { ok: true, changed: false, skipped: 'SAME_MEDIA_IDENTITY', stableHash: stableHash };
+  }
+
+  try {
+    if (typeof MINIAPP_mediaConfig_ !== 'function' || typeof MINIAPP_teamGithubDelete_ !== 'function') {
+      throw new Error('persistent media delete helpers missing');
+    }
+    var props = PropertiesService.getScriptProperties();
+    var cfg = MINIAPP_mediaConfig_(props);
+    var path = 'media/teams/' + stableHash + '.bin';
+    MINIAPP_teamGithubDelete_(cfg, path, 'cleanup renamed team photo ' + stableHash.slice(0, 12));
+
+    var prefix = typeof MINIAPP_TEAM_MEDIA_HASH_PREFIX !== 'undefined'
+      ? String(MINIAPP_TEAM_MEDIA_HASH_PREFIX)
+      : 'MINIAPP_TEAM_MEDIA_HASH_';
+    props.deleteProperty(prefix + stableHash);
+    return { ok: true, changed: true, stableHash: stableHash };
+  } catch (error) {
+    console.warn('Admin old team-photo cleanup warning', error && error.message ? error.message : error);
+    return {
+      ok: false,
+      changed: false,
+      warning: 'OLD_TEAM_MEDIA_CLEANUP_FAILED',
+      stableHash: stableHash
+    };
   }
 }
 
