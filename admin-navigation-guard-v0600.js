@@ -1,9 +1,10 @@
 /* Royal CRM Mini App — v0.6 admin navigation guard
  * Keeps navigation inside admin mode. Any participant/team transition originating
  * from admin UI is routed to the private admin detail instead of ordinary/public UI.
+ * Installed on window capture so it runs before ordinary document-level routers.
  */
 (() => {
-  const VERSION = '0.6.0-admin-navigation-guard.1';
+  const VERSION = '0.6.0-admin-navigation-guard.2';
 
   const clean = value => String(value == null ? '' : value).trim();
   function id(value) {
@@ -51,7 +52,7 @@
     document.head.appendChild(style);
   }
 
-  document.addEventListener('click', event => {
+  window.addEventListener('click', event => {
     const teamTarget = event.target?.closest?.('[data-admin-route-team="1"],[data-admin-participant-team="1"]');
     if (teamTarget) {
       if (openAdminTeam(teamTarget.dataset.teamName, teamTarget.dataset.teamGame, event)) return;
