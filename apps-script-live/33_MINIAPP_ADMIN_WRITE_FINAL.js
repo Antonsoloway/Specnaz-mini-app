@@ -6,6 +6,7 @@
  * Final v0.6 admin-write dispatch.
  * - participant operations reuse the hardened write.3 implementation;
  * - team operations add transactional photo support from file 32;
+ * - old private-media identity is cleaned after a successful rename;
  * - journal never stores base64 image payloads;
  * - delete remains disabled.
  */
@@ -105,6 +106,15 @@ function MINIAPP_adminWriteFinalUpdateTeam_(ctx) {
   var finalRow = MINIAPP_adminWriteFindTeamRow_(sheet, nextName, game) || row;
   MINIAPP_adminTeamPhotoMarkDirty_(finalRow);
 
+  var oldMediaCleanup = { ok: true, changed: false };
+  if (nextName !== originalName && typeof MINIAPP_adminTeamPhotoCleanupOldIdentity_ === 'function') {
+    oldMediaCleanup = MINIAPP_adminTeamPhotoCleanupOldIdentity_(
+      originalName,
+      game,
+      photoPrepared && photoPrepared.stableHash
+    ) || oldMediaCleanup;
+  }
+
   if (typeof markPublicSyncPending_ === 'function') {
     markPublicSyncPending_('miniapp_admin_team_final:' + game + ':' + nextName);
   }
@@ -117,6 +127,9 @@ function MINIAPP_adminWriteFinalUpdateTeam_(ctx) {
   };
   var photoSummary = MINIAPP_adminTeamPhotoSummary_(photoPrepared);
   if (photoSummary) journalChanges.photo = photoSummary;
+  if (oldMediaCleanup && oldMediaCleanup.warning) {
+    journalChanges.mediaCleanupWarning = oldMediaCleanup.warning;
+  }
 
   MINIAPP_adminWriteHardenedAppendJournal_(
     ctx,
@@ -137,6 +150,9 @@ function MINIAPP_adminWriteFinalUpdateTeam_(ctx) {
     row: finalRow,
     revision: MINIAPP_adminWriteTeamRevision_(after),
     photoChanged: !!photoPrepared.changed,
+    oldMediaCleanup: oldMediaCleanup && oldMediaCleanup.warning
+      ? { ok: false, warning: oldMediaCleanup.warning }
+      : { ok: true },
     message: photoPrepared.changed ? 'Команда и фото обновлены.' : 'Команда обновлена.'
   };
 }
@@ -246,7 +262,8 @@ function MINIAPP_adminWriteFinalMeta_() {
       ? MINIAPP_ADMIN_TEAM_PHOTO_MAX_UPLOAD_BYTES : 650000,
     storage: 'existing-private-team-media',
     sheetCell: 'CellImage',
-    deleteEnabled: false
+    deleteEnabled: false,
+    renameCleanup: typeof MINIAPP_adminTeamPhotoCleanupOldIdentity_ === 'function'
   };
   return meta;
 }
