@@ -10,7 +10,9 @@
   <title>ЧП Mini App</title>
   <script>
   (() => {
-    const target = 'app-v0559.html';
+    const params = new URLSearchParams(window.location.search || '');
+    const isV0600Preview = params.get('tgWebAppStartParam') === 'v0600';
+    const target = isV0600Preview ? 'app-v0600.html' : 'app-v0559.html';
     const next = target + (window.location.search || '') + (window.location.hash || '');
     window.location.replace(next);
   })();
