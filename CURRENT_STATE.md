@@ -26,9 +26,9 @@
 - bot: `@doveofpeace_bot`.
 
 Текущий preview delivery:
-- `version-v0600.js` cache-bust: **`20260820-2220`**;
-- `app-v0600.html` → `version-v0600.js?v=20260820-2220`;
-- `app.html` previewBuild: **`20260820-2220`**.
+- `version-v0600.js` cache-bust: **`20260820-2242`**;
+- `app-v0600.html` → `version-v0600.js?v=20260820-2242`;
+- `app.html` previewBuild: **`20260820-2242`**.
 
 ---
 
@@ -114,7 +114,8 @@ Public snapshot:
 - `admin-media-cache-v0600-v2.js` = `0.6.0-admin-media-cache.2`;
 - `admin-team-detail-v0600.js` = `0.6.0-admin-team-detail.3`;
 - **`admin-participant-detail-v0600.js` = `0.6.0-admin-participant-detail.1`**;
-- **`admin-participant-nav-guard-v0600.js` = `0.6.0-admin-participant-nav-guard.1`**.
+- **`admin-participant-nav-guard-v0600.js` = `0.6.0-admin-participant-nav-guard.1`**;
+- **`admin-participant-memberships-v0600.js` = `0.6.0-admin-participant-memberships.1`**.
 
 ### Admin search / avatars
 - поиск по participants/teams должен сохранять deterministic hybrid behavior обычного режима;
@@ -127,7 +128,12 @@ Public snapshot:
 В списке участников:
 - raw Telegram ID **не показывается визуально**;
 - ID остаётся только скрытым техническим identity для search/avatar/editor;
-- под именем показывается `@username` при наличии и список всех текущих memberships/команд;
+- `@username` показывается при наличии;
+- memberships/команды теперь выводятся **отдельными ordinary-style плашками**, через те же `membership-list` / `membership-pill`, что и на обычной странице участников v0.5.59;
+- каждая плашка показывает `команда + роль + игра`; несколько membership → несколько отдельных плашек;
+- существующие `team-game-colors-v0535.js` и `active-teams-v0559.js` повторно декорируют эти же плашки: сохраняются цвета РМ/РК и золотая рамка для `Активен` по source-of-truth team status;
+- старая единая текстовая строка команд в admin summary скрыта;
+- плашки внутри admin summary display-only (`pointer-events:none`), поэтому весь summary остаётся единым navigation target и tap по карточке/плашке не уводит в ordinary/public route;
 - tap по карточке больше не раскрывает старый `<details>` с техническими полями — открывает отдельный normal-style participant detail;
 - `admin-participant-nav-guard-v0600.js` отключает pointer-events у ordinary avatar subtree внутри admin summary, чтобы тап по аватару не успевал открыть public participant profile раньше admin detail; весь summary остаётся единым navigation target.
 
@@ -182,7 +188,7 @@ Participant metric rankings:
 - без 128 thumbnails/network prewarm;
 - Back → предыдущий detail/list state.
 
-**Статус frontend:** GitHub `main` фактически на preview delivery `20260820-2220`; после документационной записи `21:42` добавлен participant navigation guard. Apps Script/Sheets для этой guard-правки не менялись; Cloud Shell не нужен. Participant detail/rankings/nav guard требуют Telegram smoke.
+**Статус frontend:** GitHub `main` фактически на preview delivery `20260820-2242`; поверх participant detail/nav guard добавлен read-only `admin-participant-memberships-v0600.js`, который возвращает списку участников ordinary-style membership pills с существующими RM/RK и active-team decorators. Apps Script/Worker/Sheets/data этой правкой не менялись; Cloud Shell не нужен. Telegram WebView visual smoke для новых плашек и ранее pending participant detail/rankings/nav guard ещё требуется.
 
 ---
 
@@ -236,7 +242,7 @@ Repo config:
 6. Admin avatars/team photos повторно читаются из общего persistent cache.
 7. Admin search проверяется по имени/@/ID/role/nickname/team + `вышка`.
 8. `Вышел` сравнить с physical order таблицы.
-9. Admin participant list: visible ID отсутствует, memberships видны; tap по summary и по аватару → именно admin participant detail, не accordion и не public profile.
+9. Admin participant list: visible ID отсутствует; каждая membership показана отдельной ordinary-style плашкой `команда + роль + игра`; РМ/РК окраска и золото `Активен` совпадают с обычной страницей; tap по summary, аватару и области плашек → именно admin participant detail, не accordion/public profile/team route.
 10. Admin participant detail: все private поля, persistent avatar, memberships → team detail, editor; U/AB/AC/AD → rankings descending; tap row → participant; Back state.
 11. Admin team detail: фото, D:L, editor, состав, включая минимум одну `Неактивен`.
 12. Нажать E/F/H/I/J/K и проверить каждый team ranking: all teams, descending, нули внизу, tap team → detail, Back.
@@ -262,7 +268,8 @@ Repo config:
 - exited physical-row ordering;
 - admin hybrid search;
 - admin participant list without visible Telegram ID;
-- admin participant summary/avatar navigation must resolve to admin participant detail before ordinary public-profile handlers;
+- admin participant list memberships use ordinary `membership-list` / `membership-pill` visuals with existing RM/RK and active-team decorators; не возвращать одну текстовую строку команд;
+- admin participant summary/avatar/membership area navigation must resolve to admin participant detail before ordinary public-profile/team handlers;
 - admin participant detail from private snapshot + U/AB/AC/AD rankings;
 - admin team detail from private snapshot including inactive;
 - admin team metric rankings E/F/H/I/J/K from full private team set.
