@@ -1,6 +1,6 @@
 /* Royal CRM Mini App — final admin edit gate v0.6.0-write.4 */
 (() => {
-  const VERSION = '0.6.0-write.4-gate.1';
+  const VERSION = '0.6.0-write.4-gate.2';
   let checking = false;
 
   const clean = value => String(value == null ? '' : value).trim();
@@ -40,6 +40,7 @@
       write?.transport === 'worker-signed-hmac' &&
       write?.deleteEnabled === false &&
       photo?.enabled === true &&
+      photo?.renameCleanup === true &&
       operations.includes('updateParticipant') &&
       operations.includes('createParticipant') &&
       operations.includes('updateTeam') &&
