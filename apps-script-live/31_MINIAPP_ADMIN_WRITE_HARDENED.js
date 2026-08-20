@@ -47,7 +47,23 @@ function MINIAPP_adminWriteHardenedUpdateParticipant_(ctx) {
     return MINIAPP_adminWriteConflict_('PARTICIPANT_CHANGED', 'Карточка участника уже изменилась. Обновите данные и повторите.', currentRevision);
   }
 
-  var normalized = MINIAPP_adminWriteHardenedNormalizeParticipantInput_(ctx.ss, ctx.payload.changes || {}, false);
+  // PARTICIPANT_BOT_FIELDS_READ_ONLY_V0600
+  // Existing participant: admins may manually change only CRM name and the
+  // five membership slots (team / role / in-game nickname). Telegram identity,
+  // Telegram profile fields, counters, date and chat state are bot/system-owned.
+  var requestedChanges = ctx.payload && ctx.payload.changes || {};
+  var allowedManualFields = { name: true, memberships: true };
+  var forbiddenManualFields = Object.keys(requestedChanges).filter(function(key) {
+    return !allowedManualFields[key];
+  });
+  if (forbiddenManualFields.length) {
+    return MINIAPP_adminWriteError_(
+      'PARTICIPANT_FIELD_READ_ONLY',
+      'Telegram-данные, статус, дата и счётчики участника заполняются ботом и недоступны для ручного изменения.'
+    );
+  }
+
+  var normalized = MINIAPP_adminWriteHardenedNormalizeParticipantInput_(ctx.ss, requestedChanges, false);
   if (!normalized.ok) return normalized;
   var changes = normalized.value;
   var identityChanged = false;

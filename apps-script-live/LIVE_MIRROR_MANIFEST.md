@@ -1,9 +1,9 @@
-# Live Apps Script mirror — v0.6 final write branch
+# Live Apps Script mirror
 
-> Generated from the factual Apps Script project after `clasp push`.
-> Generated at: 2026-08-20T13:34:32+00:00
-> Source: `~/table-chp-1.3`
-> Secrets and `.clasp.json` are intentionally excluded.
+> Generated from the live Apps Script project via `clasp pull`.
+> Generated at: 2026-08-20T15:51:10+00:00
+> Local source folder: `~/table-chp-1.3`
+> `.clasp.json`, Script Properties, bot tokens, GitHub tokens and other secrets are intentionally NOT stored here.
 
 ## Files and SHA-256
 
@@ -37,7 +37,7 @@ ecb5c1602a8ab814bccf262b993f2487932f1545688fec7354887481da00d1ce  27_MINIAPP_TEA
 24ef20a469e192e07f3fb3057d1bb50feb7cf7d48c44d9ad83ec81e28fc9e609  28_MINIAPP_ADMIN_DATA.js
 caaab3ab0b4f6b949debe6206bb63df0b3079f0a1eee0a306f81bf48a6256c1d  29_MINIAPP_ADMIN_WRITE.js
 9105a61876cb07c87478361cf6f0e38757782bd3cad3c6f185b3a4529ca780f4  30_MINIAPP_ADMIN_WRITE_BACKEND.js
-d1429f60560d2e5b10bc7be574b4b08375e9482f1b64d95c25c0af85cdb4eb08  31_MINIAPP_ADMIN_WRITE_HARDENED.js
+638c2071e1dcc6a02ef9037c20703e60692996a8cf2e647a4e99858096b021e9  31_MINIAPP_ADMIN_WRITE_HARDENED.js
 83557bf01550da2ad38d94f86620bb995f2d6ee6146f8ef53e72efc492661e0d  32_MINIAPP_ADMIN_TEAM_PHOTO.js
 b012d88daaca99afbff16f2737981a973bd975d96bf65f0ac947ac0c5dbe2fce  33_MINIAPP_ADMIN_WRITE_FINAL.js
 d81026ded8b851437b932bcebf3281f850a6050a31a99028f4db22b6fdeb32c6  appsscript.json
