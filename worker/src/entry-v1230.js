@@ -1,6 +1,6 @@
 import currentWorker from './entry-v1220.js';
 
-const WRAPPER_VERSION = '1.23.2-dev';
+const WRAPPER_VERSION = '1.23.3-dev';
 const TEAM_MEDIA_PREFIX = 'media/teams/';
 const FINAL_WRITE_VERSION = '0.6.0-write.4';
 const TEAM_PHOTO_SOURCE_PREFIX = 'ROYAL_CRM_TEAM_PHOTO_SOURCE_V1';
@@ -23,12 +23,13 @@ export default {
         service: 'royal-crm-miniapp-api',
         version: WRAPPER_VERSION,
         adminWrite: 'worker-signed-hmac-final-write4',
-        teamPhotoBridge: 'expiring-hmac-private-github'
+        teamPhotoBridge: 'expiring-hmac-private-github',
+        teamPhotoRenameCleanup: 'required'
       }), { status: 200, headers });
     }
 
     // Keep v0.6 edit controls disabled until the private admin snapshot proves
-    // the FINAL Apps Script backend + team photo capability are both live.
+    // the FINAL Apps Script backend + team photo capability + rename cleanup.
     if (url.pathname === '/admin-data' && request.method === 'GET') {
       return handleFinalAdminData(request, env, ctx);
     }
@@ -63,6 +64,7 @@ async function handleFinalAdminData(request, env, ctx) {
     write.transport === 'worker-signed-hmac' &&
     write.deleteEnabled === false &&
     teamPhoto.enabled === true &&
+    teamPhoto.renameCleanup === true &&
     Number(teamPhoto.maxUploadBytes || 0) >= 500000 &&
     operations.includes('updateParticipant') &&
     operations.includes('createParticipant') &&
