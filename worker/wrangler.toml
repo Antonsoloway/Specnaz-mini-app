@@ -22,5 +22,6 @@ invocation_logs = true
 # GITHUB_TOKEN
 # SESSION_SECRET
 # BOT_TOKEN is also used server-side as the HMAC key for Worker -> Apps Script
-# admin-write requests. It is never exposed to the browser or GitHub.
+# admin-write requests and short-lived Google Sheets CellImage source URLs.
+# It is never exposed to the browser or GitHub.
 # Cloudflare Builds source: GitHub main, root path /worker.
