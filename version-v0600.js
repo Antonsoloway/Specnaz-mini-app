@@ -1,7 +1,7 @@
 /* Royal CRM Mini App — v0.6.0 version guard + final admin-write loader */
 (() => {
   const VERSION = '0.6.0';
-  const CACHE = '20260820-1018';
+  const CACHE = '20260820-1040';
 
   function apply() {
     const badge = document.getElementById('versionBadge');
@@ -17,7 +17,7 @@
     document.body.appendChild(photo);
   }
 
-  function loadAdminWrite() {
+  function loadAdminWriteCore() {
     if (window.RoyalAdminWriteV0600) {
       loadPhotoModule();
       return;
@@ -31,6 +31,20 @@
     document.body.appendChild(script);
   }
 
+  function loadFinalGate() {
+    if (window.RoyalAdminWriteGateV0600) {
+      loadAdminWriteCore();
+      return;
+    }
+    if (document.querySelector('script[data-admin-write-gate-v0600="1"]')) return;
+    const gate = document.createElement('script');
+    gate.src = `admin-write-gate-v0600.js?v=${CACHE}`;
+    gate.async = false;
+    gate.dataset.adminWriteGateV0600 = '1';
+    gate.addEventListener('load', loadAdminWriteCore, { once:true });
+    document.body.appendChild(gate);
+  }
+
   apply();
   setTimeout(apply, 0);
   setTimeout(apply, 500);
@@ -41,5 +55,5 @@
     observer.observe(badge, { childList: true, characterData: true, subtree: true });
   }
   window.__ROYAL_UI_VERSION__ = VERSION;
-  loadAdminWrite();
+  loadFinalGate();
 })();
