@@ -1,16 +1,16 @@
 /* Royal CRM Mini App — v0.6 admin avatar bridge
  *
- * The canonical avatar loader (media-v0517.js) does NOT load by avatarFileId.
- * It discovers images only under [data-telegram-id] and requests /avatar by raw
- * Telegram ID. Admin cards did not expose that DOM contract, so the normal
- * loader correctly found zero admin images.
+ * Admin participant cards use EXACTLY the same persistent avatar cache as the
+ * normal participant list:
+ *   IndexedDB: royal-crm-media-cache
+ *   key: avatar:<avatarFileId|tg-id>
+ *   memory -> disk -> network fallback
+ *   same IntersectionObserver/concurrency/retry path.
  *
- * This bridge makes admin participant cards use exactly the same contract,
- * loader and cache as the normal participant list. No second avatar backend,
- * cache or snapshot dependency is introduced.
+ * No second admin avatar cache exists.
  */
 (() => {
-  const VERSION = '0.6.0-admin-avatar-bridge.2';
+  const VERSION = '0.6.0-admin-avatar-bridge.3';
   let scheduled = 0;
   let decorating = false;
 
@@ -47,6 +47,19 @@
     return telegramId(idField?.querySelector('span:last-child')?.textContent);
   }
 
+  function attachImageEvents(img, wrap, record) {
+    if (!img || img.dataset.adminAvatarEvents === '1') return;
+    img.dataset.adminAvatarEvents = '1';
+    img.addEventListener('load', () => {
+      if (!img.src) return;
+      wrap.classList.remove('fallback');
+      record.dataset.adminAvatarLoaded = '1';
+    });
+    img.addEventListener('error', () => {
+      wrap.classList.add('fallback');
+    });
+  }
+
   function ensureAvatarDom(record) {
     const id = recordId(record);
     if (!id) return false;
@@ -55,7 +68,7 @@
     const main = summary?.querySelector('.royal-admin-summary-main');
     if (!summary || !main) return false;
 
-    // This is the critical contract required by mediaV0517TelegramIdForImage().
+    // Canonical media contract required by the normal persistent loader.
     record.dataset.telegramId = id;
 
     let wrap = summary.querySelector('.royal-admin-participant-avatar');
@@ -69,9 +82,6 @@
       wrap.appendChild(fallback);
       summary.insertBefore(wrap, main);
     }
-
-    // Putting the ID on the nearest holder too makes the contract resilient if
-    // the card markup changes later.
     wrap.dataset.telegramId = id;
 
     let img = wrap.querySelector('img.person-avatar');
@@ -79,35 +89,41 @@
       img = document.createElement('img');
       img.className = 'person-avatar';
       img.alt = '';
-      img.addEventListener('load', () => {
-        if (!img.src) return;
-        wrap.classList.remove('fallback');
-        record.dataset.adminAvatarLoaded = '1';
-      });
-      img.addEventListener('error', () => {
-        wrap.classList.add('fallback');
-      });
       wrap.appendChild(img);
     }
+    attachImageEvents(img, wrap, record);
 
-    // If an older broken admin pass left an error state, replace the image so
-    // media-v0517's WeakSet/loaded-state cannot suppress a fresh canonical load.
+    // Old failed DOM nodes may be remembered by queue/observer WeakSets.
+    // Replace only failed nodes, preserving successfully cached images.
     if (img.dataset.avatarLoaded === 'error') {
       const fresh = img.cloneNode(false);
       fresh.removeAttribute('src');
       delete fresh.dataset.avatarLoaded;
       delete fresh.dataset.avatarRetries;
-      fresh.addEventListener('load', () => {
-        if (!fresh.src) return;
-        wrap.classList.remove('fallback');
-        record.dataset.adminAvatarLoaded = '1';
-      });
-      fresh.addEventListener('error', () => wrap.classList.add('fallback'));
+      delete fresh.dataset.adminAvatarEvents;
+      attachImageEvents(fresh, wrap, record);
       img.replaceWith(fresh);
     }
 
     record.dataset.adminAvatarEnhanced = '1';
     return true;
+  }
+
+  function setupWithCanonicalPersistentCache(screen) {
+    // Hard-bind to the exact cache used by normal mode. This avoids any load-
+    // order ambiguity with the older session-only setupAvatarLoading symbol.
+    const persistent = window.RoyalPersistentMediaCache;
+    if (persistent && typeof persistent.setup === 'function') {
+      persistent.setup(screen);
+      return 'persistent';
+    }
+
+    // Safe fallback only while the persistent module is still initializing.
+    if (typeof setupAvatarLoading === 'function') {
+      setupAvatarLoading(screen);
+      return 'global';
+    }
+    return 'missing';
   }
 
   function refresh() {
@@ -124,8 +140,9 @@
         if (ensureAvatarDom(record)) prepared += 1;
       });
 
-      if (prepared && typeof setupAvatarLoading === 'function') {
-        setupAvatarLoading(screen);
+      if (prepared) {
+        const mode = setupWithCanonicalPersistentCache(screen);
+        screen.dataset.adminAvatarCache = mode;
       }
       return prepared > 0;
     } catch (error) {
@@ -160,6 +177,8 @@
     }
   }, true);
 
+  // Persistent cache is loaded synchronously before admin-v0600 in app-v0600,
+  // but keep bounded late passes for WebView script/startup races.
   schedule(0);
   setTimeout(refresh, 300);
   setTimeout(refresh, 1000);
@@ -167,6 +186,9 @@
   window.RoyalAdminAvatarRefreshV0600 = {
     version: VERSION,
     refresh,
-    schedule
+    schedule,
+    get cacheVersion() {
+      return window.RoyalPersistentMediaCache?.version || '';
+    }
   };
 })();
