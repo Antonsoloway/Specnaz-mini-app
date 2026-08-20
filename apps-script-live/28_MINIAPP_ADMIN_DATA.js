@@ -1,7 +1,7 @@
 /*
  * Royal CRM / Таблица ЧП
  * 28_MINIAPP_ADMIN_DATA.js
- * v0.6.0-read.3
+ * v0.6.0-write.4
  *
  * PRIVATE admin snapshot for Mini App v0.6.
  * - Does NOT change the stable user snapshot.json contract.
@@ -12,7 +12,7 @@
  *   while it already owns the ScriptLock; no second time trigger is required.
  */
 
-var MINIAPP_ADMIN_DATA_VERSION = '0.6.0-read.3';
+var MINIAPP_ADMIN_DATA_VERSION = '0.6.0-write.4';
 var MINIAPP_ADMIN_DATA_DEFAULT_PATH = 'admin-snapshot.json';
 var MINIAPP_ADMIN_DATA_LAST_HASH = 'MINIAPP_ADMIN_DATA_LAST_HASH';
 
@@ -104,6 +104,11 @@ function MINIAPP_buildAdminData_() {
   var participants = MINIAPP_adminReadParticipants_(base);
   var teams = MINIAPP_adminReadTeams_(ss, teamsSheet);
 
+  // v0.6 final write: revisions include every field an admin can edit.
+  if (typeof MINIAPP_adminWriteFinalDecorateRevisions_ === 'function') {
+    MINIAPP_adminWriteFinalDecorateRevisions_(participants, teams);
+  }
+
   var inChat = 0;
   var exited = 0;
   participants.forEach(function(p) {
@@ -126,6 +131,9 @@ function MINIAPP_buildAdminData_() {
     version: MINIAPP_ADMIN_DATA_VERSION,
     participants: participants,
     teams: teams,
+    write: typeof MINIAPP_adminWriteFinalMeta_ === 'function'
+      ? MINIAPP_adminWriteFinalMeta_()
+      : { enabled: false, deleteEnabled: false, transport: 'disabled' },
     stats: {
       participants: participants.length,
       inChat: inChat,
@@ -135,10 +143,9 @@ function MINIAPP_buildAdminData_() {
       pausedTeams: pausedTeams,
       inactiveTeams: inactiveTeams
     },
-    journal: {
-      version: '0.6.0-planned',
-      rows: []
-    }
+    journal: typeof MINIAPP_adminWriteFinalJournalData_ === 'function'
+      ? MINIAPP_adminWriteFinalJournalData_()
+      : { version: '0.6.0-read', rows: [] }
   };
 }
 

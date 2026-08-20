@@ -1,7 +1,7 @@
 /**
  * ROYAL CRM — Telegram Mini App API
  * Файл: 12_MINI_APP_API.gs
- * Версия 0.2.4
+ * Версия 0.2.5
  *
  * ВАЖНО: этот файл НЕ объявляет глобальные doGet/doPost.
  * Их существующие точки входа остаются в 01_CORE_MAIN и 05_RELIABLE_WEBHOOK_QUEUE.
@@ -11,7 +11,7 @@
  * Старый POST + poll оставлен как совместимый резерв.
  */
 
-const MINIAPP_VERSION = '0.2.4';
+const MINIAPP_VERSION = '0.2.5';
 const MINIAPP_TOKEN_PROPERTY = 'TELEGRAM_BOT_TOKEN';
 const MINIAPP_CHAT_ID_PROPERTY = 'MINI_APP_CHAT_ID';
 const MINIAPP_DEFAULT_CHAT_ID = '-1002109152418';
@@ -20,6 +20,12 @@ const MINIAPP_ALLOWED_CHAT_STATE = 'В чате';
 const MINIAPP_RESULT_TTL_SEC = 120;
 
 function MINIAPP_doPost_(e) {
+  // v0.6 admin write: only signed Worker -> Apps Script POSTs are accepted.
+  if (typeof MINIAPP_adminWriteBackendMaybeHandle_ === 'function') {
+    const adminWriteResponse = MINIAPP_adminWriteBackendMaybeHandle_(e);
+    if (adminWriteResponse) return adminWriteResponse;
+  }
+
   let result;
   try {
     result = MINIAPP_buildAuthResult_(e);
