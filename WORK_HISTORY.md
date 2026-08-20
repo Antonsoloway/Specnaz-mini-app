@@ -3,6 +3,56 @@
 > Краткий журнал фактически выполненных работ. Новые записи добавляются сверху.
 > Здесь фиксируются изменения, проверки, диагнозы и откаты, которые нужны следующему чату.
 
+## 2026-08-20 20:24 — v0.6 preview: persistent media v2 + обычноподобная страница команды в админ-режиме
+
+**Запрос пользователя:** в admin mode аватарки не должны заново грузиться при каждом входе; в списке команд нужны фото; при нажатии на команду нужно открывать такую же страницу, как в обычном режиме — большое фото и состав участников.
+
+**Что выяснилось после предыдущих попыток:**
+- admin avatars действительно отображались, но старый bridge мог выбирать `avatar:tg-<id>` раньше public snapshot, тогда как обычный режим хранит `avatar:<avatarFileId>`; из-за разных ключей повторный вход мог снова уходить в сеть;
+- одновременно существовали два admin avatar path: `admin-search-media-sort` вызывал общий `setupAvatarLoading()`, а отдельный avatar bridge запускал второй проход;
+- admin team thumbnail раньше вообще не запрашивался, если в DOM поле `Фото C` показывало `—`;
+- подготовленный `/admin-team-photo` не был достаточным: он требовал `photoUrl` до SHA-256 media lookup; для CellImage/private media это неверно;
+- обычный `/team-photo` опирается на public snapshot, поэтому не может обслужить все admin-only `Неактивен` команды;
+- обычный `renderTeamDetail()` также не подходит напрямую для admin-only teams, потому что public snapshot их не содержит.
+
+**Frontend исправлен в `main`:**
+- добавлен `admin-media-cache-v0600-v2.js` → **`0.6.0-admin-media-cache.2`**;
+- это единственный admin media-layer, загружаемый новым `version-v0600.js`; старый `admin-media-cache-v0600.js` больше не является active loader;
+- один IndexedDB с обычным режимом: `royal-crm-media-cache / images`;
+- avatar primary key = `avatar:<avatarFileId>`; `avatar:tg-<id>` — только fallback/migration bridge;
+- admin v2 ждёт public snapshot перед выбором primary key; если найден старый tg-key и позже известен `avatarFileId`, blob мигрирует в primary key;
+- после network load `idbPut()` awaited, чтобы быстрое закрытие WebView не оставляло фото только в памяти;
+- team key = тот же `team:<normalized name>\n<normalized game>`, что обычный team-photo cache;
+- team thumbnail теперь пытается загрузить фото независимо от текстового `Фото C`;
+- admin team network route = `/admin-team-photo`, disk-first остаётся приоритетом; background refresh не чаще 30 минут;
+- добавлен `admin-team-detail-v0600.js` → **`0.6.0-admin-team-detail.1`**;
+- тап по `[data-admin-team] > summary` открывает обычноподобный detail: большой `team-photo-box`, `team-detail-head`, `team-stats`, `team-members-list`;
+- состав строится из private admin participants по exact team + game, поэтому inactive team data не теряются;
+- member avatars на detail идут через тот же admin persistent media v2;
+- Back state сохраняется через `RoyalNav` с временным hidden rich-marker, чтобы вернуться к прежнему admin DOM/search/filter/scroll state.
+
+**Worker исправлен в repo:**
+- добавлен `worker/src/entry-v1241.js` → **1.24.1**;
+- `worker/wrangler.toml` переключён на `src/entry-v1241.js`;
+- `/admin-team-photo` повторно авторизует пользователя через защищённый `/admin-data`;
+- команда ищется в private admin snapshot по `name + game`;
+- сначала читается `media/teams/<sha256(normalized name + game)>.bin`;
+- только если private media отсутствует, разрешён compatibility fallback на `photoUrl`;
+- отсутствие/пустота ephemeral `photoUrl` больше не блокирует SHA-256 lookup;
+- public `/team-photo`, `/snapshot`, `/contact-by-id`, admin-write chain остаются унаследованными из `entry-v1230.js`.
+
+**Доставка preview:**
+- `version-v0600.js` cache-bust → **`20260820-2024`**;
+- `app-v0600.html` → `version-v0600.js?v=20260820-2024`;
+- `app.html` previewBuild → **`20260820-2024`**;
+- стабильный `app-v0559.html` не менялся.
+
+**Apps Script / Sheets:** не менялись; Cloud Shell не нужен; данные участников/команд этой правкой не изменялись.
+
+**Статус:** frontend + Worker source/config **repo updated**. В этой сессии прямой health-check Worker не состоялся из-за DNS ограничения среды, поэтому `Worker 1.24.1 production verified` пока НЕ записывать. Нужен Telegram smoke после Cloudflare auto-deploy: открыть admin `Команды`, проверить thumbnail, открыть команду → большое фото + состав, Back, затем повторно открыть ту же команду/участников и убедиться, что фото приходят из disk cache без повторной задержки. Отдельно проверить одну `Неактивен` команду.
+
+---
+
 ## 2026-08-20 19:05 — v0.6 preview: admin hybrid search, аватарки и порядок «Вышел»
 
 **Запрос пользователя:** в админ-режиме поиск должен работать так же полно, как на обычных страницах; у участников должны отображаться аватарки; фильтр `Вышел` должен повторять порядок админской таблицы — недавно вышедшие сверху, давно вышедшие снизу.
