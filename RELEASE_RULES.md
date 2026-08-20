@@ -80,6 +80,9 @@
 72. Безопасное ускорение team-photo cache допускается внутри штатного `media-persistent-cache`: одним readonly-проходом можно заранее сохранить в JS-памяти **IndexedDB record/blob references**, но нельзя заранее создавать `blob:` URL для всех команд, менять DOM, перехватывать `renderTeamDetail` или отключать штатный loader/fallback. Object URL создаётся только для реально открываемой команды; сетевой prewarm запрещён.
 73. **Переименование существующей команды в `Команды!B` — каскадная операция.** До public/snapshot sync необходимо обновить все пять membership team-слотов `База участников` по identity `старое название + игра`. Ник, роль и game-columns не менять. Автоматический repair допустим только для однозначного decorative-prefix/emoji drift; полное/неоднозначное переименование без подтверждённого mapping не угадывать. Строгую public validation сохранять.
 74. **v0.6 existing-participant write policy:** администратор вручную изменяет только CRM `Имя` и пять membership slots (`команда / роль / игровой ник`). Telegram ID, состояние чата, Telegram name, `@username`, дата V, U/AB/AC/AD и вычисляемые/system поля принадлежат боту/системе и должны быть **SERVER READ-ONLY**. Frontend обязан скрывать/блокировать их, но безопасность обеспечивается серверным whitelist: `updateParticipant` принимает только `name` и `memberships`; любое другое поле отклоняется до записи (`PARTICIPANT_FIELD_READ_ONLY`).
+75. **v0.6 admin search:** админ-поиск по участникам и командам не должен деградировать до простого raw lowercase `.includes()`. Он использует deterministic hybrid forms, как обычный поиск: normalize/compact, кириллица↔латиница, human-read, один pseudo-read, confirmed aliases и доступные `searchKeys`. Для admin-only записей local search обязан работать без public snapshot. Поле ввода не перерисовывать на каждую букву и не блокировать IME.
+76. **v0.6 admin avatars:** participant avatar identity = raw Telegram ID → существующий public `avatarFileId`; использовать тот же `.person-avatar` / `setupAvatarLoading()` / avatar cache path, что и обычный список. Не вводить отдельный backend или второй формат аватаров только для admin mode.
+77. **v0.6 `Вышел` ordering:** порядок должен повторять физическую группу `База участников`, где стабильная `sortBaseByChatState_()` держит новые выходы выше старых. В admin UI при фильтре `Вышел` сортировать по source `row` по возрастанию. `AE Дата изменения` не считать датой выхода. После ухода из фильтра восстановить исходный list order; DOM-sort не должен запускать бесконечный MutationObserver/rerender цикл.
 
 ## Текущая версия
 
@@ -108,6 +111,9 @@ Admin-preview `v0.6.0` дополнительно использует:
 - team-photo upload + rename cleanup;
 - admin journal;
 - existing-participant server whitelist `name + memberships`;
+- deterministic admin hybrid search + public `searchKeys` when available;
+- participant avatars через существующий `avatarFileId`/cache path;
+- `Вышел` ordering по physical source row, newest first;
 - delete operations выключены.
 
 Все предыдущие версии сохраняются в истории изменений без удаления.
