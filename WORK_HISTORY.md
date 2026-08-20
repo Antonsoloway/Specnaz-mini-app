@@ -3,6 +3,38 @@
 > Краткий журнал фактически выполненных работ. Новые записи добавляются сверху.
 > Здесь фиксируются изменения, проверки, диагнозы и откаты, которые нужны следующему чату.
 
+## 2026-08-20 22:47 — v0.6 admin participants: ordinary-style membership pills
+
+**Запрос пользователя:** в admin mode на странице `Участники` команды у каждого участника должны выглядеть так же, как на обычной странице участников: отдельные цветные плашки с названием команды, ролью и игрой, а не одной строкой текста.
+
+**Фактическая сверка перед правкой:**
+- ordinary participant list в `app.js` использует `membership-list` + отдельный `membership-pill` на каждый membership;
+- `team-game-colors-v0535.js` уже окрашивает эти плашки по РМ/РК;
+- `active-teams-v0559.js` уже ставит `active-team-gold-v0559` на `.membership-pill[data-team]` по фактическому team status `Активен` и identity `название + игра`;
+- admin base DOM уже содержит все 5 private membership slots в hidden technical detail, поэтому новый API/backend не нужен;
+- `admin-participant-detail-v0600.js .1` поверх этого DOM раньше показывал команды одной текстовой строкой.
+
+**Что изменено:**
+- добавлен новый read-only frontend module `admin-participant-memberships-v0600.js` → **`0.6.0-admin-participant-memberships.1`**;
+- модуль читает существующие private membership slots из admin participant record и создаёт в summary обычный контейнер `membership-list`;
+- каждый заполненный membership выводится отдельной ordinary-style `membership-pill` с `команда + роль + игра`; пустые слоты не показываются;
+- старая объединённая строка `.royal-admin-participant-list-teams` скрыта;
+- повторно вызываются существующие `RoyalTeamGameColors.refresh()` и `RoyalActiveTeams.refresh()`, поэтому плашки получают те же РМ/РК цвета и ту же золотую рамку `Активен`, что ordinary UI;
+- плашки в admin summary сделаны display-only (`pointer-events:none`): весь summary остаётся единым navigation target, поэтому tap по области плашек открывает **admin participant detail**, а не ordinary team/public route;
+- существующий participant nav guard для аватара сохранён; raw Telegram ID остаётся hidden technical identity.
+
+**Доставка preview:**
+- `version-v0600.js` cache-bust → **`20260820-2242`** и loader chain дополнен новым membership module после participant nav guard;
+- `app-v0600.html` → `version-v0600.js?v=20260820-2242`;
+- `app.html` previewBuild → **`20260820-2242`**;
+- stable `v0.5.59` не менялся.
+
+**Backend / data:** Worker, Apps Script, Google Sheets, public/private snapshot data и write whitelist этой правкой не менялись. Cloud Shell не нужен; это только frontend presentation/decorator layer.
+
+**Verification:** текущие repo-файлы/loader/cache-bust повторно прочитаны после commit; CSS `active-teams-v0559.css` подтверждает gold style для `.membership-pill.active-team-gold-v0559`. Реальный Telegram WebView visual smoke ещё pending: проверить участника с двумя командами РК+РМ, активную команду с золотом и tap по карточке/аватару/области плашек.
+
+---
+
 ## 2026-08-20 22:24 — factual resync: preview build 2220 + participant nav guard
 
 **Задача:** новый чат восстановил состояние по `START_HERE.md`, `CURRENT_STATE.md`, последним `WORK_HISTORY.md` и сверил документацию с фактическим `main` и свежим public snapshot.
