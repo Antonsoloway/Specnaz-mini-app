@@ -1,10 +1,12 @@
 /* Royal CRM Mini App — v0.6 admin navigation guard
  * Keeps navigation inside admin mode. Any participant/team transition originating
  * from admin UI is routed to the private admin detail instead of ordinary/public UI.
- * Installed on window capture so it runs before ordinary document-level routers.
+ * Handles both click routers and the legacy avatar pointerdown/pointerup profile route.
  */
 (() => {
-  const VERSION = '0.6.0-admin-navigation-guard.2';
+  const VERSION = '0.6.0-admin-navigation-guard.3';
+  let rosterPress = null;
+  let lastParticipantRoute = { id:'', at:0 };
 
   const clean = value => String(value == null ? '' : value).trim();
   function id(value) {
@@ -18,9 +20,15 @@
     if (low === 'рк' || low.includes('royal kingdom')) return 'Royal Kingdom';
     return raw;
   }
-  function blockOrdinary(event) {
-    event.preventDefault();
+  function blockOrdinary(event, prevent=true) {
+    if (prevent) event.preventDefault();
     event.stopImmediatePropagation();
+  }
+  function isIndependentAction(target) {
+    return !!target?.closest?.('[data-user-menu],button,a,input,select,textarea,summary');
+  }
+  function adminRosterMember(target) {
+    return target?.closest?.('.royal-admin-team-detail-shell .team-member[data-telegram-id]') || null;
   }
   function openAdminTeam(name, game, event) {
     const teamName = clean(name);
@@ -34,6 +42,9 @@
     const pid = id(telegramId);
     if (!pid || !window.RoyalAdminParticipantDetailV0600?.open) return false;
     blockOrdinary(event);
+    const now = Date.now();
+    if (lastParticipantRoute.id === pid && now - lastParticipantRoute.at < 450) return true;
+    lastParticipantRoute = { id:pid, at:now };
     window.RoyalAdminParticipantDetailV0600.open(pid);
     return true;
   }
@@ -46,11 +57,73 @@
       .royal-admin-participant-list-membership{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:rgba(84,169,235,.14)}
       .royal-admin-participant-list-membership>*{pointer-events:none!important}
       .royal-admin-team-detail-shell .team-member[data-telegram-id]{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:rgba(84,169,235,.14)}
-      .royal-admin-team-detail-shell .team-member[data-telegram-id] .person-avatar-wrap,
-      .royal-admin-team-detail-shell .team-member[data-telegram-id] .person-avatar-wrap *{pointer-events:none!important}
     `;
     document.head.appendChild(style);
   }
+
+  function installOrdinaryParticipantFallbackBlock() {
+    const ordinary = window.RoyalOpenParticipantByTelegramId;
+    if (typeof ordinary !== 'function' || ordinary.__royalAdminNavigationProtected) return;
+    const guarded = function(telegramId) {
+      const pid = id(telegramId);
+      const adminVisible = !!document.querySelector(
+        '.royal-admin-team-detail-shell,[data-admin-participant="1"],[data-admin-team="1"],.royal-admin-team-ranking-shell,.royal-admin-participant-ranking-shell'
+      );
+      if (pid && adminVisible && window.RoyalAdminParticipantDetailV0600?.open) {
+        const now = Date.now();
+        if (!(lastParticipantRoute.id === pid && now - lastParticipantRoute.at < 450)) {
+          lastParticipantRoute = { id:pid, at:now };
+          window.RoyalAdminParticipantDetailV0600.open(pid);
+        }
+        return true;
+      }
+      return ordinary(telegramId);
+    };
+    guarded.__royalAdminNavigationProtected = true;
+    guarded.__royalOrdinaryParticipantOpen = ordinary;
+    window.RoyalOpenParticipantByTelegramId = guarded;
+  }
+
+  // Legacy public participant profile listens on document capture to avatar pointer events.
+  // Capture first on window so admin roster taps never reach that ordinary handler.
+  window.addEventListener('pointerdown', event => {
+    const member = adminRosterMember(event.target);
+    if (!member || isIndependentAction(event.target)) {
+      rosterPress = null;
+      return;
+    }
+    const pid = id(member.dataset.telegramId);
+    if (!pid) {
+      rosterPress = null;
+      return;
+    }
+    rosterPress = {
+      id:pid,
+      pointerId:event.pointerId,
+      x:Number(event.clientX || 0),
+      y:Number(event.clientY || 0),
+      at:Date.now()
+    };
+    blockOrdinary(event, false);
+  }, true);
+
+  window.addEventListener('pointerup', event => {
+    const saved = rosterPress;
+    rosterPress = null;
+    if (!saved || saved.pointerId !== event.pointerId) return;
+    const member = adminRosterMember(event.target);
+    if (!member || id(member.dataset.telegramId) !== saved.id) {
+      blockOrdinary(event, false);
+      return;
+    }
+    const dx = Number(event.clientX || 0) - saved.x;
+    const dy = Number(event.clientY || 0) - saved.y;
+    blockOrdinary(event, false);
+    if ((dx * dx + dy * dy) > 196 || Date.now() - saved.at > 900) return;
+    openAdminParticipant(saved.id, event);
+  }, true);
+
+  window.addEventListener('pointercancel', () => { rosterPress = null; }, true);
 
   window.addEventListener('click', event => {
     const teamTarget = event.target?.closest?.('[data-admin-route-team="1"],[data-admin-participant-team="1"]');
@@ -64,9 +137,9 @@
     const rankingTeam = event.target?.closest?.('[data-admin-ranking-team="1"]');
     if (rankingTeam && openAdminTeam(rankingTeam.dataset.teamName, rankingTeam.dataset.teamGame, event)) return;
 
-    const member = event.target?.closest?.('.royal-admin-team-detail-shell .team-member[data-telegram-id]');
+    const member = adminRosterMember(event.target);
     if (member) {
-      if (event.target?.closest?.('[data-user-menu],button,a,input,select,textarea')) return;
+      if (isIndependentAction(event.target)) return;
       if (openAdminParticipant(member.dataset.telegramId, event)) return;
     }
 
@@ -88,5 +161,6 @@
   }, true);
 
   installStyle();
+  installOrdinaryParticipantFallbackBlock();
   window.RoyalAdminNavigationGuardV0600 = { version:VERSION };
 })();
