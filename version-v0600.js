@@ -1,19 +1,32 @@
 /* Royal CRM Mini App — v0.6.0 version guard + final admin-write loader */
 (() => {
   const VERSION = '0.6.0';
-  const CACHE = '20260820-1712';
+  const CACHE = '20260820-1908';
 
   function apply() {
     const badge = document.getElementById('versionBadge');
     if (badge && badge.textContent !== `v${VERSION} ›`) badge.textContent = `v${VERSION} ›`;
   }
 
+  function loadAdminEnhancements() {
+    if (window.RoyalAdminSearchMediaSortV0600 || document.querySelector('script[data-admin-search-media-sort-v0600="1"]')) return;
+    const script = document.createElement('script');
+    script.src = `admin-search-media-sort-v0600.js?v=${CACHE}`;
+    script.async = false;
+    script.dataset.adminSearchMediaSortV0600 = '1';
+    document.body.appendChild(script);
+  }
+
   function loadParticipantPolicy() {
-    if (window.RoyalAdminParticipantEditPolicyV0600 || document.querySelector('script[data-admin-participant-policy-v0600="1"]')) return;
+    if (window.RoyalAdminParticipantEditPolicyV0600 || document.querySelector('script[data-admin-participant-policy-v0600="1"]')) {
+      loadAdminEnhancements();
+      return;
+    }
     const policy = document.createElement('script');
     policy.src = `admin-participant-edit-policy-v0600.js?v=${CACHE}`;
     policy.async = false;
     policy.dataset.adminParticipantPolicyV0600 = '1';
+    policy.addEventListener('load', loadAdminEnhancements, { once:true });
     document.body.appendChild(policy);
   }
 
