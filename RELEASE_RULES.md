@@ -79,12 +79,14 @@
 71. **Не возвращать iOS fast-path из `stable-v0559.js 0.5.59.3`: пакетное создание session object URLs для всех team blobs и синхронная подмена `renderTeamDetail()` на реальном iPhone привели к полному исчезновению фото команд.** Любое новое ускорение iOS сначала делать изолированно, без отключения штатного loader/fallback, и проверять на реальном iPhone до публикации.
 72. Безопасное ускорение team-photo cache допускается внутри штатного `media-persistent-cache`: одним readonly-проходом можно заранее сохранить в JS-памяти **IndexedDB record/blob references**, но нельзя заранее создавать `blob:` URL для всех команд, менять DOM, перехватывать `renderTeamDetail` или отключать штатный loader/fallback. Object URL создаётся только для реально открываемой команды; сетевой prewarm запрещён.
 73. **Переименование существующей команды в `Команды!B` — каскадная операция.** До public/snapshot sync необходимо обновить все пять membership team-слотов `База участников` по identity `старое название + игра`. Ник, роль и game-columns не менять. Автоматический repair допустим только для однозначного decorative-prefix/emoji drift; полное/неоднозначное переименование без подтверждённого mapping не угадывать. Строгую public validation сохранять.
+74. **v0.6 existing-participant write policy:** администратор вручную изменяет только CRM `Имя` и пять membership slots (`команда / роль / игровой ник`). Telegram ID, состояние чата, Telegram name, `@username`, дата V, U/AB/AC/AD и вычисляемые/system поля принадлежат боту/системе и должны быть **SERVER READ-ONLY**. Frontend обязан скрывать/блокировать их, но безопасность обеспечивается серверным whitelist: `updateParticipant` принимает только `name` и `memberships`; любое другое поле отклоняется до записи (`PARTICIPANT_FIELD_READ_ONLY`).
 
 ## Текущая версия
 
-На 19.08.2026 актуальная версия: `v0.5.59`.
+На 20.08.2026 стабильная версия для обычного запуска: **`v0.5.59`**.
+Отдельный admin-preview: **`v0.6.0`** через `startapp=v0600`; не делать его общим entrypoint до завершения admin smoke-test.
 
-Запись `v0.5.59 — Активные команды спецназа` содержит:
+Стабильная `v0.5.59` сохраняет:
 - статус команды из `Команды!L` через Unified Snapshot/Worker;
 - золотую маркировку активных команд;
 - inline JPEG-крота на detail/team cards;
@@ -92,11 +94,20 @@
 - server alias `BbllllKA / Royal Kingdom ↔ вышка` через writer `1.2.4`, `searchIndexVersion=1.1.3`;
 - каскадное переименование team identity в live Apps Script и pre-snapshot repair однозначного decorative drift;
 - постоянный team-photo cache key `команда + игра`;
-- safe disk-record warm в `media-persistent-cache-v0554.js 0.5.54.2`: record/blob references заранее, object URL только для открываемой команды, без сети;
-- iOS-safe team-photo guard `0.5.59.2`, сохраняющий рабочий source до готовности кэша/proxy; неудачный fast patch `0.5.59.3` откатан;
+- safe disk-record warm в `media-persistent-cache-v0554.js 0.5.54.2`;
+- iOS-safe team-photo guard `0.5.59.2`; неудачный fast patch `0.5.59.3` откатан;
 - кнопку `Связаться` через Worker/Голубца для участников без `@username`;
-- восстановление кнопок `Связаться` после Back/rerender списка участников;
-- устойчивую `/auth`: 12 секунд + один automatic retry для временных сбоев, `AUTH_TIMEOUT` вместо Android code 20;
+- восстановление кнопок `Связаться` после Back/rerender;
+- устойчивую `/auth`: 12 секунд + один automatic retry;
 - credits `@sfinks_spb`, `@O_Chaplygina`, `@Yanochka_2404`, `@DmitryRoyal`.
+
+Admin-preview `v0.6.0` дополнительно использует:
+- private admin snapshot `0.6.0-write.4` + optimistic revisions;
+- Worker-signed HMAC write transport;
+- защищённые admin participant/team mutations;
+- team-photo upload + rename cleanup;
+- admin journal;
+- existing-participant server whitelist `name + memberships`;
+- delete operations выключены.
 
 Все предыдущие версии сохраняются в истории изменений без удаления.
