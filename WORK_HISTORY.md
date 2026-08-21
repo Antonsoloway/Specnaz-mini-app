@@ -3,6 +3,18 @@
 > Краткий журнал фактически выполненных работ. Новые записи добавляются сверху.
 > Здесь фиксируются изменения, проверки, диагнозы и откаты, которые нужны следующему чату.
 
+## 2026-08-21 20:24 — endpoint repair v2 live; pinned write route independently verified
+
+**Cloud Shell результат:** обновлённый `scripts/repair-v0600-admin-write-endpoint.sh` завершился маркером `ADMIN WRITE ENDPOINT REPAIRED`. Он выбрал exact существующий deployment `Таблица ЧП 1.3`, внедрил его `/exec` в live `31_MINIAPP_ADMIN_WRITE_HARDENED.js`, обновил только этот deployment и дождался exact private snapshot. Новый deployment не создавался; participant/team rows installer не менял.
+
+**Независимая runtime-проверка:** production Worker `/health` вернул `1.27.0` и `adminWriteEndpoint=pinned-deployment-config`. Private snapshot `2026-08-21T17:23:59.615Z` вернул `0.6.0-write.5`, `endpointPinned=true`, `endpointSource=deployment-constant`, exact установленный endpoint и все шесть create/update/delete operations. Прямой non-mutating POST к этому endpoint вернул ожидаемый JSON `INVALID_REQUEST_ID / 0.6.0-write.5`, а не прежний `404 text/html`.
+
+**Данные после ремонта:** 207 participants / 128 teams; admin journal `rows=[]`; неудавшаяся ранее `Cataha` отсутствует. Это подтверждает, что repair не создал, не изменил и не удалил CRM-записи.
+
+**Доставка и factual mirror:** endpoint hardening был squash-merged PR #9 (`47725e2`); Worker `1.27.0` live. После успешного installer полный `clasp pull` mirror из 34 файлов и manifest синхронизированы в `main` commit `8b64a7adad828c2dc3d3d068b6315ded96b7cd5c`; live mirror содержит exact endpoint, не placeholder.
+
+**Оставшийся smoke:** backend route и pin исправлены, но реальный `createTeam` после ремонта ещё не выполнялся. Полностью закрыть/открыть Mini App и один раз повторить добавление тестовой команды; затем проверить её в private snapshot/admin journal. До этого не объявлять пользовательский create-flow подтверждённым.
+
 ## 2026-08-21 19:20 — first endpoint repair exposed false-success `clasp run`; storage dependency removed
 
 **Результат первого repair run на Cloud Shell:** Worker guard `1.26.0`, `clasp pull/push`, update существующего deployment и direct non-mutating route check прошли. Во время endpoint setter Apps Script напечатал `Exception: We're sorry, a server error occurred while reading from storage`, однако `clasp run` вернул exit code 0; installer ошибочно отметил запрос успешным и после `30/30` snapshot checks корректно остановился. Команду повторять тем же installer запрещено.
