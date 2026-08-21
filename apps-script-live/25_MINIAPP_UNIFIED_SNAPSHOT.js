@@ -59,6 +59,7 @@ function MINIAPP_bootstrapUnifiedSnapshot() {
 function MINIAPP_exportUnifiedSnapshotToGitHub() {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(25000)) return { ok: false, skipped: true, reason: 'LOCK_BUSY' };
+  var lockHeld = true;
 
   try {
     MINIAPP_unifiedRequireHelpers_();
@@ -103,23 +104,30 @@ function MINIAPP_exportUnifiedSnapshotToGitHub() {
     var searchStats = MINIAPP_unifiedAttachSearchKeys_(stable);
 
 
-    // v1.2.5 / Mini App v0.6: build a separate PRIVATE admin snapshot using
-    // the same existing 5-minute trigger. Failure here must never break the
-    // stable participant snapshot used by v0.5.59.
+    var sections = MINIAPP_readSpecnazHistorySections_();
+
+    // All Sheet reads above are now captured consistently. Release ScriptLock
+    // before any GitHub request so the recurring snapshot cannot stall an admin
+    // mutation for the duration of external network I/O.
+    try { lock.releaseLock(); } catch (_) {}
+    lockHeld = false;
+
+    // The normal write path uses a one-off queue. This recurring trigger is the
+    // durable fallback: it captures private admin data under a new short lock,
+    // releases that lock, then performs GitHub I/O without blocking mutations.
     var adminSnapshotResult = { ok: false, skipped: true, reason: 'ADMIN_EXPORTER_MISSING' };
-    if (typeof MINIAPP_exportAdminSnapshotUnlocked_ === 'function') {
+    if (typeof MINIAPP_exportAdminSnapshotToGitHub === 'function') {
       try {
-        adminSnapshotResult = MINIAPP_exportAdminSnapshotUnlocked_(props, repo, token, branch);
+        adminSnapshotResult = MINIAPP_exportAdminSnapshotToGitHub();
       } catch (adminSnapshotError) {
         adminSnapshotResult = {
           ok: false,
           error: String(adminSnapshotError && adminSnapshotError.message ? adminSnapshotError.message : adminSnapshotError || 'UNKNOWN')
         };
-        console.error('MINIAPP admin snapshot export failed', adminSnapshotResult.error);
+        console.error('MINIAPP admin snapshot fallback failed', adminSnapshotResult.error);
       }
     }
 
-    var sections = MINIAPP_readSpecnazHistorySections_();
     var nowIso = new Date().toISOString();
     var historyVersion = typeof MINIAPP_SPECNAZ_HISTORY_VERSION !== 'undefined'
       ? String(MINIAPP_SPECNAZ_HISTORY_VERSION || '1.3.0') : '1.3.0';
@@ -149,7 +157,8 @@ function MINIAPP_exportUnifiedSnapshotToGitHub() {
         teamSearchKeys: searchStats.teamKeys,
         statsTouched: statsTouched,
         historySections: sections.length,
-        teamStatusStats: teamStatusStats
+        teamStatusStats: teamStatusStats,
+        adminSnapshot: adminSnapshotResult
       };
     }
 
@@ -184,10 +193,13 @@ function MINIAPP_exportUnifiedSnapshotToGitHub() {
       statsTouched: statsTouched,
       historySections: sections.length,
       teamStatusStats: teamStatusStats,
+      adminSnapshot: adminSnapshotResult,
       github: github
     };
   } finally {
-    try { lock.releaseLock(); } catch (_) {}
+    if (lockHeld) {
+      try { lock.releaseLock(); } catch (_) {}
+    }
   }
 }
 

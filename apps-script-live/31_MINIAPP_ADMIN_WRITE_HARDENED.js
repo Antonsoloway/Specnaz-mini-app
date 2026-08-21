@@ -204,6 +204,8 @@ function MINIAPP_adminWriteHardenedUpdateParticipant_(ctx) {
 
   var after = MINIAPP_adminWriteHardenedParticipantRecord_(sheet, row);
   MINIAPP_adminWriteHardenedAppendJournal_(ctx, 'participant', telegramId, row, before, after, changes);
+  var revision = MINIAPP_adminWriteHardenedParticipantRevision_(after);
+  after.revision = revision;
 
   return {
     ok: true,
@@ -212,7 +214,8 @@ function MINIAPP_adminWriteHardenedUpdateParticipant_(ctx) {
     entityType: 'participant',
     entityKey: telegramId,
     row: row,
-    revision: MINIAPP_adminWriteHardenedParticipantRevision_(after),
+    revision: revision,
+    record: after,
     message: 'Участник обновлён.'
   };
 }
@@ -276,6 +279,8 @@ function MINIAPP_adminWriteHardenedCreateParticipant_(ctx) {
 
   var after = MINIAPP_adminWriteHardenedParticipantRecord_(sheet, row);
   MINIAPP_adminWriteHardenedAppendJournal_(ctx, 'participant', telegramId, row, before, after, value);
+  var revision = MINIAPP_adminWriteHardenedParticipantRevision_(after);
+  after.revision = revision;
 
   return {
     ok: true,
@@ -284,7 +289,8 @@ function MINIAPP_adminWriteHardenedCreateParticipant_(ctx) {
     entityType: 'participant',
     entityKey: telegramId,
     row: row,
-    revision: MINIAPP_adminWriteHardenedParticipantRevision_(after),
+    revision: revision,
+    record: after,
     message: 'Участник добавлен.'
   };
 }

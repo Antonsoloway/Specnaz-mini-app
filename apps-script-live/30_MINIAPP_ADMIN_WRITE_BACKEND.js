@@ -117,7 +117,11 @@ function MINIAPP_adminWriteBackendExecute_(e) {
   var lock = LockService.getScriptLock();
   var mutationStarted = false;
   try {
-    if (!lock.tryLock(20000)) {
+    // Snapshot publishers now hold ScriptLock only while reading the Sheet.
+    // Six seconds is enough to join a short transaction without making the
+    // browser sit through a twenty-second lock timeout. Explicit WRITE_BUSY is
+    // safe for the UI to retry with the same idempotency requestId.
+    if (!lock.tryLock(6000)) {
       return MINIAPP_adminWriteError_('WRITE_BUSY', 'База занята другой операцией. Повторите через несколько секунд.');
     }
 
@@ -255,6 +259,8 @@ function MINIAPP_adminWritePreflight() {
   if (typeof finalRoleNormalizeRowSlot_ !== 'function') issues.push('FINAL_ROLE_NORMALIZER_MISSING');
   if (typeof finalRoleCascadeTeamRename_ !== 'function') issues.push('TEAM_CASCADE_MISSING');
   if (typeof MINIAPP_exportAdminSnapshotUnlocked_ !== 'function') issues.push('ADMIN_SNAPSHOT_EXPORTER_MISSING');
+  if (typeof MINIAPP_prepareAdminSnapshot_ !== 'function') issues.push('ADMIN_SNAPSHOT_PREPARE_MISSING');
+  if (typeof MINIAPP_queueAdminSnapshotRefresh_ !== 'function') issues.push('ADMIN_SNAPSHOT_QUEUE_MISSING');
 
   var tokenProperty = typeof MINIAPP_TOKEN_PROPERTY !== 'undefined'
     ? MINIAPP_TOKEN_PROPERTY : 'TELEGRAM_BOT_TOKEN';
@@ -292,7 +298,11 @@ function MINIAPP_adminWritePreflight() {
       typeof MINIAPP_teamGithubUpsert_ === 'function',
     counterHistoryInvariant: typeof processManualCounterEdits_ === 'function',
     baseSortInvariant: typeof sortBaseByChatState_ === 'function',
-    teamRenameCascadeInvariant: typeof finalRoleCascadeTeamRename_ === 'function'
+    teamRenameCascadeInvariant: typeof finalRoleCascadeTeamRename_ === 'function',
+    snapshotRefresh: typeof MINIAPP_queueAdminSnapshotRefresh_ === 'function'
+      ? 'commit-first-queued-private-trigger'
+      : 'synchronous-compatibility-fallback',
+    writeLockWaitMs: 6000
   };
   console.log(JSON.stringify(result, null, 2));
   return result;

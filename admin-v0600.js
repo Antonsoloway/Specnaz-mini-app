@@ -1,6 +1,6 @@
 /* Royal CRM Mini App — Admin Mode v0.6.0 (read phase) */
 (() => {
-  const VERSION = '0.6.0-read.1';
+  const VERSION = '0.6.0-read.2';
   let adminPayload = null;
   let activeTab = 'participants';
   let participantFilter = 'all';
@@ -441,6 +441,12 @@
     version: VERSION,
     open: openAdmin,
     refresh: () => openAdmin(true),
-    clearCache: () => { adminPayload = null; }
+    clearCache: () => { adminPayload = null; },
+    acceptPayload: data => {
+      if (!data?.ok || !data?.adminData) return false;
+      adminPayload = data;
+      if (document.querySelector('.royal-admin-screen')) renderCurrentTab();
+      return true;
+    }
   };
 })();
