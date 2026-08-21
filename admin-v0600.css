@@ -3,6 +3,12 @@
 .royal-admin-tile span{filter:drop-shadow(0 0 8px rgba(255,75,75,.45))}
 .royal-admin-tile b{color:#ffb3b3}
 .royal-admin-tile small{color:#bca4a6}
+.royal-admin-tile--relocated{display:none!important}
+.royal-admin-header-entry{margin-left:auto;flex:0 0 108px;min-height:82px;align-self:stretch;padding:9px 8px;border:1px solid rgba(255,92,92,.58);border-radius:18px;background:linear-gradient(145deg,#4a2027,#21171b);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center;box-shadow:0 10px 24px rgba(89,13,21,.24);touch-action:manipulation;-webkit-tap-highlight-color:rgba(255,92,92,.18)}
+.royal-admin-header-entry span{font-size:25px;line-height:1;filter:drop-shadow(0 0 8px rgba(255,75,75,.45))}
+.royal-admin-header-entry b{font-size:12px;line-height:1.15;color:#ffd7da}
+.royal-admin-header-entry small{font-size:10px;color:#c99ea3}
+.royal-admin-header-entry:active{transform:scale(.97)}
 .royal-admin-screen{padding-bottom:24px}
 .royal-admin-head{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;margin:22px 0 14px}
 .royal-admin-head h2{margin:0 0 5px;font-size:28px}
@@ -54,3 +60,4 @@
 .royal-admin-error{padding:18px;border:1px solid rgba(255,86,86,.35);border-radius:15px;background:rgba(105,27,34,.22);color:#ffc6cb}
 .royal-admin-count{margin:8px 0 0;color:#879aa8;font-size:12px}
 @media (min-width:560px){.royal-admin-stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:380px){.royal-admin-header-entry{flex-basis:96px;min-height:76px;padding:8px 6px;border-radius:16px}.royal-admin-header-entry b{font-size:11px}}

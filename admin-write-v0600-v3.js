@@ -1,23 +1,29 @@
-/* Royal CRM Mini App — protected Admin Write UI v0.6.0-write.3 */
+/* Royal CRM Mini App — protected Admin Write/Delete UI v0.6.0-write.5 */
 (() => {
-  const VERSION = '0.6.0-write.3';
+  const VERSION = '0.6.0-write.5-ui.1';
   const state = { editing:false, payload:null, loading:null, modal:null, observerBusy:false };
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const clean = value => String(value == null ? '' : value).trim();
+  const lower = value => clean(value).toLocaleLowerCase('ru-RU').replace(/ё/g,'е');
+  const numeric = value => {
+    const text = clean(value).replace(/\s+/g,'').replace(',','.');
+    const number = Number(text);
+    return text && Number.isFinite(number) ? number : NaN;
+  };
 
   function installCss() {
     if (!document.querySelector('link[data-admin-write-css="1"]')) {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = 'admin-write-v0600.css?v=20260820-0925';
+      link.href = 'admin-write-v0600.css?v=20260821-1325';
       link.dataset.adminWriteCss = '1';
       document.head.appendChild(link);
     }
     if (!document.querySelector('link[data-admin-write-v2-css="1"]')) {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = 'admin-write-v0600-v2.css?v=20260820-0925';
+      link.href = 'admin-write-v0600-v2.css?v=20260821-1325';
       link.dataset.adminWriteV2Css = '1';
       document.head.appendChild(link);
     }
@@ -27,6 +33,22 @@
   function participants() { return Array.isArray(state.payload?.adminData?.participants) ? state.payload.adminData.participants : []; }
   function teams() { return Array.isArray(state.payload?.adminData?.teams) ? state.payload.adminData.teams : []; }
   function writeMeta() { return state.payload?.adminData?.write || {}; }
+
+  function operationEnabled(name) {
+    const meta = writeMeta();
+    const operations = Array.isArray(meta?.operations) ? meta.operations : [];
+    return meta?.enabled === true && meta?.deleteEnabled === true && operations.includes(name);
+  }
+
+  function canDeleteParticipant(record) {
+    return operationEnabled('deleteParticipant') && lower(record?.chatState) === 'вышел';
+  }
+
+  function canDeleteTeam(record) {
+    return operationEnabled('deleteTeam') &&
+      lower(record?.status) === 'неактивен' &&
+      numeric(record?.players) === 0;
+  }
 
   async function loadAdmin(force=false) {
     if (state.payload && !force) return state.payload;
@@ -108,7 +130,7 @@
         actions.insertAdjacentElement('afterend', toolbar);
         toolbar.insertAdjacentHTML(
           'afterend',
-          '<div class="royal-admin-edit-hint" data-admin-edit-hint="1">Редактируются только исходные поля. Формулы, вычисляемые игры/статусы и командные E:L защищены от записи.</div>'
+        '<div class="royal-admin-edit-hint" data-admin-edit-hint="1">Редактируются только исходные поля. Удаление доступно только для «Вышел» и для неактивных команд без участников; сервер повторно проверяет условия перед записью.</div>'
         );
       }
     }
@@ -218,6 +240,19 @@
       ? 'Добавить участника'
       : `Изменить: ${clean(source?.name || source?.telegramName || source?.username || source?.telegramId || 'Участник')}`;
     const dateValue = creating ? todayInput() : dateInputValue(source?.date);
+    const participantEligible = lower(source?.chatState) === 'вышел';
+    const participantDeleteEnabled = operationEnabled('deleteParticipant');
+
+    const deleteButton = !creating && participantEligible && participantDeleteEnabled
+      ? '<button type="button" class="royal-admin-form-button is-delete" data-admin-delete-participant="1">🗑 Удалить участника</button>'
+      : '';
+    const deleteNote = creating
+      ? ''
+      : participantEligible && participantDeleteEnabled
+        ? '<div class="royal-admin-danger-note is-delete-ready">Удаление полностью очистит запись участника в админской таблице. История админских действий сохранится в журнале.</div>'
+        : participantEligible
+          ? '<div class="royal-admin-danger-note">Сервер удаления ещё обновляется. Редактирование остаётся доступным, удаление пока заблокировано.</div>'
+          : '<div class="royal-admin-danger-note">Удалить можно только участника со статусом «Вышел».</div>';
 
     openModal(`
       <div class="royal-admin-modal-head"><div><div class="royal-admin-kicker">Участники</div><h3>${esc(title)}</h3></div><button type="button" class="royal-admin-modal-close" data-write-close="1">×</button></div>
@@ -237,9 +272,9 @@
         <div class="royal-admin-form-note">Telegram ID — неизменяемый ключ. Статус T, игры W:AA и дата изменения AE остаются под системной логикой. Увеличение U проходит через штатную «Историю спецназа».</div>
         <div class="royal-admin-write-section-title">Команды и роли</div>
         ${normalizedSlots(source).map(slotHtml).join('')}
-        <div class="royal-admin-danger-note">Удаление участников в v0.6 отключено. Для покинувшего чат используется «Вышел» — запись и история сохраняются.</div>
+        ${deleteNote}
         <div data-write-status></div>
-        <div class="royal-admin-form-actions"><button type="button" class="royal-admin-form-button" data-write-close="1">Отмена</button><button type="submit" class="royal-admin-form-button is-save">💾 Сохранить</button></div>
+        <div class="royal-admin-form-actions">${deleteButton}<button type="button" class="royal-admin-form-button" data-write-close="1">Отмена</button><button type="submit" class="royal-admin-form-button is-save">💾 Сохранить</button></div>
       </form>`,
       { kind:'participant', creating, record:source }
     );
@@ -247,6 +282,18 @@
 
   function openTeamModal(team, creating=false) {
     const source = team || { game:'Royal Match' };
+    const teamEligible = lower(source?.status) === 'неактивен' && numeric(source?.players) === 0;
+    const teamDeleteEnabled = operationEnabled('deleteTeam');
+    const deleteButton = !creating && teamEligible && teamDeleteEnabled
+      ? '<button type="button" class="royal-admin-form-button is-delete" data-admin-delete-team="1">🗑 Удалить команду</button>'
+      : '';
+    const deleteNote = creating
+      ? '<div class="royal-admin-danger-note">Фото C и вычисляемые E:L приложение не перезаписывает.</div>'
+      : teamEligible && teamDeleteEnabled
+        ? '<div class="royal-admin-danger-note is-delete-ready">Удаление очистит исходную строку A:D. Формулы таблицы сохранятся; фото старой команды будет очищено из приватного медиахранилища.</div>'
+        : teamEligible
+          ? '<div class="royal-admin-danger-note">Сервер удаления ещё обновляется. Редактирование остаётся доступным, удаление пока заблокировано.</div>'
+          : '<div class="royal-admin-danger-note">Удалить можно только команду со статусом «Неактивен», в которой 0 участников.</div>';
     openModal(`
       <div class="royal-admin-modal-head"><div><div class="royal-admin-kicker">Команды</div><h3>${creating ? 'Добавить команду' : `Изменить: ${esc(source?.name)}`}</h3></div><button type="button" class="royal-admin-modal-close" data-write-close="1">×</button></div>
       <form class="royal-admin-form" data-write-team-form="1" data-write-mode="${creating ? 'create' : 'update'}">
@@ -256,9 +303,9 @@
           <label class="royal-admin-input is-wide"><span>Лидер / подпись</span><input data-write-field="leader" maxlength="180" value="${esc(source?.leader)}"></label>
         </div>
         <div class="royal-admin-form-note">Игра существующей команды — часть identity и не меняется. Переименование названия каскадно обновляет все 5 membership-слотов этой игры.</div>
-        <div class="royal-admin-danger-note">Фото C и вычисляемые E:L приложение не перезаписывает. Удаление команд в v0.6 отключено.</div>
+        ${deleteNote}
         <div data-write-status></div>
-        <div class="royal-admin-form-actions"><button type="button" class="royal-admin-form-button" data-write-close="1">Отмена</button><button type="submit" class="royal-admin-form-button is-save">💾 Сохранить</button></div>
+        <div class="royal-admin-form-actions">${deleteButton}<button type="button" class="royal-admin-form-button" data-write-close="1">Отмена</button><button type="submit" class="royal-admin-form-button is-save">💾 Сохранить</button></div>
       </form>`,
       { kind:'team', creating, record:source }
     );
@@ -301,20 +348,24 @@
   }
 
   function collectParticipant(form) {
+    const creating = form.dataset.writeMode === 'create';
+    const changes = {
+      name:clean(form.querySelector('[data-write-field="name"]')?.value),
+      memberships:collectMemberships(form)
+    };
+    if (creating) Object.assign(changes, {
+      telegramName:clean(form.querySelector('[data-write-field="telegramName"]')?.value),
+      username:clean(form.querySelector('[data-write-field="username"]')?.value),
+      date:clean(form.querySelector('[data-write-field="date"]')?.value),
+      specnaz:numberField(form,'specnaz'),
+      screens:numberField(form,'screens'),
+      activityBase:numberField(form,'activityBase'),
+      activityOutside:numberField(form,'activityOutside'),
+      chatState:clean(form.querySelector('[data-write-field="chatState"]')?.value)
+    });
     return {
       telegramId:clean(form.querySelector('[data-write-field="telegramId"]')?.value),
-      changes:{
-        name:clean(form.querySelector('[data-write-field="name"]')?.value),
-        telegramName:clean(form.querySelector('[data-write-field="telegramName"]')?.value),
-        username:clean(form.querySelector('[data-write-field="username"]')?.value),
-        date:clean(form.querySelector('[data-write-field="date"]')?.value),
-        specnaz:numberField(form,'specnaz'),
-        screens:numberField(form,'screens'),
-        activityBase:numberField(form,'activityBase'),
-        activityOutside:numberField(form,'activityOutside'),
-        chatState:clean(form.querySelector('[data-write-field="chatState"]')?.value),
-        memberships:collectMemberships(form)
-      }
+      changes
     };
   }
 
@@ -390,6 +441,92 @@
     }
   }
 
+  function confirmDelete(message) {
+    return new Promise(resolve => {
+      try {
+        if (window.Telegram?.WebApp?.showConfirm) {
+          window.Telegram.WebApp.showConfirm(clean(message), answer => resolve(answer === true));
+          return;
+        }
+      } catch (_) {}
+      resolve(window.confirm(clean(message)));
+    });
+  }
+
+  async function refreshAfterMutation(result) {
+    await new Promise(resolve => setTimeout(resolve,650));
+    closeModal();
+    state.payload = null;
+    try { window.RoyalAdminV0600?.clearCache?.(); } catch (_) {}
+    try { await window.RoyalAdminV0600?.refresh?.(); } catch (_) {}
+    await loadAdmin(true).catch(() => null);
+    showMessage(result?.message || 'Изменение сохранено.');
+    setTimeout(() => { if (state.editing) injectEditUi(); },180);
+  }
+
+  async function deleteParticipant(button) {
+    const participant = state.modal?.record || null;
+    if (!participant || !canDeleteParticipant(participant)) {
+      showMessage('Удалить можно только участника со статусом «Вышел».', true);
+      return;
+    }
+    if (!participant.revision) {
+      showMessage('Карточка устарела: нет revision. Обновите админ-режим.', true);
+      return;
+    }
+    const title = clean(participant.name || participant.telegramName || participant.username || participant.telegramId || 'участника');
+    const confirmed = await confirmDelete(`Точно хотите удалить участника «${title}»? Запись будет полностью очищена в админской таблице.`);
+    if (!confirmed) return;
+
+    button.disabled = true;
+    modalStatus('Повторно проверяем статус «Вышел» и удаляем…');
+    try {
+      const result = await adminWrite('deleteParticipant', {
+        telegramId:clean(participant.telegramId),
+        expectedRevision:clean(participant.revision)
+      });
+      modalStatus(result?.message || 'Участник удалён.', 'ok');
+      await refreshAfterMutation(result);
+    } catch (error) {
+      modalStatus(error?.message || 'Участник не удалён.', 'error');
+      if (error?.conflict) state.payload = null;
+    } finally {
+      if (document.body.contains(button)) button.disabled = false;
+    }
+  }
+
+  async function deleteTeam(button) {
+    const team = state.modal?.record || null;
+    if (!team || !canDeleteTeam(team)) {
+      showMessage('Удалить можно только неактивную команду, в которой 0 участников.', true);
+      return;
+    }
+    if (!team.revision) {
+      showMessage('Карточка устарела: нет revision. Обновите админ-режим.', true);
+      return;
+    }
+    const title = clean(team.name || 'команду');
+    const confirmed = await confirmDelete(`Точно хотите удалить команду «${title}»? Строка команды будет очищена в админской таблице.`);
+    if (!confirmed) return;
+
+    button.disabled = true;
+    modalStatus('Повторно проверяем статус, состав и удаляем…');
+    try {
+      const result = await adminWrite('deleteTeam', {
+        name:clean(team.name),
+        game:clean(team.game),
+        expectedRevision:clean(team.revision)
+      });
+      modalStatus(result?.message || 'Команда удалена.', 'ok');
+      await refreshAfterMutation(result);
+    } catch (error) {
+      modalStatus(error?.message || 'Команда не удалена.', 'error');
+      if (error?.conflict) state.payload = null;
+    } finally {
+      if (document.body.contains(button)) button.disabled = false;
+    }
+  }
+
   async function submitForm(form) {
     const save = form.querySelector('.is-save');
     if (save) save.disabled = true;
@@ -399,14 +536,7 @@
         ? await saveParticipant(form)
         : await saveTeam(form);
       modalStatus(result?.message || 'Сохранено.', 'ok');
-      await new Promise(resolve => setTimeout(resolve,650));
-      closeModal();
-      state.payload = null;
-      try { window.RoyalAdminV0600?.clearCache?.(); } catch (_) {}
-      try { await window.RoyalAdminV0600?.refresh?.(); } catch (_) {}
-      await loadAdmin(true).catch(() => null);
-      showMessage(result?.message || 'Изменение сохранено.');
-      setTimeout(() => { if (state.editing) injectEditUi(); },180);
+      await refreshAfterMutation(result);
     } catch (error) {
       modalStatus(error?.message || 'Изменение не сохранено.', 'error');
       if (error?.conflict) state.payload = null;
@@ -440,8 +570,10 @@
     return ({
       updateParticipant:'Изменение участника',
       createParticipant:'Новый участник',
+      deleteParticipant:'Удаление участника',
       updateTeam:'Изменение команды',
-      createTeam:'Новая команда'
+      createTeam:'Новая команда',
+      deleteTeam:'Удаление команды'
     })[clean(op)] || clean(op) || 'Изменение';
   }
 
@@ -492,6 +624,20 @@
     }
     if (target?.matches?.('[data-admin-write-modal="1"]')) {
       closeModal(); return;
+    }
+
+    const deleteParticipantButton = target?.closest?.('[data-admin-delete-participant="1"]');
+    if (deleteParticipantButton) {
+      event.preventDefault(); event.stopImmediatePropagation();
+      await deleteParticipant(deleteParticipantButton);
+      return;
+    }
+
+    const deleteTeamButton = target?.closest?.('[data-admin-delete-team="1"]');
+    if (deleteTeamButton) {
+      event.preventDefault(); event.stopImmediatePropagation();
+      await deleteTeam(deleteTeamButton);
+      return;
     }
 
     if (target?.closest?.('[data-admin-create-participant="1"]')) {

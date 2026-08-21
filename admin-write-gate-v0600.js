@@ -1,6 +1,6 @@
-/* Royal CRM Mini App — final admin edit gate v0.6.0-write.4 */
+/* Royal CRM Mini App — final admin edit/delete gate v0.6.0-write.5 */
 (() => {
-  const VERSION = '0.6.0-write.4-gate.2';
+  const VERSION = '0.6.0-write.5-gate.1';
   let checking = false;
 
   const clean = value => String(value == null ? '' : value).trim();
@@ -32,21 +32,33 @@
     const write = data?.adminData?.write || {};
     const photo = write?.teamPhoto || {};
     const operations = Array.isArray(write?.operations) ? write.operations : [];
-    const ready = Boolean(
-      data?.permissions?.isAdmin === true &&
-      data?.permissions?.canEdit === true &&
-      write?.enabled === true &&
-      write?.version === '0.6.0-write.4' &&
-      write?.transport === 'worker-signed-hmac' &&
-      write?.deleteEnabled === false &&
-      photo?.enabled === true &&
-      photo?.renameCleanup === true &&
+    const baseOperationsReady = Boolean(
       operations.includes('updateParticipant') &&
       operations.includes('createParticipant') &&
       operations.includes('updateTeam') &&
       operations.includes('createTeam')
     );
-    return {ready,data};
+    const write4Ready = Boolean(
+      write?.version === '0.6.0-write.4' &&
+      write?.deleteEnabled === false
+    );
+    const write5Ready = Boolean(
+      write?.version === '0.6.0-write.5' &&
+      write?.deleteEnabled === true &&
+      operations.includes('deleteParticipant') &&
+      operations.includes('deleteTeam')
+    );
+    const ready = Boolean(
+      data?.permissions?.isAdmin === true &&
+      data?.permissions?.canEdit === true &&
+      write?.enabled === true &&
+      write?.transport === 'worker-signed-hmac' &&
+      photo?.enabled === true &&
+      photo?.renameCleanup === true &&
+      baseOperationsReady &&
+      (write4Ready || write5Ready)
+    );
+    return {ready,deleteReady:write5Ready,data};
   }
 
   // Registered BEFORE admin-write-v0600-v3.js. This capture listener owns the

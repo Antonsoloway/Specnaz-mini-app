@@ -1,7 +1,7 @@
 /*
  * Royal CRM / Таблица ЧП
  * 30_MINIAPP_ADMIN_WRITE_BACKEND.js
- * v0.6.0-write.4
+ * v0.6.0-write.5
  *
  * Server-to-server write gateway for Mini App v0.6.
  * The browser NEVER sends CRM mutation payloads directly to Apps Script.
@@ -13,14 +13,16 @@
  *   then calls final mutation helpers from 33_MINIAPP_ADMIN_WRITE_FINAL.js.
  */
 
-var MINIAPP_ADMIN_WRITE_BACKEND_VERSION = '0.6.0-write.4';
+var MINIAPP_ADMIN_WRITE_BACKEND_VERSION = '0.6.0-write.5';
 var MINIAPP_ADMIN_WRITE_BACKEND_MAX_AGE_SEC = 90;
 var MINIAPP_ADMIN_WRITE_BACKEND_FUTURE_SKEW_SEC = 30;
 var MINIAPP_ADMIN_WRITE_BACKEND_ALLOWED_OPS = {
   updateParticipant: true,
   createParticipant: true,
+  deleteParticipant: true,
   updateTeam: true,
-  createTeam: true
+  createTeam: true,
+  deleteTeam: true
 };
 
 /** Called only from MINIAPP_doPost_ in 12_MINI_APP_API.js. */
@@ -245,6 +247,8 @@ function MINIAPP_adminWritePreflight() {
   if (typeof MINIAPP_adminWriteFinalDispatch_ !== 'function') issues.push('WRITE_33_FINAL_DISPATCH_MISSING');
   if (typeof MINIAPP_adminWriteFinalMeta_ !== 'function') issues.push('WRITE_33_FINAL_META_MISSING');
   if (typeof MINIAPP_adminWriteFinalJournalData_ !== 'function') issues.push('WRITE_33_FINAL_JOURNAL_MISSING');
+  if (typeof MINIAPP_adminWriteFinalDeleteParticipant_ !== 'function') issues.push('WRITE_33_PARTICIPANT_DELETE_MISSING');
+  if (typeof MINIAPP_adminWriteFinalDeleteTeam_ !== 'function') issues.push('WRITE_33_TEAM_DELETE_MISSING');
   if (typeof MINIAPP_teamGithubUpsert_ !== 'function') issues.push('PERSISTENT_TEAM_MEDIA_UPSERT_MISSING');
   if (typeof processManualCounterEdits_ !== 'function') issues.push('MANUAL_COUNTER_INVARIANT_MISSING');
   if (typeof sortBaseByChatState_ !== 'function') issues.push('BASE_SORT_INVARIANT_MISSING');
@@ -275,7 +279,8 @@ function MINIAPP_adminWritePreflight() {
     endpointPresent: !!endpoint,
     firstEmptyParticipantRow: base ? MINIAPP_adminWriteFindEmptyParticipantRow_(base) : 0,
     firstEmptyTeamRow: teams ? MINIAPP_adminWriteFindEmptyTeamRow_(teams) : 0,
-    deleteEnabled: false,
+    deleteEnabled: typeof MINIAPP_adminWriteFinalDeleteParticipant_ === 'function' &&
+      typeof MINIAPP_adminWriteFinalDeleteTeam_ === 'function',
     transport: 'worker-signed-hmac',
     teamPhoto: typeof MINIAPP_adminTeamPhotoPrepareUpload_ === 'function' &&
       typeof MINIAPP_adminTeamPhotoApplyCell_ === 'function' &&
