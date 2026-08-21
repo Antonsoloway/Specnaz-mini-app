@@ -3,6 +3,18 @@
 > Краткий журнал фактически выполненных работ. Новые записи добавляются сверху.
 > Здесь фиксируются изменения, проверки, диагнозы и откаты, которые нужны следующему чату.
 
+## 2026-08-21 14:21 — rollout stage 2: Apps Script write.5 + delete contract production verified
+
+**Cloud Shell installer result:** существующий deployment `Таблица ЧП 1.3` обновлён, non-mutating HTTP route сразу подтвердил `0.6.0-write.5`. Installer затем остановился после `15×12s` snapshot checks с сообщением, что private snapshot ещё write.4; повторный push/deploy не требовался.
+
+**Причина ложного отрицания:** 180-секундное окно закончилось раньше следующего штатного 5-minute trigger. В `2026-08-21T11:19:11.398Z` (`14:19 MSK`) trigger опубликовал private snapshot `adminData.version=0.6.0-write.5`, `write.version=0.6.0-write.5`, `deleteEnabled=true`, operations `update/create/deleteParticipant + update/create/deleteTeam`, HMAC transport, photo capability + rename cleanup, 207 participants / 128 teams. Production Worker `/health` повторно подтвердил `1.25.0` и delete policy marker.
+
+**Исправление процесса:** installer snapshot wait увеличен с `15×12s` до `30×12s`, чтобы покрыть полный trigger interval с запасом; успешный `clasp run` теперь печатает свой output. Сообщение финального timeout прямо запрещает повторную установку.
+
+**Фактический live status:** GitHub Pages build `20260821-1325`, Worker `1.25.0`, Apps Script route/private snapshot `0.6.0-write.5`; guarded delete contract live. Ни один participant/team не удалялся во время rollout/verification. Остаётся device smoke и factual full `clasp pull` mirror/manifest sync.
+
+---
+
 ## 2026-08-21 13:50 — rollout stage 1: PR #3 merged, frontend 1325 + Worker 1.25 production verified
 
 **Публикация по прямому подтверждению пользователя:** draft PR #3 переведён в ready и squash-merged в `main`; merge SHA `0951daa8ccf4128572c14c4294be836188154de7`.

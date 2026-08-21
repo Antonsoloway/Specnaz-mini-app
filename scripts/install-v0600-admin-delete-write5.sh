@@ -113,6 +113,7 @@ done
 
 info "REFRESH PRIVATE ADMIN SNAPSHOT"
 if clasp run MINIAPP_exportAdminSnapshotToGitHub >/tmp/royal-v0600-write5-export.txt 2>&1; then
+  cat /tmp/royal-v0600-write5-export.txt
   ok "Private admin snapshot export requested"
 else
   warn "clasp run недоступен; штатный trigger обновит snapshot примерно за 5 минут"
@@ -121,8 +122,10 @@ fi
 if command -v gh >/dev/null 2>&1; then
   info "PRIVATE SNAPSHOT CAPABILITY CHECK"
   SNAPSHOT_OK=0
-  for attempt in $(seq 1 15); do
-    printf '[INFO] snapshot check %s/15\n' "$attempt"
+  # Full 5-minute trigger interval plus propagation margin. The previous
+  # 15x12s window could stop two minutes before the next healthy trigger.
+  for attempt in $(seq 1 30); do
+    printf '[INFO] snapshot check %s/30\n' "$attempt"
     if gh api "repos/Antonsoloway/royal-crm-data/contents/admin-snapshot.json" \
       -H 'Accept: application/vnd.github.raw+json' 2>/dev/null \
       | python3 -c 'import json,sys; d=json.load(sys.stdin); a=d.get("adminData") or {}; w=a.get("write") or {}; ops=set(w.get("operations") or []); assert a.get("version")=="0.6.0-write.5"; assert w.get("version")=="0.6.0-write.5"; assert w.get("deleteEnabled") is True; assert {"deleteParticipant","deleteTeam"}.issubset(ops); print("[OK] write.5 delete contract live")' 2>/dev/null; then
@@ -131,7 +134,7 @@ if command -v gh >/dev/null 2>&1; then
     fi
     sleep 12
   done
-  [[ "$SNAPSHOT_OK" == "1" ]] || fail "write.5 route live, но private snapshot ещё не подтвердил delete contract"
+  [[ "$SNAPSHOT_OK" == "1" ]] || fail "write.5 route live, но private snapshot не подтвердил delete contract за полный trigger interval. Не повторяйте установку."
 else
   warn "gh CLI не найден; capability подтвердится через Worker/admin preview после обновления snapshot"
 fi

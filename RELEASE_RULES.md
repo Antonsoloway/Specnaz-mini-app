@@ -127,8 +127,8 @@ Admin-preview `v0.6.0` дополнительно использует:
 - normal-style admin team detail с private participants, полным D:L блоком и кнопкой hardened editor;
 - team metric rankings E/F/H/I/J/K по полному private team set;
 - `Вышел` ordering по physical source row, newest first;
-- production Apps Script write.4 пока держит delete operations выключенными;
-- write.5 installer добавляет только два узких destructive flow: participant `AF=Вышел` и team `L=Неактивен + E=0 + refs=0`, с confirm/revision/server recheck/journal и сохранением formula columns;
-- frontend build `20260821-1325` и Worker `1.25.0` уже live после merge `0951daa`: admin entry перенесён вправо от имени админа, write.4 edit сохранён, delete включится только при доказанном private snapshot write.5 contract.
+- production Apps Script/private snapshot = `0.6.0-write.5`;
+- live write.5 содержит только два узких destructive flow: participant `AF=Вышел` и team `L=Неактивен + E=0 + refs=0`, с confirm/revision/server recheck/journal и сохранением formula columns;
+- frontend build `20260821-1325` и Worker `1.25.0` live после merge `0951daa`: admin entry перенесён вправо от имени админа, write.4 compatibility сохранена, delete разрешается только при доказанном private snapshot write.5 contract.
 
 Все предыдущие версии сохраняются в истории изменений без удаления.
