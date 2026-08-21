@@ -1,6 +1,6 @@
 /* Royal CRM Mini App — protected Admin Write/Delete UI v0.6.0-write.5 */
 (() => {
-  const VERSION = '0.6.0-write.5-ui.6';
+  const VERSION = '0.6.0-write.5-ui.7';
   const WRITE_BUSY_RETRY_DELAYS_MS = [700, 1400, 2500];
   const TRANSPORT_RETRY_DELAY_MS = 700;
   const ADMIN_READ_RETRY_DELAYS_MS = [0, 700, 1600];
@@ -111,9 +111,23 @@
   }
 
   async function loadAdmin(force=false) {
-    if (state.payload && !force) return state.payload;
+    // PENDING_WRITE_MONOTONIC_SNAPSHOT_V0600
+    // A private snapshot may lag behind a committed response for a few seconds.
+    // While our own requestIds are still pending, the optimistic payload is the
+    // newest authoritative client state and must not be replaced by that lagging
+    // snapshot. This also lets an admin safely open the next edit immediately.
+    if (state.payload && (!force || state.pendingRequestIds.size)) return state.payload;
     if (state.loading && !force) return state.loading;
+    const payloadBeforeFetch = state.payload;
     state.loading = fetchAdminSnapshot().then(data => {
+      if (state.pendingRequestIds.size) {
+        const allPendingConfirmed = [...state.pendingRequestIds]
+          .every(requestId => journalContains(data,requestId));
+        if (!allPendingConfirmed && (state.payload || payloadBeforeFetch)) {
+          return state.payload || payloadBeforeFetch;
+        }
+        if (allPendingConfirmed) state.pendingRequestIds.clear();
+      }
       state.payload = data;
       return data;
     }).finally(() => { state.loading = null; });
