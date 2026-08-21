@@ -262,9 +262,12 @@ function MINIAPP_adminWritePreflight() {
     issues.push('BOT_TOKEN_MISSING');
   }
 
-  var endpoint = '';
-  try { endpoint = String(ScriptApp.getService().getUrl() || '').trim(); } catch (_) {}
+  var endpointInfo = typeof MINIAPP_adminWriteResolvedEndpoint_ === 'function'
+    ? MINIAPP_adminWriteResolvedEndpoint_()
+    : { endpoint: '', source: 'missing', pinned: false };
+  var endpoint = String(endpointInfo.endpoint || '').trim();
   if (!endpoint) issues.push('WEB_APP_URL_MISSING');
+  if (!endpointInfo.pinned) issues.push('ADMIN_WRITE_ENDPOINT_NOT_PINNED');
 
   var result = {
     ok: issues.length === 0,
@@ -277,6 +280,8 @@ function MINIAPP_adminWritePreflight() {
       ? MINIAPP_ADMIN_TEAM_PHOTO_VERSION : '',
     issues: issues,
     endpointPresent: !!endpoint,
+    endpointPinned: endpointInfo.pinned === true,
+    endpointSource: endpointInfo.source || 'missing',
     firstEmptyParticipantRow: base ? MINIAPP_adminWriteFindEmptyParticipantRow_(base) : 0,
     firstEmptyTeamRow: teams ? MINIAPP_adminWriteFindEmptyTeamRow_(teams) : 0,
     deleteEnabled: typeof MINIAPP_adminWriteFinalDeleteParticipant_ === 'function' &&
