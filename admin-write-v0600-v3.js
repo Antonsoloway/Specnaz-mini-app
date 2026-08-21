@@ -1,6 +1,6 @@
 /* Royal CRM Mini App — protected Admin Write/Delete UI v0.6.0-write.5 */
 (() => {
-  const VERSION = '0.6.0-write.5-ui.2';
+  const VERSION = '0.6.0-write.5-ui.3';
   const state = { editing:false, payload:null, loading:null, modal:null, observerBusy:false };
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -547,7 +547,9 @@
   async function submitForm(form) {
     const save = form.querySelector('.is-save');
     if (save) save.disabled = true;
-    modalStatus('Проверяем права и сохраняем…');
+    modalStatus(form.matches('[data-write-team-form]')
+      ? 'Сохраняем команду и фото… Это может занять до минуты.'
+      : 'Проверяем права и сохраняем…');
     try {
       const result = form.matches('[data-write-participant-form]')
         ? await saveParticipant(form)

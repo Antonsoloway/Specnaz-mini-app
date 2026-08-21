@@ -22,23 +22,23 @@
 - постоянный entrypoint: `app.html`;
 - обычный запуск → **`app-v0559.html` / v0.5.59**;
 - `startapp=v0600` / `tgWebAppStartParam=v0600` → **`app-v0600.html` / v0.6.0 admin preview**;
-- текущий cache-forced preview: `startapp=v0600-1435` → тот же `app-v0600.html`, но с уникальным start parameter;
+- текущий cache-forced preview: `startapp=v0600-2050` → тот же `app-v0600.html`, но с уникальным start parameter;
 - обычных пользователей пока не переводить на v0.6;
 - bot: `@doveofpeace_bot`.
 
 Текущий preview delivery:
-- `version-v0600.js` cache-bust: **`20260821-1435`**;
-- `app-v0600.html` → `version-v0600.js?v=20260821-1435`;
-- `app.html` previewBuild: **`20260821-1435`**;
-- `app.html` принимает `v0600`, старые aliases `v0600-2328`, `v0600-1325` и текущий cache-forced alias `v0600-1435`;
-- GitHub Pages production подтверждён на build `20260821-1435` после merge PR #6 (`b579dbd`); старые aliases сохранены для совместимости.
+- `version-v0600.js` cache-bust: **`20260821-2050`**;
+- `app-v0600.html` → `transport-v0514.js?v=20260821-2050` и `version-v0600.js?v=20260821-2050`;
+- `app.html` previewBuild: **`20260821-2050`**;
+- `app.html` принимает `v0600`, старые aliases `v0600-2328`, `v0600-1325`, `v0600-1435` и текущий cache-forced alias `v0600-2050`;
+- GitHub Pages production build **`20260821-2050`** сохраняет весь frontend build 1435 и дополнительно исправляет ложный `WORKER_TIMEOUT` при долгом admin write с фото.
 
 ---
 
 ## 3. Live Apps Script / admin backend
 
 Подтверждено live на 21.08.2026:
-- private admin snapshot: `adminData.version = 0.6.0-write.5`; последний подтверждённый срез generatedAt `2026-08-21T17:23:59.615Z`, 207 participants / 128 teams, admin journal `rows=[]`;
+- private admin snapshot: `adminData.version = 0.6.0-write.5`; последний подтверждённый срез generatedAt `2026-08-21T17:47:50.475Z`, 207 participants / 129 teams;
 - advertised write endpoint закреплён: `endpointPinned=true`, `endpointSource=deployment-constant`; URL snapshot точно совпадает с существующим deployment `Таблица ЧП 1.3`;
 - прямой non-mutating POST к этому `/exec` вернул JSON `INVALID_REQUEST_ID / 0.6.0-write.5`, то есть маршрут доступен и не подменён HTML/404;
 - optimistic `revision` у participant/team records;
@@ -59,11 +59,12 @@ Production write.5 policy:
 
 Admin-write endpoint incident — resolved:
 - исходная причина ошибки `Сервер Google Sheets вернул неожиданный ответ` — private snapshot рекламировал stale `ScriptApp.getService().getUrl()`, который отвечал `404 text/html`, вместо exact deployment `Таблица ЧП 1.3`; это не было ошибкой `createTeam` или формы;
-- попытка создать `Cataha` до ремонта не дошла до Sheets: команда отсутствует, admin journal пуст;
+- попытка создать `Cataha` до ремонта не дошла до Sheets; после ремонта пользовательский повтор в `20:47 MSK` успешно создал `CATAHA / Royal Match` в строке 99 с leader `Cataha` и фото 160971 bytes;
 - первый repair безопасно остановился после Apps Script storage exception: snapshot остался `script-service-fallback`, participant/team data не изменились;
 - repair v2 выполнен успешно в `20:24 MSK`: exact URL существующего deployment внедрён в live source без Script Properties, существующий deployment обновлён, trigger опубликовал `deployment-constant`, factual live mirror синхронизирован commit `8b64a7a`; новый deployment не создавался;
 - production Worker `/health` независимо подтверждён: `1.27.0`, `adminWriteEndpoint=pinned-deployment-config`; edit/create/delete routes снова разрешаются только при доказанном pin;
-- сам маршрут и контракт исправлены, но фактический `createTeam` write с устройства ещё не выполнялся после ремонта. Для device smoke полностью закрыть/открыть Mini App и один раз повторить добавление; до результата не объявлять пользовательский сценарий подтверждённым.
+- backend createTeam device smoke подтверждён журналом и snapshot, однако прежний общий transport timeout 5 секунд оборвал ожидание браузера до завершения Apps Script и показал ложный `WORKER_TIMEOUT`; повторять сохранение было нельзя, так как запись уже существовала;
+- frontend build `20260821-2050`: только `/admin-write` ждёт до 60 секунд, обычные reads сохраняют 5 секунд, UI заранее сообщает, что команда с фото может сохраняться до минуты. `requestId`/server idempotency сохранены.
 
 Live modules:
 - `28_MINIAPP_ADMIN_DATA.js` — private admin read;
@@ -130,7 +131,7 @@ Public snapshot:
 - `admin-v0600.js` / `admin-eligibility-v0600.js`;
 - `admin-entry-relocation-v0600.js` = `0.6.0-admin-entry-relocation.2`;
 - `admin-write-gate-v0600.js` = `0.6.0-write.5-gate.1`;
-- `admin-write-v0600-v3.js` = `0.6.0-write.5-ui.2`;
+- `admin-write-v0600-v3.js` = `0.6.0-write.5-ui.3`;
 - `admin-team-photo-v0600.js`;
 - `admin-participant-edit-policy-v0600.js`;
 - `admin-search-media-sort-v0600.js` = `0.6.0-admin-search-media-sort.2`;
@@ -228,9 +229,9 @@ Participant metric rankings:
 - перед каждой операцией Telegram `showConfirm`/browser confirm задаёт явный вопрос `Точно хотите удалить...`;
 - frontend-условия не являются защитой: Apps Script повторно читает live Sheet под lock и отклоняет операцию при изменившемся status/count/revision;
 - после успеха private snapshot обновляется, cache сбрасывается, удалённая запись исчезает из admin list/table;
-- проверка snapshot на 21.08.2026: 207 participants, 128 admin teams; `Вышел` = 16; `Неактивен` = 26, из них E=0 = 25; все 25 дополнительно имели 0 live membership refs, одна неактивная команда с ненулевым E остаётся заблокированной.
+- проверка snapshot после создания `CATAHA`: 207 participants, 129 admin teams; `Вышел` = 16; `Неактивен` = 27, из них E=0 = 26; новая `CATAHA` имеет 0 участников, одна прежняя неактивная команда с ненулевым E остаётся заблокированной.
 
-**Статус frontend:** PR #6 squash-merged в `main` (`b579dbd`); GitHub Pages production фактически отдаёт build **`20260821-1435`**, participant detail `.2`, team detail `.4` и оба direct delete marker. Private snapshot write.5 capability и pinned write endpoint доказаны; Worker `1.27.0` разрешает edit/delete по этому контракту. Реальный Telegram WebView smoke и по одной разрешённой тестовой операции всё ещё обязательны: HTTP/tests не заменяют device smoke.
+**Статус frontend:** build **`20260821-2050`** сохраняет participant detail `.2`, team detail `.4` и оба direct delete marker из build 1435, обновляет write UI до `.3` и даёт `/admin-write` отдельное 60-second transport window. Private snapshot write.5 capability и pinned endpoint доказаны; createTeam с фото подтверждён на реальном Android. Update participant/team и обе guarded delete операции всё ещё требуют отдельных device smoke: HTTP/tests не заменяют их.
 
 ---
 
@@ -276,10 +277,10 @@ Repo config / production:
 
 ## 10. Минимальный smoke v0.6 перед общим релизом
 
-1. Обычный `startapp` остаётся v0.5.59; `startapp=v0600` открывает v0.6. Для принудительно свежей проверки build 1435 использовать `startapp=v0600-1435`.
+1. Обычный `startapp` остаётся v0.5.59; `startapp=v0600` открывает v0.6. Для принудительно свежей проверки build 2050 использовать `startapp=v0600-2050`.
 2. Не-админ не получает admin-data/write.
 3. Existing participant editor: только имя + memberships; прямой system-field write отклоняется.
-4. После полного reopen Mini App создать одну тестовую команду; запись должна появиться в private snapshot/admin list и журнале. Затем проверить разрешённое update write; stale revision не перезаписывает новое.
+4. CreateTeam с фото уже подтверждён (`CATAHA`, строка 99, journal + snapshot). После build 2050 форма должна дождаться ответа без ложного `WORKER_TIMEOUT`. Затем проверить разрешённое update write; stale revision не перезаписывает новое.
 5. Team rename каскадит memberships; team photo upload/rename cleanup работают.
 6. Admin avatars/team photos повторно читаются из общего persistent cache.
 7. Admin search проверяется по имени/@/ID/role/nickname/team + `вышка`.

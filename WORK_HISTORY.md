@@ -3,6 +3,18 @@
 > Краткий журнал фактически выполненных работ. Новые записи добавляются сверху.
 > Здесь фиксируются изменения, проверки, диагнозы и откаты, которые нужны следующему чату.
 
+## 2026-08-21 20:50 — createTeam с фото был успешен; ложный 5-second WORKER_TIMEOUT исправлен
+
+**Симптом на Android:** после повторной проверки `Добавить команду` форма показала `WORKER_TIMEOUT` при отправке фото 157 КБ. Повторно нажимать `Сохранить` запрещено до проверки результата, потому что timeout транспорта не доказывает откат серверной операции.
+
+**Фактический результат:** private snapshot `2026-08-21T17:47:50.475Z` содержит новую `CATAHA / Royal Match`, leader `Cataha`, row 99, status `Неактивен`, players 0 и рабочий `photoUrl`. Journal записал один `createTeam` в `20:47:35` с тем же requestId и фото `160971 bytes / image/jpeg`. Итог: операция и фото сохранились успешно; teams стало 129. Дубля нет.
+
+**Причина ложной ошибки:** shared `transport-v0514.js 0.5.14.1` давал всем Worker routes только 5 секунд. Admin write с фото синхронно обновляет Sheet/media/snapshots и завершился примерно за 15 секунд; браузер дважды оборвал ожидание по 5 секунд, хотя Worker/Apps Script продолжили и committed write.
+
+**Исправление build `20260821-2050`:** transport → `0.5.14.2`; только `/admin-write` получает 60-second timeout, обычные Worker reads остаются на 5 секунд, `/auth` — 12 секунд + один transient retry. Write UI → `.3` и явно предупреждает, что сохранение команды/фото может занять до минуты. Обновлены `app-v0600.html`, `app.html`, preview/cache alias `v0600-2050`; stable v0.5.59 routes не меняются.
+
+**Проверка:** `node --check` чист; 19/19 Node tests прошли, включая runtime-test маршрутизации timeout `admin-write=60000`, ordinary read `=5000`; `git diff --check` чист. Backend повторно не вызывался и CRM-данные этой frontend-правкой не менялись.
+
 ## 2026-08-21 20:24 — endpoint repair v2 live; pinned write route independently verified
 
 **Cloud Shell результат:** обновлённый `scripts/repair-v0600-admin-write-endpoint.sh` завершился маркером `ADMIN WRITE ENDPOINT REPAIRED`. Он выбрал exact существующий deployment `Таблица ЧП 1.3`, внедрил его `/exec` в live `31_MINIAPP_ADMIN_WRITE_HARDENED.js`, обновил только этот deployment и дождался exact private snapshot. Новый deployment не создавался; participant/team rows installer не менял.
