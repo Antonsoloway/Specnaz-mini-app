@@ -37,22 +37,23 @@
 
 ## 3. Live Apps Script / admin backend
 
-Подтверждено на 21.08.2026:
-- private admin snapshot: `adminData.version = 0.6.0-write.4`;
+Подтверждено live на 21.08.2026:
+- private admin snapshot: `adminData.version = 0.6.0-write.5`, generatedAt `2026-08-21T11:19:11.398Z`;
 - optimistic `revision` у participant/team records;
 - write transport: **Mini App → Worker → HMAC → Apps Script → Google Sheets**;
 - HMAC secret не попадает в браузер/GitHub;
 - существующий deployment **`Таблица ЧП 1.3`** сохранён;
-- delete operations в production write.4 выключены;
+- `deleteParticipant` и `deleteTeam` включены в production write.5;
 - team photo capability + rename cleanup подтверждались установщиком.
 
-Подготовлено в candidate write.5, но **ещё не объявлено live**:
+Production write.5 policy:
 - `deleteParticipant` только если фактический `База участников!AF = Вышел`;
 - `deleteTeam` только если фактические `Команды!L = Неактивен`, `E = 0` и повторный scan всех пяти live membership slots вернул 0 ссылок;
 - participant delete очищает только source ranges `A:S`, `U:V`, `AB:AF`, сохраняя formula arrays `T` и `W:AA`;
 - team delete очищает только source `A:D`, сохраняя formula columns `E:L`;
 - обе операции используют optimistic revision, ScriptLock, admin journal и обязательное подтверждение в Mini App;
-- для установки подготовлен `scripts/install-v0600-admin-delete-write5.sh`; он сначала требует live Worker `1.25.0`, затем обновляет только существующий deployment `Таблица ЧП 1.3`; новый deployment не создаёт.
+- installer сохранил и обновил только существующий deployment `Таблица ЧП 1.3`; новый deployment не создавался;
+- первый installer run остановился после 15 snapshot checks незадолго до штатного trigger, но route уже был live; следующий trigger в `14:19 MSK` опубликовал полный write.5 contract. Окно ожидания installer увеличено до полного trigger interval `30×12s`.
 
 Live modules:
 - `28_MINIAPP_ADMIN_DATA.js` — private admin read;
@@ -207,7 +208,7 @@ Participant metric rankings:
 - без 128 thumbnails/network prewarm;
 - Back → предыдущий detail/list state.
 
-### Admin entry + guarded deletion — candidate build 1325
+### Admin entry + guarded deletion — live build 1325 / write.5
 
 - плитка `Админ режим` больше не занимает место в основном grid: после подтверждения admin eligibility она скрывается, а кнопка переносится внутрь `#selfProfileCard .self-profile-head`, справа от имени/username;
 - relocation переживает повторный render self-profile через `MutationObserver`; если eligibility исчезла, перенесённая кнопка удаляется;
@@ -217,7 +218,7 @@ Participant metric rankings:
 - после успеха private snapshot обновляется, cache сбрасывается, удалённая запись исчезает из admin list/table;
 - проверка snapshot на 21.08.2026: 207 participants, 128 admin teams; `Вышел` = 16; `Неактивен` = 26, из них E=0 = 25; все 25 дополнительно имели 0 live membership refs, одна неактивная команда с ненулевым E остаётся заблокированной.
 
-**Статус frontend:** PR #3 merged в `main` (`0951daa`); GitHub Pages production фактически отдаёт build **`20260821-1325`**, подключённый relocation `.2` и router alias `v0600-1325`. Delete UI остаётся скрыт на production Apps Script write.4 и включится только после доказанного private snapshot write.5. Реальный Telegram WebView smoke кнопки/confirm ещё требуется; commit и HTTP delivery не заменяют device smoke.
+**Статус frontend:** PR #3 merged в `main` (`0951daa`); GitHub Pages production фактически отдаёт build **`20260821-1325`**, подключённый relocation `.2` и router alias `v0600-1325`. Private snapshot write.5 доказан, поэтому Worker 1.25 разрешает delete UI администраторам. Реальный Telegram WebView smoke кнопки/confirm и по одной разрешённой тестовой операции ещё требуется; commit/HTTP/snapshot verification не заменяют device smoke.
 
 ---
 
@@ -247,7 +248,7 @@ Repo config / production:
 - `/admin-team-photo` — protected private media route;
 - public `/snapshot`, `/team-photo`, `/contact-by-id`, auth/media routes не должны регрессировать.
 
-`entry-v1250.js` принимает write.4 для обычного edit во время перехода и включает `canDelete` только для доказанного snapshot write.5 с двумя delete operations. На текущем rollout stage Worker 1.25 + frontend 1325 live, Apps Script/private snapshot всё ещё write.4; delete ещё не live.
+`entry-v1250.js` принимает write.4 для обычного edit во время перехода и включает `canDelete` только для доказанного snapshot write.5 с двумя delete operations. Production Worker 1.25 + frontend 1325 + Apps Script/private snapshot write.5 подтверждены; delete contract live.
 
 ---
 
@@ -263,7 +264,7 @@ Repo config / production:
 
 ## 10. Минимальный smoke v0.6 перед общим релизом
 
-1. Обычный `startapp` остаётся v0.5.59; `startapp=v0600` открывает v0.6. Для принудительно свежей проверки candidate использовать `startapp=v0600-1325`.
+1. Обычный `startapp` остаётся v0.5.59; `startapp=v0600` открывает v0.6. Для принудительно свежей проверки build 1325 использовать `startapp=v0600-1325`.
 2. Не-админ не получает admin-data/write.
 3. Existing participant editor: только имя + memberships; прямой system-field write отклоняется.
 4. Разрешённое test write читается обратно и появляется в журнале; stale revision не перезаписывает новое.
