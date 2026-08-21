@@ -223,11 +223,14 @@ function MINIAPP_requestImmediateUnifiedSnapshot_(reason) {
   if (typeof MINIAPP_flushQueuedUnifiedSnapshot !== 'function') return queued;
 
   try {
+    var refresh = MINIAPP_flushQueuedUnifiedSnapshot();
     return {
-      ok: true,
-      mode: 'installable-trigger-direct-flush',
+      ok: !refresh || refresh.ok !== false,
+      mode: refresh && refresh.ok === false
+        ? 'installable-trigger-queued-retry'
+        : 'installable-trigger-direct-flush',
       queued: queued,
-      refresh: MINIAPP_flushQueuedUnifiedSnapshot()
+      refresh: refresh
     };
   } catch (error) {
     console.error('Immediate unified snapshot refresh failed', error && error.stack ? error.stack : error);
