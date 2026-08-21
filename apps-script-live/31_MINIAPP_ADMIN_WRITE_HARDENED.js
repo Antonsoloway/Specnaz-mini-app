@@ -197,15 +197,22 @@ function MINIAPP_adminWriteHardenedUpdateParticipant_(ctx) {
   }
 
   SpreadsheetApp.flush();
-  if (identityChanged) MINIAPP_adminWriteRefreshParticipantLinks_(ctx.ss, changes);
-  if (typeof markPublicSyncPending_ === 'function') {
-    markPublicSyncPending_('miniapp_admin_participant_hardened:' + telegramId);
-  }
-
   var after = MINIAPP_adminWriteHardenedParticipantRecord_(sheet, row);
   MINIAPP_adminWriteHardenedAppendJournal_(ctx, 'participant', telegramId, row, before, after, changes);
   var revision = MINIAPP_adminWriteHardenedParticipantRevision_(after);
   after.revision = revision;
+
+  // The Sheet mutation + journal above are the commit boundary. Link refresh
+  // and public-sync hints are non-essential and must never turn a committed
+  // participant edit into a client-visible failure and unsafe retry.
+  if (identityChanged) {
+    try { MINIAPP_adminWriteRefreshParticipantLinks_(ctx.ss, changes); }
+    catch (linkError) { console.warn('Participant links refresh deferred', linkError); }
+  }
+  if (typeof markPublicSyncPending_ === 'function') {
+    try { markPublicSyncPending_('miniapp_admin_participant_hardened:' + telegramId); }
+    catch (syncError) { console.warn('Participant public sync marker deferred', syncError); }
+  }
 
   return {
     ok: true,
@@ -529,6 +536,7 @@ function MINIAPP_adminWriteHardenedMeta_() {
     deleteEnabled: false,
     transport: 'worker-signed-hmac',
     participantIdentity: 'telegramId-immutable',
+    membershipWrite: 'atomic-validation-safe-rollback',
     teamIdentity: 'name+game',
     writableParticipantFields: [
       'name', 'telegramName', 'username', 'memberships', 'specnaz', 'date',
