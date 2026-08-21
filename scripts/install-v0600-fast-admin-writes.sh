@@ -60,6 +60,7 @@ DEPLOY_ID="$(printf '%s\n' "$LINE" | sed -E 's/^[[:space:]]*-[[:space:]]+([^[:sp
 WEBAPP_URL="https://script.google.com/macros/s/${DEPLOY_ID}/exec"
 
 FILES=(
+  02_PUBLIC_SYNC_V4.js
   25_MINIAPP_UNIFIED_SNAPSHOT.js
   28_MINIAPP_ADMIN_DATA.js
   29_MINIAPP_ADMIN_WRITE.js
@@ -97,9 +98,14 @@ PY
 node --check "$TEMP_DIR/31_MINIAPP_ADMIN_WRITE_HARDENED.js"
 grep -q "MINIAPP_flushQueuedAdminSnapshot" "$TEMP_DIR/28_MINIAPP_ADMIN_DATA.js" || fail "private snapshot queue missing"
 grep -q "response: 'commit-first'" "$TEMP_DIR/28_MINIAPP_ADMIN_DATA.js" || fail "commit-first response marker missing"
-grep -q "MINIAPP_queueAdminSnapshotRefresh_('admin-write-commit')" "$TEMP_DIR/29_MINIAPP_ADMIN_WRITE.js" || fail "admin write queue hook missing"
+grep -q "ONE_OFF_UNIFIED_SNAPSHOT_QUEUE_V126" "$TEMP_DIR/25_MINIAPP_UNIFIED_SNAPSHOT.js" || fail "unified one-off snapshot queue missing"
+grep -q "MINIAPP_flushQueuedUnifiedSnapshot" "$TEMP_DIR/25_MINIAPP_UNIFIED_SNAPSHOT.js" || fail "unified queue handler missing"
+grep -q "MINIAPP_queueUnifiedSnapshotRefresh_('manual-sheet-'" "$TEMP_DIR/02_PUBLIC_SYNC_V4.js" || fail "manual Sheet edit queue hook missing"
+grep -q "MINIAPP_queueUnifiedSnapshotRefresh_('admin-write-commit', true)" "$TEMP_DIR/29_MINIAPP_ADMIN_WRITE.js" || fail "admin write unified queue hook missing"
+grep -q "ROLE_VALIDATION_ATOMIC_MEMBERSHIP_V0600" "$TEMP_DIR/29_MINIAPP_ADMIN_WRITE.js" || fail "atomic membership writer missing"
+grep -q "membership rollback failed" "$TEMP_DIR/29_MINIAPP_ADMIN_WRITE.js" || fail "membership rollback guard missing"
 grep -q "tryLock(6000)" "$TEMP_DIR/30_MINIAPP_ADMIN_WRITE_BACKEND.js" || fail "short write-lock policy missing"
-grep -q "sourceLock: 'sheet-capture-only'" "$TEMP_DIR/33_MINIAPP_ADMIN_WRITE_FINAL.js" || fail "snapshot capability marker missing"
+grep -q "publicMode: unifiedQueueReady ? 'one-off-deduplicated-trigger'" "$TEMP_DIR/33_MINIAPP_ADMIN_WRITE_FINAL.js" || fail "one-off snapshot capability marker missing"
 grep -Fq "$WEBAPP_URL" "$TEMP_DIR/31_MINIAPP_ADMIN_WRITE_HARDENED.js" || fail "exact endpoint injection missing"
 ok "Backup: $BACKUP_DIR"
 
@@ -152,7 +158,7 @@ for attempt in $(seq 1 30); do
   printf '[INFO] snapshot check %s/30\n' "$attempt"
   if gh api "repos/Antonsoloway/royal-crm-data/contents/admin-snapshot.json" \
     -H 'Accept: application/vnd.github.raw+json' 2>/dev/null \
-    | python3 -c 'import json,sys; d=json.load(sys.stdin); expected=sys.argv[1]; a=d.get("adminData") or {}; w=a.get("write") or {}; s=w.get("snapshotRefresh") or {}; assert a.get("version")=="0.6.0-write.5"; assert w.get("endpoint")==expected; assert w.get("endpointPinned") is True; assert s.get("mode")=="queued-private-trigger"; assert s.get("response")=="commit-first"; assert s.get("sourceLock")=="sheet-capture-only"; print("[OK] commit-first snapshot contract live")' "$WEBAPP_URL" 2>/dev/null; then
+    | python3 -c 'import json,sys; d=json.load(sys.stdin); expected=sys.argv[1]; a=d.get("adminData") or {}; w=a.get("write") or {}; s=w.get("snapshotRefresh") or {}; m=w.get("membershipWrite") or {}; assert a.get("version")=="0.6.0-write.5"; assert w.get("endpoint")==expected; assert w.get("endpointPinned") is True; assert s.get("mode")=="queued-unified-trigger"; assert s.get("response")=="commit-first"; assert s.get("sourceLock")=="sheet-capture-only"; assert s.get("publicMode")=="one-off-deduplicated-trigger"; assert s.get("privateMode")=="same-one-off-trigger"; assert s.get("manualEdit")=="installable-on-edit-and-on-change-queue"; assert m.get("atomic") is True; assert m.get("mode")=="single-range-validation-safe"; assert m.get("rollback")=="source-values-and-role-rules"; print("[OK] one-off unified + atomic membership contract live")' "$WEBAPP_URL" 2>/dev/null; then
     SNAPSHOT_OK=1
     break
   fi
@@ -167,9 +173,12 @@ ok "Live Apps Script mirror synced"
 printf '\n============================================================\n'
 printf '✅✅✅ FAST ADMIN EDITING READY ✅✅✅\n'
 printf 'Sheet commit: immediate response\n'
-printf 'Private snapshot: background queue\n'
+printf 'App write snapshots: one deduplicated background trigger\n'
+printf 'Manual Sheet edits: same one-off trigger\n'
+printf 'Public + private snapshots: refreshed together\n'
 printf 'Recurring snapshot: releases ScriptLock before GitHub I/O\n'
 printf 'Write lock wait: 6 seconds with idempotent UI retry\n'
+printf 'Membership write: atomic range + validation-safe rollback\n'
 printf 'Stable deployment preserved: %s\n' "$EXPECTED_DESC"
 printf 'No participant or team was created, changed or deleted.\n'
 printf '============================================================\n'
