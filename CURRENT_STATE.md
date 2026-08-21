@@ -22,16 +22,16 @@
 - постоянный entrypoint: `app.html`;
 - обычный запуск → **`app-v0559.html` / v0.5.59**;
 - `startapp=v0600` / `tgWebAppStartParam=v0600` → **`app-v0600.html` / v0.6.0 admin preview**;
-- временный cache-forced preview для текущей ветки: `startapp=v0600-1325` → тот же `app-v0600.html`, но с уникальным start parameter;
+- текущий cache-forced preview: `startapp=v0600-1435` → тот же `app-v0600.html`, но с уникальным start parameter;
 - обычных пользователей пока не переводить на v0.6;
 - bot: `@doveofpeace_bot`.
 
 Текущий preview delivery:
-- `version-v0600.js` cache-bust: **`20260821-1325`**;
-- `app-v0600.html` → `version-v0600.js?v=20260821-1325`;
-- `app.html` previewBuild: **`20260821-1325`**;
-- `app.html` принимает `v0600`, предыдущий alias `v0600-2328` и текущий cache-forced alias `v0600-1325`;
-- GitHub Pages production подтверждён на build `20260821-1325` после merge PR #3 (`0951daa`); старый alias `v0600-2328` сохранён только для совместимости.
+- `version-v0600.js` cache-bust: **`20260821-1435`**;
+- `app-v0600.html` → `version-v0600.js?v=20260821-1435`;
+- `app.html` previewBuild: **`20260821-1435`**;
+- `app.html` принимает `v0600`, старые aliases `v0600-2328`, `v0600-1325` и текущий cache-forced alias `v0600-1435`;
+- GitHub Pages production подтверждён на build `20260821-1435` после merge PR #6 (`b579dbd`); старые aliases сохранены для совместимости.
 
 ---
 
@@ -120,13 +120,13 @@ Public snapshot:
 - `admin-v0600.js` / `admin-eligibility-v0600.js`;
 - `admin-entry-relocation-v0600.js` = `0.6.0-admin-entry-relocation.2`;
 - `admin-write-gate-v0600.js` = `0.6.0-write.5-gate.1`;
-- `admin-write-v0600-v3.js` = `0.6.0-write.5-ui.1`;
+- `admin-write-v0600-v3.js` = `0.6.0-write.5-ui.2`;
 - `admin-team-photo-v0600.js`;
 - `admin-participant-edit-policy-v0600.js`;
 - `admin-search-media-sort-v0600.js` = `0.6.0-admin-search-media-sort.2`;
 - `admin-media-cache-v0600-v2.js` = `0.6.0-admin-media-cache.2`;
-- `admin-team-detail-v0600.js` = `0.6.0-admin-team-detail.3`;
-- **`admin-participant-detail-v0600.js` = `0.6.0-admin-participant-detail.1`**;
+- `admin-team-detail-v0600.js` = `0.6.0-admin-team-detail.4`;
+- **`admin-participant-detail-v0600.js` = `0.6.0-admin-participant-detail.2`**;
 - **`admin-participant-nav-guard-v0600.js` = `0.6.0-admin-participant-nav-guard.1`**;
 - **`admin-participant-memberships-v0600.js` = `0.6.0-admin-participant-memberships.1`**;
 - **`admin-navigation-guard-v0600.js` = `0.6.0-admin-navigation-guard.3`**.
@@ -190,7 +190,7 @@ Participant metric rankings:
 
 ### Admin team metric rankings — repo ready, smoke pending
 
-В `admin-team-detail-v0600.js .3` шесть карточек статистики кликабельны:
+В `admin-team-detail-v0600.js .4` шесть карточек статистики кликабельны:
 - `Игроков E` → `players`;
 - `Общий спецназ F` → `specnazTrips`;
 - `Скрины H` → `screens`;
@@ -208,17 +208,19 @@ Participant metric rankings:
 - без 128 thumbnails/network prewarm;
 - Back → предыдущий detail/list state.
 
-### Admin entry + guarded deletion — live build 1325 / write.5
+### Admin entry + guarded deletion — live build 1435 / write.5
 
 - плитка `Админ режим` больше не занимает место в основном grid: после подтверждения admin eligibility она скрывается, а кнопка переносится внутрь `#selfProfileCard .self-profile-head`, справа от имени/username;
 - relocation переживает повторный render self-profile через `MutationObserver`; если eligibility исчезла, перенесённая кнопка удаляется;
-- delete-кнопка участника видна только при `chatState = Вышел`, delete-кнопка команды — только при `status = Неактивен` и `players = 0`;
+- delete-кнопка участника видна прямо на admin participant detail только при `chatState = Вышел`;
+- delete-кнопка команды видна прямо на admin team detail только при `status = Неактивен` и `players = 0`;
+- перед direct delete frontend повторно загружает свежую private card/revision; кнопки в modal editor также сохранены;
 - перед каждой операцией Telegram `showConfirm`/browser confirm задаёт явный вопрос `Точно хотите удалить...`;
 - frontend-условия не являются защитой: Apps Script повторно читает live Sheet под lock и отклоняет операцию при изменившемся status/count/revision;
 - после успеха private snapshot обновляется, cache сбрасывается, удалённая запись исчезает из admin list/table;
 - проверка snapshot на 21.08.2026: 207 participants, 128 admin teams; `Вышел` = 16; `Неактивен` = 26, из них E=0 = 25; все 25 дополнительно имели 0 live membership refs, одна неактивная команда с ненулевым E остаётся заблокированной.
 
-**Статус frontend:** PR #3 merged в `main` (`0951daa`); GitHub Pages production фактически отдаёт build **`20260821-1325`**, подключённый relocation `.2` и router alias `v0600-1325`. Private snapshot write.5 доказан, поэтому Worker 1.25 разрешает delete UI администраторам. Реальный Telegram WebView smoke кнопки/confirm и по одной разрешённой тестовой операции ещё требуется; commit/HTTP/snapshot verification не заменяют device smoke.
+**Статус frontend:** PR #6 squash-merged в `main` (`b579dbd`); GitHub Pages production фактически отдаёт build **`20260821-1435`**, participant detail `.2`, team detail `.4` и оба direct delete marker. Private snapshot write.5 и Worker 1.25 доказаны. Реальный Telegram WebView smoke кнопки/confirm и по одной разрешённой тестовой операции ещё требуется; HTTP/tests не заменяют device smoke.
 
 ---
 
@@ -248,7 +250,7 @@ Repo config / production:
 - `/admin-team-photo` — protected private media route;
 - public `/snapshot`, `/team-photo`, `/contact-by-id`, auth/media routes не должны регрессировать.
 
-`entry-v1250.js` принимает write.4 для обычного edit во время перехода и включает `canDelete` только для доказанного snapshot write.5 с двумя delete operations. Production Worker 1.25 + frontend 1325 + Apps Script/private snapshot write.5 подтверждены; delete contract live.
+`entry-v1250.js` принимает write.4 для обычного edit во время перехода и включает `canDelete` только для доказанного snapshot write.5 с двумя delete operations. Production Worker 1.25 + frontend 1435 + Apps Script/private snapshot write.5 подтверждены; delete contract live.
 
 ---
 
@@ -264,7 +266,7 @@ Repo config / production:
 
 ## 10. Минимальный smoke v0.6 перед общим релизом
 
-1. Обычный `startapp` остаётся v0.5.59; `startapp=v0600` открывает v0.6. Для принудительно свежей проверки build 1325 использовать `startapp=v0600-1325`.
+1. Обычный `startapp` остаётся v0.5.59; `startapp=v0600` открывает v0.6. Для принудительно свежей проверки build 1435 использовать `startapp=v0600-1435`.
 2. Не-админ не получает admin-data/write.
 3. Existing participant editor: только имя + memberships; прямой system-field write отклоняется.
 4. Разрешённое test write читается обратно и появляется в журнале; stale revision не перезаписывает новое.
