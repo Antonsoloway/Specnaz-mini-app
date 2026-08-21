@@ -16,6 +16,8 @@
 var MINIAPP_ADMIN_WRITE_BACKEND_VERSION = '0.6.0-write.5';
 var MINIAPP_ADMIN_WRITE_BACKEND_MAX_AGE_SEC = 90;
 var MINIAPP_ADMIN_WRITE_BACKEND_FUTURE_SKEW_SEC = 30;
+var MINIAPP_ADMIN_REFRESH_ACTION = 'admin-snapshot-refresh';
+var MINIAPP_ADMIN_REFRESH_CANONICAL_PREFIX = 'ROYAL_CRM_ADMIN_REFRESH_V1';
 var MINIAPP_ADMIN_WRITE_BACKEND_ALLOWED_OPS = {
   updateParticipant: true,
   createParticipant: true,
@@ -29,7 +31,11 @@ var MINIAPP_ADMIN_WRITE_BACKEND_ALLOWED_OPS = {
 function MINIAPP_adminWriteBackendMaybeHandle_(e) {
   var action = MINIAPP_adminWriteValue_(e && e.parameter && e.parameter.action);
   var backend = MINIAPP_adminWriteValue_(e && e.parameter && e.parameter.backend);
-  if (action !== MINIAPP_ADMIN_WRITE_ACTION || backend !== '1') return null;
+  if (backend !== '1') return null;
+  if (action === MINIAPP_ADMIN_REFRESH_ACTION) {
+    return MINIAPP_adminRefreshBackendHandle_(e);
+  }
+  if (action !== MINIAPP_ADMIN_WRITE_ACTION) return null;
 
   var result;
   try {
@@ -192,6 +198,95 @@ function MINIAPP_adminWriteBackendExecute_(e) {
     }
     try { lock.releaseLock(); } catch (_) {}
   }
+}
+
+/**
+ * Signed Worker background kick. It never mutates CRM source cells.
+ * The write request has already committed before the Worker calls this route.
+ */
+function MINIAPP_adminRefreshBackendHandle_(e) {
+  var result;
+  try {
+    result = MINIAPP_adminRefreshBackendExecute_(e);
+  } catch (error) {
+    console.error('MINIAPP admin refresh fatal', error && error.stack ? error.stack : error);
+    result = MINIAPP_adminWriteError_(
+      'ADMIN_REFRESH_SERVER_ERROR',
+      'Фоновое обновление данных не запустилось; остаётся пятиминутный резерв.'
+    );
+  }
+  result.version = MINIAPP_ADMIN_WRITE_BACKEND_VERSION;
+  return MINIAPP_adminWriteBackendJson_(result);
+}
+
+function MINIAPP_adminRefreshBackendExecute_(e) {
+  var requestId = MINIAPP_adminWriteRequestId_(e && e.parameter && e.parameter.requestId);
+  var adminId = MINIAPP_adminWriteTelegramId_(e && e.parameter && e.parameter.adminTelegramId);
+  var timestampText = MINIAPP_adminWriteValue_(e && e.parameter && e.parameter.timestamp);
+  var signature = MINIAPP_adminWriteValue_(e && e.parameter && e.parameter.signature).toLowerCase();
+
+  if (!requestId) return MINIAPP_adminWriteError_('INVALID_REQUEST_ID', 'Некорректный идентификатор операции.');
+  if (!adminId) return MINIAPP_adminWriteError_('ADMIN_ID_INVALID', 'Не удалось определить администратора.');
+  if (!/^\d{10,13}$/.test(timestampText)) {
+    return MINIAPP_adminWriteError_('BACKEND_TIMESTAMP_INVALID', 'Некорректная серверная метка времени.');
+  }
+  if (!/^[0-9a-f]{64}$/.test(signature)) {
+    return MINIAPP_adminWriteError_('BACKEND_SIGNATURE_INVALID', 'Серверная подпись отсутствует или повреждена.');
+  }
+
+  var nowSec = Math.floor(Date.now() / 1000);
+  var timestampSec = Number(timestampText);
+  if (!isFinite(timestampSec) ||
+      nowSec - timestampSec > MINIAPP_ADMIN_WRITE_BACKEND_MAX_AGE_SEC ||
+      timestampSec - nowSec > MINIAPP_ADMIN_WRITE_BACKEND_FUTURE_SKEW_SEC) {
+    return MINIAPP_adminWriteError_('BACKEND_REQUEST_EXPIRED', 'Серверный запрос устарел.');
+  }
+
+  var tokenProperty = typeof MINIAPP_TOKEN_PROPERTY !== 'undefined'
+    ? MINIAPP_TOKEN_PROPERTY : 'TELEGRAM_BOT_TOKEN';
+  var botToken = MINIAPP_adminWriteValue_(
+    PropertiesService.getScriptProperties().getProperty(tokenProperty)
+  );
+  if (!botToken) return MINIAPP_adminWriteError_('BACKEND_SECRET_MISSING', 'Не найден серверный секрет Telegram.');
+
+  var canonical = [
+    MINIAPP_ADMIN_REFRESH_CANONICAL_PREFIX,
+    requestId,
+    adminId,
+    timestampText
+  ].join('\n');
+  var expected = MINIAPP_adminWriteBackendHmacHex_(botToken, canonical);
+  if (!MINIAPP_adminWriteBackendConstantTimeEqual_(expected, signature)) {
+    return MINIAPP_adminWriteError_('BACKEND_SIGNATURE_MISMATCH', 'Серверная подпись не подтверждена.');
+  }
+  if (typeof MINIAPP_flushQueuedUnifiedSnapshot !== 'function') {
+    return MINIAPP_adminWriteError_(
+      'UNIFIED_REFRESH_HANDLER_MISSING',
+      'Фоновое обновление данных ещё не установлено.'
+    );
+  }
+
+  var refresh = MINIAPP_flushQueuedUnifiedSnapshot();
+  if (!refresh || refresh.ok === false) {
+    return {
+      ok: false,
+      error: 'ADMIN_REFRESH_FAILED',
+      message: 'Фоновое обновление не завершилось; остаётся пятиминутный резерв.',
+      requestId: requestId,
+      refreshReason: refresh && (refresh.reason || refresh.error) || 'UNKNOWN'
+    };
+  }
+  return {
+    ok: true,
+    action: MINIAPP_ADMIN_REFRESH_ACTION,
+    requestId: requestId,
+    changed: refresh.changed === true,
+    skipped: refresh.skipped === true,
+    reason: String(refresh.reason || ''),
+    captureSequence: Number(refresh.captureSequence || 0),
+    mode: 'worker-background-direct-flush',
+    fallback: 'unified-5-minute-trigger'
+  };
 }
 
 function MINIAPP_adminWriteBackendCanonical_(requestId, adminId, op, timestamp, payloadRaw) {

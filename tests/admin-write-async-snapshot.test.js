@@ -225,6 +225,18 @@ test('all write paths use commit-first metadata and short lock scope', () => {
     path.join(ROOT, 'apps-script-live', '02_PUBLIC_SYNC_V4.js'),
     'utf8'
   );
+  const workerSource = fs.readFileSync(
+    path.join(ROOT, 'worker', 'src', 'entry-v1210.js'),
+    'utf8'
+  );
+  const workerWrapperSource = fs.readFileSync(
+    path.join(ROOT, 'worker', 'src', 'entry-v1280.js'),
+    'utf8'
+  );
+  const wranglerSource = fs.readFileSync(
+    path.join(ROOT, 'worker', 'wrangler.toml'),
+    'utf8'
+  );
 
   assert.match(writeSource, /MINIAPP_queueAdminSnapshotRefresh_\('admin-write-commit'\)/);
   assert.match(writeSource, /MINIAPP_queueUnifiedSnapshotRefresh_\('admin-write-commit', true\)/);
@@ -233,11 +245,21 @@ test('all write paths use commit-first metadata and short lock scope', () => {
   assert.match(finalSource, /mode:[\s\S]*'queued-private-trigger'/);
   assert.match(finalSource, /record: after/);
   assert.match(finalSource, /membershipWrite\s*=\s*\{[\s\S]*atomic: true[\s\S]*single-range-validation-safe/);
-  assert.match(finalSource, /publicMode:[\s\S]*'one-off-deduplicated-trigger'/);
-  assert.match(finalSource, /manualEdit: 'installable-on-edit-and-on-change-queue'/);
-  assert.match(manualEditSource, /handlePublicSyncEdit[\s\S]*MINIAPP_queueUnifiedSnapshotRefresh_\('manual-sheet-'/);
-  assert.match(manualEditSource, /handlePublicSyncChange[\s\S]*MINIAPP_queueUnifiedSnapshotRefresh_\('manual-sheet-'/);
-  assert.match(unifiedSource, /ONE_OFF_UNIFIED_SNAPSHOT_QUEUE_V126/);
+  assert.match(finalSource, /publicMode:[\s\S]*'direct-signed-refresh-with-queued-fallback'/);
+  assert.match(finalSource, /appWriteDispatch: 'worker-wait-until-signed-refresh'/);
+  assert.match(finalSource, /manualEdit: 'installable-direct-flush-with-queued-retry'/);
+  assert.match(manualEditSource, /handlePublicSyncEdit[\s\S]*MINIAPP_requestImmediateUnifiedSnapshot_\('manual-sheet-'/);
+  assert.match(manualEditSource, /handlePublicSyncChange[\s\S]*MINIAPP_requestImmediateUnifiedSnapshot_\('manual-sheet-'/);
+  assert.match(manualEditSource, /function MINIAPP_requestImmediateUnifiedSnapshot_[\s\S]*MINIAPP_flushQueuedUnifiedSnapshot\(\)/);
+  assert.match(backendSource, /ROYAL_CRM_ADMIN_REFRESH_V1/);
+  assert.match(backendSource, /action === MINIAPP_ADMIN_REFRESH_ACTION[\s\S]*MINIAPP_adminRefreshBackendHandle_/);
+  assert.match(backendSource, /MINIAPP_adminRefreshBackendExecute_[\s\S]*MINIAPP_flushQueuedUnifiedSnapshot\(\)/);
+  assert.match(workerSource, /ctx\.waitUntil\([\s\S]*requestImmediateSnapshotRefresh/);
+  assert.match(workerSource, /action: 'admin-snapshot-refresh'/);
+  assert.match(workerWrapperSource, /WRAPPER_VERSION = '1\.28\.0'/);
+  assert.match(workerWrapperSource, /worker-wait-until-signed-refresh/);
+  assert.match(wranglerSource, /main = "src\/entry-v1280\.js"/);
+  assert.match(unifiedSource, /DIRECT_DISPATCH_WITH_QUEUE_FALLBACK_V127/);
   assert.match(unifiedSource, /function MINIAPP_flushQueuedUnifiedSnapshot\(\)/);
   assert.match(unifiedSource, /lock\.releaseLock\(\)[\s\S]*MINIAPP_exportAdminSnapshotToGitHub\(\)/);
   assert.match(unifiedSource, /lock\.releaseLock\(\)[\s\S]*MINIAPP_unifiedPutWithRetry_/);

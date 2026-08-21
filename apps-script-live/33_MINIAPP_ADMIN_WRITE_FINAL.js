@@ -606,9 +606,11 @@ function MINIAPP_adminWriteFinalMeta_() {
       ? 'commit-first'
       : 'snapshot-first',
     sourceLock: 'sheet-capture-only',
-    publicMode: unifiedQueueReady ? 'one-off-deduplicated-trigger' : 'five-minute-fallback',
-    privateMode: unifiedQueueReady ? 'same-one-off-trigger' : 'separate-private-refresh',
-    manualEdit: 'installable-on-edit-and-on-change-queue',
+    publicMode: unifiedQueueReady ? 'direct-signed-refresh-with-queued-fallback' : 'five-minute-fallback',
+    privateMode: unifiedQueueReady ? 'same-direct-refresh' : 'separate-private-refresh',
+    appWriteDispatch: 'worker-wait-until-signed-refresh',
+    manualEdit: 'installable-direct-flush-with-queued-retry',
+    clockTrigger: 'durable-retry-not-latency-contract',
     fallback: 'unified-5-minute-trigger'
   };
   meta.teamPhoto = {

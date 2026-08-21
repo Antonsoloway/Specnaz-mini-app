@@ -2,6 +2,7 @@ import currentWorker from './entry-v1200.js';
 
 const WRAPPER_VERSION = '1.21.0-dev';
 const ADMIN_WRITE_CANONICAL_PREFIX = 'ROYAL_CRM_ADMIN_WRITE_V1';
+const ADMIN_REFRESH_CANONICAL_PREFIX = 'ROYAL_CRM_ADMIN_REFRESH_V1';
 const ALLOWED_OPERATIONS = new Set([
   'updateParticipant',
   'createParticipant',
@@ -201,11 +202,60 @@ async function handleAdminWrite(request, env, ctx) {
   }
 
   const status = result?.ok ? 200 : result?.conflict ? 409 : mapUpstreamErrorStatus(result?.error);
+  let snapshotDispatch = 'not-scheduled';
+  if (result?.ok && ctx && typeof ctx.waitUntil === 'function') {
+    snapshotDispatch = 'worker-wait-until';
+    ctx.waitUntil(
+      requestImmediateSnapshotRefresh(endpoint, botToken, adminId, requestId)
+        .catch(error => console.warn('admin snapshot background kick failed', error?.message || 'unknown'))
+    );
+  }
+
   return jsonFrom(adminResponse, {
     ...result,
     workerVersion: WRAPPER_VERSION,
-    transport: 'worker-signed-hmac'
+    transport: 'worker-signed-hmac',
+    snapshotDispatch
   }, status);
+}
+
+async function requestImmediateSnapshotRefresh(endpoint, botToken, adminId, requestId) {
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const canonical = [
+    ADMIN_REFRESH_CANONICAL_PREFIX,
+    requestId,
+    adminId,
+    timestamp
+  ].join('\n');
+  const signature = await hmacSha256Hex(botToken, canonical);
+  const form = new URLSearchParams({
+    miniapp: '1',
+    action: 'admin-snapshot-refresh',
+    backend: '1',
+    adminTelegramId: adminId,
+    requestId,
+    timestamp,
+    signature
+  });
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+      'User-Agent': 'Royal-CRM-MiniApp-Worker/admin-snapshot-refresh'
+    },
+    body: form.toString(),
+    redirect: 'follow',
+    cache: 'no-store'
+  });
+  const text = await response.text();
+  let data;
+  try { data = JSON.parse(text || '{}'); }
+  catch { throw new Error('ADMIN_REFRESH_UPSTREAM_INVALID'); }
+  if (!response.ok || !data?.ok) {
+    throw new Error(String(data?.error || 'ADMIN_REFRESH_UPSTREAM_FAILED'));
+  }
+  return data;
 }
 
 async function authorizeViaAdminData(request, env, ctx) {
