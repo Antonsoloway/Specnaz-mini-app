@@ -25,18 +25,18 @@ done
 [[ -f "$PROJECT_DIR/.clasp.json" ]] || fail ".clasp.json не найден в $PROJECT_DIR"
 gh auth status >/dev/null 2>&1 || fail "GitHub CLI не авторизован"
 
-info "ROLLOUT GUARD — WORKER 1.27"
+info "ROLLOUT GUARD — WORKER 1.28"
 WORKER_READY=0
 for attempt in $(seq 1 12); do
   printf '[INFO] worker check %s/12\n' "$attempt"
   if curl -fsS --max-time 20 "$WORKER_HEALTH_URL" \
-    | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("version")=="1.27.0"; assert d.get("adminWriteEndpoint")=="pinned-deployment-config"; print("[OK] Worker 1.27 live")' 2>/dev/null; then
+    | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("version")=="1.28.0"; assert d.get("adminWriteEndpoint")=="pinned-deployment-config"; assert d.get("snapshotDispatch")=="worker-wait-until-signed-refresh"; print("[OK] Worker 1.28 live")' 2>/dev/null; then
     WORKER_READY=1
     break
   fi
   sleep 5
 done
-[[ "$WORKER_READY" == "1" ]] || fail "Worker 1.27 ещё не live. Apps Script не изменён."
+[[ "$WORKER_READY" == "1" ]] || fail "Worker 1.28 ещё не live. Apps Script не изменён."
 
 mkdir -p "$BACKUP_DIR"
 cd "$PROJECT_DIR"
@@ -98,14 +98,17 @@ PY
 node --check "$TEMP_DIR/31_MINIAPP_ADMIN_WRITE_HARDENED.js"
 grep -q "MINIAPP_flushQueuedAdminSnapshot" "$TEMP_DIR/28_MINIAPP_ADMIN_DATA.js" || fail "private snapshot queue missing"
 grep -q "response: 'commit-first'" "$TEMP_DIR/28_MINIAPP_ADMIN_DATA.js" || fail "commit-first response marker missing"
-grep -q "ONE_OFF_UNIFIED_SNAPSHOT_QUEUE_V126" "$TEMP_DIR/25_MINIAPP_UNIFIED_SNAPSHOT.js" || fail "unified one-off snapshot queue missing"
+grep -q "DIRECT_DISPATCH_WITH_QUEUE_FALLBACK_V127" "$TEMP_DIR/25_MINIAPP_UNIFIED_SNAPSHOT.js" || fail "unified direct-dispatch fallback marker missing"
 grep -q "MINIAPP_flushQueuedUnifiedSnapshot" "$TEMP_DIR/25_MINIAPP_UNIFIED_SNAPSHOT.js" || fail "unified queue handler missing"
-grep -q "MINIAPP_queueUnifiedSnapshotRefresh_('manual-sheet-'" "$TEMP_DIR/02_PUBLIC_SYNC_V4.js" || fail "manual Sheet edit queue hook missing"
+grep -q "installable-trigger-direct-flush" "$TEMP_DIR/02_PUBLIC_SYNC_V4.js" || fail "manual Sheet direct flush missing"
 grep -q "MINIAPP_queueUnifiedSnapshotRefresh_('admin-write-commit', true)" "$TEMP_DIR/29_MINIAPP_ADMIN_WRITE.js" || fail "admin write unified queue hook missing"
 grep -q "ROLE_VALIDATION_ATOMIC_MEMBERSHIP_V0600" "$TEMP_DIR/29_MINIAPP_ADMIN_WRITE.js" || fail "atomic membership writer missing"
 grep -q "membership rollback failed" "$TEMP_DIR/29_MINIAPP_ADMIN_WRITE.js" || fail "membership rollback guard missing"
 grep -q "tryLock(6000)" "$TEMP_DIR/30_MINIAPP_ADMIN_WRITE_BACKEND.js" || fail "short write-lock policy missing"
-grep -q "publicMode: unifiedQueueReady ? 'one-off-deduplicated-trigger'" "$TEMP_DIR/33_MINIAPP_ADMIN_WRITE_FINAL.js" || fail "one-off snapshot capability marker missing"
+grep -q "ROYAL_CRM_ADMIN_REFRESH_V1" "$TEMP_DIR/30_MINIAPP_ADMIN_WRITE_BACKEND.js" || fail "signed background refresh route missing"
+grep -q "MINIAPP_flushQueuedUnifiedSnapshot" "$TEMP_DIR/30_MINIAPP_ADMIN_WRITE_BACKEND.js" || fail "direct unified flush route missing"
+grep -q "appWriteDispatch: 'worker-wait-until-signed-refresh'" "$TEMP_DIR/33_MINIAPP_ADMIN_WRITE_FINAL.js" || fail "Worker direct-dispatch capability marker missing"
+grep -q "manualEdit: 'installable-direct-flush-with-queued-retry'" "$TEMP_DIR/33_MINIAPP_ADMIN_WRITE_FINAL.js" || fail "manual direct-flush capability marker missing"
 grep -Fq "$WEBAPP_URL" "$TEMP_DIR/31_MINIAPP_ADMIN_WRITE_HARDENED.js" || fail "exact endpoint injection missing"
 ok "Backup: $BACKUP_DIR"
 
@@ -143,6 +146,12 @@ for attempt in $(seq 1 10); do
 done
 [[ "$ROUTE_OK" == "1" ]] || fail "Deployment обновлён, но write.5 route не подтверждён. Не повторяйте установку."
 
+info "NON-MUTATING SIGNED REFRESH ROUTE CHECK"
+REFRESH_BODY="$(curl -sS -L --max-time 30 -H 'Content-Type: application/x-www-form-urlencoded' \
+  --data 'miniapp=1&action=admin-snapshot-refresh&backend=1' "$WEBAPP_URL" || true)"
+printf '%s' "$REFRESH_BODY" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("error")=="INVALID_REQUEST_ID"; assert d.get("version")=="0.6.0-write.5"; print("[OK] signed refresh route live")' \
+  || fail "Deployment обновлён, но background refresh route не подтверждён."
+
 info "REFRESH PRIVATE SNAPSHOT (NO CRM MUTATION)"
 EXPORT_OUTPUT="$(clasp run MINIAPP_exportAdminSnapshotToGitHub 2>&1 || true)"
 if [[ -n "$EXPORT_OUTPUT" ]]; then printf '%s\n' "$EXPORT_OUTPUT"; fi
@@ -158,7 +167,7 @@ for attempt in $(seq 1 30); do
   printf '[INFO] snapshot check %s/30\n' "$attempt"
   if gh api "repos/Antonsoloway/royal-crm-data/contents/admin-snapshot.json" \
     -H 'Accept: application/vnd.github.raw+json' 2>/dev/null \
-    | python3 -c 'import json,sys; d=json.load(sys.stdin); expected=sys.argv[1]; a=d.get("adminData") or {}; w=a.get("write") or {}; s=w.get("snapshotRefresh") or {}; m=w.get("membershipWrite") or {}; assert a.get("version")=="0.6.0-write.5"; assert w.get("endpoint")==expected; assert w.get("endpointPinned") is True; assert s.get("mode")=="queued-unified-trigger"; assert s.get("response")=="commit-first"; assert s.get("sourceLock")=="sheet-capture-only"; assert s.get("publicMode")=="one-off-deduplicated-trigger"; assert s.get("privateMode")=="same-one-off-trigger"; assert s.get("manualEdit")=="installable-on-edit-and-on-change-queue"; assert m.get("atomic") is True; assert m.get("mode")=="single-range-validation-safe"; assert m.get("rollback")=="source-values-and-role-rules"; print("[OK] one-off unified + atomic membership contract live")' "$WEBAPP_URL" 2>/dev/null; then
+    | python3 -c 'import json,sys; d=json.load(sys.stdin); expected=sys.argv[1]; a=d.get("adminData") or {}; w=a.get("write") or {}; s=w.get("snapshotRefresh") or {}; m=w.get("membershipWrite") or {}; assert a.get("version")=="0.6.0-write.5"; assert w.get("endpoint")==expected; assert w.get("endpointPinned") is True; assert s.get("mode")=="queued-unified-trigger"; assert s.get("response")=="commit-first"; assert s.get("sourceLock")=="sheet-capture-only"; assert s.get("publicMode")=="direct-signed-refresh-with-queued-fallback"; assert s.get("privateMode")=="same-direct-refresh"; assert s.get("appWriteDispatch")=="worker-wait-until-signed-refresh"; assert s.get("manualEdit")=="installable-direct-flush-with-queued-retry"; assert m.get("atomic") is True; assert m.get("mode")=="single-range-validation-safe"; assert m.get("rollback")=="source-values-and-role-rules"; print("[OK] direct snapshot dispatch + atomic membership contract live")' "$WEBAPP_URL" 2>/dev/null; then
     SNAPSHOT_OK=1
     break
   fi
@@ -173,8 +182,8 @@ ok "Live Apps Script mirror synced"
 printf '\n============================================================\n'
 printf '✅✅✅ FAST ADMIN EDITING READY ✅✅✅\n'
 printf 'Sheet commit: immediate response\n'
-printf 'App write snapshots: one deduplicated background trigger\n'
-printf 'Manual Sheet edits: same one-off trigger\n'
+printf 'App write snapshots: Worker-signed background flush; clock trigger is fallback\n'
+printf 'Manual Sheet edits: installable trigger flushes immediately; queue retries on failure\n'
 printf 'Public + private snapshots: refreshed together\n'
 printf 'Recurring snapshot: releases ScriptLock before GitHub I/O\n'
 printf 'Write lock wait: 6 seconds with idempotent UI retry\n'
