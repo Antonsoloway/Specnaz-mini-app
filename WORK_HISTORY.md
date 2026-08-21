@@ -3,6 +3,16 @@
 > Краткий журнал фактически выполненных работ. Новые записи добавляются сверху.
 > Здесь фиксируются изменения, проверки, диагнозы и откаты, которые нужны следующему чату.
 
+## 2026-08-21 13:50 — rollout stage 1: PR #3 merged, frontend 1325 + Worker 1.25 production verified
+
+**Публикация по прямому подтверждению пользователя:** draft PR #3 переведён в ready и squash-merged в `main`; merge SHA `0951daa8ccf4128572c14c4294be836188154de7`.
+
+**Фактическая production verification:** Cloudflare branch deployment перед merge завершился успешно; после merge прямой `GET https://royal-crm-miniapp-api.tropical-spoon.workers.dev/health` вернул `200`, `version=1.25.0`, `adminDelete=participant-exited+team-inactive-empty`. GitHub Pages фактически отдаёт `app-v0600.html`/router build `20260821-1325`, подключённый `admin-entry-relocation-v0600.js .2` и alias `v0600-1325`.
+
+**Rollout boundary:** live Apps Script/private snapshot пока остаётся `0.6.0-write.4`; delete operations ещё не доступны, обычный admin edit сохранён. Следующий и единственный внешний шаг — запустить штатный installer `scripts/install-v0600-admin-delete-write5.sh` в уже настроенном Cloud Shell. Installer сам проверяет production Worker 1.25 **до** Apps Script mutation, обновляет только deployment `Таблица ЧП 1.3`, подтверждает write.5 route/snapshot и синхронизирует factual live mirror.
+
+---
+
 ## 2026-08-21 13:39 — v0.6 candidate: admin entry beside name + guarded participant/team deletion
 
 **Запрос пользователя:** перенести вход `Админ режим` в свободную область справа от имени админа на self-profile; в admin mode разрешить удаление команды только со статусом `Неактивен` и 0 участников, а участника — только со статусом `Вышел`; перед удалением обязательно спросить подтверждение, после успеха запись должна исчезнуть из admin table/list.
