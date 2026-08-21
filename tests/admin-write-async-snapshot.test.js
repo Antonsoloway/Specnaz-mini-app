@@ -9,6 +9,10 @@ const adminDataSource = fs.readFileSync(
   path.join(ROOT, 'apps-script-live', '28_MINIAPP_ADMIN_DATA.js'),
   'utf8'
 );
+const unifiedSource = fs.readFileSync(
+  path.join(ROOT, 'apps-script-live', '25_MINIAPP_UNIFIED_SNAPSHOT.js'),
+  'utf8'
+);
 
 function createQueueSandbox() {
   const values = new Map([
@@ -92,6 +96,49 @@ function createQueueSandbox() {
   return { sandbox, values, triggers, triggerDelays, publishes };
 }
 
+function createUnifiedQueueSandbox() {
+  const values = new Map();
+  const triggers = [];
+  const triggerDelays = [];
+  const exports = [];
+  let uuid = 0;
+  const properties = {
+    getProperty(key) { return values.has(key) ? values.get(key) : null; },
+    setProperty(key, value) { values.set(key, String(value)); return this; },
+    deleteProperty(key) { values.delete(key); return this; }
+  };
+  const sandbox = {
+    console,
+    Date,
+    JSON,
+    Math,
+    PropertiesService: { getScriptProperties: () => properties },
+    Utilities: { getUuid: () => `unified-${++uuid}` },
+    ScriptApp: {
+      getProjectTriggers: () => [...triggers],
+      deleteTrigger(trigger) {
+        const index = triggers.indexOf(trigger);
+        if (index >= 0) triggers.splice(index, 1);
+      },
+      newTrigger(handler) {
+        const trigger = { getHandlerFunction: () => handler };
+        return {
+          timeBased() { return this; },
+          after(delay) { triggerDelays.push(delay); return this; },
+          create() { triggers.push(trigger); return trigger; }
+        };
+      }
+    }
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(unifiedSource, sandbox, { filename: '25_MINIAPP_UNIFIED_SNAPSHOT.js' });
+  sandbox.MINIAPP_exportUnifiedSnapshotToGitHub = options => {
+    exports.push(options);
+    return { ok:true, changed:true, adminSnapshot:{ ok:true, changed:true } };
+  };
+  return { sandbox, values, triggers, triggerDelays, exports };
+}
+
 test('admin snapshot queue is durable, deduplicated and publishes outside ScriptLock', () => {
   const { sandbox, values, triggers, triggerDelays, publishes } = createQueueSandbox();
 
@@ -132,6 +179,31 @@ test('a superseded capture is never allowed to overwrite a newer queued mutation
   assert.equal(queued.reason, 'new mutation');
 });
 
+test('one unified time trigger deduplicates app and manual Sheet changes', () => {
+  const { sandbox, values, triggers, triggerDelays, exports } = createUnifiedQueueSandbox();
+
+  const appWrite = sandbox.MINIAPP_queueUnifiedSnapshotRefresh_('admin-write-commit', true);
+  assert.equal(appWrite.mode, 'queued-unified-trigger');
+  assert.deepEqual([...appWrite.updates], ['admin-snapshot', 'public-snapshot']);
+  assert.equal(triggers.length, 1);
+  assert.equal(triggerDelays[0], 1500);
+
+  const manualEdit = sandbox.MINIAPP_queueUnifiedSnapshotRefresh_('manual-sheet-edit', false);
+  assert.equal(manualEdit.deduplicated, true);
+  assert.equal(triggers.length, 1);
+  const queued = JSON.parse(values.get('MINIAPP_UNIFIED_SNAPSHOT_QUEUE_V1'));
+  assert.equal(queued.reason, 'manual-sheet-edit');
+  assert.equal(queued.includeAdminSnapshot, true, 'a pending private refresh must not be dropped');
+
+  const result = sandbox.MINIAPP_flushQueuedUnifiedSnapshot();
+  assert.equal(result.ok, true);
+  assert.equal(exports.length, 1);
+  assert.equal(exports[0].queueToken, queued.token);
+  assert.equal(exports[0].skipAdminSnapshot, false);
+  assert.equal(triggers.length, 0);
+  assert.equal(values.has('MINIAPP_UNIFIED_SNAPSHOT_QUEUE_V1'), false);
+});
+
 test('all write paths use commit-first metadata and short lock scope', () => {
   const writeSource = fs.readFileSync(
     path.join(ROOT, 'apps-script-live', '29_MINIAPP_ADMIN_WRITE.js'),
@@ -149,12 +221,24 @@ test('all write paths use commit-first metadata and short lock scope', () => {
     path.join(ROOT, 'apps-script-live', '25_MINIAPP_UNIFIED_SNAPSHOT.js'),
     'utf8'
   );
+  const manualEditSource = fs.readFileSync(
+    path.join(ROOT, 'apps-script-live', '02_PUBLIC_SYNC_V4.js'),
+    'utf8'
+  );
 
   assert.match(writeSource, /MINIAPP_queueAdminSnapshotRefresh_\('admin-write-commit'\)/);
+  assert.match(writeSource, /MINIAPP_queueUnifiedSnapshotRefresh_\('admin-write-commit', true\)/);
   assert.match(backendSource, /lock\.tryLock\(6000\)/);
   assert.match(backendSource, /ADMIN_SNAPSHOT_QUEUE_MISSING/);
   assert.match(finalSource, /mode:[\s\S]*'queued-private-trigger'/);
   assert.match(finalSource, /record: after/);
+  assert.match(finalSource, /membershipWrite\s*=\s*\{[\s\S]*atomic: true[\s\S]*single-range-validation-safe/);
+  assert.match(finalSource, /publicMode:[\s\S]*'one-off-deduplicated-trigger'/);
+  assert.match(finalSource, /manualEdit: 'installable-on-edit-and-on-change-queue'/);
+  assert.match(manualEditSource, /handlePublicSyncEdit[\s\S]*MINIAPP_queueUnifiedSnapshotRefresh_\('manual-sheet-'/);
+  assert.match(manualEditSource, /handlePublicSyncChange[\s\S]*MINIAPP_queueUnifiedSnapshotRefresh_\('manual-sheet-'/);
+  assert.match(unifiedSource, /ONE_OFF_UNIFIED_SNAPSHOT_QUEUE_V126/);
+  assert.match(unifiedSource, /function MINIAPP_flushQueuedUnifiedSnapshot\(\)/);
   assert.match(unifiedSource, /lock\.releaseLock\(\)[\s\S]*MINIAPP_exportAdminSnapshotToGitHub\(\)/);
   assert.match(unifiedSource, /lock\.releaseLock\(\)[\s\S]*MINIAPP_unifiedPutWithRetry_/);
 });

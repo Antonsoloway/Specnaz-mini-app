@@ -1,14 +1,19 @@
 /* Royal CRM Mini App — protected Admin Write/Delete UI v0.6.0-write.5 */
 (() => {
-  const VERSION = '0.6.0-write.5-ui.7';
+  const VERSION = '0.6.0-write.5-ui.8';
   const WRITE_BUSY_RETRY_DELAYS_MS = [700, 1400, 2500];
   const TRANSPORT_RETRY_DELAY_MS = 700;
   const ADMIN_READ_RETRY_DELAYS_MS = [0, 700, 1600];
   const SNAPSHOT_POLL_DELAYS_MS = [2500, 4000, 7000, 12000, 20000, 35000, 60000, 90000, 120000];
+  const PUBLIC_SNAPSHOT_POLL_DELAYS_MS = [2500, 3500, 5000, 8000, 12000, 18000, 30000, 45000];
+  const PUBLIC_SNAPSHOT_WATCH_MS = 20000;
   const state = {
     editing:false,
     payload:null,
     loading:null,
+    publicLoading:null,
+    publicPollGeneration:0,
+    liveRefreshTimer:0,
     modal:null,
     observerBusy:false,
     pendingRequestIds:new Set()
@@ -108,6 +113,110 @@
       throw error;
     }
     throw lastError || new Error('Не удалось загрузить админские данные.');
+  }
+
+  // ADMIN_PUBLIC_SNAPSHOT_LIVE_REFRESH_V0600
+  // The one-off Apps Script trigger publishes both snapshots in background.
+  // A visible v0.6 client checks their hashes and applies the new data without
+  // requiring the user to close Telegram or wait for the five-minute fallback.
+  function currentPublicSnapshot() {
+    try { return typeof snapshotState !== 'undefined' ? snapshotState : null; }
+    catch (_) { return null; }
+  }
+
+  function publicSnapshotHash() {
+    const snapshot = currentPublicSnapshot();
+    return clean(snapshot?.dataHash || snapshot?.generatedAt);
+  }
+
+  function syncAuthenticatedMembershipsFromPublicSnapshot() {
+    const snapshot = currentPublicSnapshot();
+    const id = clean(authState?.user?.telegramId || window.Telegram?.WebApp?.initDataUnsafe?.user?.id);
+    if (!id || !authState || !Array.isArray(snapshot?.participants)) return;
+    const participant = snapshot.participants.find(item => clean(item?.telegramId) === id);
+    if (!participant) return;
+    authState.memberships = Array.isArray(participant.memberships)
+      ? participant.memberships.map(item => ({ ...item }))
+      : [];
+  }
+
+  function renderVisiblePublicSnapshot() {
+    if (isAdminScreen() || state.modal) return;
+    const panel = document.getElementById('panel');
+    if (!panel) return;
+    if (panel.querySelector(
+      '.team-detail-head,.participant-detail-card,.specnaz-menu-head,.hero-list,.history-list,.guide-head'
+    )) return;
+
+    const participantSearch = document.getElementById('participantSearch');
+    if (participantSearch && typeof renderParticipantsPage === 'function') {
+      renderParticipantsPage(participantSearch.value || '');
+      return;
+    }
+    const teamSearch = document.getElementById('teamSearch');
+    if (teamSearch && typeof renderTeamsPage === 'function') {
+      renderTeamsPage(teamSearch.value || '');
+      return;
+    }
+    try {
+      if (typeof renderPage === 'function' && typeof activePage !== 'undefined' && activePage !== 'admin') {
+        renderPage(activePage || 'home');
+      }
+    } catch (_) {}
+  }
+
+  async function refreshPublicSnapshotOnce() {
+    if (!sessionToken || typeof loadSnapshot !== 'function') return false;
+    if (state.publicLoading) return state.publicLoading;
+    const before = publicSnapshotHash();
+    state.publicLoading = (async () => {
+      await loadSnapshot();
+      const after = publicSnapshotHash();
+      syncAuthenticatedMembershipsFromPublicSnapshot();
+      const changed = !!after && after !== before;
+      if (changed) renderVisiblePublicSnapshot();
+      return changed;
+    })().finally(() => { state.publicLoading = null; });
+    return state.publicLoading;
+  }
+
+  async function refreshVisibleAdminSnapshot() {
+    if (!isAdminScreen() || state.modal || state.pendingRequestIds.size || state.loading) return false;
+    const before = clean(state.payload?.dataHash || state.payload?.generatedAt);
+    const data = await fetchAdminSnapshot();
+    const after = clean(data?.dataHash || data?.generatedAt);
+    if (!after || after === before) return false;
+    state.payload = data;
+    try { window.RoyalAdminV0600?.acceptPayload?.(data); } catch (_) {}
+    setTimeout(() => { if (state.editing && isAdminScreen()) injectEditUi(); }, 100);
+    return true;
+  }
+
+  async function refreshPublicSnapshotAfterMutation() {
+    const generation = ++state.publicPollGeneration;
+    const baseline = publicSnapshotHash();
+    for (const delay of PUBLIC_SNAPSHOT_POLL_DELAYS_MS) {
+      await new Promise(resolve => setTimeout(resolve, delay));
+      if (generation !== state.publicPollGeneration) return false;
+      await refreshPublicSnapshotOnce().catch(() => false);
+      const current = publicSnapshotHash();
+      if (current && current !== baseline) return true;
+    }
+    return false;
+  }
+
+  function scheduleLiveSnapshotRefresh(delay=PUBLIC_SNAPSHOT_WATCH_MS) {
+    if (state.liveRefreshTimer) clearTimeout(state.liveRefreshTimer);
+    state.liveRefreshTimer = setTimeout(async () => {
+      state.liveRefreshTimer = 0;
+      if (document.visibilityState !== 'hidden') {
+        await Promise.allSettled([
+          refreshPublicSnapshotOnce(),
+          refreshVisibleAdminSnapshot()
+        ]);
+      }
+      scheduleLiveSnapshotRefresh();
+    }, Math.max(1000, Number(delay) || PUBLIC_SNAPSHOT_WATCH_MS));
   }
 
   async function loadAdmin(force=false) {
@@ -671,6 +780,7 @@
       showMessage(result?.message || 'Изменение сохранено. Данные обновляются в фоне.');
       setTimeout(() => { if (state.editing && isAdminScreen()) injectEditUi(); },100);
       refreshSnapshotInBackground().catch(() => null);
+      refreshPublicSnapshotAfterMutation().catch(() => null);
       return;
     }
 
@@ -682,6 +792,7 @@
     await loadAdmin(true).catch(() => null);
     showMessage(result?.message || 'Изменение сохранено.');
     setTimeout(() => { if (state.editing) injectEditUi(); },180);
+    refreshPublicSnapshotAfterMutation().catch(() => null);
   }
 
   async function deleteParticipant(button, directRecord=null) {
@@ -972,11 +1083,20 @@
   });
   observer.observe(document.body,{childList:true,subtree:true});
 
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'hidden') scheduleLiveSnapshotRefresh(1000);
+  });
+
   installCss();
+  scheduleLiveSnapshotRefresh(5000);
   window.RoyalAdminWriteV0600 = {
     version:VERSION,
     toggle:toggleEditing,
     refresh:() => loadAdmin(true),
+    refreshSnapshots:() => Promise.allSettled([
+      refreshPublicSnapshotOnce(),
+      refreshVisibleAdminSnapshot()
+    ]),
     canDeleteParticipant,
     canDeleteTeam,
     get enabled(){ return state.editing; }

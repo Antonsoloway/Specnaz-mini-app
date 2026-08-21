@@ -764,6 +764,12 @@ function MINIAPP_adminWriteRefreshParticipantLinks_(ss, changes) {
 
 function MINIAPP_adminWriteRefreshAdminSnapshot_() {
   try {
+    // App writes do not fire Google Sheets onEdit. Queue the same unified
+    // one-off refresh explicitly so private admin data and the public app
+    // snapshot are both published without waiting for the five-minute fallback.
+    if (typeof MINIAPP_queueUnifiedSnapshotRefresh_ === 'function') {
+      return MINIAPP_queueUnifiedSnapshotRefresh_('admin-write-commit', true);
+    }
     if (typeof MINIAPP_queueAdminSnapshotRefresh_ === 'function') {
       return MINIAPP_queueAdminSnapshotRefresh_('admin-write-commit');
     }

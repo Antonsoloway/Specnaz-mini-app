@@ -189,7 +189,11 @@ function handlePublicSyncEdit(e) {
   const relevant = [SHEET_BASE, SHEET_TEAMS, SHEET_HISTORY];
   if (relevant.indexOf(sheetName) === -1) return;
 
-  markPublicSyncPending_('edit:' + sheetName + '!' + e.range.getA1Notation());
+  const reason = 'edit:' + sheetName + '!' + e.range.getA1Notation();
+  markPublicSyncPending_(reason);
+  if (typeof MINIAPP_queueUnifiedSnapshotRefresh_ === 'function') {
+    MINIAPP_queueUnifiedSnapshotRefresh_('manual-sheet-' + reason, true);
+  }
 }
 
 /** Лёгкий onChange для вставки/замены изображений команд. */
@@ -206,7 +210,11 @@ function handlePublicSyncChange(e) {
   } catch (err) {}
 
   if (activeSheetName && activeSheetName !== SHEET_TEAMS) return;
-  markPublicSyncPending_('photo_change:' + changeType + (activeSheetName ? ':' + activeSheetName : ''));
+  const reason = 'photo_change:' + changeType + (activeSheetName ? ':' + activeSheetName : '');
+  markPublicSyncPending_(reason);
+  if (typeof MINIAPP_queueUnifiedSnapshotRefresh_ === 'function') {
+    MINIAPP_queueUnifiedSnapshotRefresh_('manual-sheet-' + reason, true);
+  }
 }
 
 
@@ -2853,5 +2861,4 @@ function installPublicSyncV60Stable() {
     next_step: 'Запустите installRoyalCrmPublicRecovery из файла 08_TELEGRAM_NAME_LINKS.gs'
   };
 }
-
 

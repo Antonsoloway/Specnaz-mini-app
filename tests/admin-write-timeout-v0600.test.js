@@ -78,7 +78,7 @@ test('explicit WRITE_BUSY is retried safely with the same request id', () => {
   assert.match(writeSource, /clean\(error\?\.code\) === 'WRITE_BUSY'/);
   assert.match(writeSource, /return await postWriteOnce\(id, op, payload\)/);
   assert.match(writeSource, /Ждём и повторяем автоматически/);
-  assert.match(writeSource, /const VERSION = '0\.6\.0-write\.5-ui\.7'/);
+  assert.match(writeSource, /const VERSION = '0\.6\.0-write\.5-ui\.8'/);
 });
 
 test('transient admin-data reads retry briefly before showing a friendly error', () => {
@@ -103,4 +103,13 @@ test('a lagging private snapshot cannot replace an optimistic committed record',
   assert.match(writeSource, /allPendingConfirmed = \[\.\.\.state\.pendingRequestIds\]/);
   assert.match(writeSource, /journalContains\(data,requestId\)/);
   assert.match(writeSource, /return state\.payload \|\| payloadBeforeFetch/);
+});
+
+test('v0.6 refreshes public and visible admin snapshots after the one-off trigger', () => {
+  assert.match(writeSource, /ADMIN_PUBLIC_SNAPSHOT_LIVE_REFRESH_V0600/);
+  assert.match(writeSource, /PUBLIC_SNAPSHOT_WATCH_MS = 20000/);
+  assert.match(writeSource, /refreshPublicSnapshotAfterMutation\(\)\.catch/);
+  assert.match(writeSource, /loadSnapshot\(\)/);
+  assert.match(writeSource, /RoyalAdminV0600\?\.acceptPayload/);
+  assert.match(writeSource, /document\.addEventListener\('visibilitychange'/);
 });

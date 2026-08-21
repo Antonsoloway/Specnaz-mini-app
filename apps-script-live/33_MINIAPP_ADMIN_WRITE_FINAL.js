@@ -595,14 +595,20 @@ function MINIAPP_adminWriteFinalMeta_() {
   };
   meta.writableTeamFields = ['name', 'leader', 'photo'];
   meta.createTeamFields = ['game', 'name', 'leader', 'photo'];
+  var unifiedQueueReady = typeof MINIAPP_queueUnifiedSnapshotRefresh_ === 'function';
   meta.snapshotRefresh = {
-    mode: typeof MINIAPP_queueAdminSnapshotRefresh_ === 'function'
-      ? 'queued-private-trigger'
-      : 'synchronous-compatibility-fallback',
-    response: typeof MINIAPP_queueAdminSnapshotRefresh_ === 'function'
+    mode: unifiedQueueReady
+      ? 'queued-unified-trigger'
+      : (typeof MINIAPP_queueAdminSnapshotRefresh_ === 'function'
+        ? 'queued-private-trigger'
+        : 'synchronous-compatibility-fallback'),
+    response: unifiedQueueReady || typeof MINIAPP_queueAdminSnapshotRefresh_ === 'function'
       ? 'commit-first'
       : 'snapshot-first',
     sourceLock: 'sheet-capture-only',
+    publicMode: unifiedQueueReady ? 'one-off-deduplicated-trigger' : 'five-minute-fallback',
+    privateMode: unifiedQueueReady ? 'same-one-off-trigger' : 'separate-private-refresh',
+    manualEdit: 'installable-on-edit-and-on-change-queue',
     fallback: 'unified-5-minute-trigger'
   };
   meta.teamPhoto = {
