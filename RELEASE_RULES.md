@@ -92,6 +92,7 @@
 84. **v0.6 participant delete:** удаление разрешается только если live `База участников!AF` в момент серверной операции точно равно `Вышел`. Клиент обязан показать явное подтверждение, но окончательную защиту обеспечивают Apps Script под `ScriptLock` + optimistic revision. Очищаются только source ranges `A:S`, `U:V`, `AB:AF`; array-formula columns `T` и `W:AA` не очищаются напрямую. После commit обязательны admin journal, stable base sort/formula restore, snapshot refresh и public-sync marker. Для любого другого chat state операция отклоняется.
 85. **v0.6 team delete:** удаление разрешается только по exact identity `название + игра`, если live `Команды!L = Неактивен`, live `E = 0` и независимый scan всех пяти membership slots `База участников` по той же identity вернул 0 ссылок. Клиент показывает подтверждение; Apps Script повторяет все проверки под lock и проверяет revision. Очищаются только source cells `A:D`; formula columns `E:L` сохраняются. После commit обязательны admin journal, нормализация порядка, private-media cleanup, snapshot refresh и public-sync marker.
 86. **v0.6 admin entry:** после подтверждённой admin eligibility вход `Админ режим` размещается внутри self-profile header справа от identity админа. Исходная grid-плитка скрывается, но остаётся eligibility anchor. Relocation обязан переживать повторные render/Back без дублей и исчезать при потере admin eligibility.
+87. **v0.6 delete action visibility:** разрешённая кнопка `Удалить` должна быть видна прямо на private admin detail участника/команды, а не только внутри modal editor. Кнопка видна только при доказанном Worker `permissions.canDelete` и локальном eligibility (`Вышел` либо `Неактивен + 0`). Перед confirm frontend повторно загружает свежую private card/revision; все server guards и журнал остаются обязательными.
 
 ## Текущая версия
 
@@ -129,6 +130,6 @@ Admin-preview `v0.6.0` дополнительно использует:
 - `Вышел` ordering по physical source row, newest first;
 - production Apps Script/private snapshot = `0.6.0-write.5`;
 - live write.5 содержит только два узких destructive flow: participant `AF=Вышел` и team `L=Неактивен + E=0 + refs=0`, с confirm/revision/server recheck/journal и сохранением formula columns;
-- frontend build `20260821-1325` и Worker `1.25.0` live после merge `0951daa`: admin entry перенесён вправо от имени админа, write.4 compatibility сохранена, delete разрешается только при доказанном private snapshot write.5 contract.
+- frontend build `20260821-1435` и Worker `1.25.0` live после merge `b579dbd`: admin entry перенесён вправо от имени админа, eligible delete actions видны прямо на participant/team detail, delete разрешается только при доказанном private snapshot write.5 contract.
 
 Все предыдущие версии сохраняются в истории изменений без удаления.
