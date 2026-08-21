@@ -179,8 +179,9 @@ function processPublicSyncQueue() {
 }
 
 /**
- * Установочный onEdit-триггер. Он только помечает очередь и не выполняет
- * тяжёлую синхронизацию внутри пользовательского редактирования.
+ * Установочный onEdit-триггер. Installable trigger уже выполняется вне
+ * пользовательской транзакции, поэтому он сразу flush-ит unified snapshot.
+ * Одноразовая очередь остаётся durable retry, если прямой запуск не завершился.
  */
 function handlePublicSyncEdit(e) {
   if (!e || !e.range) return;
@@ -191,9 +192,7 @@ function handlePublicSyncEdit(e) {
 
   const reason = 'edit:' + sheetName + '!' + e.range.getA1Notation();
   markPublicSyncPending_(reason);
-  if (typeof MINIAPP_queueUnifiedSnapshotRefresh_ === 'function') {
-    MINIAPP_queueUnifiedSnapshotRefresh_('manual-sheet-' + reason, true);
-  }
+  MINIAPP_requestImmediateUnifiedSnapshot_('manual-sheet-' + reason);
 }
 
 /** Лёгкий onChange для вставки/замены изображений команд. */
@@ -212,8 +211,32 @@ function handlePublicSyncChange(e) {
   if (activeSheetName && activeSheetName !== SHEET_TEAMS) return;
   const reason = 'photo_change:' + changeType + (activeSheetName ? ':' + activeSheetName : '');
   markPublicSyncPending_(reason);
-  if (typeof MINIAPP_queueUnifiedSnapshotRefresh_ === 'function') {
-    MINIAPP_queueUnifiedSnapshotRefresh_('manual-sheet-' + reason, true);
+  MINIAPP_requestImmediateUnifiedSnapshot_('manual-sheet-' + reason);
+}
+
+function MINIAPP_requestImmediateUnifiedSnapshot_(reason) {
+  if (typeof MINIAPP_queueUnifiedSnapshotRefresh_ !== 'function') {
+    return { ok: false, skipped: true, reason: 'UNIFIED_QUEUE_MISSING' };
+  }
+
+  var queued = MINIAPP_queueUnifiedSnapshotRefresh_(reason, true);
+  if (typeof MINIAPP_flushQueuedUnifiedSnapshot !== 'function') return queued;
+
+  try {
+    return {
+      ok: true,
+      mode: 'installable-trigger-direct-flush',
+      queued: queued,
+      refresh: MINIAPP_flushQueuedUnifiedSnapshot()
+    };
+  } catch (error) {
+    console.error('Immediate unified snapshot refresh failed', error && error.stack ? error.stack : error);
+    return {
+      ok: false,
+      mode: 'installable-trigger-queued-retry',
+      queued: queued,
+      error: String(error && error.message ? error.message : error || 'UNKNOWN')
+    };
   }
 }
 
