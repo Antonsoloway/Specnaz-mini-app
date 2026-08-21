@@ -38,7 +38,9 @@
 ## 3. Live Apps Script / admin backend
 
 Подтверждено live на 21.08.2026:
-- private admin snapshot: `adminData.version = 0.6.0-write.5`; последний диагностический срез generatedAt `2026-08-21T16:14:19.734Z`;
+- private admin snapshot: `adminData.version = 0.6.0-write.5`; последний подтверждённый срез generatedAt `2026-08-21T17:23:59.615Z`, 207 participants / 128 teams, admin journal `rows=[]`;
+- advertised write endpoint закреплён: `endpointPinned=true`, `endpointSource=deployment-constant`; URL snapshot точно совпадает с существующим deployment `Таблица ЧП 1.3`;
+- прямой non-mutating POST к этому `/exec` вернул JSON `INVALID_REQUEST_ID / 0.6.0-write.5`, то есть маршрут доступен и не подменён HTML/404;
 - optimistic `revision` у participant/team records;
 - write transport: **Mini App → Worker → HMAC → Apps Script → Google Sheets**;
 - HMAC secret не попадает в браузер/GitHub;
@@ -55,14 +57,13 @@ Production write.5 policy:
 - installer сохранил и обновил только существующий deployment `Таблица ЧП 1.3`; новый deployment не создавался;
 - первый installer run остановился после 15 snapshot checks незадолго до штатного trigger, но route уже был live; следующий trigger в `14:19 MSK` опубликовал полный write.5 contract. Окно ожидания installer увеличено до полного trigger interval `30×12s`.
 
-Текущий admin-write incident / rollout boundary:
-- фактический private snapshot публиковал endpoint из `ScriptApp.getService().getUrl()`, который не совпал с deployment `Таблица ЧП 1.3`; прямые GET/POST к snapshot endpoint возвращают `404 text/html`, поэтому Worker показывал `Сервер Google Sheets вернул неожиданный ответ`;
-- installer при этом проверял exact выбранный deployment и получил корректный JSON `0.6.0-write.5`; причина не в `createTeam` и не в данных формы, а в рассинхронизации advertised endpoint;
-- попытка создать `Cataha` не дошла до Sheets: в свежем private snapshot такой команды нет, admin journal пуст;
-- production Worker `1.26.0` ввёл fail-closed gate; первый repair run безопасно обновил source/deployment, но `clasp run MINIAPP_setAdminWriteEndpoint` вернул Apps Script storage exception с exit code 0. Snapshot после полного trigger interval остался `endpointPinned=false`, `endpointSource=script-service-fallback`; participant/team data и journal не изменились;
-- candidate Worker `1.27.0` принимает pin только из validated Script Property или installer-injected deployment constant. Repair installer v2 выбирает exact существующий deployment до push, внедряет URL прямо в source и больше не зависит от storage setter; `clasp run` export exception распознаётся явно, после чего installer ждёт штатный trigger;
-- `apps-script-live/30` + `31` и `scripts/repair-v0600-admin-write-endpoint.sh` подготовлены для exact-match snapshot verification и factual live-mirror sync;
-- до выполнения repair installer на живом Apps Script повторно нажимать `Сохранить` не нужно. Ни одна participant/team запись этой правкой не изменяется.
+Admin-write endpoint incident — resolved:
+- исходная причина ошибки `Сервер Google Sheets вернул неожиданный ответ` — private snapshot рекламировал stale `ScriptApp.getService().getUrl()`, который отвечал `404 text/html`, вместо exact deployment `Таблица ЧП 1.3`; это не было ошибкой `createTeam` или формы;
+- попытка создать `Cataha` до ремонта не дошла до Sheets: команда отсутствует, admin journal пуст;
+- первый repair безопасно остановился после Apps Script storage exception: snapshot остался `script-service-fallback`, participant/team data не изменились;
+- repair v2 выполнен успешно в `20:24 MSK`: exact URL существующего deployment внедрён в live source без Script Properties, существующий deployment обновлён, trigger опубликовал `deployment-constant`, factual live mirror синхронизирован commit `8b64a7a`; новый deployment не создавался;
+- production Worker `/health` независимо подтверждён: `1.27.0`, `adminWriteEndpoint=pinned-deployment-config`; edit/create/delete routes снова разрешаются только при доказанном pin;
+- сам маршрут и контракт исправлены, но фактический `createTeam` write с устройства ещё не выполнялся после ремонта. Для device smoke полностью закрыть/открыть Mini App и один раз повторить добавление; до результата не объявлять пользовательский сценарий подтверждённым.
 
 Live modules:
 - `28_MINIAPP_ADMIN_DATA.js` — private admin read;
@@ -229,7 +230,7 @@ Participant metric rankings:
 - после успеха private snapshot обновляется, cache сбрасывается, удалённая запись исчезает из admin list/table;
 - проверка snapshot на 21.08.2026: 207 participants, 128 admin teams; `Вышел` = 16; `Неактивен` = 26, из них E=0 = 25; все 25 дополнительно имели 0 live membership refs, одна неактивная команда с ненулевым E остаётся заблокированной.
 
-**Статус frontend:** PR #6 squash-merged в `main` (`b579dbd`); GitHub Pages production фактически отдаёт build **`20260821-1435`**, participant detail `.2`, team detail `.4` и оба direct delete marker. Private snapshot write.5 capability доказан, но write endpoint mismatch блокирует фактические edit/delete до endpoint repair. Реальный Telegram WebView smoke и по одной разрешённой тестовой операции выполняются только после repair; HTTP/tests не заменяют device smoke.
+**Статус frontend:** PR #6 squash-merged в `main` (`b579dbd`); GitHub Pages production фактически отдаёт build **`20260821-1435`**, participant detail `.2`, team detail `.4` и оба direct delete marker. Private snapshot write.5 capability и pinned write endpoint доказаны; Worker `1.27.0` разрешает edit/delete по этому контракту. Реальный Telegram WebView smoke и по одной разрешённой тестовой операции всё ещё обязательны: HTTP/tests не заменяют device smoke.
 
 ---
 
@@ -252,14 +253,14 @@ Participant metric rankings:
 Frontend Worker origin: `https://royal-crm-miniapp-api.tropical-spoon.workers.dev`.
 
 Repo config / production:
-- candidate `worker/wrangler.toml` → `src/entry-v1270.js`;
-- production `/health` подтверждён: `1.26.0 + adminWriteEndpoint=pinned-script-property`; candidate `1.27.0` после merge требует прямой `/health` check `adminWriteEndpoint=pinned-deployment-config`;
+- `worker/wrangler.toml` → `src/entry-v1270.js`;
+- production `/health` подтверждён: `1.27.0 + adminWriteEndpoint=pinned-deployment-config`;
 - `/admin-data` — admin-only private read;
 - `/admin-write` — authenticated admin mutation;
 - `/admin-team-photo` — protected private media route;
 - public `/snapshot`, `/team-photo`, `/contact-by-id`, auth/media routes не должны регрессировать.
 
-`entry-v1250.js` сохраняет write.4/write.5 capability gates. `entry-v1260.js`/`entry-v1270.js` требуют pinned exact endpoint: пока snapshot не содержит `endpointPinned=true` и source `script-property` либо `deployment-constant`, permissions `canEdit/canDelete=false`; underlying `/admin-write` повторяет тот же fail-closed guard.
+`entry-v1250.js` сохраняет write.4/write.5 capability gates. Production `entry-v1270.js` требует pinned exact endpoint: пока snapshot не содержит `endpointPinned=true` и source `script-property` либо `deployment-constant`, permissions `canEdit/canDelete=false`; underlying `/admin-write` повторяет тот же fail-closed guard. Текущий snapshot удовлетворяет этому контракту через `deployment-constant`.
 
 ---
 
@@ -278,7 +279,7 @@ Repo config / production:
 1. Обычный `startapp` остаётся v0.5.59; `startapp=v0600` открывает v0.6. Для принудительно свежей проверки build 1435 использовать `startapp=v0600-1435`.
 2. Не-админ не получает admin-data/write.
 3. Existing participant editor: только имя + memberships; прямой system-field write отклоняется.
-4. Разрешённое test write читается обратно и появляется в журнале; stale revision не перезаписывает новое.
+4. После полного reopen Mini App создать одну тестовую команду; запись должна появиться в private snapshot/admin list и журнале. Затем проверить разрешённое update write; stale revision не перезаписывает новое.
 5. Team rename каскадит memberships; team photo upload/rename cleanup работают.
 6. Admin avatars/team photos повторно читаются из общего persistent cache.
 7. Admin search проверяется по имени/@/ID/role/nickname/team + `вышка`.
