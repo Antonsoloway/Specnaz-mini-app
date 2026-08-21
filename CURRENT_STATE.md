@@ -26,12 +26,12 @@
 - обычных пользователей пока не переводить на v0.6;
 - bot: `@doveofpeace_bot`.
 
-Текущий preview candidate:
+Текущий preview delivery:
 - `version-v0600.js` cache-bust: **`20260821-1325`**;
 - `app-v0600.html` → `version-v0600.js?v=20260821-1325`;
 - `app.html` previewBuild: **`20260821-1325`**;
 - `app.html` принимает `v0600`, предыдущий alias `v0600-2328` и текущий cache-forced alias `v0600-1325`;
-- production GitHub Pages остаётся на build `20260820-2328`, пока ветка write.5 не принята в `main`.
+- GitHub Pages production подтверждён на build `20260821-1325` после merge PR #3 (`0951daa`); старый alias `v0600-2328` сохранён только для совместимости.
 
 ---
 
@@ -217,7 +217,7 @@ Participant metric rankings:
 - после успеха private snapshot обновляется, cache сбрасывается, удалённая запись исчезает из admin list/table;
 - проверка snapshot на 21.08.2026: 207 participants, 128 admin teams; `Вышел` = 16; `Неактивен` = 26, из них E=0 = 25; все 25 дополнительно имели 0 live membership refs, одна неактивная команда с ненулевым E остаётся заблокированной.
 
-**Статус frontend:** GitHub `main` фактически остаётся на preview delivery **`20260820-2328`**. Candidate build **`20260821-1325`** подключает рабочий relocation-модуль и delete UI, сохраняя редактирование на production write.4 во время rollout. Node contract/DOM tests проходят; реальный Telegram WebView smoke и production rollout выполняются только после обновления live Apps Script до write.5 и принятия ветки в `main`. GitHub commit сам по себе live-подтверждением не является.
+**Статус frontend:** PR #3 merged в `main` (`0951daa`); GitHub Pages production фактически отдаёт build **`20260821-1325`**, подключённый relocation `.2` и router alias `v0600-1325`. Delete UI остаётся скрыт на production Apps Script write.4 и включится только после доказанного private snapshot write.5. Реальный Telegram WebView smoke кнопки/confirm ещё требуется; commit и HTTP delivery не заменяют device smoke.
 
 ---
 
@@ -239,15 +239,15 @@ Participant metric rankings:
 
 Frontend Worker origin: `https://royal-crm-miniapp-api.tropical-spoon.workers.dev`.
 
-Repo config:
-- production `main`: `worker/wrangler.toml` → `src/entry-v1241.js`, source/runtime `1.24.1`;
-- candidate: `worker/wrangler.toml` → `src/entry-v1250.js`, source `1.25.0`;
+Repo config / production:
+- `worker/wrangler.toml` → `src/entry-v1250.js`;
+- source/runtime `1.25.0`, production `/health` подтверждён после merge `0951daa`;
 - `/admin-data` — admin-only private read;
 - `/admin-write` — authenticated admin mutation;
 - `/admin-team-photo` — protected private media route;
 - public `/snapshot`, `/team-photo`, `/contact-by-id`, auth/media routes не должны регрессировать.
 
-`entry-v1250.js` принимает write.4 для обычного edit во время перехода и включает `canDelete` только для доказанного snapshot write.5 с двумя delete operations. Если production runtime не проверен отдельно, не называть `1.25.0` подтверждённым только из-за GitHub commit.
+`entry-v1250.js` принимает write.4 для обычного edit во время перехода и включает `canDelete` только для доказанного snapshot write.5 с двумя delete operations. На текущем rollout stage Worker 1.25 + frontend 1325 live, Apps Script/private snapshot всё ещё write.4; delete ещё не live.
 
 ---
 
