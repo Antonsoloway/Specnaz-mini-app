@@ -33,6 +33,7 @@ function createSandbox(initialProperty = '', serviceUrl = STALE) {
   };
   vm.createContext(sandbox);
   vm.runInContext(source, sandbox, { filename: '31_MINIAPP_ADMIN_WRITE_HARDENED.js' });
+  sandbox.MINIAPP_ADMIN_WRITE_PINNED_ENDPOINT = '__ROYAL_CRM_ADMIN_WRITE_ENDPOINT__';
   return { sandbox, getProperty: () => property };
 }
 
