@@ -23,7 +23,7 @@ var MINIAPP_ADMIN_WRITE_HARDENED_VERSION = '0.6.0-write.3';
 var MINIAPP_ADMIN_WRITE_ENDPOINT_PROPERTY = 'MINIAPP_ADMIN_WRITE_ENDPOINT';
 // Replaced by the rollout installer with the exact existing deployment URL.
 // The placeholder is intentionally invalid and therefore never enables writes.
-var MINIAPP_ADMIN_WRITE_PINNED_ENDPOINT = '__ROYAL_CRM_ADMIN_WRITE_ENDPOINT__';
+var MINIAPP_ADMIN_WRITE_PINNED_ENDPOINT = "https://script.google.com/macros/s/AKfycbwmFpY8BPmxcQhBwwk0v2oXLUc9PukMbostm9o44X9RKf0WyST80V_vDtJXRFV3DZ8LUg/exec";
 
 /**
  * ScriptApp.getService().getUrl() is not a stable deployment selector when a
