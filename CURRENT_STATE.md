@@ -22,16 +22,16 @@
 - постоянный entrypoint: `app.html`;
 - обычный запуск → **`app-v0559.html` / v0.5.59**;
 - `startapp=v0600` / `tgWebAppStartParam=v0600` → **`app-v0600.html` / v0.6.0 admin preview**;
-- текущий cache-forced preview: `startapp=v0600-2110` → тот же `app-v0600.html`, но с уникальным start parameter;
+- текущий cache-forced preview: `startapp=v0600-2130` → тот же `app-v0600.html`, но с уникальным start parameter;
 - обычных пользователей пока не переводить на v0.6;
 - bot: `@doveofpeace_bot`.
 
 Текущий preview delivery:
-- `version-v0600.js` cache-bust: **`20260821-2110`**;
-- `app-v0600.html` → `transport-v0514.js?v=20260821-2050` и `version-v0600.js?v=20260821-2110`;
-- `app.html` previewBuild: **`20260821-2110`**;
-- `app.html` принимает `v0600`, старые aliases `v0600-2328`, `v0600-1325`, `v0600-1435`, `v0600-2050` и текущий cache-forced alias `v0600-2110`;
-- GitHub Pages production build **`20260821-2110`** сохраняет 60-second write transport из build 2050 и добавляет bounded automatic retry при явном Apps Script `WRITE_BUSY`.
+- `version-v0600.js` cache-bust: **`20260821-2130`**;
+- `app-v0600.html` → `transport-v0514.js?v=20260821-2050`, `changelog-v0600.js?v=20260821-2130`, `admin-v0600.js?v=20260821-2130` и `version-v0600.js?v=20260821-2130`;
+- `app.html` previewBuild: **`20260821-2130`**;
+- `app.html` принимает `v0600`, старые aliases `v0600-2328`, `v0600-1325`, `v0600-1435`, `v0600-2050`, `v0600-2110` и текущий cache-forced alias `v0600-2130`;
+- GitHub Pages build **`20260821-2130`** сохраняет 60-second safety window, использует три bounded `WRITE_BUSY` retry через 0.7/1.4/2.5 секунды и понимает новый commit-first response: подтверждённая запись немедленно применяется в текущем admin UI, private snapshot догружается без блокировки формы.
 
 ---
 
@@ -67,6 +67,15 @@ Admin-write endpoint incident — resolved:
 - frontend build `20260821-2050`: только `/admin-write` ждёт до 60 секунд, обычные reads сохраняют 5 секунд, UI заранее сообщает, что команда с фото может сохраняться до минуты. `requestId`/server idempotency сохранены.
 - первая попытка добавить Антона (`telegramId=1456874273`) в `CATAHA` в `21:03 MSK` получила явный `WRITE_BUSY`: Unified Snapshot trigger удерживал общий ScriptLock дольше server wait. Операция безопасно не начиналась — snapshot оставил прежние два membership (`Спецназ РМ/РК`), у `CATAHA` players=0, новой journal row нет;
 - frontend build `20260821-2110` автоматически повторяет только explicit `WRITE_BUSY` максимум два раза через 1.5/3 секунды и всегда с тем же `requestId`. Stale revision/validation/delete conflicts не повторяются; одна transport retry также сохраняет тот же id.
+
+Fast-write rollout boundary:
+- repo/frontend build `20260821-2130` подготовлен и публикуется отдельно от Apps Script deployment;
+- Apps Script commit-first candidate меняет все шесть create/update/delete operations одинаково: Sheet mutation + journal + idempotency cache завершаются под коротким ScriptLock, ответ возвращается без ожидания private GitHub snapshot;
+- private snapshot ставится в durable deduplicated one-off queue; его Sheet capture выполняется под ScriptLock, GitHub publish — после release и под отдельным publish lock; superseded capture не может затереть более новую mutation;
+- пятиминутный Unified Snapshot также освобождает общий ScriptLock до public/private GitHub I/O; recurring trigger остаётся fallback, даже если one-off trigger не создался;
+- backend wait на общий write lock сокращён с 20 до 6 секунд; явный `WRITE_BUSY` по-прежнему доказывает, что mutation не начиналась, и retry использует тот же requestId;
+- frontend `admin-write-v0600-v3.js .5` получает committed record в response, оптимистично обновляет/удаляет строку и stats, а затем принимает только private snapshot, содержащий journal requestId всех локально pending операций;
+- **этот Apps Script режим ещё не считается production**, пока пользователь не выполнит `scripts/install-v0600-fast-admin-writes.sh` и fresh private snapshot не подтвердит `snapshotRefresh.mode=queued-private-trigger`, `response=commit-first`, `sourceLock=sheet-capture-only`.
 
 Live modules:
 - `28_MINIAPP_ADMIN_DATA.js` — private admin read;
@@ -130,10 +139,10 @@ Public snapshot:
 ## 6. v0.6 admin preview — frontend
 
 Основные активные модули:
-- `admin-v0600.js` / `admin-eligibility-v0600.js`;
+- `admin-v0600.js` = `0.6.0-read.2` / `admin-eligibility-v0600.js`;
 - `admin-entry-relocation-v0600.js` = `0.6.0-admin-entry-relocation.2`;
 - `admin-write-gate-v0600.js` = `0.6.0-write.5-gate.1`;
-- `admin-write-v0600-v3.js` = `0.6.0-write.5-ui.4`;
+- `admin-write-v0600-v3.js` = `0.6.0-write.5-ui.5`;
 - `admin-team-photo-v0600.js`;
 - `admin-participant-edit-policy-v0600.js`;
 - `admin-search-media-sort-v0600.js` = `0.6.0-admin-search-media-sort.2`;
@@ -233,7 +242,7 @@ Participant metric rankings:
 - после успеха private snapshot обновляется, cache сбрасывается, удалённая запись исчезает из admin list/table;
 - проверка snapshot после создания `CATAHA`: 207 participants, 129 admin teams; `Вышел` = 16; `Неактивен` = 27, из них E=0 = 26; новая `CATAHA` имеет 0 участников, одна прежняя неактивная команда с ненулевым E остаётся заблокированной.
 
-**Статус frontend:** build **`20260821-2110`** сохраняет participant detail `.2`, team detail `.4`, direct delete marker и 60-second `/admin-write`, обновляет write UI до `.4` с двумя safe retries только для `WRITE_BUSY`. Private snapshot write.5 capability и pinned endpoint доказаны; createTeam с фото подтверждён на Android. Update participant после lock-retry и обе guarded delete операции всё ещё требуют device smoke: HTTP/tests не заменяют их.
+**Статус frontend:** build **`20260821-2130`** сохраняет participant detail `.2`, team detail `.4`, direct delete marker и 60-second `/admin-write`, обновляет write UI до `.5` с тремя safe retries только для `WRITE_BUSY`, немедленным optimistic apply committed record и background journal-confirmed refresh. До установки Apps Script fast-write backend новый frontend остаётся backward-compatible и использует прежний synchronous refresh. Private snapshot write.5 capability и pinned endpoint доказаны; createTeam с фото подтверждён на Android. Update participant после fast-write rollout и обе guarded delete операции всё ещё требуют device smoke: HTTP/tests не заменяют их.
 
 ---
 
@@ -279,10 +288,10 @@ Repo config / production:
 
 ## 10. Минимальный smoke v0.6 перед общим релизом
 
-1. Обычный `startapp` остаётся v0.5.59; `startapp=v0600` открывает v0.6. Для принудительно свежей проверки build 2110 использовать `startapp=v0600-2110`.
+1. Обычный `startapp` остаётся v0.5.59; `startapp=v0600` открывает v0.6. Для принудительно свежей проверки build 2130 использовать `startapp=v0600-2130`.
 2. Не-админ не получает admin-data/write.
 3. Existing participant editor: только имя + memberships; прямой system-field write отклоняется.
-4. CreateTeam с фото подтверждён (`CATAHA`, строка 99, journal + snapshot). Build 2050 убрал ложный `WORKER_TIMEOUT`; первая updateParticipant-проверка попала в snapshot ScriptLock и безопасно вернула `WRITE_BUSY`. На build 2110 повторить update один раз: UI должен сам дождаться lock/retry; stale revision не перезаписывает новое.
+4. CreateTeam с фото подтверждён (`CATAHA`, строка 99, journal + snapshot). Build 2050 убрал ложный `WORKER_TIMEOUT`; первая updateParticipant-проверка попала в snapshot ScriptLock и безопасно вернула `WRITE_BUSY`. После fast-write installer открыть build 2130 и повторить update один раз: форма должна закрыться сразу после Sheet commit, строка обновиться локально, а private snapshot/journal — подтянуться в фоне; stale revision не перезаписывает новое.
 5. Team rename каскадит memberships; team photo upload/rename cleanup работают.
 6. Admin avatars/team photos повторно читаются из общего persistent cache.
 7. Admin search проверяется по имени/@/ID/role/nickname/team + `вышка`.

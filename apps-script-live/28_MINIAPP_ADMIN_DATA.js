@@ -8,29 +8,68 @@
  * - Writes a separate private admin-snapshot.json.
  * - Normal users never receive this file.
  * - Worker /admin-data must perform a fresh Telegram administrator/creator check.
- * - Existing Unified Snapshot trigger may call MINIAPP_exportAdminSnapshotUnlocked_()
- *   while it already owns the ScriptLock; no second time trigger is required.
+ * - Admin mutations only queue this export and return after the Sheet commit.
+ * - Sheet reads happen under ScriptLock; GitHub I/O happens after that lock is
+ *   released, so snapshot publishing never extends the write transaction.
+ * - A deduplicated one-off trigger publishes the private snapshot in background;
+ *   the existing five-minute unified trigger remains the durable fallback.
  */
 
 var MINIAPP_ADMIN_DATA_VERSION = '0.6.0-write.5';
 var MINIAPP_ADMIN_DATA_DEFAULT_PATH = 'admin-snapshot.json';
 var MINIAPP_ADMIN_DATA_LAST_HASH = 'MINIAPP_ADMIN_DATA_LAST_HASH';
+var MINIAPP_ADMIN_SNAPSHOT_QUEUE_HANDLER = 'MINIAPP_flushQueuedAdminSnapshot';
+var MINIAPP_ADMIN_SNAPSHOT_QUEUE_PROPERTY = 'MINIAPP_ADMIN_SNAPSHOT_QUEUE_V1';
+var MINIAPP_ADMIN_SNAPSHOT_QUEUE_MAX_ATTEMPTS = 4;
+var MINIAPP_ADMIN_SNAPSHOT_QUEUE_DELAY_MS = 1500;
 
 function MINIAPP_exportAdminSnapshotToGitHub() {
+  var queued = MINIAPP_adminSnapshotQueueRead_();
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(25000)) return { ok: false, skipped: true, reason: 'LOCK_BUSY' };
+  var prepared;
   try {
     var props = PropertiesService.getScriptProperties();
     var repo = String(props.getProperty('DATA_GITHUB_REPO') || '').trim();
     var token = String(props.getProperty('DATA_GITHUB_TOKEN') || '').trim();
     var branch = String(props.getProperty('DATA_GITHUB_BRANCH') || 'main').trim();
-    return MINIAPP_exportAdminSnapshotUnlocked_(props, repo, token, branch);
+    prepared = MINIAPP_prepareAdminSnapshot_(props, repo, token, branch);
   } finally {
     try { lock.releaseLock(); } catch (_) {}
   }
+
+  var publishLock = LockService.getUserLock();
+  if (!publishLock.tryLock(20000)) {
+    return { ok: false, queued: !!queued, skipped: true, reason: 'PUBLISH_BUSY' };
+  }
+  try {
+    if (queued && queued.token) {
+      var current = MINIAPP_adminSnapshotQueueRead_();
+      if (!current || current.token !== queued.token) {
+        MINIAPP_adminSnapshotQueueEnsureTrigger_(MINIAPP_ADMIN_SNAPSHOT_QUEUE_DELAY_MS);
+        return { ok: true, skipped: true, reason: 'SUPERSEDED' };
+      }
+    }
+    var published = MINIAPP_publishPreparedAdminSnapshot_(prepared);
+    if (queued && queued.token) MINIAPP_adminSnapshotQueueClearIfToken_(queued.token);
+    return published;
+  } finally {
+    try { publishLock.releaseLock(); } catch (_) {}
+  }
 }
 
+/**
+ * Compatibility wrapper for older callers that already own ScriptLock.
+ * New code should use MINIAPP_prepareAdminSnapshot_ under the lock and publish
+ * only after releasing it.
+ */
 function MINIAPP_exportAdminSnapshotUnlocked_(props, repo, token, branch) {
+  return MINIAPP_publishPreparedAdminSnapshot_(
+    MINIAPP_prepareAdminSnapshot_(props, repo, token, branch)
+  );
+}
+
+function MINIAPP_prepareAdminSnapshot_(props, repo, token, branch) {
   if (typeof MINIAPP_putPrivateGitHubFile_ !== 'function') {
     throw new Error('Admin snapshot: MINIAPP_putPrivateGitHubFile_ missing');
   }
@@ -59,7 +98,8 @@ function MINIAPP_exportAdminSnapshotUnlocked_(props, repo, token, branch) {
       version: MINIAPP_ADMIN_DATA_VERSION,
       participants: adminData.participants.length,
       teams: adminData.teams.length,
-      hash: hash
+      hash: hash,
+      prepared: true
     };
   }
 
@@ -73,9 +113,6 @@ function MINIAPP_exportAdminSnapshotUnlocked_(props, repo, token, branch) {
     adminData: adminData
   };
 
-  var github = MINIAPP_putPrivateGitHubFile_(repo, branch, path, JSON.stringify(payload), token, hash);
-  props.setProperty(MINIAPP_ADMIN_DATA_LAST_HASH, hash);
-
   return {
     ok: true,
     changed: true,
@@ -83,8 +120,219 @@ function MINIAPP_exportAdminSnapshotUnlocked_(props, repo, token, branch) {
     participants: adminData.participants.length,
     teams: adminData.teams.length,
     hash: hash,
-    github: github
+    prepared: true,
+    _props: props,
+    _repo: repo,
+    _token: token,
+    _branch: branch,
+    _path: path,
+    _payload: JSON.stringify(payload)
   };
+}
+
+function MINIAPP_publishPreparedAdminSnapshot_(prepared) {
+  if (!prepared || prepared.ok === false) return prepared;
+  if (!prepared.changed) return MINIAPP_adminSnapshotPublicResult_(prepared);
+
+  var github = MINIAPP_putPrivateGitHubFile_(
+    prepared._repo,
+    prepared._branch,
+    prepared._path,
+    prepared._payload,
+    prepared._token,
+    prepared.hash
+  );
+  prepared._props.setProperty(MINIAPP_ADMIN_DATA_LAST_HASH, prepared.hash);
+
+  var result = MINIAPP_adminSnapshotPublicResult_(prepared);
+  result.github = github;
+  return result;
+}
+
+function MINIAPP_adminSnapshotPublicResult_(prepared) {
+  return {
+    ok: prepared && prepared.ok !== false,
+    changed: !!(prepared && prepared.changed),
+    version: prepared && prepared.version || MINIAPP_ADMIN_DATA_VERSION,
+    participants: Number(prepared && prepared.participants || 0),
+    teams: Number(prepared && prepared.teams || 0),
+    hash: String(prepared && prepared.hash || '')
+  };
+}
+
+/**
+ * Commit-first queue entrypoint called by admin-write while it still owns the
+ * short mutation lock. No Sheet read or external request is performed here.
+ */
+function MINIAPP_queueAdminSnapshotRefresh_(reason) {
+  var props = PropertiesService.getScriptProperties();
+  var queuedAt = new Date().toISOString();
+  var token = Utilities.getUuid().replace(/-/g, '');
+  var item = {
+    token: token,
+    queuedAt: queuedAt,
+    reason: String(reason || 'admin-write').slice(0, 300),
+    attempts: 0
+  };
+  props.setProperty(MINIAPP_ADMIN_SNAPSHOT_QUEUE_PROPERTY, JSON.stringify(item));
+
+  var schedule = MINIAPP_adminSnapshotQueueEnsureTrigger_(MINIAPP_ADMIN_SNAPSHOT_QUEUE_DELAY_MS);
+  return {
+    ok: true,
+    queued: true,
+    mode: 'queued-private-trigger',
+    response: 'commit-first',
+    token: token,
+    queuedAt: queuedAt,
+    scheduled: schedule.created === true || schedule.existing === true,
+    deduplicated: schedule.existing === true,
+    fallback: 'unified-5-minute-trigger',
+    warning: schedule.warning || ''
+  };
+}
+
+/** Time-driven handler. Never mutates participant or team source cells. */
+function MINIAPP_flushQueuedAdminSnapshot() {
+  MINIAPP_adminSnapshotQueueClearOwnTriggers_();
+  var item = MINIAPP_adminSnapshotQueueRead_();
+  if (!item || !item.token) return { ok: true, skipped: true, reason: 'QUEUE_EMPTY' };
+
+  var lock = LockService.getScriptLock();
+  var prepared;
+  if (!lock.tryLock(4000)) {
+    return MINIAPP_adminSnapshotQueueRetry_(item, 'SOURCE_LOCK_BUSY');
+  }
+  try {
+    var props = PropertiesService.getScriptProperties();
+    prepared = MINIAPP_prepareAdminSnapshot_(
+      props,
+      String(props.getProperty('DATA_GITHUB_REPO') || '').trim(),
+      String(props.getProperty('DATA_GITHUB_TOKEN') || '').trim(),
+      String(props.getProperty('DATA_GITHUB_BRANCH') || 'main').trim()
+    );
+  } catch (prepareError) {
+    return MINIAPP_adminSnapshotQueueRetry_(
+      item,
+      'PREPARE_FAILED: ' + String(prepareError && prepareError.message ? prepareError.message : prepareError)
+    );
+  } finally {
+    try { lock.releaseLock(); } catch (_) {}
+  }
+
+  // Do not publish an older capture if another mutation was queued while the
+  // Sheet was being read. The next trigger will capture the newest state.
+  var current = MINIAPP_adminSnapshotQueueRead_();
+  if (!current || current.token !== item.token) {
+    MINIAPP_adminSnapshotQueueEnsureTrigger_(MINIAPP_ADMIN_SNAPSHOT_QUEUE_DELAY_MS);
+    return { ok: true, skipped: true, reason: 'SUPERSEDED' };
+  }
+
+  // UserLock is used only for private-snapshot network publication. Admin writes
+  // never acquire it, while overlapping queue handlers cannot publish out of order.
+  var publishLock = LockService.getUserLock();
+  if (!publishLock.tryLock(20000)) {
+    return MINIAPP_adminSnapshotQueueRetry_(item, 'PUBLISH_BUSY');
+  }
+  try {
+    current = MINIAPP_adminSnapshotQueueRead_();
+    if (!current || current.token !== item.token) {
+      MINIAPP_adminSnapshotQueueEnsureTrigger_(MINIAPP_ADMIN_SNAPSHOT_QUEUE_DELAY_MS);
+      return { ok: true, skipped: true, reason: 'SUPERSEDED_BEFORE_PUBLISH' };
+    }
+
+    var published = MINIAPP_publishPreparedAdminSnapshot_(prepared);
+    MINIAPP_adminSnapshotQueueClearIfToken_(item.token);
+    return published;
+  } catch (publishError) {
+    return MINIAPP_adminSnapshotQueueRetry_(
+      item,
+      'PUBLISH_FAILED: ' + String(publishError && publishError.message ? publishError.message : publishError)
+    );
+  } finally {
+    try { publishLock.releaseLock(); } catch (_) {}
+  }
+}
+
+function MINIAPP_adminSnapshotQueueRead_() {
+  var raw = String(PropertiesService.getScriptProperties()
+    .getProperty(MINIAPP_ADMIN_SNAPSHOT_QUEUE_PROPERTY) || '').trim();
+  if (!raw) return null;
+  try {
+    var item = JSON.parse(raw);
+    return item && typeof item === 'object' ? item : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function MINIAPP_adminSnapshotQueueRetry_(item, reason) {
+  var props = PropertiesService.getScriptProperties();
+  var current = MINIAPP_adminSnapshotQueueRead_();
+  if (!current || !item || current.token !== item.token) {
+    MINIAPP_adminSnapshotQueueEnsureTrigger_(MINIAPP_ADMIN_SNAPSHOT_QUEUE_DELAY_MS);
+    return { ok: false, skipped: true, reason: 'SUPERSEDED_RETRY' };
+  }
+
+  current.attempts = Number(current.attempts || 0) + 1;
+  current.lastError = String(reason || 'UNKNOWN').slice(0, 500);
+  current.lastAttemptAt = new Date().toISOString();
+  props.setProperty(MINIAPP_ADMIN_SNAPSHOT_QUEUE_PROPERTY, JSON.stringify(current));
+
+  var scheduled = false;
+  if (current.attempts < MINIAPP_ADMIN_SNAPSHOT_QUEUE_MAX_ATTEMPTS) {
+    var delay = MINIAPP_ADMIN_SNAPSHOT_QUEUE_DELAY_MS * Math.pow(2, current.attempts);
+    var schedule = MINIAPP_adminSnapshotQueueEnsureTrigger_(delay);
+    scheduled = schedule.created === true || schedule.existing === true;
+  }
+  return {
+    ok: false,
+    queued: true,
+    retry: scheduled,
+    attempts: current.attempts,
+    reason: current.lastError,
+    fallback: 'unified-5-minute-trigger'
+  };
+}
+
+function MINIAPP_adminSnapshotQueueEnsureTrigger_(delayMs) {
+  try {
+    var triggers = ScriptApp.getProjectTriggers();
+    for (var i = 0; i < triggers.length; i += 1) {
+      if (String(triggers[i].getHandlerFunction() || '') === MINIAPP_ADMIN_SNAPSHOT_QUEUE_HANDLER) {
+        return { ok: true, existing: true, created: false };
+      }
+    }
+    ScriptApp.newTrigger(MINIAPP_ADMIN_SNAPSHOT_QUEUE_HANDLER)
+      .timeBased()
+      .after(Math.max(1000, Number(delayMs) || MINIAPP_ADMIN_SNAPSHOT_QUEUE_DELAY_MS))
+      .create();
+    return { ok: true, existing: false, created: true };
+  } catch (error) {
+    return {
+      ok: false,
+      existing: false,
+      created: false,
+      warning: String(error && error.message ? error.message : error || 'TRIGGER_CREATE_FAILED')
+    };
+  }
+}
+
+function MINIAPP_adminSnapshotQueueClearOwnTriggers_() {
+  try {
+    ScriptApp.getProjectTriggers().forEach(function(trigger) {
+      if (String(trigger.getHandlerFunction() || '') === MINIAPP_ADMIN_SNAPSHOT_QUEUE_HANDLER) {
+        ScriptApp.deleteTrigger(trigger);
+      }
+    });
+  } catch (_) {}
+}
+
+function MINIAPP_adminSnapshotQueueClearIfToken_(token) {
+  var props = PropertiesService.getScriptProperties();
+  var current = MINIAPP_adminSnapshotQueueRead_();
+  if (!current || current.token !== String(token || '')) return false;
+  props.deleteProperty(MINIAPP_ADMIN_SNAPSHOT_QUEUE_PROPERTY);
+  return true;
 }
 
 function MINIAPP_buildAdminData_() {

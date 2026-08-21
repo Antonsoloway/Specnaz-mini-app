@@ -125,7 +125,8 @@ function MINIAPP_adminWriteFinalUpdateTeam_(ctx) {
     markPublicSyncPending_('miniapp_admin_team_final:' + game + ':' + nextName);
   }
 
-  var after = MINIAPP_adminWriteTeamRecord_(sheet, finalRow);
+  var after = MINIAPP_adminWriteFinalTeamState_(sheet, finalRow);
+  if (photoPrepared.changed && photoPrepared.sourceUrl) after.photoUrl = photoPrepared.sourceUrl;
   var key = game + ' :: ' + nextName;
   var journalChanges = {
     name: nextName,
@@ -146,6 +147,8 @@ function MINIAPP_adminWriteFinalUpdateTeam_(ctx) {
     after,
     journalChanges
   );
+  var revision = MINIAPP_adminWriteTeamRevision_(after);
+  after.revision = revision;
 
   return {
     ok: true,
@@ -153,8 +156,10 @@ function MINIAPP_adminWriteFinalUpdateTeam_(ctx) {
     op: ctx.op,
     entityType: 'team',
     entityKey: key,
+    previousEntityKey: game + ' :: ' + originalName,
     row: finalRow,
-    revision: MINIAPP_adminWriteTeamRevision_(after),
+    revision: revision,
+    record: after,
     photoChanged: !!photoPrepared.changed,
     oldMediaCleanup: oldMediaCleanup && oldMediaCleanup.warning
       ? { ok: false, warning: oldMediaCleanup.warning }
@@ -220,7 +225,8 @@ function MINIAPP_adminWriteFinalCreateTeam_(ctx) {
     markPublicSyncPending_('miniapp_admin_team_create_final:' + game + ':' + name);
   }
 
-  var after = MINIAPP_adminWriteTeamRecord_(sheet, finalRow);
+  var after = MINIAPP_adminWriteFinalTeamState_(sheet, finalRow);
+  if (photoPrepared.changed && photoPrepared.sourceUrl) after.photoUrl = photoPrepared.sourceUrl;
   var key = game + ' :: ' + name;
   var journalChanges = {
     game: game,
@@ -239,6 +245,8 @@ function MINIAPP_adminWriteFinalCreateTeam_(ctx) {
     after,
     journalChanges
   );
+  var revision = MINIAPP_adminWriteTeamRevision_(after);
+  after.revision = revision;
 
   return {
     ok: true,
@@ -247,7 +255,8 @@ function MINIAPP_adminWriteFinalCreateTeam_(ctx) {
     entityType: 'team',
     entityKey: key,
     row: finalRow,
-    revision: MINIAPP_adminWriteTeamRevision_(after),
+    revision: revision,
+    record: after,
     photoChanged: !!photoPrepared.changed,
     message: photoPrepared.changed ? 'Команда с фото добавлена.' : 'Команда добавлена.'
   };
@@ -581,6 +590,16 @@ function MINIAPP_adminWriteFinalMeta_() {
   meta.writableParticipantFields = ['name', 'memberships'];
   meta.writableTeamFields = ['name', 'leader', 'photo'];
   meta.createTeamFields = ['game', 'name', 'leader', 'photo'];
+  meta.snapshotRefresh = {
+    mode: typeof MINIAPP_queueAdminSnapshotRefresh_ === 'function'
+      ? 'queued-private-trigger'
+      : 'synchronous-compatibility-fallback',
+    response: typeof MINIAPP_queueAdminSnapshotRefresh_ === 'function'
+      ? 'commit-first'
+      : 'snapshot-first',
+    sourceLock: 'sheet-capture-only',
+    fallback: 'unified-5-minute-trigger'
+  };
   meta.teamPhoto = {
     enabled: typeof MINIAPP_adminTeamPhotoPrepareUpload_ === 'function',
     maxUploadBytes: typeof MINIAPP_ADMIN_TEAM_PHOTO_MAX_UPLOAD_BYTES !== 'undefined'

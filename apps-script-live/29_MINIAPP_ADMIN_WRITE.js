@@ -703,9 +703,15 @@ function MINIAPP_adminWriteRefreshParticipantLinks_(ss, changes) {
 
 function MINIAPP_adminWriteRefreshAdminSnapshot_() {
   try {
+    if (typeof MINIAPP_queueAdminSnapshotRefresh_ === 'function') {
+      return MINIAPP_queueAdminSnapshotRefresh_('admin-write-commit');
+    }
     if (typeof MINIAPP_exportAdminSnapshotUnlocked_ !== 'function') {
       return { ok: false, skipped: true, reason: 'EXPORTER_MISSING' };
     }
+    // Compatibility fallback for a partial rollout only. The vetted installer
+    // always deploys file 28 together with this module, so production writes use
+    // the commit-first queue above and never wait for GitHub here.
     var props = PropertiesService.getScriptProperties();
     return MINIAPP_exportAdminSnapshotUnlocked_(
       props,

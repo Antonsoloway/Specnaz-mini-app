@@ -3,6 +3,22 @@
 > Краткий журнал фактически выполненных работ. Новые записи добавляются сверху.
 > Здесь фиксируются изменения, проверки, диагнозы и откаты, которые нужны следующему чату.
 
+## 2026-08-21 21:30 — всё admin-редактирование переведено на commit-first + background snapshots
+
+**Запрос пользователя:** ускорить всё редактирование после ложного `WORKER_TIMEOUT` при создании команды и `WRITE_BUSY` при добавлении membership.
+
+**Подтверждённая причина:** `30_MINIAPP_ADMIN_WRITE_BACKEND.js` после уже committed Sheet mutation синхронно вызывал полный private snapshot export в GitHub, продолжая держать общий `ScriptLock`. Пятиминутный `25_MINIAPP_UNIFIED_SNAPSHOT.js` также держал тот же lock во время private/public GitHub I/O. Поэтому обычная membership/name правка могла ждать сетевые операции, а конкурирующий snapshot полностью блокировал write.
+
+**Apps Script candidate:** files 25/28/29/30/31/33 переведены на commit-first contract. Все шесть create/update/delete flows сначала фиксируют Sheet + journal + idempotency cache и возвращают success без ожидания snapshot. Private admin refresh теперь durable/deduplicated one-off queue; Sheet capture выполняется под коротким ScriptLock, GitHub publication — после release и под отдельным UserLock. Queue имеет bounded retry, token guard от stale/superseded publish и recurring five-minute direct fallback. Unified Snapshot освобождает ScriptLock до private/public GitHub requests. Backend lock wait сокращён с 20 до 6 секунд.
+
+**Frontend build `20260821-2130`:** `admin-write-v0600-v3.js 0.6.0-write.5-ui.5` применяет returned committed participant/team record или delete result сразу в текущем private admin list/stats, закрывает форму без ожидания snapshot и non-blocking polling принимает authoritative payload только когда journal содержит все локально pending requestId. `admin-v0600.js 0.6.0-read.2` получил controlled `acceptPayload`; `changelog-v0600.js` добавляет пользовательскую запись об ускоренном защищённом редактировании. Explicit `WRITE_BUSY` retry остаётся строго same-id и расширен до трёх коротких задержек 0.7/1.4/2.5 секунды; validation/revision/delete conflicts не повторяются. Старый live backend совместим: без `adminSnapshot.queued=true` frontend сохраняет прежний synchronous refresh.
+
+**Rollout tooling:** добавлен `scripts/install-v0600-fast-admin-writes.sh`. Он выполняет `clasp status → pull → backup`, выбирает ровно один существующий deployment `Таблица ЧП 1.3`, внедряет его exact `/exec`, проверяет source markers, push/update только существующего deployment, non-mutating write route, fresh private markers `queued-private-trigger / commit-first / sheet-capture-only` и затем синхронизирует factual live mirror. Installer не создаёт/изменяет/удаляет participant/team records.
+
+**Проверка:** JS syntax всех затронутых Apps Script/frontend modules, `bash -n`, `git diff --check` и **24/24 Node tests** прошли. Новые VM tests подтверждают deduplicated queue, публикацию только после ScriptLock release, отдельную сериализацию publish и запрет stale capture затереть более новую mutation.
+
+**Rollout boundary на момент записи:** repo/frontend готовы к публикации, но Apps Script commit-first ещё не production. После merge выполнить ровно одну Cloud Shell команду fast-write installer, дождаться capability check и только затем провести один Android smoke `Антон → CATAHA`; до этого текущие live Sheet данные остаются без membership CATAHA, а команда — с players=0.
+
 ## 2026-08-21 21:10 — updateParticipant попал в snapshot ScriptLock; safe WRITE_BUSY retry добавлен
 
 **Симптом на Android:** при попытке добавить себя в `CATAHA` форма ждала и вернула `База занята другой операцией. Повторите через несколько секунд.` Это Apps Script `WRITE_BUSY`, а не frontend timeout: admin backend не получил общий ScriptLock в отведённое окно и не начинал mutation.

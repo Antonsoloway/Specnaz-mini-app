@@ -70,9 +70,17 @@ test('ordinary Worker reads keep the five second timeout', async () => {
 });
 
 test('explicit WRITE_BUSY is retried safely with the same request id', () => {
-  assert.match(writeSource, /WRITE_BUSY_RETRY_DELAYS_MS = \[1500, 3000\]/);
+  assert.match(writeSource, /WRITE_BUSY_RETRY_DELAYS_MS = \[700, 1400, 2500\]/);
   assert.match(writeSource, /clean\(error\?\.code\) === 'WRITE_BUSY'/);
   assert.match(writeSource, /return await postWriteOnce\(id, op, payload\)/);
   assert.match(writeSource, /Ждём и повторяем автоматически/);
-  assert.match(writeSource, /const VERSION = '0\.6\.0-write\.5-ui\.4'/);
+  assert.match(writeSource, /const VERSION = '0\.6\.0-write\.5-ui\.5'/);
+});
+
+test('queued commit closes immediately and refreshes the private snapshot in background', () => {
+  assert.match(writeSource, /result\?\.adminSnapshot\?\.queued === true/);
+  assert.match(writeSource, /applyCommittedResult\(result\)/);
+  assert.match(writeSource, /refreshSnapshotInBackground\(\)\.catch/);
+  assert.match(writeSource, /SNAPSHOT_POLL_DELAYS_MS/);
+  assert.doesNotMatch(writeSource, /Сохраняем команду и фото… Это может занять до минуты/);
 });

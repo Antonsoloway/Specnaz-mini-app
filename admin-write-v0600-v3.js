@@ -1,9 +1,17 @@
 /* Royal CRM Mini App — protected Admin Write/Delete UI v0.6.0-write.5 */
 (() => {
-  const VERSION = '0.6.0-write.5-ui.4';
-  const WRITE_BUSY_RETRY_DELAYS_MS = [1500, 3000];
-  const TRANSPORT_RETRY_DELAY_MS = 900;
-  const state = { editing:false, payload:null, loading:null, modal:null, observerBusy:false };
+  const VERSION = '0.6.0-write.5-ui.5';
+  const WRITE_BUSY_RETRY_DELAYS_MS = [700, 1400, 2500];
+  const TRANSPORT_RETRY_DELAY_MS = 700;
+  const SNAPSHOT_POLL_DELAYS_MS = [2500, 4000, 7000, 12000, 20000, 35000, 60000, 90000, 120000];
+  const state = {
+    editing:false,
+    payload:null,
+    loading:null,
+    modal:null,
+    observerBusy:false,
+    pendingRequestIds:new Set()
+  };
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const clean = value => String(value == null ? '' : value).trim();
@@ -55,24 +63,28 @@
       numeric(record?.players) === 0;
   }
 
+  async function fetchAdminSnapshot() {
+    if (!sessionToken) throw new Error('SESSION_MISSING');
+    const response = await fetch(`${API_URL}/admin-data`, {
+      method:'GET', mode:'cors', cache:'no-store',
+      headers:{ Authorization:`Bearer ${sessionToken}` }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data?.ok || !data?.adminData) {
+      const error = new Error(data?.message || `HTTP ${response.status}`);
+      error.code = data?.error || `HTTP_${response.status}`;
+      throw error;
+    }
+    return data;
+  }
+
   async function loadAdmin(force=false) {
     if (state.payload && !force) return state.payload;
     if (state.loading && !force) return state.loading;
-    state.loading = (async () => {
-      if (!sessionToken) throw new Error('SESSION_MISSING');
-      const response = await fetch(`${API_URL}/admin-data`, {
-        method:'GET', mode:'cors', cache:'no-store',
-        headers:{ Authorization:`Bearer ${sessionToken}` }
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data?.ok || !data?.adminData) {
-        const error = new Error(data?.message || `HTTP ${response.status}`);
-        error.code = data?.error || `HTTP_${response.status}`;
-        throw error;
-      }
+    state.loading = fetchAdminSnapshot().then(data => {
       state.payload = data;
       return data;
-    })().finally(() => { state.loading = null; });
+    }).finally(() => { state.loading = null; });
     return state.loading;
   }
 
@@ -478,7 +490,144 @@
     });
   }
 
+  function teamIdentity(record) {
+    return `${lower(record?.game)} :: ${lower(record?.name)}`;
+  }
+
+  function recomputeAdminStats(data) {
+    const admin = data?.adminData;
+    if (!admin) return;
+    const participantList = Array.isArray(admin.participants) ? admin.participants : [];
+    const teamList = Array.isArray(admin.teams) ? admin.teams : [];
+    admin.stats = {
+      ...(admin.stats || {}),
+      participants:participantList.length,
+      inChat:participantList.filter(item => lower(item?.chatState) === 'в чате').length,
+      exited:participantList.filter(item => lower(item?.chatState) === 'вышел' || lower(item?.status) === 'вышел').length,
+      teams:teamList.length,
+      activeTeams:teamList.filter(item => lower(item?.status) === 'активен').length,
+      pausedTeams:teamList.filter(item => lower(item?.status) === 'на паузе').length,
+      inactiveTeams:teamList.filter(item => lower(item?.status) === 'неактивен').length
+    };
+  }
+
+  function addOptimisticJournal(data, result) {
+    const admin = data?.adminData;
+    if (!admin || !result?.requestId) return;
+    if (!admin.journal || typeof admin.journal !== 'object') {
+      admin.journal = { version:'0.6.0-write.5', rows:[] };
+    }
+    if (!Array.isArray(admin.journal.rows)) admin.journal.rows = [];
+    if (admin.journal.rows.some(row => clean(row?.requestId) === clean(result.requestId))) return;
+    admin.journal.rows.unshift({
+      requestId:clean(result.requestId),
+      at:new Date().toISOString(),
+      op:clean(result.op),
+      entityType:clean(result.entityType),
+      entityKey:clean(result.entityKey),
+      row:Number(result.row || 0),
+      adminUsername:'сохранено — snapshot обновляется',
+      changed:{ snapshotRefresh:'queued' },
+      after:result.record || (result.deleted ? { deleted:true } : {})
+    });
+  }
+
+  function applyCommittedResult(result) {
+    const data = state.payload;
+    const admin = data?.adminData;
+    if (!data?.ok || !admin) return false;
+
+    if (result?.entityType === 'participant') {
+      const list = Array.isArray(admin.participants) ? admin.participants : [];
+      const id = clean(result.entityKey || result.record?.telegramId);
+      const index = list.findIndex(item => clean(item?.telegramId) === id);
+      if (result.deleted) {
+        if (index >= 0) list.splice(index, 1);
+      } else if (result.record) {
+        const next = {
+          ...(index >= 0 ? list[index] : {}),
+          ...result.record,
+          telegramId:id,
+          revision:clean(result.revision || result.record?.revision)
+        };
+        if (index >= 0) list[index] = next;
+        else list.push(next);
+        list.sort((a,b) => clean(a?.name || a?.telegramName || a?.telegramId)
+          .localeCompare(clean(b?.name || b?.telegramName || b?.telegramId),'ru',{sensitivity:'base'}));
+      }
+      admin.participants = list;
+    }
+
+    if (result?.entityType === 'team') {
+      const list = Array.isArray(admin.teams) ? admin.teams : [];
+      const previous = clean(result.previousEntityKey).toLocaleLowerCase('ru-RU');
+      const current = clean(result.entityKey).toLocaleLowerCase('ru-RU');
+      const index = list.findIndex(item => {
+        const key = `${clean(item?.game)} :: ${clean(item?.name)}`.toLocaleLowerCase('ru-RU');
+        return key === previous || key === current || teamIdentity(item) === teamIdentity(result.record);
+      });
+      if (result.deleted) {
+        if (index >= 0) list.splice(index, 1);
+      } else if (result.record) {
+        const next = {
+          ...(index >= 0 ? list[index] : {}),
+          ...result.record,
+          revision:clean(result.revision || result.record?.revision)
+        };
+        if (index >= 0) list[index] = next;
+        else list.push(next);
+        list.sort((a,b) => clean(a?.name).localeCompare(clean(b?.name),'ru',{sensitivity:'base'}));
+      }
+      admin.teams = list;
+    }
+
+    addOptimisticJournal(data, result);
+    recomputeAdminStats(data);
+    admin.snapshotRefresh = {
+      pending:true,
+      requestId:clean(result?.requestId),
+      queuedAt:clean(result?.adminSnapshot?.queuedAt) || new Date().toISOString()
+    };
+    try { window.RoyalAdminV0600?.acceptPayload?.(data); } catch (_) {}
+    return true;
+  }
+
+  function journalContains(data, requestId) {
+    const rows = Array.isArray(data?.adminData?.journal?.rows)
+      ? data.adminData.journal.rows : [];
+    return rows.some(row => clean(row?.requestId) === clean(requestId));
+  }
+
+  async function refreshSnapshotInBackground() {
+    for (const delay of SNAPSHOT_POLL_DELAYS_MS) {
+      if (!state.pendingRequestIds.size) return;
+      await new Promise(resolve => setTimeout(resolve,delay));
+      const data = await fetchAdminSnapshot().catch(() => null);
+      if (!data) continue;
+
+      const confirmed = [...state.pendingRequestIds]
+        .filter(requestId => journalContains(data,requestId));
+      confirmed.forEach(requestId => state.pendingRequestIds.delete(requestId));
+      if (state.pendingRequestIds.size) continue;
+
+      state.payload = data;
+      try { window.RoyalAdminV0600?.acceptPayload?.(data); } catch (_) {}
+      setTimeout(() => { if (state.editing && isAdminScreen()) injectEditUi(); },180);
+      return;
+    }
+  }
+
   async function refreshAfterMutation(result) {
+    if (result?.adminSnapshot?.queued === true) {
+      if (result?.requestId) state.pendingRequestIds.add(clean(result.requestId));
+      applyCommittedResult(result);
+      closeModal();
+      showMessage(result?.message || 'Изменение сохранено. Данные обновляются в фоне.');
+      setTimeout(() => { if (state.editing && isAdminScreen()) injectEditUi(); },100);
+      refreshSnapshotInBackground().catch(() => null);
+      return;
+    }
+
     await new Promise(resolve => setTimeout(resolve,650));
     closeModal();
     state.payload = null;
@@ -570,8 +719,8 @@
     const save = form.querySelector('.is-save');
     if (save) save.disabled = true;
     modalStatus(form.matches('[data-write-team-form]')
-      ? 'Сохраняем команду и фото… Это может занять до минуты.'
-      : 'Проверяем права и сохраняем…');
+      ? 'Фиксируем команду и фото…'
+      : 'Фиксируем изменение в таблице…');
     try {
       const result = form.matches('[data-write-participant-form]')
         ? await saveParticipant(form)
