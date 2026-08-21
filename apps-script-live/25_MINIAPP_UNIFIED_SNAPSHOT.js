@@ -1,19 +1,28 @@
 /*
  * Royal CRM / Таблица ЧП
  * 25_MINIAPP_UNIFIED_SNAPSHOT.js
- * v1.2.5
+ * v1.2.6
  *
  * Atomic Mini App snapshot writer.
  * One source write contains base participants/teams + specnaz score/rank + specnaz history.
  * Participant identity is Telegram ID only.
  * Search keys are prepared here, while the Mini App keeps its independent v0.5.47-style fallback search.
+ * App writes and installable Sheet edit/change handlers enqueue one deduplicated
+ * one-off trigger. The five-minute trigger remains a durable fallback only.
  */
 
-var MINIAPP_UNIFIED_SNAPSHOT_VERSION = '1.2.5';
+var MINIAPP_UNIFIED_SNAPSHOT_VERSION = '1.2.6';
 var MINIAPP_UNIFIED_SNAPSHOT_SCHEMA = '1.4.2';
 var MINIAPP_UNIFIED_SEARCH_INDEX_VERSION = '1.1.3';
 var MINIAPP_UNIFIED_SNAPSHOT_HANDLER = 'MINIAPP_exportUnifiedSnapshotToGitHub';
 var MINIAPP_UNIFIED_SNAPSHOT_LAST_HASH = 'MINIAPP_UNIFIED_SNAPSHOT_LAST_HASH';
+var MINIAPP_UNIFIED_SNAPSHOT_QUEUE_HANDLER = 'MINIAPP_flushQueuedUnifiedSnapshot';
+var MINIAPP_UNIFIED_SNAPSHOT_QUEUE_PROPERTY = 'MINIAPP_UNIFIED_SNAPSHOT_QUEUE_V1';
+var MINIAPP_UNIFIED_SNAPSHOT_QUEUE_MAX_ATTEMPTS = 5;
+var MINIAPP_UNIFIED_SNAPSHOT_QUEUE_DELAY_MS = 1500;
+var MINIAPP_UNIFIED_SNAPSHOT_CAPTURE_SEQUENCE = 'MINIAPP_UNIFIED_SNAPSHOT_CAPTURE_SEQUENCE_V1';
+var MINIAPP_UNIFIED_SNAPSHOT_LAST_PUBLISHED_CAPTURE = 'MINIAPP_UNIFIED_SNAPSHOT_LAST_PUBLISHED_CAPTURE_V1';
+var MINIAPP_UNIFIED_SNAPSHOT_QUEUE_MARKER = 'ONE_OFF_UNIFIED_SNAPSHOT_QUEUE_V126';
 
 var MINIAPP_UNIFIED_SEARCH_ALIASES = {
   'has ne dogonyat': ['нас не догонят'],
@@ -56,10 +65,13 @@ function MINIAPP_bootstrapUnifiedSnapshot() {
   return { ok: true, version: MINIAPP_UNIFIED_SNAPSHOT_VERSION, trigger: trigger, sync: sync };
 }
 
-function MINIAPP_exportUnifiedSnapshotToGitHub() {
+function MINIAPP_exportUnifiedSnapshotToGitHub(options) {
+  options = options && typeof options === 'object' ? options : {};
+  var queueToken = String(options.queueToken || '').trim();
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(25000)) return { ok: false, skipped: true, reason: 'LOCK_BUSY' };
   var lockHeld = true;
+  var captureSequence = 0;
 
   try {
     MINIAPP_unifiedRequireHelpers_();
@@ -105,6 +117,11 @@ function MINIAPP_exportUnifiedSnapshotToGitHub() {
 
 
     var sections = MINIAPP_readSpecnazHistorySections_();
+    captureSequence = Math.max(
+      Date.now(),
+      Number(props.getProperty(MINIAPP_UNIFIED_SNAPSHOT_CAPTURE_SEQUENCE) || 0) + 1
+    );
+    props.setProperty(MINIAPP_UNIFIED_SNAPSHOT_CAPTURE_SEQUENCE, String(captureSequence));
 
     // All Sheet reads above are now captured consistently. Release ScriptLock
     // before any GitHub request so the recurring snapshot cannot stall an admin
@@ -112,11 +129,18 @@ function MINIAPP_exportUnifiedSnapshotToGitHub() {
     try { lock.releaseLock(); } catch (_) {}
     lockHeld = false;
 
+    if (queueToken && MINIAPP_unifiedSnapshotQueueIsSuperseded_(queueToken)) {
+      MINIAPP_unifiedSnapshotQueueEnsureTrigger_(MINIAPP_UNIFIED_SNAPSHOT_QUEUE_DELAY_MS);
+      return { ok: true, skipped: true, reason: 'SUPERSEDED', captureSequence: captureSequence };
+    }
+
     // The normal write path uses a one-off queue. This recurring trigger is the
     // durable fallback: it captures private admin data under a new short lock,
     // releases that lock, then performs GitHub I/O without blocking mutations.
-    var adminSnapshotResult = { ok: false, skipped: true, reason: 'ADMIN_EXPORTER_MISSING' };
-    if (typeof MINIAPP_exportAdminSnapshotToGitHub === 'function') {
+    var adminSnapshotResult = options.skipAdminSnapshot === true
+      ? { ok: true, skipped: true, reason: 'SKIPPED_BY_CALLER' }
+      : { ok: false, skipped: true, reason: 'ADMIN_EXPORTER_MISSING' };
+    if (options.skipAdminSnapshot !== true && typeof MINIAPP_exportAdminSnapshotToGitHub === 'function') {
       try {
         adminSnapshotResult = MINIAPP_exportAdminSnapshotToGitHub();
       } catch (adminSnapshotError) {
@@ -128,7 +152,18 @@ function MINIAPP_exportUnifiedSnapshotToGitHub() {
       }
     }
 
-    var nowIso = new Date().toISOString();
+    if (queueToken && MINIAPP_unifiedSnapshotQueueIsSuperseded_(queueToken)) {
+      MINIAPP_unifiedSnapshotQueueEnsureTrigger_(MINIAPP_UNIFIED_SNAPSHOT_QUEUE_DELAY_MS);
+      return {
+        ok: true,
+        skipped: true,
+        reason: 'SUPERSEDED_AFTER_ADMIN',
+        captureSequence: captureSequence,
+        adminSnapshot: adminSnapshotResult
+      };
+    }
+
+    var nowIso = new Date(captureSequence).toISOString();
     var historyVersion = typeof MINIAPP_SPECNAZ_HISTORY_VERSION !== 'undefined'
       ? String(MINIAPP_SPECNAZ_HISTORY_VERSION || '1.3.0') : '1.3.0';
     var profileVersion = typeof MINIAPP_PROFILE_STATS_VERSION !== 'undefined'
@@ -143,25 +178,6 @@ function MINIAPP_exportUnifiedSnapshotToGitHub() {
       specnazHistory: { version: historyVersion, sections: sections }
     };
     var dataHash = MINIAPP_unifiedSha256_(JSON.stringify(hashBasis));
-    var lastHash = String(props.getProperty(MINIAPP_UNIFIED_SNAPSHOT_LAST_HASH) || '').trim();
-
-    if (lastHash && lastHash === dataHash) {
-      return {
-        ok: true, changed: false,
-        version: MINIAPP_UNIFIED_SNAPSHOT_VERSION,
-        schemaVersion: MINIAPP_UNIFIED_SNAPSHOT_SCHEMA,
-        searchIndexVersion: MINIAPP_UNIFIED_SEARCH_INDEX_VERSION,
-        participants: stable.participants.length,
-        teams: stable.teams.length,
-        participantSearchKeys: searchStats.participantKeys,
-        teamSearchKeys: searchStats.teamKeys,
-        statsTouched: statsTouched,
-        historySections: sections.length,
-        teamStatusStats: teamStatusStats,
-        adminSnapshot: adminSnapshotResult
-      };
-    }
-
     var payload = {
       schemaVersion: MINIAPP_UNIFIED_SNAPSHOT_SCHEMA,
       generatedAt: nowIso,
@@ -178,29 +194,238 @@ function MINIAPP_exportUnifiedSnapshotToGitHub() {
       unifiedSnapshotVersion: MINIAPP_UNIFIED_SNAPSHOT_VERSION
     };
 
-    var github = MINIAPP_unifiedPutWithRetry_(repo, branch, path, JSON.stringify(payload), token, dataHash);
-    props.setProperty(MINIAPP_UNIFIED_SNAPSHOT_LAST_HASH, dataHash);
+    // Public GitHub writes are serialized independently from Sheet mutations.
+    // Capture sequence is allocated while ScriptLock is held, so an older
+    // recurring capture can never overwrite a newer queued capture.
+    var publishLock = LockService.getUserLock();
+    if (!publishLock.tryLock(20000)) {
+      return { ok: false, skipped: true, reason: 'PUBLISH_BUSY', captureSequence: captureSequence };
+    }
+    try {
+      if (queueToken && MINIAPP_unifiedSnapshotQueueIsSuperseded_(queueToken)) {
+        MINIAPP_unifiedSnapshotQueueEnsureTrigger_(MINIAPP_UNIFIED_SNAPSHOT_QUEUE_DELAY_MS);
+        return { ok: true, skipped: true, reason: 'SUPERSEDED_BEFORE_PUBLISH', captureSequence: captureSequence };
+      }
 
-    return {
-      ok: true, changed: true,
-      version: MINIAPP_UNIFIED_SNAPSHOT_VERSION,
-      schemaVersion: MINIAPP_UNIFIED_SNAPSHOT_SCHEMA,
-      searchIndexVersion: MINIAPP_UNIFIED_SEARCH_INDEX_VERSION,
-      participants: stable.participants.length,
-      teams: stable.teams.length,
-      participantSearchKeys: searchStats.participantKeys,
-      teamSearchKeys: searchStats.teamKeys,
-      statsTouched: statsTouched,
-      historySections: sections.length,
-      teamStatusStats: teamStatusStats,
-      adminSnapshot: adminSnapshotResult,
-      github: github
-    };
+      var lastPublishedCapture = Number(
+        props.getProperty(MINIAPP_UNIFIED_SNAPSHOT_LAST_PUBLISHED_CAPTURE) || 0
+      );
+      if (lastPublishedCapture > captureSequence) {
+        return {
+          ok: true,
+          skipped: true,
+          reason: 'STALE_CAPTURE',
+          captureSequence: captureSequence,
+          lastPublishedCapture: lastPublishedCapture,
+          adminSnapshot: adminSnapshotResult
+        };
+      }
+
+      var lastHash = String(props.getProperty(MINIAPP_UNIFIED_SNAPSHOT_LAST_HASH) || '').trim();
+      if (lastHash && lastHash === dataHash) {
+        props.setProperty(MINIAPP_UNIFIED_SNAPSHOT_LAST_PUBLISHED_CAPTURE, String(captureSequence));
+        return {
+          ok: true, changed: false,
+          version: MINIAPP_UNIFIED_SNAPSHOT_VERSION,
+          schemaVersion: MINIAPP_UNIFIED_SNAPSHOT_SCHEMA,
+          searchIndexVersion: MINIAPP_UNIFIED_SEARCH_INDEX_VERSION,
+          participants: stable.participants.length,
+          teams: stable.teams.length,
+          participantSearchKeys: searchStats.participantKeys,
+          teamSearchKeys: searchStats.teamKeys,
+          statsTouched: statsTouched,
+          historySections: sections.length,
+          teamStatusStats: teamStatusStats,
+          captureSequence: captureSequence,
+          adminSnapshot: adminSnapshotResult
+        };
+      }
+
+      var github = MINIAPP_unifiedPutWithRetry_(repo, branch, path, JSON.stringify(payload), token, dataHash);
+      props.setProperty(MINIAPP_UNIFIED_SNAPSHOT_LAST_HASH, dataHash);
+      props.setProperty(MINIAPP_UNIFIED_SNAPSHOT_LAST_PUBLISHED_CAPTURE, String(captureSequence));
+
+      return {
+        ok: true, changed: true,
+        version: MINIAPP_UNIFIED_SNAPSHOT_VERSION,
+        schemaVersion: MINIAPP_UNIFIED_SNAPSHOT_SCHEMA,
+        searchIndexVersion: MINIAPP_UNIFIED_SEARCH_INDEX_VERSION,
+        participants: stable.participants.length,
+        teams: stable.teams.length,
+        participantSearchKeys: searchStats.participantKeys,
+        teamSearchKeys: searchStats.teamKeys,
+        statsTouched: statsTouched,
+        historySections: sections.length,
+        teamStatusStats: teamStatusStats,
+        captureSequence: captureSequence,
+        adminSnapshot: adminSnapshotResult,
+        github: github
+      };
+    } finally {
+      try { publishLock.releaseLock(); } catch (_) {}
+    }
   } finally {
     if (lockHeld) {
       try { lock.releaseLock(); } catch (_) {}
     }
   }
+}
+
+/**
+ * Lightweight entrypoint for both app writes and installable Sheet edit/change
+ * handlers. It only stores the newest request and ensures one time trigger.
+ */
+function MINIAPP_queueUnifiedSnapshotRefresh_(reason, includeAdminSnapshot) {
+  var props = PropertiesService.getScriptProperties();
+  var existing = MINIAPP_unifiedSnapshotQueueRead_();
+  var queuedAt = new Date().toISOString();
+  var token = Utilities.getUuid().replace(/-/g, '');
+  var item = {
+    token: token,
+    queuedAt: queuedAt,
+    reason: String(reason || 'source-change').slice(0, 300),
+    attempts: 0,
+    includeAdminSnapshot: includeAdminSnapshot !== false || !!(existing && existing.includeAdminSnapshot)
+  };
+  props.setProperty(MINIAPP_UNIFIED_SNAPSHOT_QUEUE_PROPERTY, JSON.stringify(item));
+
+  var schedule = MINIAPP_unifiedSnapshotQueueEnsureTrigger_(MINIAPP_UNIFIED_SNAPSHOT_QUEUE_DELAY_MS);
+  return {
+    ok: true,
+    queued: true,
+    mode: 'queued-unified-trigger',
+    response: 'commit-first',
+    token: token,
+    queuedAt: queuedAt,
+    scheduled: schedule.created === true || schedule.existing === true,
+    deduplicated: schedule.existing === true,
+    updates: item.includeAdminSnapshot ? ['admin-snapshot', 'public-snapshot'] : ['public-snapshot'],
+    fallback: 'unified-5-minute-trigger',
+    warning: schedule.warning || ''
+  };
+}
+
+/** Time-driven handler. It never mutates participant or team source cells. */
+function MINIAPP_flushQueuedUnifiedSnapshot() {
+  MINIAPP_unifiedSnapshotQueueClearOwnTriggers_();
+  var item = MINIAPP_unifiedSnapshotQueueRead_();
+  if (!item || !item.token) return { ok: true, skipped: true, reason: 'QUEUE_EMPTY' };
+
+  try {
+    var result = MINIAPP_exportUnifiedSnapshotToGitHub({
+      queueToken: item.token,
+      skipAdminSnapshot: item.includeAdminSnapshot !== true
+    });
+
+    if (result && /^SUPERSEDED/.test(String(result.reason || ''))) {
+      MINIAPP_unifiedSnapshotQueueEnsureTrigger_(MINIAPP_UNIFIED_SNAPSHOT_QUEUE_DELAY_MS);
+      return result;
+    }
+    if (!result || result.ok === false) {
+      return MINIAPP_unifiedSnapshotQueueRetry_(item, result && result.reason || 'EXPORT_FAILED');
+    }
+    if (item.includeAdminSnapshot === true && result.adminSnapshot && result.adminSnapshot.ok === false) {
+      return MINIAPP_unifiedSnapshotQueueRetry_(
+        item,
+        'ADMIN_EXPORT_FAILED: ' + String(result.adminSnapshot.reason || result.adminSnapshot.error || 'UNKNOWN')
+      );
+    }
+
+    MINIAPP_unifiedSnapshotQueueClearIfToken_(item.token);
+    return result;
+  } catch (error) {
+    return MINIAPP_unifiedSnapshotQueueRetry_(
+      item,
+      'EXPORT_EXCEPTION: ' + String(error && error.message ? error.message : error || 'UNKNOWN')
+    );
+  }
+}
+
+function MINIAPP_unifiedSnapshotQueueRead_() {
+  var raw = String(PropertiesService.getScriptProperties()
+    .getProperty(MINIAPP_UNIFIED_SNAPSHOT_QUEUE_PROPERTY) || '').trim();
+  if (!raw) return null;
+  try {
+    var item = JSON.parse(raw);
+    return item && typeof item === 'object' ? item : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function MINIAPP_unifiedSnapshotQueueIsSuperseded_(token) {
+  var current = MINIAPP_unifiedSnapshotQueueRead_();
+  return !current || current.token !== String(token || '');
+}
+
+function MINIAPP_unifiedSnapshotQueueRetry_(item, reason) {
+  var props = PropertiesService.getScriptProperties();
+  var current = MINIAPP_unifiedSnapshotQueueRead_();
+  if (!current || !item || current.token !== item.token) {
+    MINIAPP_unifiedSnapshotQueueEnsureTrigger_(MINIAPP_UNIFIED_SNAPSHOT_QUEUE_DELAY_MS);
+    return { ok: false, skipped: true, reason: 'SUPERSEDED_RETRY' };
+  }
+
+  current.attempts = Number(current.attempts || 0) + 1;
+  current.lastError = String(reason || 'UNKNOWN').slice(0, 500);
+  current.lastAttemptAt = new Date().toISOString();
+  props.setProperty(MINIAPP_UNIFIED_SNAPSHOT_QUEUE_PROPERTY, JSON.stringify(current));
+
+  var scheduled = false;
+  if (current.attempts < MINIAPP_UNIFIED_SNAPSHOT_QUEUE_MAX_ATTEMPTS) {
+    var delay = MINIAPP_UNIFIED_SNAPSHOT_QUEUE_DELAY_MS * Math.pow(2, current.attempts);
+    var schedule = MINIAPP_unifiedSnapshotQueueEnsureTrigger_(delay);
+    scheduled = schedule.created === true || schedule.existing === true;
+  }
+  return {
+    ok: false,
+    queued: true,
+    retry: scheduled,
+    attempts: current.attempts,
+    reason: current.lastError,
+    fallback: 'unified-5-minute-trigger'
+  };
+}
+
+function MINIAPP_unifiedSnapshotQueueEnsureTrigger_(delayMs) {
+  try {
+    var triggers = ScriptApp.getProjectTriggers();
+    for (var i = 0; i < triggers.length; i += 1) {
+      if (String(triggers[i].getHandlerFunction() || '') === MINIAPP_UNIFIED_SNAPSHOT_QUEUE_HANDLER) {
+        return { ok: true, existing: true, created: false };
+      }
+    }
+    ScriptApp.newTrigger(MINIAPP_UNIFIED_SNAPSHOT_QUEUE_HANDLER)
+      .timeBased()
+      .after(Math.max(1000, Number(delayMs) || MINIAPP_UNIFIED_SNAPSHOT_QUEUE_DELAY_MS))
+      .create();
+    return { ok: true, existing: false, created: true };
+  } catch (error) {
+    return {
+      ok: false,
+      existing: false,
+      created: false,
+      warning: String(error && error.message ? error.message : error || 'TRIGGER_CREATE_FAILED')
+    };
+  }
+}
+
+function MINIAPP_unifiedSnapshotQueueClearOwnTriggers_() {
+  try {
+    ScriptApp.getProjectTriggers().forEach(function(trigger) {
+      if (String(trigger.getHandlerFunction() || '') === MINIAPP_UNIFIED_SNAPSHOT_QUEUE_HANDLER) {
+        ScriptApp.deleteTrigger(trigger);
+      }
+    });
+  } catch (_) {}
+}
+
+function MINIAPP_unifiedSnapshotQueueClearIfToken_(token) {
+  var props = PropertiesService.getScriptProperties();
+  var current = MINIAPP_unifiedSnapshotQueueRead_();
+  if (!current || current.token !== String(token || '')) return false;
+  props.deleteProperty(MINIAPP_UNIFIED_SNAPSHOT_QUEUE_PROPERTY);
+  return true;
 }
 
 function MINIAPP_installUnifiedSnapshotTrigger_() {
