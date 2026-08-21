@@ -95,6 +95,7 @@
 87. **v0.6 delete action visibility:** разрешённая кнопка `Удалить` должна быть видна прямо на private admin detail участника/команды, а не только внутри modal editor. Кнопка видна только при доказанном Worker `permissions.canDelete` и локальном eligibility (`Вышел` либо `Неактивен + 0`). Перед confirm frontend повторно загружает свежую private card/revision; все server guards и журнал остаются обязательными.
 88. **v0.6 admin-write endpoint:** private snapshot не имеет права считать `ScriptApp.getService().getUrl()` доказательством production route при нескольких Apps Script deployments. Installer обязан выбрать ровно один существующий deployment `Таблица ЧП 1.3`, проверить его прямым non-mutating POST, внедрить exact `/exec` в deployment configuration до `clasp push` и подтвердить в свежем private snapshot одновременно `endpoint`, `endpointPinned=true`, `endpointSource=deployment-constant`. Script Property разрешён только как совместимый validated override и не может быть единственным rollout-механизмом: `clasp run` способен вернуть Apps Script storage exception с exit code 0. Worker разрешает edit/delete только при полном pinned contract; fallback service URL остаётся диагностическим и всегда read-only.
 89. **v0.6 admin-write timeout:** mutation route `/admin-write` не имеет права использовать общий 5-second read timeout. Team write с фото синхронно обновляет Sheet, private media и snapshots и может занять десятки секунд; текущий client window = 60 секунд. Обычные read routes сохраняют короткий timeout, `/auth` — отдельные 12 секунд. Transport retry допускается только с тем же `requestId`, чтобы server idempotency не создала дубль; UI должен сообщать, что фото может сохраняться до минуты, а timeout сам по себе не считается доказательством отсутствия commit.
+90. **v0.6 WRITE_BUSY retry:** Unified Snapshot и admin mutation используют общий Apps Script ScriptLock. Явный server `WRITE_BUSY` означает, что mutation не начиналась, поэтому frontend может автоматически повторить операцию только bounded-число раз (сейчас 2) и обязательно с тем же `requestId`. Нельзя автоматически повторять validation, stale revision, eligibility/delete conflicts или произвольные HTTP errors. Во время ожидания UI показывает, что таблица обновляется в фоне; после исчерпания retries выводится исходный безопасный отказ.
 
 ## Текущая версия
 
@@ -132,7 +133,7 @@ Admin-preview `v0.6.0` дополнительно использует:
 - `Вышел` ordering по physical source row, newest first;
 - production Apps Script/private snapshot = `0.6.0-write.5`;
 - live write.5 содержит только два узких destructive flow: participant `AF=Вышел` и team `L=Неактивен + E=0 + refs=0`, с confirm/revision/server recheck/journal и сохранением formula columns;
-- frontend build `20260821-2050`: admin entry справа от имени, eligible delete actions на detail, `/admin-write` ждёт до 60 секунд вместо общего 5-second read timeout;
+- frontend build `20260821-2110`: admin entry справа от имени, eligible delete actions на detail, `/admin-write` ждёт до 60 секунд и bounded-retry выполняется только для explicit `WRITE_BUSY` с тем же requestId;
 - production Worker `1.27.0` держит endpoint fail-closed; live snapshot доказал exact installer-injected `deployment-constant`, edit/create/delete разрешены только при pinned contract.
 
 Все предыдущие версии сохраняются в истории изменений без удаления.
