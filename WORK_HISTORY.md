@@ -3,6 +3,18 @@
 > Краткий журнал фактически выполненных работ. Новые записи добавляются сверху.
 > Здесь фиксируются изменения, проверки, диагнозы и откаты, которые нужны следующему чату.
 
+## 2026-08-21 18:05 — createTeam blocked by stale advertised Apps Script endpoint; exact-deployment pin prepared
+
+**Симптом на устройстве:** при `Добавить команду → Сохранить` frontend показал `Сервер Google Sheets вернул неожиданный ответ.` Команда визуально не появилась.
+
+**Фактическая проверка до правки:** свежий private snapshot `2026-08-21T14:49:10.927Z` и последующие trigger snapshots не содержат `Cataha`; journal пуст, поэтому повторной/скрытой записи не было. Endpoint, опубликованный snapshot через `ScriptApp.getService().getUrl()`, прямым GET и non-mutating POST отвечает `404 text/html`. На присланном экране Cloud Shell видно, что installer выбрал другой exact deployment `Таблица ЧП 1.3`, обновил его и тем же non-mutating POST получил корректный JSON `0.6.0-write.5`. Значит createTeam не дошёл до Sheets: Worker отправлял HMAC-запрос в старый advertised `/exec`.
+
+**Исправление в repo:** `31_MINIAPP_ADMIN_WRITE_HARDENED.js` добавляет валидированный Script Property `MINIAPP_ADMIN_WRITE_ENDPOINT`, authenticated `clasp run` setter и metadata `endpointPinned/endpointSource`; `30_MINIAPP_ADMIN_WRITE_BACKEND.js` выводит pin в preflight. Worker `1.26.0` и underlying write handler fail closed: без `endpointPinned=true + endpointSource=script-property` `/admin-data` становится read-only, а `/admin-write` возвращает понятный `ADMIN_WRITE_ENDPOINT_NOT_PINNED`, не обращаясь к ложному URL. Старый service URL сохранён только как diagnostic fallback.
+
+**Rollout tooling:** добавлен отдельный `scripts/repair-v0600-admin-write-endpoint.sh`. Он требует уже live Worker 1.26, делает `clasp pull`/backup, обновляет только files 30/31, выбирает ровно один существующий deployment `Таблица ЧП 1.3`, обновляет и напрямую проверяет его, сохраняет exact `/exec` в Script Properties, запрашивает private snapshot, требует exact endpoint + pin markers и затем синхронизирует factual live mirror. Штатный delete installer обновлён тем же постоянным invariant. Новый deployment не создаётся; participant/team rows installer не меняет.
+
+**Проверка:** JS syntax checks и shell `bash -n` чисты; `node --test tests/*.test.js` — 14/14 pass, включая приоритет pinned endpoint, explicit unsafe fallback, setter validation и Worker pin guard; `git diff --check` чист. Внешний rollout boundary: после merge/production Worker 1.26 выполнить один repair installer в уже настроенном Cloud Shell и проверить fresh private snapshot; до этого редактирование намеренно read-only.
+
 ## 2026-08-21 14:42 — delete-кнопки выведены прямо на admin detail
 
 **Симптом на устройстве:** у участников `Вышел` и команд `Неактивен + 0` пользователь не видел кнопку удаления.
