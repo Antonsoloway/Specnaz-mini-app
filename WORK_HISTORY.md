@@ -3,6 +3,18 @@
 > Краткий журнал фактически выполненных работ. Новые записи добавляются сверху.
 > Здесь фиксируются изменения, проверки, диагнозы и откаты, которые нужны следующему чату.
 
+## 2026-08-21 14:42 — delete-кнопки выведены прямо на admin detail
+
+**Симптом на устройстве:** у участников `Вышел` и команд `Неактивен + 0` пользователь не видел кнопку удаления.
+
+**Причина:** write.5 UI добавлял delete action только внутрь modal editor. После более позднего ввода отдельных normal-style admin participant/team detail на этих экранах осталась только `Редактировать`; поэтому реальная возможность была скрыта и неочевидна.
+
+**Исправление build `20260821-1435`:** `admin-participant-detail-v0600.js .2` и `admin-team-detail-v0600.js .4` показывают красную `Удалить` прямо под кнопкой редактирования и только для разрешённых записей. `admin-write-v0600-v3.js 0.6.0-write.5-ui.2` перед confirm повторно загружает свежую private card/revision. Telegram `showConfirm`, Apps Script lock/revision/live-status checks, journal и refresh после успеха не ослаблялись. Кнопки в modal editor сохранены.
+
+**Проверка и доставка:** 10/10 Node tests прошли, включая новые detail eligibility tests; `node --check` и `git diff --check` чисты. PR #6 squash-merged в `main`, SHA `b579dbd46a2258321560b8db40b412791a94abf6`. GitHub Pages фактически отдаёт `version-v0600.js?v=20260821-1435`, participant detail `.2`, team detail `.4` и оба delete marker; Worker `/health` остался `1.25.0/write5`. Destructive test не выполнялся; device smoke и confirm/удаление одной тестовой записи остаются за админом.
+
+---
+
 ## 2026-08-21 14:21 — rollout stage 2: Apps Script write.5 + delete contract production verified
 
 **Cloud Shell installer result:** существующий deployment `Таблица ЧП 1.3` обновлён, non-mutating HTTP route сразу подтвердил `0.6.0-write.5`. Installer затем остановился после `15×12s` snapshot checks с сообщением, что private snapshot ещё write.4; повторный push/deploy не требовался.
