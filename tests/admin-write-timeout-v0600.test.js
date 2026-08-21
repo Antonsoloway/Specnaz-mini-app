@@ -12,6 +12,10 @@ const writeSource = fs.readFileSync(
   path.join(__dirname, '..', 'admin-write-v0600-v3.js'),
   'utf8'
 );
+const adminReadSource = fs.readFileSync(
+  path.join(__dirname, '..', 'admin-v0600.js'),
+  'utf8'
+);
 
 function createTransport() {
   const scheduled = [];
@@ -74,7 +78,15 @@ test('explicit WRITE_BUSY is retried safely with the same request id', () => {
   assert.match(writeSource, /clean\(error\?\.code\) === 'WRITE_BUSY'/);
   assert.match(writeSource, /return await postWriteOnce\(id, op, payload\)/);
   assert.match(writeSource, /Ждём и повторяем автоматически/);
-  assert.match(writeSource, /const VERSION = '0\.6\.0-write\.5-ui\.5'/);
+  assert.match(writeSource, /const VERSION = '0\.6\.0-write\.5-ui\.7'/);
+});
+
+test('transient admin-data reads retry briefly before showing a friendly error', () => {
+  assert.match(adminReadSource, /ADMIN_READ_RETRY_DELAYS_MS = \[0, 700, 1600\]/);
+  assert.match(writeSource, /ADMIN_READ_RETRY_DELAYS_MS = \[0, 700, 1600\]/);
+  assert.match(adminReadSource, /ADMIN_NETWORK_RETRY_EXHAUSTED/);
+  assert.match(writeSource, /ADMIN_NETWORK_RETRY_EXHAUSTED/);
+  assert.match(adminReadSource, /Связь с сервером прервалась/);
 });
 
 test('queued commit closes immediately and refreshes the private snapshot in background', () => {
@@ -83,4 +95,12 @@ test('queued commit closes immediately and refreshes the private snapshot in bac
   assert.match(writeSource, /refreshSnapshotInBackground\(\)\.catch/);
   assert.match(writeSource, /SNAPSHOT_POLL_DELAYS_MS/);
   assert.doesNotMatch(writeSource, /Сохраняем команду и фото… Это может занять до минуты/);
+});
+
+test('a lagging private snapshot cannot replace an optimistic committed record', () => {
+  assert.match(writeSource, /PENDING_WRITE_MONOTONIC_SNAPSHOT_V0600/);
+  assert.match(writeSource, /state\.payload && \(!force \|\| state\.pendingRequestIds\.size\)/);
+  assert.match(writeSource, /allPendingConfirmed = \[\.\.\.state\.pendingRequestIds\]/);
+  assert.match(writeSource, /journalContains\(data,requestId\)/);
+  assert.match(writeSource, /return state\.payload \|\| payloadBeforeFetch/);
 });
