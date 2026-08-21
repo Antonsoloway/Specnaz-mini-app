@@ -3,6 +3,16 @@
 > Краткий журнал фактически выполненных работ. Новые записи добавляются сверху.
 > Здесь фиксируются изменения, проверки, диагнозы и откаты, которые нужны следующему чату.
 
+## 2026-08-21 19:20 — first endpoint repair exposed false-success `clasp run`; storage dependency removed
+
+**Результат первого repair run на Cloud Shell:** Worker guard `1.26.0`, `clasp pull/push`, update существующего deployment и direct non-mutating route check прошли. Во время endpoint setter Apps Script напечатал `Exception: We're sorry, a server error occurred while reading from storage`, однако `clasp run` вернул exit code 0; installer ошибочно отметил запрос успешным и после `30/30` snapshot checks корректно остановился. Команду повторять тем же installer запрещено.
+
+**Фактическая проверка после экрана:** private snapshot `2026-08-21T16:14:19.734Z` остаётся write.5, 128 teams, journal 0, `Cataha` отсутствует, endpoint прежний 404 service fallback, `endpointPinned=false`, `endpointSource=script-service-fallback`. Ни одна participant/team запись не создавалась, не менялась и не удалялась.
+
+**Исправление v2:** exact URL существующего deployment теперь внедряется installer в `MINIAPP_ADMIN_WRITE_PINNED_ENDPOINT` **до** `clasp push`; resolver публикует `endpointSource=deployment-constant`. Script Property остаётся optional override, но rollout от Google storage больше не зависит. Worker candidate `1.27.0`, underlying write handler и transitional `1.26` wrapper принимают два доказанных source (`script-property` / `deployment-constant`) и по-прежнему блокируют service fallback. Repair/delete installers требуют Worker 1.27, инжектируют exact URL, проверяют прямой route и exact private snapshot; текстовая `Exception/Error` от `clasp run export` больше не считается успехом и не мешает ожидать штатный trigger.
+
+**Rollout boundary:** после merge сначала подтвердить production `/health = 1.27.0 / pinned-deployment-config`, затем запустить только обновлённый repair v2 одной Cloud Shell командой. Новый deployment не создаётся; повтор предыдущего storage-setter flow исключён.
+
 ## 2026-08-21 18:05 — createTeam blocked by stale advertised Apps Script endpoint; exact-deployment pin prepared
 
 **Симптом на устройстве:** при `Добавить команду → Сохранить` frontend показал `Сервер Google Sheets вернул неожиданный ответ.` Команда визуально не появилась.
