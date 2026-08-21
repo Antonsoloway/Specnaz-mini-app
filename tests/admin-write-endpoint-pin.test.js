@@ -44,6 +44,15 @@ test('private metadata prefers the pinned named deployment over ScriptApp fallba
   assert.equal(meta.endpointSource, 'script-property');
 });
 
+test('installer-pinned deployment constant works without Script Properties storage', () => {
+  const { sandbox } = createSandbox('', STALE);
+  sandbox.MINIAPP_ADMIN_WRITE_PINNED_ENDPOINT = STABLE;
+  const meta = sandbox.MINIAPP_adminWriteHardenedMeta_();
+  assert.equal(meta.endpoint, STABLE);
+  assert.equal(meta.endpointPinned, true);
+  assert.equal(meta.endpointSource, 'deployment-constant');
+});
+
 test('an unpinned ScriptApp service URL is explicitly marked unsafe', () => {
   const { sandbox } = createSandbox('', STALE);
   const meta = sandbox.MINIAPP_adminWriteHardenedMeta_();
@@ -70,6 +79,30 @@ test('Worker refuses admin writes when snapshot endpoint is not pinned', () => {
     'utf8'
   );
   assert.match(workerSource, /ADMIN_WRITE_ENDPOINT_NOT_PINNED/);
-  assert.match(workerSource, /writeMeta\?\.endpointPinned !== true/);
-  assert.match(workerSource, /writeMeta\?\.endpointSource !== 'script-property'/);
+  assert.match(workerSource, /endpointSource === 'script-property'/);
+  assert.match(workerSource, /endpointSource === 'deployment-constant'/);
+});
+
+test('repair installer injects the selected deployment and does not rely on storage setter', () => {
+  const installer = fs.readFileSync(
+    path.join(__dirname, '..', 'scripts', 'repair-v0600-admin-write-endpoint.sh'),
+    'utf8'
+  );
+  assert.match(installer, /MINIAPP_ADMIN_WRITE_PINNED_ENDPOINT/);
+  assert.match(installer, /endpointSource"\)=="deployment-constant"/);
+  assert.doesNotMatch(installer, /clasp run MINIAPP_setAdminWriteEndpoint/);
+});
+
+test('Worker 1.26 transition and 1.27 production wrapper preserve constant eligibility', () => {
+  const transition = fs.readFileSync(
+    path.join(__dirname, '..', 'worker', 'src', 'entry-v1260.js'),
+    'utf8'
+  );
+  const production = fs.readFileSync(
+    path.join(__dirname, '..', 'worker', 'src', 'entry-v1270.js'),
+    'utf8'
+  );
+  assert.match(transition, /endpointSource === 'deployment-constant'/);
+  assert.match(production, /WRAPPER_VERSION = '1\.27\.0'/);
+  assert.match(production, /source === 'deployment-constant'/);
 });

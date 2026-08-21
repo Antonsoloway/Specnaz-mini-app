@@ -1,5 +1,5 @@
 name = "royal-crm-miniapp-api"
-main = "src/entry-v1260.js"
+main = "src/entry-v1270.js"
 compatibility_date = "2026-08-15"
 
 [vars]
@@ -25,9 +25,10 @@ invocation_logs = true
 # admin-write requests and short-lived Google Sheets CellImage source URLs.
 # It is never exposed to the browser or GitHub.
 #
-# entry-v1260 keeps every entry-v1250 route and enables admin writes only when
-# the private snapshot pins the exact named Apps Script deployment URL.
-# This prevents ScriptApp.getService().getUrl() from advertising a stale /exec.
+# entry-v1270 keeps every entry-v1260 route and accepts only an exact endpoint
+# pinned by Script Property or installer-injected deployment configuration.
+# This prevents ScriptApp.getService().getUrl() from advertising a stale /exec
+# without depending on transient Google storage during rollout.
 # Protected /admin-team-photo still covers active/paused/inactive teams.
 # Media identity remains SHA-256(name + game); browser persistence stays in
 # royal-crm-media-cache.

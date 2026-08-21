@@ -21,13 +21,17 @@
 
 var MINIAPP_ADMIN_WRITE_HARDENED_VERSION = '0.6.0-write.3';
 var MINIAPP_ADMIN_WRITE_ENDPOINT_PROPERTY = 'MINIAPP_ADMIN_WRITE_ENDPOINT';
+// Replaced by the rollout installer with the exact existing deployment URL.
+// The placeholder is intentionally invalid and therefore never enables writes.
+var MINIAPP_ADMIN_WRITE_PINNED_ENDPOINT = '__ROYAL_CRM_ADMIN_WRITE_ENDPOINT__';
 
 /**
  * ScriptApp.getService().getUrl() is not a stable deployment selector when a
  * project has more than one versioned deployment. A time-driven snapshot can
  * otherwise advertise an older /exec URL even though the installer updated
- * the named production deployment. The installer pins that exact URL in a
- * Script Property; the property is configuration, not a secret.
+ * the named production deployment. The installer pins that exact URL in the
+ * deployed source. Script Properties remain a compatible override, but writes
+ * do not depend on Google storage being available during rollout.
  */
 function MINIAPP_adminWriteSafeEndpoint_(value) {
   var endpoint = String(value || '').trim();
@@ -45,6 +49,11 @@ function MINIAPP_adminWriteResolvedEndpoint_() {
   configured = MINIAPP_adminWriteSafeEndpoint_(configured);
   if (configured) {
     return { endpoint: configured, source: 'script-property', pinned: true };
+  }
+
+  var deployed = MINIAPP_adminWriteSafeEndpoint_(MINIAPP_ADMIN_WRITE_PINNED_ENDPOINT);
+  if (deployed) {
+    return { endpoint: deployed, source: 'deployment-constant', pinned: true };
   }
 
   var serviceUrl = '';

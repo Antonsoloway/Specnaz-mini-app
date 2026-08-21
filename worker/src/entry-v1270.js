@@ -1,6 +1,6 @@
-import currentWorker from './entry-v1250.js';
+import currentWorker from './entry-v1260.js';
 
-const WRAPPER_VERSION = '1.26.0';
+const WRAPPER_VERSION = '1.27.0';
 
 export default {
   async fetch(request, env, ctx) {
@@ -15,7 +15,7 @@ export default {
         ok: true,
         service: 'royal-crm-miniapp-api',
         version: WRAPPER_VERSION,
-        adminWriteEndpoint: 'pinned-script-property'
+        adminWriteEndpoint: 'pinned-deployment-config'
       }, 200);
     }
 
@@ -29,9 +29,9 @@ export default {
       if (!data?.ok || !data?.adminData) return base;
 
       const write = data.adminData.write || {};
-      const endpointSource = String(write.endpointSource || '');
+      const source = String(write.endpointSource || '');
       const endpointPinned = write.endpointPinned === true &&
-        (endpointSource === 'script-property' || endpointSource === 'deployment-constant');
+        (source === 'script-property' || source === 'deployment-constant');
       data.version = WRAPPER_VERSION;
       data.permissions = {
         ...(data.permissions || {}),

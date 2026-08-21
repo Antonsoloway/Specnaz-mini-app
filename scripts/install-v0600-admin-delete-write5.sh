@@ -24,18 +24,18 @@ done
 [[ -d "$PROJECT_DIR" ]] || fail "Apps Script каталог не найден: $PROJECT_DIR"
 [[ -f "$PROJECT_DIR/.clasp.json" ]] || fail ".clasp.json не найден в $PROJECT_DIR"
 
-info "ROLLOUT GUARD — WORKER 1.26 MUST BE LIVE FIRST"
+info "ROLLOUT GUARD — WORKER 1.27 MUST BE LIVE FIRST"
 WORKER_READY=0
 for attempt in $(seq 1 12); do
   printf '[INFO] worker check %s/12\n' "$attempt"
   if curl -fsS --max-time 20 "$WORKER_HEALTH_URL" \
-    | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("version")=="1.26.0"; assert d.get("adminDelete")=="participant-exited+team-inactive-empty"; assert d.get("adminWriteEndpoint")=="pinned-script-property"; print("[OK] Worker 1.26 endpoint gate live")' 2>/dev/null; then
+    | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("version")=="1.27.0"; assert d.get("adminDelete")=="participant-exited+team-inactive-empty"; assert d.get("adminWriteEndpoint")=="pinned-deployment-config"; print("[OK] Worker 1.27 endpoint gate live")' 2>/dev/null; then
     WORKER_READY=1
     break
   fi
   sleep 5
 done
-[[ "$WORKER_READY" == "1" ]] || fail "Worker 1.26 ещё не live. Apps Script не изменён; повторите после deployment GitHub main."
+[[ "$WORKER_READY" == "1" ]] || fail "Worker 1.27 ещё не live. Apps Script не изменён; повторите после deployment GitHub main."
 
 mkdir -p "$BACKUP_DIR"
 cd "$PROJECT_DIR"
@@ -45,6 +45,20 @@ clasp status
 
 info "CLASP PULL — берём фактический live source"
 clasp pull
+
+info "SELECT EXISTING DEPLOYMENT: $EXPECTED_DESC"
+DEPLOY_OUTPUT=""
+if DEPLOY_OUTPUT="$(clasp list-deployments 2>&1)"; then :
+elif DEPLOY_OUTPUT="$(clasp deployments 2>&1)"; then :
+else fail "Не удалось получить список deployments"; fi
+printf '%s\n' "$DEPLOY_OUTPUT"
+mapfile -t MATCHES < <(printf '%s\n' "$DEPLOY_OUTPUT" | grep -F "$EXPECTED_DESC" || true)
+[[ ${#MATCHES[@]} -eq 1 ]] || fail "Найдено ${#MATCHES[@]} deployment '$EXPECTED_DESC'; ожидался ровно 1. Новый deployment не создан."
+LINE="${MATCHES[0]}"
+printf '%s\n' "$LINE" | grep -q '@HEAD' && fail "Стабильный deployment неожиданно @HEAD; ничего не меняем"
+DEPLOY_ID="$(printf '%s\n' "$LINE" | sed -E 's/^[[:space:]]*-[[:space:]]+([^[:space:]]+).*/\1/')"
+[[ "$DEPLOY_ID" =~ ^[A-Za-z0-9_-]{20,}$ ]] || fail "Не удалось извлечь deployment ID"
+WEBAPP_URL="https://script.google.com/macros/s/${DEPLOY_ID}/exec"
 
 FILES=(
   28_MINIAPP_ADMIN_DATA.js
@@ -59,12 +73,30 @@ for file_name in "${FILES[@]}"; do
   curl -fsSL "$RAW/apps-script-live/$file_name" -o "$TEMP_DIR/$file_name"
   node --check "$TEMP_DIR/$file_name"
 done
+python3 - "$TEMP_DIR/31_MINIAPP_ADMIN_WRITE_HARDENED.js" "$WEBAPP_URL" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+endpoint = sys.argv[2]
+text = path.read_text(encoding='utf-8')
+pattern = re.compile(r'^var MINIAPP_ADMIN_WRITE_PINNED_ENDPOINT = .+;$', re.MULTILINE)
+replacement = 'var MINIAPP_ADMIN_WRITE_PINNED_ENDPOINT = ' + json.dumps(endpoint) + ';'
+updated, count = pattern.subn(replacement, text, count=1)
+if count != 1:
+    raise SystemExit('[ERROR] deployment endpoint constant anchor missing')
+path.write_text(updated, encoding='utf-8')
+print('[OK] exact deployment endpoint injected into source')
+PY
+node --check "$TEMP_DIR/31_MINIAPP_ADMIN_WRITE_HARDENED.js"
 ok "Backup: $BACKUP_DIR"
 
 grep -q "0.6.0-write.5" "$TEMP_DIR/28_MINIAPP_ADMIN_DATA.js" || fail "write.5 admin-data marker missing"
 grep -q "deleteParticipant: true" "$TEMP_DIR/30_MINIAPP_ADMIN_WRITE_BACKEND.js" || fail "deleteParticipant backend allowlist missing"
 grep -q "deleteTeam: true" "$TEMP_DIR/30_MINIAPP_ADMIN_WRITE_BACKEND.js" || fail "deleteTeam backend allowlist missing"
-grep -q "function MINIAPP_setAdminWriteEndpoint" "$TEMP_DIR/31_MINIAPP_ADMIN_WRITE_HARDENED.js" || fail "stable endpoint pin helper missing"
+grep -Fq "$WEBAPP_URL" "$TEMP_DIR/31_MINIAPP_ADMIN_WRITE_HARDENED.js" || fail "exact endpoint injection missing"
 grep -q "function MINIAPP_adminWriteFinalDeleteParticipant_" "$TEMP_DIR/33_MINIAPP_ADMIN_WRITE_FINAL.js" || fail "participant delete helper missing"
 grep -q "function MINIAPP_adminWriteFinalDeleteTeam_" "$TEMP_DIR/33_MINIAPP_ADMIN_WRITE_FINAL.js" || fail "team delete helper missing"
 
@@ -79,19 +111,6 @@ info "CLASP PUSH"
 clasp push
 ok "Apps Script write.5 source pushed"
 
-info "SELECT EXISTING DEPLOYMENT: $EXPECTED_DESC"
-DEPLOY_OUTPUT=""
-if DEPLOY_OUTPUT="$(clasp list-deployments 2>&1)"; then :
-elif DEPLOY_OUTPUT="$(clasp deployments 2>&1)"; then :
-else fail "Не удалось получить список deployments"; fi
-printf '%s\n' "$DEPLOY_OUTPUT"
-mapfile -t MATCHES < <(printf '%s\n' "$DEPLOY_OUTPUT" | grep -F "$EXPECTED_DESC" || true)
-[[ ${#MATCHES[@]} -eq 1 ]] || fail "Найдено ${#MATCHES[@]} deployment '$EXPECTED_DESC'; ожидался ровно 1. Новый deployment не создан."
-LINE="${MATCHES[0]}"
-printf '%s\n' "$LINE" | grep -q '@HEAD' && fail "Стабильный deployment неожиданно @HEAD; ничего не меняем"
-DEPLOY_ID="$(printf '%s\n' "$LINE" | sed -E 's/^[[:space:]]*-[[:space:]]+([^[:space:]]+).*/\1/')"
-[[ "$DEPLOY_ID" =~ ^[A-Za-z0-9_-]{20,}$ ]] || fail "Не удалось извлечь deployment ID"
-
 info "UPDATE EXISTING DEPLOYMENT ONLY"
 if clasp update-deployment "$DEPLOY_ID" --description "$EXPECTED_DESC"; then :
 elif clasp create-deployment --deploymentId "$DEPLOY_ID" --description "$EXPECTED_DESC"; then :
@@ -99,7 +118,6 @@ elif clasp deploy -i "$DEPLOY_ID" -d "$EXPECTED_DESC"; then :
 else fail "Не удалось обновить существующий deployment. Новый deployment не создавался."; fi
 ok "Existing deployment updated"
 
-WEBAPP_URL="https://script.google.com/macros/s/${DEPLOY_ID}/exec"
 info "NON-MUTATING WRITE.5 ROUTE CHECK"
 ROUTE_OK=0
 for attempt in $(seq 1 10); do
@@ -113,22 +131,13 @@ for attempt in $(seq 1 10); do
 done
 [[ "$ROUTE_OK" == "1" ]] || fail "Deployment обновлён, но write.5 route не подтверждён. Не повторяйте установку."
 
-info "PIN EXACT STABLE DEPLOYMENT URL"
-ENDPOINT_PARAMS="$(python3 -c 'import json,sys; print(json.dumps([sys.argv[1]]))' "$WEBAPP_URL")"
-if ENDPOINT_OUTPUT="$(clasp run MINIAPP_setAdminWriteEndpoint --params "$ENDPOINT_PARAMS" 2>&1)"; then
-  printf '%s\n' "$ENDPOINT_OUTPUT"
-  ok "Stable endpoint configuration requested"
-else
-  printf '%s\n' "$ENDPOINT_OUTPUT" >&2
-  fail "Не удалось привязать stable endpoint. Deployment уже обновлён; не повторяйте установку."
-fi
-
 info "REFRESH PRIVATE ADMIN SNAPSHOT"
-if clasp run MINIAPP_exportAdminSnapshotToGitHub >/tmp/royal-v0600-write5-export.txt 2>&1; then
-  cat /tmp/royal-v0600-write5-export.txt
+EXPORT_OUTPUT="$(clasp run MINIAPP_exportAdminSnapshotToGitHub 2>&1 || true)"
+if [[ -n "$EXPORT_OUTPUT" ]]; then printf '%s\n' "$EXPORT_OUTPUT"; fi
+if [[ "$EXPORT_OUTPUT" != *"Exception:"* && "$EXPORT_OUTPUT" != *"Error:"* ]]; then
   ok "Private admin snapshot export requested"
 else
-  warn "clasp run недоступен; штатный trigger обновит snapshot примерно за 5 минут"
+  warn "clasp run export вернул server/storage error; штатный trigger обновит snapshot примерно за 5 минут"
 fi
 
 if command -v gh >/dev/null 2>&1; then
@@ -140,7 +149,7 @@ if command -v gh >/dev/null 2>&1; then
     printf '[INFO] snapshot check %s/30\n' "$attempt"
     if gh api "repos/Antonsoloway/royal-crm-data/contents/admin-snapshot.json" \
       -H 'Accept: application/vnd.github.raw+json' 2>/dev/null \
-      | python3 -c 'import json,sys; d=json.load(sys.stdin); expected=sys.argv[1]; a=d.get("adminData") or {}; w=a.get("write") or {}; ops=set(w.get("operations") or []); assert a.get("version")=="0.6.0-write.5"; assert w.get("version")=="0.6.0-write.5"; assert w.get("deleteEnabled") is True; assert {"deleteParticipant","deleteTeam"}.issubset(ops); assert w.get("endpoint")==expected; assert w.get("endpointPinned") is True; assert w.get("endpointSource")=="script-property"; print("[OK] write.5 exact endpoint contract live")' "$WEBAPP_URL" 2>/dev/null; then
+      | python3 -c 'import json,sys; d=json.load(sys.stdin); expected=sys.argv[1]; a=d.get("adminData") or {}; w=a.get("write") or {}; ops=set(w.get("operations") or []); assert a.get("version")=="0.6.0-write.5"; assert w.get("version")=="0.6.0-write.5"; assert w.get("deleteEnabled") is True; assert {"deleteParticipant","deleteTeam"}.issubset(ops); assert w.get("endpoint")==expected; assert w.get("endpointPinned") is True; assert w.get("endpointSource")=="deployment-constant"; print("[OK] write.5 exact endpoint contract live")' "$WEBAPP_URL" 2>/dev/null; then
       SNAPSHOT_OK=1
       break
     fi
@@ -162,6 +171,6 @@ printf 'Team delete: L = Неактивен AND E = 0 AND live refs = 0\n'
 printf 'Rows: source cells cleared; formula arrays preserved\n'
 printf 'Confirmation: required in Mini App\n'
 printf 'Stable deployment preserved: %s\n' "$EXPECTED_DESC"
-printf 'Snapshot endpoint: exact named deployment, pinned in Script Properties\n'
+printf 'Snapshot endpoint: exact named deployment, injected by installer\n'
 printf 'No participant or team was changed by this installer.\n'
 printf '============================================================\n'

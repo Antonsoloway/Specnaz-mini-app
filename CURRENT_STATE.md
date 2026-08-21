@@ -38,7 +38,7 @@
 ## 3. Live Apps Script / admin backend
 
 Подтверждено live на 21.08.2026:
-- private admin snapshot: `adminData.version = 0.6.0-write.5`; последний диагностический срез generatedAt `2026-08-21T14:58:39.225Z`;
+- private admin snapshot: `adminData.version = 0.6.0-write.5`; последний диагностический срез generatedAt `2026-08-21T16:14:19.734Z`;
 - optimistic `revision` у participant/team records;
 - write transport: **Mini App → Worker → HMAC → Apps Script → Google Sheets**;
 - HMAC secret не попадает в браузер/GitHub;
@@ -59,8 +59,9 @@ Production write.5 policy:
 - фактический private snapshot публиковал endpoint из `ScriptApp.getService().getUrl()`, который не совпал с deployment `Таблица ЧП 1.3`; прямые GET/POST к snapshot endpoint возвращают `404 text/html`, поэтому Worker показывал `Сервер Google Sheets вернул неожиданный ответ`;
 - installer при этом проверял exact выбранный deployment и получил корректный JSON `0.6.0-write.5`; причина не в `createTeam` и не в данных формы, а в рассинхронизации advertised endpoint;
 - попытка создать `Cataha` не дошла до Sheets: в свежем private snapshot такой команды нет, admin journal пуст;
-- Worker `1.26.0` вводит fail-closed gate: edit/delete разрешены только при `endpointPinned=true` и `endpointSource=script-property`; fallback URL всегда read-only;
-- `apps-script-live/30` + `31` и `scripts/repair-v0600-admin-write-endpoint.sh` подготовлены для pin exact существующего deployment в Script Properties, snapshot exact-match verification и factual live-mirror sync;
+- production Worker `1.26.0` ввёл fail-closed gate; первый repair run безопасно обновил source/deployment, но `clasp run MINIAPP_setAdminWriteEndpoint` вернул Apps Script storage exception с exit code 0. Snapshot после полного trigger interval остался `endpointPinned=false`, `endpointSource=script-service-fallback`; participant/team data и journal не изменились;
+- candidate Worker `1.27.0` принимает pin только из validated Script Property или installer-injected deployment constant. Repair installer v2 выбирает exact существующий deployment до push, внедряет URL прямо в source и больше не зависит от storage setter; `clasp run` export exception распознаётся явно, после чего installer ждёт штатный trigger;
+- `apps-script-live/30` + `31` и `scripts/repair-v0600-admin-write-endpoint.sh` подготовлены для exact-match snapshot verification и factual live-mirror sync;
 - до выполнения repair installer на живом Apps Script повторно нажимать `Сохранить` не нужно. Ни одна participant/team запись этой правкой не изменяется.
 
 Live modules:
@@ -251,14 +252,14 @@ Participant metric rankings:
 Frontend Worker origin: `https://royal-crm-miniapp-api.tropical-spoon.workers.dev`.
 
 Repo config / production:
-- candidate `worker/wrangler.toml` → `src/entry-v1260.js`;
-- source `1.26.0`; production на момент диагностики ещё `1.25.0`, после merge обязателен прямой `/health` check `version=1.26.0 + adminWriteEndpoint=pinned-script-property`;
+- candidate `worker/wrangler.toml` → `src/entry-v1270.js`;
+- production `/health` подтверждён: `1.26.0 + adminWriteEndpoint=pinned-script-property`; candidate `1.27.0` после merge требует прямой `/health` check `adminWriteEndpoint=pinned-deployment-config`;
 - `/admin-data` — admin-only private read;
 - `/admin-write` — authenticated admin mutation;
 - `/admin-team-photo` — protected private media route;
 - public `/snapshot`, `/team-photo`, `/contact-by-id`, auth/media routes не должны регрессировать.
 
-`entry-v1250.js` сохраняет write.4/write.5 capability gates. Новый `entry-v1260.js` поверх него требует pinned exact endpoint: пока snapshot не содержит `endpointPinned=true + endpointSource=script-property`, permissions `canEdit/canDelete=false`; underlying `/admin-write` повторяет тот же fail-closed guard.
+`entry-v1250.js` сохраняет write.4/write.5 capability gates. `entry-v1260.js`/`entry-v1270.js` требуют pinned exact endpoint: пока snapshot не содержит `endpointPinned=true` и source `script-property` либо `deployment-constant`, permissions `canEdit/canDelete=false`; underlying `/admin-write` повторяет тот же fail-closed guard.
 
 ---
 

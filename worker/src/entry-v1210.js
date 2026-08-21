@@ -123,7 +123,10 @@ async function handleAdminWrite(request, env, ctx) {
       message: 'Сервер редактирования Apps Script ещё не активирован.'
     }, 503);
   }
-  if (writeMeta?.endpointPinned !== true || writeMeta?.endpointSource !== 'script-property') {
+  const endpointSource = String(writeMeta?.endpointSource || '');
+  const endpointIsPinned = writeMeta?.endpointPinned === true &&
+    (endpointSource === 'script-property' || endpointSource === 'deployment-constant');
+  if (!endpointIsPinned) {
     return jsonFrom(adminResponse, {
       ok: false,
       error: 'ADMIN_WRITE_ENDPOINT_NOT_PINNED',
