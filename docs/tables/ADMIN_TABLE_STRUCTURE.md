@@ -94,3 +94,6 @@ P `Ссылка сообщения`
 - История использует Telegram ID из колонки L.
 - Служебные листы не удалять без dependency-аудита.
 - Не запускать массовые setup/upgrade-функции без отдельной причины.
+- Удаление participant record разрешено только при live `База участников!AF = Вышел`: очищать `A:S`, `U:V`, `AB:AF`, но сохранять array formulas `T` и `W:AA`; raw Telegram ID D остаётся ключом проверки до commit.
+- Удаление team record разрешено только при exact identity `A игра + B название`, live `L = Неактивен`, `E = 0` и отсутствии ссылок во всех пяти membership slots участников; очищать только source `A:D`, formula columns `E:L` сохранять.
+- Обе destructive операции требуют optimistic revision, повторной live-проверки под `ScriptLock`, подтверждения в Mini App и записи в admin journal.

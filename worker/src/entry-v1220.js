@@ -1,7 +1,7 @@
 import currentWorker from './entry-v1210.js';
 
 const WRAPPER_VERSION = '1.22.0-dev';
-const REQUIRED_WRITE_VERSION = '0.6.0-write.3';
+const SUPPORTED_WRITE_VERSIONS = new Set(['0.6.0-write.4','0.6.0-write.5']);
 
 export default {
   async fetch(request, env, ctx) {
@@ -21,7 +21,7 @@ export default {
         adminMode: 'telegram-admin-checked',
         adminData: 'private-admin-snapshot',
         adminWrite: 'worker-signed-hmac-hardened',
-        requiredWriteVersion: REQUIRED_WRITE_VERSION
+        supportedWriteVersions: [...SUPPORTED_WRITE_VERSIONS]
       }), { status: 200, headers });
     }
 
@@ -90,16 +90,24 @@ export default {
 function isHardenedWriteReady(write) {
   const meta = write || {};
   const operations = Array.isArray(meta.operations) ? meta.operations : [];
-  return Boolean(
-    meta.enabled === true &&
-    meta.version === REQUIRED_WRITE_VERSION &&
-    meta.transport === 'worker-signed-hmac' &&
-    typeof meta.endpoint === 'string' && meta.endpoint.trim() &&
+  const baseOperationsReady =
     operations.includes('updateParticipant') &&
     operations.includes('createParticipant') &&
     operations.includes('updateTeam') &&
-    operations.includes('createTeam') &&
-    meta.deleteEnabled === false
+    operations.includes('createTeam');
+  const deleteContractReady = meta.version === '0.6.0-write.4'
+    ? meta.deleteEnabled === false
+    : meta.version === '0.6.0-write.5' &&
+      meta.deleteEnabled === true &&
+      operations.includes('deleteParticipant') &&
+      operations.includes('deleteTeam');
+  return Boolean(
+    meta.enabled === true &&
+    SUPPORTED_WRITE_VERSIONS.has(meta.version) &&
+    meta.transport === 'worker-signed-hmac' &&
+    typeof meta.endpoint === 'string' && meta.endpoint.trim() &&
+    baseOperationsReady &&
+    deleteContractReady
   );
 }
 

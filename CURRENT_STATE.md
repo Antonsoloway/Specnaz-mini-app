@@ -1,6 +1,6 @@
 # Royal CRM / «Таблица ЧП» — CURRENT STATE
 
-> **Актуально на 20.08.2026.**
+> **Актуально на 21.08.2026.**
 > Новый чат обязан сначала прочитать `START_HERE.md`, затем этот файл и последние записи `WORK_HISTORY.md`.
 > Фактический runtime / живые Google Sheets / live Apps Script / текущий GitHub имеют приоритет над памятью чатов.
 
@@ -22,28 +22,37 @@
 - постоянный entrypoint: `app.html`;
 - обычный запуск → **`app-v0559.html` / v0.5.59**;
 - `startapp=v0600` / `tgWebAppStartParam=v0600` → **`app-v0600.html` / v0.6.0 admin preview**;
-- временный cache-forced preview для проверки текущего фикса: `startapp=v0600-2328` → тот же `app-v0600.html`, но с уникальным start parameter;
+- временный cache-forced preview для текущей ветки: `startapp=v0600-1325` → тот же `app-v0600.html`, но с уникальным start parameter;
 - обычных пользователей пока не переводить на v0.6;
 - bot: `@doveofpeace_bot`.
 
-Текущий preview delivery:
-- `version-v0600.js` cache-bust: **`20260820-2328`**;
-- `app-v0600.html` → `version-v0600.js?v=20260820-2328`;
-- `app.html` previewBuild: **`20260820-2328`**;
-- `app.html` принимает `v0600` и временный cache-forced alias `v0600-2328`.
+Текущий preview candidate:
+- `version-v0600.js` cache-bust: **`20260821-1325`**;
+- `app-v0600.html` → `version-v0600.js?v=20260821-1325`;
+- `app.html` previewBuild: **`20260821-1325`**;
+- `app.html` принимает `v0600`, предыдущий alias `v0600-2328` и текущий cache-forced alias `v0600-1325`;
+- production GitHub Pages остаётся на build `20260820-2328`, пока ветка write.5 не принята в `main`.
 
 ---
 
 ## 3. Live Apps Script / admin backend
 
-Подтверждено на 20.08.2026:
+Подтверждено на 21.08.2026:
 - private admin snapshot: `adminData.version = 0.6.0-write.4`;
 - optimistic `revision` у participant/team records;
 - write transport: **Mini App → Worker → HMAC → Apps Script → Google Sheets**;
 - HMAC secret не попадает в браузер/GitHub;
 - существующий deployment **`Таблица ЧП 1.3`** сохранён;
-- delete operations в v0.6 выключены;
+- delete operations в production write.4 выключены;
 - team photo capability + rename cleanup подтверждались установщиком.
+
+Подготовлено в candidate write.5, но **ещё не объявлено live**:
+- `deleteParticipant` только если фактический `База участников!AF = Вышел`;
+- `deleteTeam` только если фактические `Команды!L = Неактивен`, `E = 0` и повторный scan всех пяти live membership slots вернул 0 ссылок;
+- participant delete очищает только source ranges `A:S`, `U:V`, `AB:AF`, сохраняя formula arrays `T` и `W:AA`;
+- team delete очищает только source `A:D`, сохраняя formula columns `E:L`;
+- обе операции используют optimistic revision, ScriptLock, admin journal и обязательное подтверждение в Mini App;
+- для установки подготовлен `scripts/install-v0600-admin-delete-write5.sh`; он сначала требует live Worker `1.25.0`, затем обновляет только существующий deployment `Таблица ЧП 1.3`; новый deployment не создаёт.
 
 Live modules:
 - `28_MINIAPP_ADMIN_DATA.js` — private admin read;
@@ -53,7 +62,7 @@ Live modules:
 - `32_MINIAPP_ADMIN_TEAM_PHOTO.js`, `33_MINIAPP_ADMIN_WRITE_FINAL.js` — team photo/final integration.
 
 Public snapshot:
-- Unified Snapshot Writer `1.2.4`;
+- Unified Snapshot Writer `1.2.5`;
 - schema `1.4.2`;
 - searchIndexVersion `1.1.3`;
 - штатный trigger примерно раз в 5 минут.
@@ -108,8 +117,9 @@ Public snapshot:
 
 Основные активные модули:
 - `admin-v0600.js` / `admin-eligibility-v0600.js`;
-- `admin-write-gate-v0600.js`;
-- `admin-write-v0600-v3.js`;
+- `admin-entry-relocation-v0600.js` = `0.6.0-admin-entry-relocation.2`;
+- `admin-write-gate-v0600.js` = `0.6.0-write.5-gate.1`;
+- `admin-write-v0600-v3.js` = `0.6.0-write.5-ui.1`;
 - `admin-team-photo-v0600.js`;
 - `admin-participant-edit-policy-v0600.js`;
 - `admin-search-media-sort-v0600.js` = `0.6.0-admin-search-media-sort.2`;
@@ -197,7 +207,17 @@ Participant metric rankings:
 - без 128 thumbnails/network prewarm;
 - Back → предыдущий detail/list state.
 
-**Статус frontend:** GitHub `main` фактически на preview delivery **`20260820-2328`**. После пользовательского видео `1000238605.mp4` подтверждён конкретный регресс: tap participant в составе admin team detail открывал ordinary/public participant page с `ДОСТИЖЕНИЯ`. Корень — два legacy ordinary router (`avatar pointerup` + `.team-member click`). В repo исправлено `admin-navigation-guard-v0600.js .3`, добавлен cache-forced start alias `v0600-2328`. Apps Script/Worker/Sheets/data этой правкой не менялись; Cloud Shell не нужен. **Telegram WebView re-smoke build 2328 ещё требуется; production/runtime не объявлять подтверждённым только по commit.**
+### Admin entry + guarded deletion — candidate build 1325
+
+- плитка `Админ режим` больше не занимает место в основном grid: после подтверждения admin eligibility она скрывается, а кнопка переносится внутрь `#selfProfileCard .self-profile-head`, справа от имени/username;
+- relocation переживает повторный render self-profile через `MutationObserver`; если eligibility исчезла, перенесённая кнопка удаляется;
+- delete-кнопка участника видна только при `chatState = Вышел`, delete-кнопка команды — только при `status = Неактивен` и `players = 0`;
+- перед каждой операцией Telegram `showConfirm`/browser confirm задаёт явный вопрос `Точно хотите удалить...`;
+- frontend-условия не являются защитой: Apps Script повторно читает live Sheet под lock и отклоняет операцию при изменившемся status/count/revision;
+- после успеха private snapshot обновляется, cache сбрасывается, удалённая запись исчезает из admin list/table;
+- проверка snapshot на 21.08.2026: 207 participants, 128 admin teams; `Вышел` = 16; `Неактивен` = 26, из них E=0 = 25; все 25 дополнительно имели 0 live membership refs, одна неактивная команда с ненулевым E остаётся заблокированной.
+
+**Статус frontend:** GitHub `main` фактически остаётся на preview delivery **`20260820-2328`**. Candidate build **`20260821-1325`** подключает рабочий relocation-модуль и delete UI, сохраняя редактирование на production write.4 во время rollout. Node contract/DOM tests проходят; реальный Telegram WebView smoke и production rollout выполняются только после обновления live Apps Script до write.5 и принятия ветки в `main`. GitHub commit сам по себе live-подтверждением не является.
 
 ---
 
@@ -220,14 +240,14 @@ Participant metric rankings:
 Frontend Worker origin: `https://royal-crm-miniapp-api.tropical-spoon.workers.dev`.
 
 Repo config:
-- `worker/wrangler.toml` → `src/entry-v1241.js`;
-- source version `1.24.1`;
+- production `main`: `worker/wrangler.toml` → `src/entry-v1241.js`, source/runtime `1.24.1`;
+- candidate: `worker/wrangler.toml` → `src/entry-v1250.js`, source `1.25.0`;
 - `/admin-data` — admin-only private read;
 - `/admin-write` — authenticated admin mutation;
 - `/admin-team-photo` — protected private media route;
 - public `/snapshot`, `/team-photo`, `/contact-by-id`, auth/media routes не должны регрессировать.
 
-`entry-v1241.js` source/config лежат в `main`; если production runtime не проверен отдельно, не называть его подтверждённым только из-за GitHub commit.
+`entry-v1250.js` принимает write.4 для обычного edit во время перехода и включает `canDelete` только для доказанного snapshot write.5 с двумя delete operations. Если production runtime не проверен отдельно, не называть `1.25.0` подтверждённым только из-за GitHub commit.
 
 ---
 
@@ -243,7 +263,7 @@ Repo config:
 
 ## 10. Минимальный smoke v0.6 перед общим релизом
 
-1. Обычный `startapp` остаётся v0.5.59; `startapp=v0600` открывает v0.6. Для принудительно свежей проверки текущего admin-navigation fix использовать `startapp=v0600-2328`.
+1. Обычный `startapp` остаётся v0.5.59; `startapp=v0600` открывает v0.6. Для принудительно свежей проверки candidate использовать `startapp=v0600-1325`.
 2. Не-админ не получает admin-data/write.
 3. Existing participant editor: только имя + memberships; прямой system-field write отклоняется.
 4. Разрешённое test write читается обратно и появляется в журнале; stale revision не перезаписывает новое.
@@ -255,7 +275,10 @@ Repo config:
 10. Admin participant detail: все private поля, persistent avatar, memberships → team detail, editor; U/AB/AC/AD → rankings descending; tap row → participant; Back state.
 11. Admin team detail: фото, D:L, editor, состав, включая минимум одну `Неактивен`; **tap по аватару, имени и свободной области строки участника состава → admin participant detail с private data/editor, не ordinary `ДОСТИЖЕНИЯ`; tap по `@username` остаётся contact action.**
 12. Нажать E/F/H/I/J/K и проверить каждый team ranking: all teams, descending, нули внизу, tap team → detail, Back.
-13. Проверить Android и iPhone/iPad Telegram WebView.
+13. На главной admin-кнопка находится справа от имени админа в self-profile; старая grid-плитка отсутствует; после Back/rerender кнопка остаётся одна и открывает admin mode.
+14. Участник не `Вышел`: delete-кнопки нет и прямой `deleteParticipant` отклоняется. `Вышел`: отмена confirm ничего не меняет; подтверждение очищает source-поля, запись исчезает из admin list, formula arrays T/W:AA остаются.
+15. Команда `Активен`/`На паузе`, `Неактивен` с E>0 или с фактической membership-ссылкой: delete запрещён. Только `Неактивен` + E=0 + refs=0 после confirm очищает A:D и исчезает из admin list; E:L formulas остаются.
+16. Проверить Android и iPhone/iPad Telegram WebView.
 
 ---
 
@@ -273,7 +296,7 @@ Repo config:
 - `Связаться` только через Worker/Голубца;
 - existing-participant server whitelist `name + memberships`;
 - Worker-signed HMAC admin write;
-- delete off;
+- destructive writes server-gated: participant только `AF=Вышел`; team только `L=Неактивен`, `E=0` и live membership refs=0; optimistic revision + confirm + journal обязательны;
 - exited physical-row ordering;
 - admin hybrid search;
 - admin participant list without visible Telegram ID;

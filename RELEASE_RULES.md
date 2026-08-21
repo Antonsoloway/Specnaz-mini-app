@@ -89,10 +89,13 @@
 81. **v0.6 admin team metric rankings:** карточки `E игроки`, `F общий спецназ`, `H скрины`, `I активность в базе`, `J активность вне базы`, `K среднее` на admin team-detail открывают рейтинг **всех private admin teams** по соответствующему numeric field от большего к меньшему. Источник рейтинга = `adminData.teams`, не public snapshot, поэтому `Неактивен` и нулевые значения не отбрасываются. При равенстве tie-break детерминированный по team name/game. Строка рейтинга открывает team-detail этой команды; Back восстанавливает ranking/detail state. Не добавлять thumbnails/массовый media prewarm в список всех команд.
 82. **v0.6 admin participant navigation/detail:** в admin participant list raw Telegram ID не показывается визуально; под именем показываются memberships/команды, при этом raw ID сохраняется только как скрытая техническая identity для search/avatar/editor. Тап по participant row не раскрывает `<details>`, а открывает normal-style participant detail из private `adminData.participants`, поэтому работают `В чате`, `Вышел` и другие admin-only записи. Detail показывает все private Sheet-поля участника, memberships кликабельны и открывают admin team-detail. Кнопка `Редактировать участника` переиспользует существующий hardened editor; отдельный write-flow запрещён. Карточки `U спецназ`, `AB скрины`, `AC активность в базе`, `AD активность вне базы` открывают рейтинги всех private admin participants numeric-desc; нули не отбрасываются, ranking rows не должны массово prewarm avatars. Back обязан восстанавливать list/detail/ranking state.
 83. **v0.6 admin participant membership visuals:** memberships в admin participant list обязаны использовать тот же ordinary visual contract, что стабильная страница `Участники`: контейнер `membership-list` и отдельные `membership-pill` для каждого membership с `команда + роль + игра`. Существующие decorators `team-game-colors-v0535` и `active-teams-v0559` должны применяться повторно, чтобы РМ/РК окраска и золото `Активен` совпадали с обычным UI. Не возвращать одну объединённую текстовую строку команд. Внутри admin summary эти плашки display-only: tap по их области остаётся tap по participant summary и открывает admin participant detail, не ordinary team/public route.
+84. **v0.6 participant delete:** удаление разрешается только если live `База участников!AF` в момент серверной операции точно равно `Вышел`. Клиент обязан показать явное подтверждение, но окончательную защиту обеспечивают Apps Script под `ScriptLock` + optimistic revision. Очищаются только source ranges `A:S`, `U:V`, `AB:AF`; array-formula columns `T` и `W:AA` не очищаются напрямую. После commit обязательны admin journal, stable base sort/formula restore, snapshot refresh и public-sync marker. Для любого другого chat state операция отклоняется.
+85. **v0.6 team delete:** удаление разрешается только по exact identity `название + игра`, если live `Команды!L = Неактивен`, live `E = 0` и независимый scan всех пяти membership slots `База участников` по той же identity вернул 0 ссылок. Клиент показывает подтверждение; Apps Script повторяет все проверки под lock и проверяет revision. Очищаются только source cells `A:D`; formula columns `E:L` сохраняются. После commit обязательны admin journal, нормализация порядка, private-media cleanup, snapshot refresh и public-sync marker.
+86. **v0.6 admin entry:** после подтверждённой admin eligibility вход `Админ режим` размещается внутри self-profile header справа от identity админа. Исходная grid-плитка скрывается, но остаётся eligibility anchor. Relocation обязан переживать повторные render/Back без дублей и исчезать при потере admin eligibility.
 
 ## Текущая версия
 
-На 20.08.2026 стабильная версия для обычного запуска: **`v0.5.59`**.
+На 21.08.2026 стабильная версия для обычного запуска: **`v0.5.59`**.
 Отдельный admin-preview: **`v0.6.0`** через `startapp=v0600`; не делать его общим entrypoint до завершения admin smoke-test.
 
 Стабильная `v0.5.59` сохраняет:
@@ -100,7 +103,7 @@
 - золотую маркировку активных команд;
 - inline JPEG-крота на detail/team cards;
 - каталог `Команды принимающие участие в базе спецназа` с независимыми фильтрами и поиском;
-- server alias `BbllllKA / Royal Kingdom ↔ вышка` через writer `1.2.4`, `searchIndexVersion=1.1.3`;
+- server alias `BbllllKA / Royal Kingdom ↔ вышка` через writer `1.2.5`, `searchIndexVersion=1.1.3`;
 - каскадное переименование team identity в live Apps Script и pre-snapshot repair однозначного decorative drift;
 - постоянный team-photo cache key `команда + игра`;
 - safe disk-record warm в `media-persistent-cache-v0554.js 0.5.54.2`;
@@ -124,6 +127,8 @@ Admin-preview `v0.6.0` дополнительно использует:
 - normal-style admin team detail с private participants, полным D:L блоком и кнопкой hardened editor;
 - team metric rankings E/F/H/I/J/K по полному private team set;
 - `Вышел` ordering по physical source row, newest first;
-- delete operations выключены.
+- production write.4 пока держит delete operations выключенными;
+- candidate write.5 добавляет только два узких destructive flow: participant `AF=Вышел` и team `L=Неактивен + E=0 + refs=0`, с confirm/revision/server recheck/journal и сохранением formula columns;
+- candidate build `20260821-1325` переносит admin entry вправо от имени админа; Worker candidate `1.25.0` сохраняет write.4 edit rollout и включает delete только при доказанном write.5 contract.
 
 Все предыдущие версии сохраняются в истории изменений без удаления.

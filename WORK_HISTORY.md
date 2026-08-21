@@ -3,6 +3,35 @@
 > Краткий журнал фактически выполненных работ. Новые записи добавляются сверху.
 > Здесь фиксируются изменения, проверки, диагнозы и откаты, которые нужны следующему чату.
 
+## 2026-08-21 13:39 — v0.6 candidate: admin entry beside name + guarded participant/team deletion
+
+**Запрос пользователя:** перенести вход `Админ режим` в свободную область справа от имени админа на self-profile; в admin mode разрешить удаление команды только со статусом `Неактивен` и 0 участников, а участника — только со статусом `Вышел`; перед удалением обязательно спросить подтверждение, после успеха запись должна исчезнуть из admin table/list.
+
+**Фактическая сверка до правки:** прочитаны `START_HERE.md`, `CURRENT_STATE.md`, последние записи `WORK_HISTORY.md`, release/table rules и реальный `main=0917713`. Коммит с `admin-entry-relocation-v0600.js` не был подключён к `app-v0600.html`, не имел CSS/cache-bust и искал `.hero`, поэтому визуально ничего не переносил. Свежие snapshots 21.08.2026 согласованы: public 207 participants / 103 teams, private admin 207 participants / 128 teams; `Вышел` = 16; `Неактивен` = 26, из них E=0 = 25. Дополнительный exact scan всех пяти membership slots подтвердил 0 live refs у этих 25; одна неактивная команда с ненулевым E заблокирована. Production backend остаётся `0.6.0-write.4`, Worker `1.24.1`.
+
+**Frontend candidate build `20260821-1325`:**
+- `admin-entry-relocation-v0600.js .2` теперь подключён после eligibility, скрывает прежнюю grid-плитку и создаёт единственную кнопку внутри `#selfProfileCard .self-profile-head` справа от identity; `MutationObserver` восстанавливает её после rerender/Back и удаляет при исчезновении admin eligibility;
+- `admin-write-v0600-v3.js` → `0.6.0-write.5-ui.1`: delete-button участника появляется только для `Вышел`, команды — только для `Неактивен + players=0`;
+- перед каждым delete используется Telegram `showConfirm`, с fallback на browser confirm и формулировкой `Точно хотите удалить...`;
+- после успеха private admin data/cache обновляются, поэтому удалённая запись исчезает из admin list/table;
+- сохранён rollout write.4: обычное редактирование не блокируется, пока delete backend ещё не активирован;
+- дополнительно исправлен latent update-participant payload: существующая запись отправляет только разрешённые server whitelist поля `name + memberships`, bot/system fields больше не попадают в `changes`.
+
+**Apps Script candidate `0.6.0-write.5`:**
+- добавлены только `deleteParticipant` и `deleteTeam` в signed backend allowlist/dispatch/meta;
+- participant delete повторно читает live row под lock, проверяет raw Telegram ID, optimistic revision и exact `AF=Вышел`; очищает только `A:S`, `U:V`, `AB:AF`, сохраняя array formulas `T` и `W:AA`; затем journal, stable sort/formula restore, counter/admin/public snapshot flow;
+- team delete повторно читает exact `name+game`, проверяет revision, `L=Неактивен`, strict numeric `E=0` и независимо сканирует все пять live membership slots; очищает только source `A:D`, сохраняя formulas `E:L`; затем journal, order normalization, private-media cleanup и snapshot flow;
+- UI eligibility не считается защитой: любое изменившееся server condition даёт отказ до destructive commit;
+- `scripts/install-v0600-admin-delete-write5.sh` сначала требует уже live Worker `1.25.0` (иначе выходит до Apps Script mutation), затем делает backup + `clasp pull/status/push`, обновляет только существующий deployment `Таблица ЧП 1.3`, выполняет non-mutating route/snapshot checks и синхронизирует factual live mirror. Новый deployment не создаётся.
+
+**Worker candidate `1.25.0`:** добавлены две allowed operations и guarded error mapping; transitional gates принимают write.4 для edit и write.5 для delete; `/admin-data` выставляет `canDelete` только при доказанном private snapshot write.5 contract. Все public/media/contact routes продолжают делегироваться текущему `entry-v1241.js`.
+
+**Verification:** `node --check` прошёл для всех изменённых JS; `bash -n` installer прошёл; Worker `/health` harness вернул `200 / 1.25.0`; 7 Node tests прошли: relocation DOM/open, participant status rejection, source-range preservation, team status/E rejection, hidden membership rejection, exact A:D clear+journal, write.5 metadata. `git diff --check` чист. Реальные destructive записи намеренно не выполнялись.
+
+**Статус доставки:** работа подготовлена в feature branch `codex/admin-deletion-write5-20260821`. Production GitHub Pages/Worker/Apps Script/Sheets на момент записи не изменены; `apps-script-live` в этой ветке является install candidate и становится factual mirror только после installer + live resync. Без отдельного live rollout нельзя объявлять delete доступным пользователям.
+
+---
+
 ## 2026-08-20 23:28 — v0.6 admin team roster: ordinary participant route blocked at pointer + click level
 
 **Запрос / подтверждённый симптом:** пользователь показал, что внутри admin team detail в блоке `Состав команды` тап по участнику всё ещё открывает обычный/public participant profile с экраном `ДОСТИЖЕНИЯ`, хотя в admin mode должен открываться private admin participant detail с admin-данными и редактором. После первой попытки с click-guard пользователь прислал видео `1000238605.mp4`, где регресс сохранился.

@@ -1,7 +1,7 @@
 /*
  * Royal CRM / Таблица ЧП
  * 28_MINIAPP_ADMIN_DATA.js
- * v0.6.0-write.4
+ * v0.6.0-write.5
  *
  * PRIVATE admin snapshot for Mini App v0.6.
  * - Does NOT change the stable user snapshot.json contract.
@@ -12,7 +12,7 @@
  *   while it already owns the ScriptLock; no second time trigger is required.
  */
 
-var MINIAPP_ADMIN_DATA_VERSION = '0.6.0-write.4';
+var MINIAPP_ADMIN_DATA_VERSION = '0.6.0-write.5';
 var MINIAPP_ADMIN_DATA_DEFAULT_PATH = 'admin-snapshot.json';
 var MINIAPP_ADMIN_DATA_LAST_HASH = 'MINIAPP_ADMIN_DATA_LAST_HASH';
 

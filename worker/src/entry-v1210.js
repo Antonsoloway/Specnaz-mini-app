@@ -5,8 +5,10 @@ const ADMIN_WRITE_CANONICAL_PREFIX = 'ROYAL_CRM_ADMIN_WRITE_V1';
 const ALLOWED_OPERATIONS = new Set([
   'updateParticipant',
   'createParticipant',
+  'deleteParticipant',
   'updateTeam',
-  'createTeam'
+  'createTeam',
+  'deleteTeam'
 ]);
 
 export default {
@@ -281,6 +283,7 @@ function mapUpstreamErrorStatus(code) {
   const value = String(code || '');
   if (value === 'ADMIN_REQUIRED' || value === 'ADMIN_NOT_IN_CHAT') return 403;
   if (value === 'PARTICIPANT_NOT_FOUND' || value === 'TEAM_NOT_FOUND') return 404;
+  if (value.includes('_DELETE_')) return 409;
   if (value === 'WRITE_BUSY') return 409;
   if (value.startsWith('BACKEND_')) return 502;
   return 400;
