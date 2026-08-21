@@ -5,7 +5,7 @@
  * existing hardened team editor and opens full all-team rankings for E/F/H/I/J/K.
  */
 (() => {
-  const VERSION = '0.6.0-admin-team-detail.3';
+  const VERSION = '0.6.0-admin-team-detail.4';
   let payload = null;
   let loading = null;
 
@@ -57,6 +57,13 @@
     const raw = clean(value).replace(/\s+/g,'').replace(',','.');
     const parsed = Number(raw);
     return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function deleteButton(data, team) {
+    const allowed = window.RoyalAdminWriteV0600?.canDeleteTeam?.(team, data) === true;
+    return allowed
+      ? '<button type="button" class="royal-admin-direct-delete" data-admin-delete-team="1">🗑 Удалить команду</button>'
+      : '';
   }
 
   async function adminData(force=false) {
@@ -175,10 +182,11 @@
   }
 
   function installCss() {
-    if (document.querySelector('style[data-admin-team-detail-v0600="3"]')) return;
+    if (document.querySelector('style[data-admin-team-detail-v0600="4"]')) return;
     document.querySelector('style[data-admin-team-detail-v0600="2"]')?.remove();
+    document.querySelector('style[data-admin-team-detail-v0600="3"]')?.remove();
     const style = document.createElement('style');
-    style.dataset.adminTeamDetailV0600 = '3';
+    style.dataset.adminTeamDetailV0600 = '4';
     style.textContent = `
       .royal-admin-team-detail-shell{display:block}
       .royal-admin-team-edit{width:100%;margin:18px 0 10px;border:1px solid #a34855;border-radius:18px;padding:15px 18px;background:linear-gradient(135deg,#5a202b,#7a2c3a);color:#fff;font:800 17px/1.1 inherit;box-shadow:0 10px 30px rgba(77,19,30,.18)}
@@ -269,6 +277,7 @@
           <div class="team-stats"><span><b>${members.length}</b><small>участников</small></span><span><b>${leaders}</b><small>лидеров</small></span><span><b>${assistants}</b><small>помощников</small></span></div>
           ${adminStats(team)}
           <button type="button" class="royal-admin-team-edit" data-admin-edit-team="1">✏️ Редактировать команду</button>
+          ${deleteButton(data, team)}
           <h3 class="subheading">Состав команды</h3>
           <div class="team-members-list">${members.length ? members.map(p => memberCard(p, team.name, team.game)).join('') : '<div class="empty-state">Участники не найдены</div>'}</div>
         </section>`;

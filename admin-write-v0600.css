@@ -32,4 +32,6 @@
 .royal-admin-write-status.is-ok{border-color:rgba(87,201,137,.38);background:rgba(27,94,58,.24);color:#bdf5d5}
 .royal-admin-danger-note{padding:10px 12px;border:1px dashed rgba(255,119,128,.35);border-radius:12px;color:#be969b;font-size:11px;line-height:1.45}
 .royal-admin-danger-note.is-delete-ready{border-style:solid;border-color:rgba(255,92,105,.52);background:rgba(120,25,37,.2);color:#ffd0d4}
+.royal-admin-direct-delete{width:100%;min-height:50px;margin:8px 0 4px;border:1px solid rgba(255,88,101,.72);border-radius:18px;padding:14px 18px;background:linear-gradient(135deg,#8f2633,#581c25);color:#fff;font:900 16px/1.15 inherit;box-shadow:0 10px 30px rgba(91,20,31,.22);touch-action:manipulation}
+.royal-admin-direct-delete:disabled{opacity:.48}
 @media (min-width:560px){.royal-admin-modal{align-self:center;border-radius:22px;max-height:90dvh}.royal-admin-form-grid{grid-template-columns:1fr 1fr}.royal-admin-form-grid .is-wide{grid-column:1/-1}}

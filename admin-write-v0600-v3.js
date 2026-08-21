@@ -1,6 +1,6 @@
 /* Royal CRM Mini App — protected Admin Write/Delete UI v0.6.0-write.5 */
 (() => {
-  const VERSION = '0.6.0-write.5-ui.1';
+  const VERSION = '0.6.0-write.5-ui.2';
   const state = { editing:false, payload:null, loading:null, modal:null, observerBusy:false };
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -16,14 +16,14 @@
     if (!document.querySelector('link[data-admin-write-css="1"]')) {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = 'admin-write-v0600.css?v=20260821-1325';
+      link.href = 'admin-write-v0600.css?v=20260821-1435';
       link.dataset.adminWriteCss = '1';
       document.head.appendChild(link);
     }
     if (!document.querySelector('link[data-admin-write-v2-css="1"]')) {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = 'admin-write-v0600-v2.css?v=20260821-1325';
+      link.href = 'admin-write-v0600-v2.css?v=20260821-1435';
       link.dataset.adminWriteV2Css = '1';
       document.head.appendChild(link);
     }
@@ -32,20 +32,23 @@
   function isAdminScreen() { return !!document.querySelector('.royal-admin-screen'); }
   function participants() { return Array.isArray(state.payload?.adminData?.participants) ? state.payload.adminData.participants : []; }
   function teams() { return Array.isArray(state.payload?.adminData?.teams) ? state.payload.adminData.teams : []; }
-  function writeMeta() { return state.payload?.adminData?.write || {}; }
+  function writeMeta(source=state.payload) { return source?.adminData?.write || {}; }
 
-  function operationEnabled(name) {
-    const meta = writeMeta();
+  function operationEnabled(name, source=state.payload) {
+    const meta = writeMeta(source);
     const operations = Array.isArray(meta?.operations) ? meta.operations : [];
-    return meta?.enabled === true && meta?.deleteEnabled === true && operations.includes(name);
+    return source?.permissions?.canDelete === true &&
+      meta?.enabled === true &&
+      meta?.deleteEnabled === true &&
+      operations.includes(name);
   }
 
-  function canDeleteParticipant(record) {
-    return operationEnabled('deleteParticipant') && lower(record?.chatState) === 'вышел';
+  function canDeleteParticipant(record, source=state.payload) {
+    return operationEnabled('deleteParticipant', source) && lower(record?.chatState) === 'вышел';
   }
 
-  function canDeleteTeam(record) {
-    return operationEnabled('deleteTeam') &&
+  function canDeleteTeam(record, source=state.payload) {
+    return operationEnabled('deleteTeam', source) &&
       lower(record?.status) === 'неактивен' &&
       numeric(record?.players) === 0;
   }
@@ -464,8 +467,8 @@
     setTimeout(() => { if (state.editing) injectEditUi(); },180);
   }
 
-  async function deleteParticipant(button) {
-    const participant = state.modal?.record || null;
+  async function deleteParticipant(button, directRecord=null) {
+    const participant = directRecord || state.modal?.record || null;
     if (!participant || !canDeleteParticipant(participant)) {
       showMessage('Удалить можно только участника со статусом «Вышел».', true);
       return;
@@ -478,7 +481,10 @@
     const confirmed = await confirmDelete(`Точно хотите удалить участника «${title}»? Запись будет полностью очищена в админской таблице.`);
     if (!confirmed) return;
 
+    const direct = !button.closest?.('[data-admin-write-modal="1"]');
+    const oldText = button.textContent;
     button.disabled = true;
+    if (direct) button.textContent = 'Удаляем…';
     modalStatus('Повторно проверяем статус «Вышел» и удаляем…');
     try {
       const result = await adminWrite('deleteParticipant', {
@@ -489,14 +495,18 @@
       await refreshAfterMutation(result);
     } catch (error) {
       modalStatus(error?.message || 'Участник не удалён.', 'error');
+      if (direct) showMessage(error?.message || 'Участник не удалён.', true);
       if (error?.conflict) state.payload = null;
     } finally {
-      if (document.body.contains(button)) button.disabled = false;
+      if (document.body.contains(button)) {
+        button.disabled = false;
+        if (direct) button.textContent = oldText;
+      }
     }
   }
 
-  async function deleteTeam(button) {
-    const team = state.modal?.record || null;
+  async function deleteTeam(button, directRecord=null) {
+    const team = directRecord || state.modal?.record || null;
     if (!team || !canDeleteTeam(team)) {
       showMessage('Удалить можно только неактивную команду, в которой 0 участников.', true);
       return;
@@ -509,7 +519,10 @@
     const confirmed = await confirmDelete(`Точно хотите удалить команду «${title}»? Строка команды будет очищена в админской таблице.`);
     if (!confirmed) return;
 
+    const direct = !button.closest?.('[data-admin-write-modal="1"]');
+    const oldText = button.textContent;
     button.disabled = true;
+    if (direct) button.textContent = 'Удаляем…';
     modalStatus('Повторно проверяем статус, состав и удаляем…');
     try {
       const result = await adminWrite('deleteTeam', {
@@ -521,9 +534,13 @@
       await refreshAfterMutation(result);
     } catch (error) {
       modalStatus(error?.message || 'Команда не удалена.', 'error');
+      if (direct) showMessage(error?.message || 'Команда не удалена.', true);
       if (error?.conflict) state.payload = null;
     } finally {
-      if (document.body.contains(button)) button.disabled = false;
+      if (document.body.contains(button)) {
+        button.disabled = false;
+        if (direct) button.textContent = oldText;
+      }
     }
   }
 
@@ -629,14 +646,32 @@
     const deleteParticipantButton = target?.closest?.('[data-admin-delete-participant="1"]');
     if (deleteParticipantButton) {
       event.preventDefault(); event.stopImmediatePropagation();
-      await deleteParticipant(deleteParticipantButton);
+      try {
+        let participant = state.modal?.record || null;
+        if (!participant) {
+          await loadAdmin(true);
+          participant = findParticipantByNode(deleteParticipantButton);
+        }
+        await deleteParticipant(deleteParticipantButton, participant);
+      } catch (error) {
+        showMessage(error?.message || 'Не удалось обновить карточку.', true);
+      }
       return;
     }
 
     const deleteTeamButton = target?.closest?.('[data-admin-delete-team="1"]');
     if (deleteTeamButton) {
       event.preventDefault(); event.stopImmediatePropagation();
-      await deleteTeam(deleteTeamButton);
+      try {
+        let team = state.modal?.record || null;
+        if (!team) {
+          await loadAdmin(true);
+          team = findTeamByNode(deleteTeamButton);
+        }
+        await deleteTeam(deleteTeamButton, team);
+      } catch (error) {
+        showMessage(error?.message || 'Не удалось обновить карточку команды.', true);
+      }
       return;
     }
 
@@ -723,6 +758,8 @@
     version:VERSION,
     toggle:toggleEditing,
     refresh:() => loadAdmin(true),
+    canDeleteParticipant,
+    canDeleteTeam,
     get enabled(){ return state.editing; }
   };
 })();
