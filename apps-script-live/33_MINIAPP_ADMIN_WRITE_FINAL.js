@@ -588,6 +588,11 @@ function MINIAPP_adminWriteFinalMeta_() {
     rowMode: 'clear-source-cells-preserve-formulas'
   };
   meta.writableParticipantFields = ['name', 'memberships'];
+  meta.membershipWrite = {
+    atomic: true,
+    mode: 'single-range-validation-safe',
+    rollback: 'source-values-and-role-rules'
+  };
   meta.writableTeamFields = ['name', 'leader', 'photo'];
   meta.createTeamFields = ['game', 'name', 'leader', 'photo'];
   meta.snapshotRefresh = {

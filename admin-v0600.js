@@ -1,6 +1,7 @@
 /* Royal CRM Mini App — Admin Mode v0.6.0 (read phase) */
 (() => {
-  const VERSION = '0.6.0-read.2';
+  const VERSION = '0.6.0-read.3';
+  const ADMIN_READ_RETRY_DELAYS_MS = [0, 700, 1600];
   let adminPayload = null;
   let activeTab = 'participants';
   let participantFilter = 'all';
@@ -43,6 +44,34 @@
     return clean(value) || '—';
   }
 
+  function isTransientAdminReadError(error) {
+    const code = clean(error?.code);
+    const message = clean(error?.message).toLocaleLowerCase('ru-RU');
+    return !error?.httpStatus ||
+      [502, 503, 504].includes(Number(error?.httpStatus)) ||
+      ['WORKER_TIMEOUT','NO_GAS_FALLBACK_FOR_ROUTE','HTTP_502','HTTP_503','HTTP_504'].includes(code) ||
+      message.includes('failed to fetch') || message.includes('networkerror') || message.includes('load failed');
+  }
+
+  function wait(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+  async function fetchAdminDataOnce() {
+    const response = await fetch(`${API_URL}/admin-data`, {
+      method: 'GET',
+      mode: 'cors',
+      cache: 'no-store',
+      headers: { Authorization: `Bearer ${sessionToken}` }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data?.ok || !data?.adminData) {
+      const error = new Error(data?.message || `HTTP ${response.status}`);
+      error.code = data?.error || `HTTP_${response.status}`;
+      error.httpStatus = response.status;
+      throw error;
+    }
+    return data;
+  }
+
   function decorateEntry() {
     const grid = document.querySelector('.grid');
     if (!grid) return;
@@ -65,20 +94,25 @@
     if (adminPayload && !force) return adminPayload;
     if (!sessionToken) throw new Error('SESSION_MISSING');
 
-    const response = await fetch(`${API_URL}/admin-data`, {
-      method: 'GET',
-      mode: 'cors',
-      cache: 'no-store',
-      headers: { Authorization: `Bearer ${sessionToken}` }
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data?.ok || !data?.adminData) {
-      const error = new Error(data?.message || `HTTP ${response.status}`);
-      error.code = data?.error || `HTTP_${response.status}`;
+    let lastError = null;
+    for (let attempt = 0; attempt < ADMIN_READ_RETRY_DELAYS_MS.length; attempt += 1) {
+      if (ADMIN_READ_RETRY_DELAYS_MS[attempt]) await wait(ADMIN_READ_RETRY_DELAYS_MS[attempt]);
+      try {
+        const data = await fetchAdminDataOnce();
+        adminPayload = data;
+        return data;
+      } catch (error) {
+        lastError = error;
+        if (!isTransientAdminReadError(error) || attempt === ADMIN_READ_RETRY_DELAYS_MS.length - 1) break;
+      }
+    }
+
+    if (isTransientAdminReadError(lastError)) {
+      const error = new Error('Связь с сервером прервалась. Нажмите «Повторить».');
+      error.code = 'ADMIN_NETWORK_RETRY_EXHAUSTED';
       throw error;
     }
-    adminPayload = data;
-    return data;
+    throw lastError || new Error('Не удалось загрузить админские данные.');
   }
 
   function pushOrigin() {
@@ -334,7 +368,7 @@
         <button type="button" class="royal-back-button" data-royal-back="1">← Назад</button>
         <section class="royal-admin-screen">
           <div class="royal-admin-head"><div><div class="royal-admin-kicker">Royal CRM v0.6</div><h2>🛡 Админ режим</h2></div><span class="royal-admin-lock">🔒 ADMIN</span></div>
-          <div class="royal-admin-error"><strong>Не удалось загрузить админские данные.</strong><br>${safeEsc(error?.code || error?.message || 'UNKNOWN')}<br><br><button type="button" class="royal-admin-action is-primary" data-admin-refresh="1">Повторить</button></div>
+          <div class="royal-admin-error"><strong>Не удалось загрузить админские данные.</strong><br>${safeEsc(error?.message || error?.code || 'UNKNOWN')}<br><br><button type="button" class="royal-admin-action is-primary" data-admin-refresh="1">Повторить</button></div>
         </section>`;
       setAdminNav();
     }

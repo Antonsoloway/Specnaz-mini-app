@@ -454,18 +454,79 @@ function MINIAPP_adminWriteNormalizeMemberships_(ss, rawList) {
 function MINIAPP_adminWriteSetMemberships_(sheet, helper, row, memberships) {
   var bySlot = {};
   (memberships || []).forEach(function(item) { bySlot[Number(item.slot || 0)] = item; });
+
+  // ROLE_VALIDATION_ATOMIC_MEMBERSHIP_V0600
+  // Role validation depends on the team in the same slot. Writing team, nick
+  // and role cell-by-cell can therefore leave a half-written membership: the
+  // old role rule may reject «Игрок» before helper formulas recalculate. Write
+  // all 15 source cells as one range after temporarily removing only the five
+  // role rules, then rebuild those rules. Any failure restores both values and
+  // validations before the error escapes, so a retry can never observe a
+  // partially changed participant.
+  var firstCol = SLOT_DEFS.reduce(function(min, slot) {
+    return Math.min(min, slot.teamCol, slot.nickCol, slot.roleCol);
+  }, 9999);
+  var lastCol = SLOT_DEFS.reduce(function(max, slot) {
+    return Math.max(max, slot.teamCol, slot.nickCol, slot.roleCol);
+  }, 0);
+  var membershipRange = sheet.getRange(row, firstCol, 1, lastCol - firstCol + 1);
+  var beforeValues = membershipRange.getValues();
+  var nextValues = [beforeValues[0].slice()];
+  var roleCells = [];
+  var beforeRoleRules = [];
+  var canRebuildRules = !!(
+    helper &&
+    typeof finalRoleNormalizeRowSlot_ === 'function' &&
+    typeof FINALROLE_SLOTS_ !== 'undefined'
+  );
+
   SLOT_DEFS.forEach(function(slot) {
     var item = bySlot[slot.number] || { team: '', nickname: '', role: '', game: '' };
     var teamValue = '';
     if (item.team) teamValue = item.team + ' — ' + (item.game === 'Royal Kingdom' ? 'РК' : 'РМ');
-    sheet.getRange(row, slot.teamCol).setValue(teamValue);
-    sheet.getRange(row, slot.nickCol).setValue(item.nickname || '');
-    sheet.getRange(row, slot.roleCol).setValue(item.role || '');
-    if (helper && typeof finalRoleNormalizeRowSlot_ === 'function' && typeof FINALROLE_SLOTS_ !== 'undefined') {
+
+    nextValues[0][slot.teamCol - firstCol] = teamValue;
+    nextValues[0][slot.nickCol - firstCol] = item.nickname || '';
+    nextValues[0][slot.roleCol - firstCol] = item.role || '';
+
+    var roleCell = sheet.getRange(row, slot.roleCol);
+    roleCells.push(roleCell);
+    beforeRoleRules.push(roleCell.getDataValidation());
+  });
+
+  function restoreRoleRules_() {
+    roleCells.forEach(function(cell, index) {
+      cell.clearDataValidations();
+      if (beforeRoleRules[index]) cell.setDataValidation(beforeRoleRules[index]);
+    });
+  }
+
+  try {
+    roleCells.forEach(function(cell) { cell.clearDataValidations(); });
+    membershipRange.setValues(nextValues);
+    SpreadsheetApp.flush();
+
+    if (canRebuildRules) {
+      SLOT_DEFS.forEach(function(slot) {
       var finalSlot = FINALROLE_SLOTS_.filter(function(s) { return Number(s.number) === Number(slot.number); })[0];
       if (finalSlot) finalRoleNormalizeRowSlot_(sheet, helper, row, finalSlot);
+      });
+    } else {
+      restoreRoleRules_();
     }
-  });
+    SpreadsheetApp.flush();
+  } catch (error) {
+    try {
+      roleCells.forEach(function(cell) { cell.clearDataValidations(); });
+      membershipRange.setValues(beforeValues);
+      SpreadsheetApp.flush();
+      restoreRoleRules_();
+      SpreadsheetApp.flush();
+    } catch (rollbackError) {
+      console.error('MINIAPP membership rollback failed', rollbackError && rollbackError.stack ? rollbackError.stack : rollbackError);
+    }
+    throw error;
+  }
 }
 
 function MINIAPP_adminWriteParticipantRecord_(sheet, row) {

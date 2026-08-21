@@ -1,8 +1,9 @@
 /* Royal CRM Mini App — protected Admin Write/Delete UI v0.6.0-write.5 */
 (() => {
-  const VERSION = '0.6.0-write.5-ui.5';
+  const VERSION = '0.6.0-write.5-ui.6';
   const WRITE_BUSY_RETRY_DELAYS_MS = [700, 1400, 2500];
   const TRANSPORT_RETRY_DELAY_MS = 700;
+  const ADMIN_READ_RETRY_DELAYS_MS = [0, 700, 1600];
   const SNAPSHOT_POLL_DELAYS_MS = [2500, 4000, 7000, 12000, 20000, 35000, 60000, 90000, 120000];
   const state = {
     editing:false,
@@ -63,7 +64,16 @@
       numeric(record?.players) === 0;
   }
 
-  async function fetchAdminSnapshot() {
+  function isTransientAdminReadError(error) {
+    const code = clean(error?.code);
+    const message = clean(error?.message).toLocaleLowerCase('ru-RU');
+    return !error?.httpStatus ||
+      [502, 503, 504].includes(Number(error?.httpStatus)) ||
+      ['WORKER_TIMEOUT','NO_GAS_FALLBACK_FOR_ROUTE','HTTP_502','HTTP_503','HTTP_504'].includes(code) ||
+      message.includes('failed to fetch') || message.includes('networkerror') || message.includes('load failed');
+  }
+
+  async function fetchAdminSnapshotOnce() {
     if (!sessionToken) throw new Error('SESSION_MISSING');
     const response = await fetch(`${API_URL}/admin-data`, {
       method:'GET', mode:'cors', cache:'no-store',
@@ -73,9 +83,31 @@
     if (!response.ok || !data?.ok || !data?.adminData) {
       const error = new Error(data?.message || `HTTP ${response.status}`);
       error.code = data?.error || `HTTP_${response.status}`;
+      error.httpStatus = response.status;
       throw error;
     }
     return data;
+  }
+
+  async function fetchAdminSnapshot() {
+    let lastError = null;
+    for (let attempt = 0; attempt < ADMIN_READ_RETRY_DELAYS_MS.length; attempt += 1) {
+      if (ADMIN_READ_RETRY_DELAYS_MS[attempt]) {
+        await new Promise(resolve => setTimeout(resolve, ADMIN_READ_RETRY_DELAYS_MS[attempt]));
+      }
+      try {
+        return await fetchAdminSnapshotOnce();
+      } catch (error) {
+        lastError = error;
+        if (!isTransientAdminReadError(error) || attempt === ADMIN_READ_RETRY_DELAYS_MS.length - 1) break;
+      }
+    }
+    if (isTransientAdminReadError(lastError)) {
+      const error = new Error('Связь с сервером прервалась. Повторите загрузку.');
+      error.code = 'ADMIN_NETWORK_RETRY_EXHAUSTED';
+      throw error;
+    }
+    throw lastError || new Error('Не удалось загрузить админские данные.');
   }
 
   async function loadAdmin(force=false) {
