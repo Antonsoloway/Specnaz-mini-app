@@ -20,6 +20,61 @@
  */
 
 var MINIAPP_ADMIN_WRITE_HARDENED_VERSION = '0.6.0-write.3';
+var MINIAPP_ADMIN_WRITE_ENDPOINT_PROPERTY = 'MINIAPP_ADMIN_WRITE_ENDPOINT';
+
+/**
+ * ScriptApp.getService().getUrl() is not a stable deployment selector when a
+ * project has more than one versioned deployment. A time-driven snapshot can
+ * otherwise advertise an older /exec URL even though the installer updated
+ * the named production deployment. The installer pins that exact URL in a
+ * Script Property; the property is configuration, not a secret.
+ */
+function MINIAPP_adminWriteSafeEndpoint_(value) {
+  var endpoint = String(value || '').trim();
+  return /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}\/exec$/.test(endpoint)
+    ? endpoint
+    : '';
+}
+
+function MINIAPP_adminWriteResolvedEndpoint_() {
+  var configured = '';
+  try {
+    configured = PropertiesService.getScriptProperties()
+      .getProperty(MINIAPP_ADMIN_WRITE_ENDPOINT_PROPERTY);
+  } catch (_) {}
+  configured = MINIAPP_adminWriteSafeEndpoint_(configured);
+  if (configured) {
+    return { endpoint: configured, source: 'script-property', pinned: true };
+  }
+
+  var serviceUrl = '';
+  try { serviceUrl = ScriptApp.getService().getUrl(); } catch (_) {}
+  serviceUrl = MINIAPP_adminWriteSafeEndpoint_(serviceUrl);
+  return {
+    endpoint: serviceUrl,
+    source: serviceUrl ? 'script-service-fallback' : 'missing',
+    pinned: false
+  };
+}
+
+/**
+ * Called only by the authenticated Cloud Shell rollout via `clasp run`.
+ * Anonymous web-app traffic cannot invoke Apps Script functions by name.
+ */
+function MINIAPP_setAdminWriteEndpoint(webAppUrl) {
+  var endpoint = MINIAPP_adminWriteSafeEndpoint_(webAppUrl);
+  if (!endpoint) throw new Error('ADMIN_WRITE_ENDPOINT_INVALID');
+  PropertiesService.getScriptProperties().setProperty(
+    MINIAPP_ADMIN_WRITE_ENDPOINT_PROPERTY,
+    endpoint
+  );
+  return {
+    ok: true,
+    endpoint: endpoint,
+    endpointPinned: true,
+    endpointSource: 'script-property'
+  };
+}
 
 function MINIAPP_adminWriteHardenedDispatch_(ctx) {
   if (!ctx || !ctx.op) return MINIAPP_adminWriteError_('OPERATION_MISSING', 'Не указана операция.');
@@ -447,12 +502,14 @@ function MINIAPP_adminWriteHardenedDecorateRevisions_(participants, teams) {
 }
 
 function MINIAPP_adminWriteHardenedMeta_() {
-  var endpoint = '';
-  try { endpoint = String(ScriptApp.getService().getUrl() || '').trim(); } catch (_) {}
+  var resolvedEndpoint = MINIAPP_adminWriteResolvedEndpoint_();
+  var endpoint = resolvedEndpoint.endpoint;
   return {
     enabled: !!endpoint,
     version: MINIAPP_ADMIN_WRITE_HARDENED_VERSION,
     endpoint: endpoint,
+    endpointPinned: resolvedEndpoint.pinned,
+    endpointSource: resolvedEndpoint.source,
     operations: ['updateParticipant', 'createParticipant', 'updateTeam', 'createTeam'],
     deleteEnabled: false,
     transport: 'worker-signed-hmac',

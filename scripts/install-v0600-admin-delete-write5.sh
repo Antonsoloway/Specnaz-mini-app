@@ -24,18 +24,18 @@ done
 [[ -d "$PROJECT_DIR" ]] || fail "Apps Script каталог не найден: $PROJECT_DIR"
 [[ -f "$PROJECT_DIR/.clasp.json" ]] || fail ".clasp.json не найден в $PROJECT_DIR"
 
-info "ROLLOUT GUARD — WORKER 1.25 MUST BE LIVE FIRST"
+info "ROLLOUT GUARD — WORKER 1.26 MUST BE LIVE FIRST"
 WORKER_READY=0
 for attempt in $(seq 1 12); do
   printf '[INFO] worker check %s/12\n' "$attempt"
   if curl -fsS --max-time 20 "$WORKER_HEALTH_URL" \
-    | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("version")=="1.25.0"; assert d.get("adminDelete")=="participant-exited+team-inactive-empty"; print("[OK] Worker 1.25 delete gate live")' 2>/dev/null; then
+    | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("version")=="1.26.0"; assert d.get("adminDelete")=="participant-exited+team-inactive-empty"; assert d.get("adminWriteEndpoint")=="pinned-script-property"; print("[OK] Worker 1.26 endpoint gate live")' 2>/dev/null; then
     WORKER_READY=1
     break
   fi
   sleep 5
 done
-[[ "$WORKER_READY" == "1" ]] || fail "Worker 1.25 ещё не live. Apps Script не изменён; повторите после deployment GitHub main."
+[[ "$WORKER_READY" == "1" ]] || fail "Worker 1.26 ещё не live. Apps Script не изменён; повторите после deployment GitHub main."
 
 mkdir -p "$BACKUP_DIR"
 cd "$PROJECT_DIR"
@@ -49,6 +49,7 @@ clasp pull
 FILES=(
   28_MINIAPP_ADMIN_DATA.js
   30_MINIAPP_ADMIN_WRITE_BACKEND.js
+  31_MINIAPP_ADMIN_WRITE_HARDENED.js
   33_MINIAPP_ADMIN_WRITE_FINAL.js
 )
 
@@ -63,6 +64,7 @@ ok "Backup: $BACKUP_DIR"
 grep -q "0.6.0-write.5" "$TEMP_DIR/28_MINIAPP_ADMIN_DATA.js" || fail "write.5 admin-data marker missing"
 grep -q "deleteParticipant: true" "$TEMP_DIR/30_MINIAPP_ADMIN_WRITE_BACKEND.js" || fail "deleteParticipant backend allowlist missing"
 grep -q "deleteTeam: true" "$TEMP_DIR/30_MINIAPP_ADMIN_WRITE_BACKEND.js" || fail "deleteTeam backend allowlist missing"
+grep -q "function MINIAPP_setAdminWriteEndpoint" "$TEMP_DIR/31_MINIAPP_ADMIN_WRITE_HARDENED.js" || fail "stable endpoint pin helper missing"
 grep -q "function MINIAPP_adminWriteFinalDeleteParticipant_" "$TEMP_DIR/33_MINIAPP_ADMIN_WRITE_FINAL.js" || fail "participant delete helper missing"
 grep -q "function MINIAPP_adminWriteFinalDeleteTeam_" "$TEMP_DIR/33_MINIAPP_ADMIN_WRITE_FINAL.js" || fail "team delete helper missing"
 
@@ -111,6 +113,16 @@ for attempt in $(seq 1 10); do
 done
 [[ "$ROUTE_OK" == "1" ]] || fail "Deployment обновлён, но write.5 route не подтверждён. Не повторяйте установку."
 
+info "PIN EXACT STABLE DEPLOYMENT URL"
+ENDPOINT_PARAMS="$(python3 -c 'import json,sys; print(json.dumps([sys.argv[1]]))' "$WEBAPP_URL")"
+if ENDPOINT_OUTPUT="$(clasp run MINIAPP_setAdminWriteEndpoint --params "$ENDPOINT_PARAMS" 2>&1)"; then
+  printf '%s\n' "$ENDPOINT_OUTPUT"
+  ok "Stable endpoint configuration requested"
+else
+  printf '%s\n' "$ENDPOINT_OUTPUT" >&2
+  fail "Не удалось привязать stable endpoint. Deployment уже обновлён; не повторяйте установку."
+fi
+
 info "REFRESH PRIVATE ADMIN SNAPSHOT"
 if clasp run MINIAPP_exportAdminSnapshotToGitHub >/tmp/royal-v0600-write5-export.txt 2>&1; then
   cat /tmp/royal-v0600-write5-export.txt
@@ -128,13 +140,13 @@ if command -v gh >/dev/null 2>&1; then
     printf '[INFO] snapshot check %s/30\n' "$attempt"
     if gh api "repos/Antonsoloway/royal-crm-data/contents/admin-snapshot.json" \
       -H 'Accept: application/vnd.github.raw+json' 2>/dev/null \
-      | python3 -c 'import json,sys; d=json.load(sys.stdin); a=d.get("adminData") or {}; w=a.get("write") or {}; ops=set(w.get("operations") or []); assert a.get("version")=="0.6.0-write.5"; assert w.get("version")=="0.6.0-write.5"; assert w.get("deleteEnabled") is True; assert {"deleteParticipant","deleteTeam"}.issubset(ops); print("[OK] write.5 delete contract live")' 2>/dev/null; then
+      | python3 -c 'import json,sys; d=json.load(sys.stdin); expected=sys.argv[1]; a=d.get("adminData") or {}; w=a.get("write") or {}; ops=set(w.get("operations") or []); assert a.get("version")=="0.6.0-write.5"; assert w.get("version")=="0.6.0-write.5"; assert w.get("deleteEnabled") is True; assert {"deleteParticipant","deleteTeam"}.issubset(ops); assert w.get("endpoint")==expected; assert w.get("endpointPinned") is True; assert w.get("endpointSource")=="script-property"; print("[OK] write.5 exact endpoint contract live")' "$WEBAPP_URL" 2>/dev/null; then
       SNAPSHOT_OK=1
       break
     fi
     sleep 12
   done
-  [[ "$SNAPSHOT_OK" == "1" ]] || fail "write.5 route live, но private snapshot не подтвердил delete contract за полный trigger interval. Не повторяйте установку."
+  [[ "$SNAPSHOT_OK" == "1" ]] || fail "write.5 route live, но private snapshot не подтвердил exact stable endpoint за полный trigger interval. Не повторяйте установку."
 else
   warn "gh CLI не найден; capability подтвердится через Worker/admin preview после обновления snapshot"
 fi
@@ -150,5 +162,6 @@ printf 'Team delete: L = Неактивен AND E = 0 AND live refs = 0\n'
 printf 'Rows: source cells cleared; formula arrays preserved\n'
 printf 'Confirmation: required in Mini App\n'
 printf 'Stable deployment preserved: %s\n' "$EXPECTED_DESC"
+printf 'Snapshot endpoint: exact named deployment, pinned in Script Properties\n'
 printf 'No participant or team was changed by this installer.\n'
 printf '============================================================\n'

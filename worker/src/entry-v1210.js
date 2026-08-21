@@ -123,6 +123,13 @@ async function handleAdminWrite(request, env, ctx) {
       message: 'Сервер редактирования Apps Script ещё не активирован.'
     }, 503);
   }
+  if (writeMeta?.endpointPinned !== true || writeMeta?.endpointSource !== 'script-property') {
+    return jsonFrom(adminResponse, {
+      ok: false,
+      error: 'ADMIN_WRITE_ENDPOINT_NOT_PINNED',
+      message: 'Маршрут редактирования ещё не привязан к deployment «Таблица ЧП 1.3».'
+    }, 503);
+  }
 
   const botToken = String(env.BOT_TOKEN || '').trim();
   if (!botToken) {

@@ -93,6 +93,7 @@
 85. **v0.6 team delete:** удаление разрешается только по exact identity `название + игра`, если live `Команды!L = Неактивен`, live `E = 0` и независимый scan всех пяти membership slots `База участников` по той же identity вернул 0 ссылок. Клиент показывает подтверждение; Apps Script повторяет все проверки под lock и проверяет revision. Очищаются только source cells `A:D`; formula columns `E:L` сохраняются. После commit обязательны admin journal, нормализация порядка, private-media cleanup, snapshot refresh и public-sync marker.
 86. **v0.6 admin entry:** после подтверждённой admin eligibility вход `Админ режим` размещается внутри self-profile header справа от identity админа. Исходная grid-плитка скрывается, но остаётся eligibility anchor. Relocation обязан переживать повторные render/Back без дублей и исчезать при потере admin eligibility.
 87. **v0.6 delete action visibility:** разрешённая кнопка `Удалить` должна быть видна прямо на private admin detail участника/команды, а не только внутри modal editor. Кнопка видна только при доказанном Worker `permissions.canDelete` и локальном eligibility (`Вышел` либо `Неактивен + 0`). Перед confirm frontend повторно загружает свежую private card/revision; все server guards и журнал остаются обязательными.
+88. **v0.6 admin-write endpoint:** private snapshot не имеет права считать `ScriptApp.getService().getUrl()` доказательством production route при нескольких Apps Script deployments. Installer обязан выбрать ровно один существующий deployment `Таблица ЧП 1.3`, проверить его прямым non-mutating POST, сохранить exact `/exec` в Script Property `MINIAPP_ADMIN_WRITE_ENDPOINT` и подтвердить в свежем private snapshot одновременно `endpoint`, `endpointPinned=true`, `endpointSource=script-property`. Worker разрешает edit/delete только при полном pinned contract; fallback service URL остаётся диагностическим и всегда read-only.
 
 ## Текущая версия
 
@@ -130,6 +131,7 @@ Admin-preview `v0.6.0` дополнительно использует:
 - `Вышел` ordering по physical source row, newest first;
 - production Apps Script/private snapshot = `0.6.0-write.5`;
 - live write.5 содержит только два узких destructive flow: participant `AF=Вышел` и team `L=Неактивен + E=0 + refs=0`, с confirm/revision/server recheck/journal и сохранением formula columns;
-- frontend build `20260821-1435` и Worker `1.25.0` live после merge `b579dbd`: admin entry перенесён вправо от имени админа, eligible delete actions видны прямо на participant/team detail, delete разрешается только при доказанном private snapshot write.5 contract.
+- frontend build `20260821-1435` live после merge `b579dbd`: admin entry перенесён вправо от имени админа, eligible delete actions видны прямо на participant/team detail;
+- Worker `1.26.0` требует pinned exact Apps Script endpoint; до выполнения endpoint repair edit/delete остаются безопасно read-only.
 
 Все предыдущие версии сохраняются в истории изменений без удаления.
