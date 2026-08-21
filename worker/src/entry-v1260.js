@@ -29,8 +29,9 @@ export default {
       if (!data?.ok || !data?.adminData) return base;
 
       const write = data.adminData.write || {};
+      const endpointSource = String(write.endpointSource || '');
       const endpointPinned = write.endpointPinned === true &&
-        write.endpointSource === 'script-property';
+        (endpointSource === 'script-property' || endpointSource === 'deployment-constant');
       data.version = WRAPPER_VERSION;
       data.permissions = {
         ...(data.permissions || {}),
