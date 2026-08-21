@@ -1,6 +1,8 @@
-/* Royal CRM Mini App — transport v0.5.14.1
+/* Royal CRM Mini App — transport v0.5.14.2
  * No DOM observers and no version rewriting.
  * /auth gets a longer timeout and one automatic retry for transient failures.
+ * /admin-write gets a write-specific timeout because a photo mutation also
+ * updates Sheets media and snapshots before the Worker can answer.
  */
 (() => {
   const WORKER_ORIGIN = 'https://royal-crm-miniapp-api.tropical-spoon.workers.dev';
@@ -9,6 +11,7 @@
   const nativeFetch = window.fetch.bind(window);
   const DEFAULT_TIMEOUT_MS = 5000;
   const AUTH_TIMEOUT_MS = 12000;
+  const ADMIN_WRITE_TIMEOUT_MS = 60000;
   const AUTH_RETRY_DELAY_MS = 350;
   let callbackSeq = 0;
   let gasMode = false;
@@ -188,8 +191,13 @@
     let pathname = '';
     try { pathname = new URL(urlString).pathname; } catch (_) {}
     const isAuth = pathname === '/auth';
+    const isAdminWrite = pathname === '/admin-write';
     const attempts = isAuth ? 2 : 1;
-    const timeoutMs = isAuth ? AUTH_TIMEOUT_MS : DEFAULT_TIMEOUT_MS;
+    const timeoutMs = isAuth
+      ? AUTH_TIMEOUT_MS
+      : isAdminWrite
+        ? ADMIN_WRITE_TIMEOUT_MS
+        : DEFAULT_TIMEOUT_MS;
     const timeoutCode = isAuth ? 'AUTH_TIMEOUT' : 'WORKER_TIMEOUT';
     let lastError = null;
 
@@ -212,5 +220,5 @@
     return fallbackFor(urlString, init);
   };
 
-  window.__ROYAL_TRANSPORT_VERSION__ = '0.5.14.1';
+  window.__ROYAL_TRANSPORT_VERSION__ = '0.5.14.2';
 })();
