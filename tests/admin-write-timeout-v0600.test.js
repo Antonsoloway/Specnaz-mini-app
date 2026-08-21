@@ -8,6 +8,10 @@ const source = fs.readFileSync(
   path.join(__dirname, '..', 'transport-v0514.js'),
   'utf8'
 );
+const writeSource = fs.readFileSync(
+  path.join(__dirname, '..', 'admin-write-v0600-v3.js'),
+  'utf8'
+);
 
 function createTransport() {
   const scheduled = [];
@@ -63,4 +67,12 @@ test('ordinary Worker reads keep the five second timeout', async () => {
     'https://royal-crm-miniapp-api.tropical-spoon.workers.dev/snapshot'
   );
   assert.equal(transport.scheduled.at(-1), 5000);
+});
+
+test('explicit WRITE_BUSY is retried safely with the same request id', () => {
+  assert.match(writeSource, /WRITE_BUSY_RETRY_DELAYS_MS = \[1500, 3000\]/);
+  assert.match(writeSource, /clean\(error\?\.code\) === 'WRITE_BUSY'/);
+  assert.match(writeSource, /return await postWriteOnce\(id, op, payload\)/);
+  assert.match(writeSource, /Ждём и повторяем автоматически/);
+  assert.match(writeSource, /const VERSION = '0\.6\.0-write\.5-ui\.4'/);
 });
