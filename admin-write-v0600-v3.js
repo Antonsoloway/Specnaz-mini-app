@@ -1,6 +1,8 @@
 /* Royal CRM Mini App — protected Admin Write/Delete UI v0.6.0-write.5 */
 (() => {
-  const VERSION = '0.6.0-write.5-ui.3';
+  const VERSION = '0.6.0-write.5-ui.4';
+  const WRITE_BUSY_RETRY_DELAYS_MS = [1500, 3000];
+  const TRANSPORT_RETRY_DELAY_MS = 900;
   const state = { editing:false, payload:null, loading:null, modal:null, observerBusy:false };
 
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -433,14 +435,34 @@
   async function adminWrite(op, payload) {
     if (!sessionToken) throw new Error('Сессия приложения не готова. Откройте приложение заново.');
     const id = requestId();
-    try {
-      return await postWriteOnce(id, op, payload);
-    } catch (firstError) {
-      // Retry only true transport failure. SAME requestId means server-side
-      // idempotency protects against a lost response after a committed write.
-      if (firstError?.httpStatus) throw firstError;
-      await new Promise(resolve => setTimeout(resolve,900));
-      return postWriteOnce(id, op, payload);
+    let busyRetries = 0;
+    let transportRetries = 0;
+
+    while (true) {
+      try {
+        return await postWriteOnce(id, op, payload);
+      } catch (error) {
+        // Snapshot/export triggers share the Apps Script lock with mutations.
+        // WRITE_BUSY is an explicit proof that no mutation started, so retrying
+        // with the SAME requestId is safe and keeps server idempotency intact.
+        if (clean(error?.code) === 'WRITE_BUSY' && busyRetries < WRITE_BUSY_RETRY_DELAYS_MS.length) {
+          const delay = WRITE_BUSY_RETRY_DELAYS_MS[busyRetries];
+          busyRetries += 1;
+          modalStatus(`Таблица обновляется в фоне. Ждём и повторяем автоматически (${busyRetries}/${WRITE_BUSY_RETRY_DELAYS_MS.length})…`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+
+        // Retry only one true transport failure. SAME requestId means a lost
+        // response after a committed write cannot repeat the mutation.
+        if (!error?.httpStatus && transportRetries < 1) {
+          transportRetries += 1;
+          modalStatus('Проверяем результат и безопасно повторяем запрос…');
+          await new Promise(resolve => setTimeout(resolve, TRANSPORT_RETRY_DELAY_MS));
+          continue;
+        }
+        throw error;
+      }
     }
   }
 
