@@ -5,7 +5,7 @@
  * - existing hardened participant editor is reused, no second write flow.
  */
 (() => {
-  const VERSION = '0.6.0-admin-participant-detail.1';
+  const VERSION = '0.6.0-admin-participant-detail.2';
   let payload = null;
   let loading = null;
   let decorating = false;
@@ -56,6 +56,13 @@
     if (text === 'вышел') return ' is-exit';
     if (text === 'в чате') return ' is-in';
     return '';
+  }
+
+  function deleteButton(data, participant) {
+    const allowed = window.RoyalAdminWriteV0600?.canDeleteParticipant?.(participant, data) === true;
+    return allowed
+      ? '<button type="button" class="royal-admin-direct-delete" data-admin-delete-participant="1">🗑 Удалить участника</button>'
+      : '';
   }
 
   async function adminData(force=false) {
@@ -296,6 +303,7 @@
           <div class="participant-detail-memberships royal-admin-participant-memberships">${memberships.length ? memberships.map(membershipButton).join('') : '<span class="muted">Команды не указаны</span>'}</div>
           ${adminFields(p)}
           <button type="button" class="royal-admin-participant-edit" data-admin-edit-participant="1">✏️ Редактировать участника</button>
+          ${deleteButton(data, p)}
         </section>`;
 
       const avatar = panel.querySelector('[data-admin-media-kind="avatar"]');
@@ -312,9 +320,10 @@
   }
 
   function installCss() {
-    if (document.querySelector('style[data-admin-participant-detail-v0600="1"]')) return;
+    if (document.querySelector('style[data-admin-participant-detail-v0600="2"]')) return;
+    document.querySelector('style[data-admin-participant-detail-v0600="1"]')?.remove();
     const style = document.createElement('style');
-    style.dataset.adminParticipantDetailV0600 = '1';
+    style.dataset.adminParticipantDetailV0600 = '2';
     style.textContent = `
       .royal-admin-participant-list-meta{display:grid!important;gap:3px;min-width:0}.royal-admin-participant-list-user{color:#8fa3b1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.royal-admin-participant-list-teams{color:#9bb5c5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.royal-admin-participant-hidden-id{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
       .royal-admin-participant-detail{display:block}.royal-admin-participant-state{display:inline-flex;align-items:center;width:max-content;margin-top:7px;padding:5px 9px;border-radius:999px;background:#1e3646;color:#c7dbea;font-size:11px;font-weight:900;text-transform:uppercase}.royal-admin-participant-state.is-in{background:#1d3545;color:#d5e5ef}.royal-admin-participant-state.is-exit{background:#4b2830;color:#ffc3cc}
