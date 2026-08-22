@@ -79,9 +79,10 @@ test('implemented startup and music features are included in the v0.6 history', 
   assert.match(source, /сохраняется индивидуально для участника/);
   assert.match(source, /История изменений больше не исчезает/);
   assert.match(source, /после первого обычного касания экрана/);
+  assert.match(source, /заранее подготовленную музыку одним касанием/);
   assert.match(source, /Музыкальный файл не публикуется/);
   const preview = fs.readFileSync(path.join(__dirname, '..', 'app-v0600.html'), 'utf8');
   const app = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
-  assert.match(preview, /changelog-v0600\.js\?v=20260822-history-music-hotfix1/);
+  assert.match(preview, /changelog-v0600\.js\?v=20260822-music-gesture-hotfix2/);
   assert.match(app, /page === 'changelog' && panel\?\.querySelector\('\.changelog-screen'\)/);
 });

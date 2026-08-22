@@ -2,7 +2,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.6.0-music.3';
+  const VERSION = '0.6.0-music.4';
   const STORAGE_KEY = 'royal_music_v1';
   const LOCAL_PREFIX = `${STORAGE_KEY}:participant:`;
   const PAYLOAD_VERSION = 2;
@@ -41,7 +41,7 @@
   let authorizationPromise = null;
   let authorizationKey = '';
   let objectUrl = '';
-  let gestureUnlockPending = false;
+  let userGestureSeen = false;
   let lastObservedTimestamp = 0;
   let lastIssuedTimestamp = 0;
   let lastFailedRecord = null;
@@ -239,7 +239,7 @@
     if (state === 'storage-error') return { icon: '🔇', label: 'Настройка недоступна. Включить музыку' };
     if (state === 'starting') return { icon: '⏳', label: 'Музыка загружается. Нажмите, чтобы выключить' };
     if (state === 'off') return { icon: '🔇', label: 'Включить музыку' };
-    if (state === 'blocked') return { icon: '🔈', label: 'Коснитесь экрана или нажмите, чтобы включить звук' };
+    if (state === 'blocked') return { icon: '🔈', label: 'Нажмите, чтобы включить музыку' };
     if (state === 'error') return { icon: '⚠️', label: 'Повторить запуск музыки' };
     return { icon: '🔊', label: 'Выключить музыку' };
   }
@@ -270,8 +270,6 @@
       canRetry = Boolean(lastFailedRecord);
     } else if (storageStatus === 'read-error' && saveStatus !== 'saving') {
       message = 'Не удалось проверить сохранённую настройку. Музыка выключена; при необходимости включите её кнопкой звука.';
-    } else if (state === 'blocked') {
-      message = 'Telegram включит музыку после первого касания экрана.';
     }
     noticeText.textContent = message;
     notice.hidden = !message;
@@ -303,9 +301,9 @@
     sourceOwner = 0;
   }
 
-  async function ensureSource(generation) {
+  async function prepareSource(generation) {
     if (sourceAssigned && sourceOwner === generation) return true;
-    if (!isCurrent(generation) || !authorized || !preference) return false;
+    if (!isCurrent(generation)) return false;
     const sourceRevision = sourceGeneration;
     if (sourcePromise?.generation === generation && sourcePromise.sourceRevision === sourceRevision) {
       return sourcePromise.promise;
@@ -314,7 +312,7 @@
       const loadProtectedAudio = window.RoyalAppV0600?.fetchProtectedMediaObjectUrl;
       if (typeof loadProtectedAudio !== 'function') throw new Error('PROTECTED_AUDIO_LOADER_MISSING');
       const loadedUrl = await loadProtectedAudio(MEDIA_ASSET);
-      if (!isCurrent(generation) || sourceRevision !== sourceGeneration || !authorized || !preference) return false;
+      if (!isCurrent(generation) || sourceRevision !== sourceGeneration) return false;
       if (!/^blob:/.test(String(loadedUrl || ''))) throw new Error('PROTECTED_AUDIO_INVALID');
       objectUrl = loadedUrl;
       audio.preload = 'metadata';
@@ -329,6 +327,11 @@
     });
     sourcePromise = { generation, sourceRevision, promise: tracked };
     return tracked;
+  }
+
+  async function ensureSource(generation) {
+    if (!isCurrent(generation) || !authorized || !preference) return false;
+    return prepareSource(generation);
   }
 
   function pruneExternalMedia() {
@@ -351,9 +354,49 @@
     setState('paused');
   }
 
+  function finishPlayFailure(error, generation, attempt, fromGesture) {
+    if (!isCurrent(generation) || attempt !== playAttempt || !preference) return false;
+    const blocked = error?.name === 'NotAllowedError'
+      || /gesture|notallowed|autoplay/i.test(String(error?.message || ''));
+    setState(blocked ? 'blocked' : 'error');
+    if (fromGesture) announce(blocked ? '' : 'Не удалось запустить музыку.');
+    return false;
+  }
+
+  // TELEGRAM_ANDROID_DIRECT_GESTURE_PLAY_V0600
+  // Telegram Android disables its native media-gesture requirement on ACTION_DOWN.
+  // Keep audio.play() as the first meaningful operation in this synchronous call;
+  // no render, fetch or await may precede it inside the trusted event stack.
+  function playAssignedSourceFromGesture() {
+    const generation = lifecycleGeneration;
+    if (!isCurrent(generation) || !authorized || !preference
+      || !sourceAssigned || sourceOwner !== generation) return Promise.resolve(false);
+    if (!canPlayNow()) {
+      pauseForLifecycle();
+      return Promise.resolve(false);
+    }
+    const attempt = ++playAttempt;
+    let result;
+    try {
+      result = audio.play();
+    } catch (error) {
+      return Promise.resolve(finishPlayFailure(error, generation, attempt, true));
+    }
+    setState('starting');
+    return Promise.resolve(result).then(() => {
+      if (!isCurrent(generation) || attempt !== playAttempt || !preference) return false;
+      setState('playing');
+      announce('Музыка включена.');
+      return true;
+    }, error => finishPlayFailure(error, generation, attempt, true));
+  }
+
   async function attemptPlay(fromGesture = false) {
     const generation = lifecycleGeneration;
     if (!isCurrent(generation) || !authorized || !preference) return false;
+    if (fromGesture && sourceAssigned && sourceOwner === generation) {
+      return playAssignedSourceFromGesture();
+    }
     if (!canPlayNow()) {
       pauseForLifecycle();
       return false;
@@ -372,10 +415,7 @@
       return true;
     } catch (error) {
       if (!isCurrent(generation) || attempt !== playAttempt || !preference) return false;
-      const blocked = error?.name === 'NotAllowedError' || /gesture|notallowed|autoplay/i.test(String(error?.message || ''));
-      setState(blocked ? 'blocked' : 'error');
-      if (fromGesture) announce(blocked ? 'Telegram не разрешил автозапуск. Нажмите ещё раз.' : 'Не удалось запустить музыку.');
-      return false;
+      return finishPlayFailure(error, generation, attempt, fromGesture);
     }
   }
 
@@ -450,7 +490,8 @@
   function turnOff() {
     preference = false;
     preferenceResolved = true;
-    clearSource();
+    playAttempt += 1;
+    try { audio.pause(); } catch (_) {}
     setState('off');
     announce('Музыка выключена.');
     void persistPreference(nextRecord(false));
@@ -462,7 +503,8 @@
     setState('paused');
     announce('Музыка включается.');
     void persistPreference(nextRecord(true));
-    void attemptPlay(true);
+    if (sourceAssigned && sourceOwner === lifecycleGeneration) void playAssignedSourceFromGesture();
+    else void attemptPlay(true);
   }
 
   function toggle() {
@@ -472,7 +514,8 @@
       return;
     }
     if (state === 'blocked' || state === 'error') {
-      void attemptPlay(true);
+      if (sourceAssigned && sourceOwner === lifecycleGeneration) void playAssignedSourceFromGesture();
+      else void attemptPlay(true);
       return;
     }
     turnOff();
@@ -546,6 +589,9 @@
     setState('loading');
 
     const pending = (async () => {
+      // Warm the protected blob in parallel with preference reads. It remains
+      // silent while OFF, but lets the sound button work in one trusted click.
+      void prepareSource(generation).catch(() => false);
       const localResult = readLocalPreference(safeKey);
       const remoteResults = await Promise.all([
         storageGet(cloud, 'cloud', generation),
@@ -620,31 +666,41 @@
   }
 
   function unlockFromGesture(event) {
-    if (event?.isTrusted === false || isMusicControl(event?.target)) return;
-    if (gestureUnlockPending || terminal || !authorized || !preference || !sourceAssigned) return;
-    if (!['blocked', 'paused', 'error'].includes(state)) return;
-    gestureUnlockPending = true;
-    Promise.resolve(attemptPlay(true)).finally(() => { gestureUnlockPending = false; });
+    if (event?.isTrusted === false) return false;
+    userGestureSeen = true;
+    if (isMusicControl(event?.target)) return false;
+    if (terminal || !authorized || !preference || !sourceAssigned) return false;
+    if (!['blocked', 'paused', 'error', 'starting'].includes(state)) return false;
+    void playAssignedSourceFromGesture();
+    return true;
   }
 
-  document.addEventListener('click', event => {
+  function handleCapturedClick(event) {
     const retry = event.target?.closest?.('[data-royal-music-retry]');
     if (retry) {
       event.preventDefault();
-      event.stopPropagation();
+      event.stopImmediatePropagation?.();
       retrySave();
       return;
     }
     const button = event.target?.closest?.('[data-royal-music-toggle]');
-    if (!button) return;
-    event.preventDefault();
-    event.stopPropagation();
-    toggle();
-  }, true);
+    if (button) {
+      userGestureSeen = event?.isTrusted !== false || userGestureSeen;
+      event.preventDefault();
+      event.stopImmediatePropagation?.();
+      toggle();
+      return;
+    }
+    unlockFromGesture(event);
+  }
 
-  document.addEventListener('pointerup', unlockFromGesture, true);
-  document.addEventListener('touchend', unlockFromGesture, { capture:true, passive:true });
-  document.addEventListener('keydown', event => {
+  // Window capture runs before navigation guards that may stop propagation.
+  window.addEventListener('pointerdown', unlockFromGesture, true);
+  window.addEventListener('pointerup', unlockFromGesture, true);
+  window.addEventListener('touchstart', unlockFromGesture, { capture:true, passive:true });
+  window.addEventListener('touchend', unlockFromGesture, { capture:true, passive:true });
+  window.addEventListener('click', handleCapturedClick, true);
+  window.addEventListener('keydown', event => {
     if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') unlockFromGesture(event);
   }, true);
 
@@ -706,7 +762,7 @@
     resume: () => attemptPlay(false),
     getState: () => ({
       state, storageStatus, saveStatus, preference, preferenceResolved, authorized,
-      sourceAssigned, volume: audio.volume, mediaAsset: MEDIA_ASSET
+      sourceAssigned, userGestureSeen, volume: audio.volume, mediaAsset: MEDIA_ASSET
     })
   };
   window.__ROYAL_MUSIC_VERSION__ = VERSION;
