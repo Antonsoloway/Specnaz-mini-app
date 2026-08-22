@@ -96,11 +96,14 @@
 88. **v0.6 admin-write endpoint:** private snapshot не имеет права считать `ScriptApp.getService().getUrl()` доказательством production route при нескольких Apps Script deployments. Installer обязан выбрать ровно один существующий deployment `Таблица ЧП 1.3`, проверить его прямым non-mutating POST, внедрить exact `/exec` в deployment configuration до `clasp push` и подтвердить в свежем private snapshot одновременно `endpoint`, `endpointPinned=true`, `endpointSource=deployment-constant`. Script Property разрешён только как совместимый validated override и не может быть единственным rollout-механизмом: `clasp run` способен вернуть Apps Script storage exception с exit code 0. Worker разрешает edit/delete только при полном pinned contract; fallback service URL остаётся диагностическим и всегда read-only.
 89. **v0.6 admin-write timeout:** mutation route `/admin-write` не имеет права использовать общий 5-second read timeout; текущий safety window = 60 секунд. Обычные read routes сохраняют короткий timeout, `/auth` — отдельные 12 секунд. Transport retry допускается только с тем же `requestId`, чтобы server idempotency не создала дубль; timeout сам по себе не считается доказательством отсутствия commit. Нормальный write после fast-write rollout не ждёт private/public snapshot, но team-photo media upload всё ещё может быть дольше обычной текстовой правки.
 90. **v0.6 WRITE_BUSY retry:** Unified/private snapshot и admin mutation могут использовать общий Apps Script ScriptLock только для короткого consistent Sheet capture/commit; GitHub I/O под этим lock запрещён. Явный server `WRITE_BUSY` означает, что mutation не начиналась, поэтому frontend может автоматически повторить операцию только bounded-число раз (сейчас 3: 0.7/1.4/2.5 секунды) и обязательно с тем же `requestId`. Нельзя автоматически повторять validation, stale revision, eligibility/delete conflicts или произвольные HTTP errors. Backend lock wait остаётся коротким (6 секунд); после исчерпания retries выводится исходный безопасный отказ.
-91. **v0.6 commit-first snapshots:** успешная create/update/delete операция обязана сначала завершить Sheet mutation, journal и idempotency cache, после чего сразу вернуть success. Private admin snapshot ставится в durable deduplicated one-off queue; Sheet capture выполняется под ScriptLock, GitHub publish — после release и отдельно сериализуется, а superseded capture не имеет права затереть более новую mutation. Recurring Unified Snapshot остаётся fallback и также освобождает ScriptLock до GitHub I/O. Frontend может немедленно применить только server-returned committed record/delete result; authoritative background payload принимается лишь после появления всех pending requestId в private journal.
+91. **v0.6 commit-first snapshots:** успешная create/update/delete операция обязана сначала завершить Sheet mutation, journal и idempotency cache, после чего сразу вернуть success. После app write Worker запускает HMAC-signed direct unified refresh через `ctx.waitUntil()`; installable Sheet edit/change trigger выполняет direct flush в своём execution. One-off clock и recurring five-minute Unified Snapshot остаются durable retry/fallback, а не latency contract. Sheet capture выполняется под коротким `ScriptLock`, GitHub publish — после release и отдельно сериализуется; superseded capture не имеет права затереть более новую mutation. Frontend может немедленно применить только server-returned committed record/delete result; authoritative background payload принимается лишь после появления всех pending requestId в private journal.
+92. **Публичная документация без PII:** `CURRENT_STATE.md`, `WORK_HISTORY.md`, changelog и другие публичные handoff-файлы не содержат реальные имена участников/администраторов, Telegram ID, requestId, dataHash, номера строк с персональными записями, exact private endpoint и другие операционные идентификаторы. Использовать обезличенные роли, агрегаты и названия сценариев. Исключение — заранее согласованные публичные credits.
+93. **Синхронный handoff:** изменение active frontend build/entrypoint, Worker `main`/version, Apps Script write/snapshot contract, schema или search index считается незавершённым, пока в том же цикле не обновлены `CURRENT_STATE.md` и верх `WORK_HISTORY.md`; при изменении постоянного инварианта одновременно обновляется `RELEASE_RULES.md`.
+94. **Repo и production документируются раздельно:** каждый handoff отдельно фиксирует repo target, live Apps Script source mirror и независимо подтверждённый production deployment/runtime. Commit, Pages source update, `clasp push` или mirror sync не подменяют `/health`, capability snapshot и device smoke; неподтверждённую версию запрещено обозначать как production.
 
 ## Текущая версия
 
-На 21.08.2026 стабильная версия для обычного запуска: **`v0.5.59`**.
+На 22.08.2026 стабильная версия для обычного запуска: **`v0.5.59`**.
 Отдельный admin-preview: **`v0.6.0`** через `startapp=v0600`; не делать его общим entrypoint до завершения admin smoke-test.
 
 Стабильная `v0.5.59` сохраняет:
@@ -108,7 +111,7 @@
 - золотую маркировку активных команд;
 - inline JPEG-крота на detail/team cards;
 - каталог `Команды принимающие участие в базе спецназа` с независимыми фильтрами и поиском;
-- server alias `BbllllKA / Royal Kingdom ↔ вышка` через writer `1.2.5`, `searchIndexVersion=1.1.3`;
+- server alias `BbllllKA / Royal Kingdom ↔ вышка` через writer `1.2.7`, `searchIndexVersion=1.1.3`;
 - каскадное переименование team identity в live Apps Script и pre-snapshot repair однозначного decorative drift;
 - постоянный team-photo cache key `команда + игра`;
 - safe disk-record warm в `media-persistent-cache-v0554.js 0.5.54.2`;
@@ -134,8 +137,8 @@ Admin-preview `v0.6.0` дополнительно использует:
 - `Вышел` ordering по physical source row, newest first;
 - production Apps Script/private snapshot = `0.6.0-write.5`;
 - live write.5 содержит только два узких destructive flow: participant `AF=Вышел` и team `L=Неактивен + E=0 + refs=0`, с confirm/revision/server recheck/journal и сохранением formula columns;
-- frontend build `20260821-2130`: admin entry справа от имени, eligible delete actions на detail, 60-second safety window, три bounded retry только для explicit `WRITE_BUSY` с тем же requestId и immediate local apply для commit-first response;
-- Apps Script fast-write candidate: Sheet commit-first, private snapshot queue, recurring snapshot без GitHub I/O под ScriptLock; production считается подтверждённым только после installer и fresh private capability markers;
-- production Worker `1.27.0` держит endpoint fail-closed; live snapshot доказал exact installer-injected `deployment-constant`, edit/create/delete разрешены только при pinned contract.
+- frontend build `20260821-2350`: admin read `.3`, write UI `.8`, 60-second safety window, bounded retry только для explicit `WRITE_BUSY`, optimistic committed state и background journal-confirmed refresh;
+- production Apps Script: atomic membership range write, Sheet commit-first, direct unified snapshot refresh и durable one-off/5-minute fallback без GitHub I/O под `ScriptLock`;
+- production Worker `1.28.0` держит endpoint fail-closed и запускает signed snapshot refresh через `ctx.waitUntil()` после committed app write.
 
 Все предыдущие версии сохраняются в истории изменений без удаления.
