@@ -253,6 +253,9 @@ function MINIAPP_syncOneTeamPhotoRow_(sheet, row, cols, cfg, force) {
     if (previous) {
       MINIAPP_teamGithubDelete_(cfg, path, 'remove team photo ' + stableHash.slice(0, 12));
       props.deleteProperty(hashProp);
+      MINIAPP_auditV2RecordTeamMediaOutcome_(
+        sheet, row, teamName, game, stableHash, previous, '', 'removed'
+      );
       return 'removed';
     }
     return 'skipped';
@@ -279,7 +282,72 @@ function MINIAPP_syncOneTeamPhotoRow_(sheet, row, cols, cfg, force) {
 
   MINIAPP_teamGithubUpsert_(cfg, path, blob, 'cache team photo ' + stableHash.slice(0, 12));
   props.setProperty(hashProp, contentHash);
+  MINIAPP_auditV2RecordTeamMediaOutcome_(
+    sheet, row, teamName, game, stableHash, previousHash, contentHash,
+    previousHash ? 'replaced' : 'uploaded'
+  );
   return 'updated';
+}
+
+/**
+ * Media reconciliation is the only current path that can compare real image
+ * bytes after a manual CellImage replacement. Google onChange exposes neither
+ * an exact row nor old image bytes, so attribution remains an explicit system
+ * follow-up with an honest unknown human actor.
+ */
+function MINIAPP_auditV2RecordTeamMediaOutcome_(sheet, row, teamName, game, stableHash, beforeHash, afterHash, action) {
+  if (typeof MINIAPP_auditV2RecordSystemMutation_ !== 'function') return;
+  try {
+    var beforePresent = !!String(beforeHash || '');
+    var afterPresent = !!String(afterHash || '');
+    var diffAfter = action === 'removed'
+      ? 'Удалено'
+      : (action === 'uploaded' ? 'Добавлено' : 'Заменено');
+    var result = MINIAPP_auditV2RecordSystemMutation_(sheet.getParent(), {
+      syncBaseline: false,
+      dedupeKey: [
+        'team-media', String(stableHash || ''), String(beforeHash || ''),
+        String(afterHash || ''), String(action || '')
+      ].join(':'),
+      transactionId: 'team-media:' + String(stableHash || '').slice(0, 20),
+      op: 'updateTeamPhoto',
+      entityType: 'team',
+      entityKey: String(game || '') + ' :: ' + String(teamName || ''),
+      row: Number(row || 0),
+      before: { game: game, name: teamName, photoState: beforePresent ? 'present' : 'absent' },
+      after: { game: game, name: teamName, photoState: afterPresent ? 'present' : 'absent' },
+      changed: { photo: { changed: true, action: action } },
+      diff: [{
+        kind: action === 'removed' ? 'photo_removed' : 'photo_changed',
+        field: 'photo',
+        path: 'photo',
+        label: 'Фото команды',
+        before: beforePresent ? 'Предыдущее фото' : null,
+        after: diffAfter
+      }],
+      source: {
+        type: 'system', channel: 'persistent-media-reconcile',
+        label: 'Система медиахранилища'
+      },
+      actor: {
+        type: 'system', telegramId: '', username: '', displayName: '',
+        label: 'Система медиахранилища'
+      },
+      outcome: { status: 'committed', code: 'MEDIA_' + String(action || '').toUpperCase() },
+      metadata: {
+        photoAction: action,
+        mediaKeyPrefix: String(stableHash || '').slice(0, 16),
+        beforeHashPrefix: String(beforeHash || '').slice(0, 16),
+        afterHashPrefix: String(afterHash || '').slice(0, 16),
+        manualEditorIdentityAvailable: false
+      }
+    });
+    if (!result || result.ok === false) {
+      console.warn('Team media audit warning: ' + String(result && result.error || 'UNKNOWN'));
+    }
+  } catch (error) {
+    console.warn('Team media audit hook failed: ' + String(error && error.message || error));
+  }
 }
 
 function MINIAPP_teamHeaderColumns_(sheet) {

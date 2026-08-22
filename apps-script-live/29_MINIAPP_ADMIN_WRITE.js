@@ -116,7 +116,9 @@ function MINIAPP_adminWriteExecute_(e) {
     }
 
     // Persistent idempotency: survives CacheService expiry/restarts.
-    var journalDuplicate = MINIAPP_adminWriteFindJournalRequest_(requestId);
+    var journalDuplicate = MINIAPP_adminWriteFindJournalRequest_(
+      requestId, { lockAlreadyHeld: true }
+    );
     if (journalDuplicate) {
       var duplicateResult = {
         ok: true,
@@ -145,6 +147,12 @@ function MINIAPP_adminWriteExecute_(e) {
       ss: ss,
       adminId: adminId,
       adminUsername: MINIAPP_adminWriteUsername_(validated.user.username || profile.username || ''),
+      adminDisplayName: MINIAPP_adminWriteValue_(
+        profile.name || profile.telegramName || validated.user.first_name || ''
+      ),
+      lockAlreadyHeld: true,
+      transactionId: requestId,
+      auditChannel: 'legacy-initdata-jsonp',
       requestId: requestId,
       op: op,
       payload: payload
@@ -311,10 +319,13 @@ function MINIAPP_adminWriteUpdateTeam_(ctx) {
     return MINIAPP_adminWriteError_('TEAM_EXISTS', 'Команда с таким названием уже существует в этой игре.');
   }
 
+  var renamedMemberships = 0;
   if (nextName !== originalName) {
     sheet.getRange(row, 2).setValue(nextName);
     if (typeof finalRoleCascadeTeamRename_ === 'function') {
-      finalRoleCascadeTeamRename_(ctx.ss, game, originalName, nextName);
+      renamedMemberships = Number(
+        finalRoleCascadeTeamRename_(ctx.ss, game, originalName, nextName) || 0
+      );
     }
   }
   if (nextLeader !== before.leader) sheet.getRange(row, 4).setValue(nextLeader);
@@ -340,7 +351,13 @@ function MINIAPP_adminWriteUpdateTeam_(ctx) {
     revision: MINIAPP_adminWriteTeamRevision_(after),
     message: 'Команда обновлена.'
   };
-  MINIAPP_adminWriteAppendJournal_(ctx, 'team', key, finalRow, before, after, { name: nextName, leader: nextLeader });
+  var journalChanges = { name: nextName, leader: nextLeader };
+  if (renamedMemberships > 0) {
+    journalChanges.cascade = { membershipRenames: renamedMemberships };
+  }
+  MINIAPP_adminWriteAppendJournal_(
+    ctx, 'team', key, finalRow, before, after, journalChanges
+  );
   return result;
 }
 
@@ -624,6 +641,9 @@ function MINIAPP_adminWriteAdminMeta_() {
 }
 
 function MINIAPP_adminWriteJournalData_() {
+  if (typeof MINIAPP_auditV2JournalData_ === 'function') {
+    return MINIAPP_auditV2JournalData_();
+  }
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   var sheet = ss.getSheetByName(MINIAPP_ADMIN_WRITE_JOURNAL_SHEET);
   if (!sheet || sheet.getLastRow() < 2) {
@@ -645,6 +665,17 @@ function MINIAPP_adminWriteJournalData_() {
 }
 
 function MINIAPP_adminWriteAppendJournal_(ctx, entityType, entityKey, row, before, after, changed) {
+  if (typeof MINIAPP_auditV2RecordMiniAppMutation_ === 'function') {
+    var audit = MINIAPP_auditV2RecordMiniAppMutation_(
+      ctx, entityType, entityKey, row, before, after, changed
+    );
+    if (!audit || audit.ok === false) {
+      throw new Error('AUDIT_V2_APPEND_FAILED:' + String(audit && audit.error || 'UNKNOWN'));
+    }
+    if (!audit.skipped) return audit;
+    // Source may be deployed before the controlled v2 activation. Preserve
+    // the existing A:L journal/idempotency contract during that window.
+  }
   var sheet = MINIAPP_adminWriteEnsureJournal_(ctx.ss);
   var now = new Date();
   sheet.appendRow([
@@ -679,13 +710,17 @@ function MINIAPP_adminWriteEnsureJournal_(ss) {
   return sheet;
 }
 
-function MINIAPP_adminWriteFindJournalRequest_(requestId) {
+function MINIAPP_adminWriteFindJournalRequest_(requestId, options) {
+  if (typeof MINIAPP_auditV2FindRequest_ === 'function') {
+    var indexed = MINIAPP_auditV2FindRequest_(requestId, options || {});
+    if (indexed) return indexed;
+  }
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   var sheet = ss.getSheetByName(MINIAPP_ADMIN_WRITE_JOURNAL_SHEET);
   if (!sheet || sheet.getLastRow() < 2) return null;
   var last = sheet.getLastRow();
-  var start = Math.max(2, last - 499);
-  var count = last - start + 1;
+  var start = 2;
+  var count = last - 1;
   var values = sheet.getRange(start, 2, count, 7).getDisplayValues(); // B:H
   for (var i = values.length - 1; i >= 0; i--) {
     if (MINIAPP_adminWriteValue_(values[i][0]) !== requestId) continue;

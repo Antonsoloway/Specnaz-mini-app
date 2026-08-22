@@ -88,10 +88,13 @@ function MINIAPP_adminWriteFinalUpdateTeam_(ctx) {
     if (!photoCellResult || photoCellResult.ok === false) return photoCellResult;
   }
 
+  var renamedMemberships = 0;
   if (nextName !== originalName) {
     sheet.getRange(row, 2).setValue(nextName);
     if (typeof finalRoleCascadeTeamRename_ === 'function') {
-      finalRoleCascadeTeamRename_(ctx.ss, game, originalName, nextName);
+      renamedMemberships = Number(
+        finalRoleCascadeTeamRename_(ctx.ss, game, originalName, nextName) || 0
+      );
     }
   }
   if (nextLeader !== before.leader) {
@@ -110,20 +113,6 @@ function MINIAPP_adminWriteFinalUpdateTeam_(ctx) {
 
   SpreadsheetApp.flush();
   var finalRow = MINIAPP_adminWriteFindTeamRow_(sheet, nextName, game) || row;
-  MINIAPP_adminTeamPhotoMarkDirty_(finalRow);
-
-  var oldMediaCleanup = { ok: true, changed: false };
-  if (nextName !== originalName && typeof MINIAPP_adminTeamPhotoCleanupOldIdentity_ === 'function') {
-    oldMediaCleanup = MINIAPP_adminTeamPhotoCleanupOldIdentity_(
-      originalName,
-      game,
-      photoPrepared && photoPrepared.stableHash
-    ) || oldMediaCleanup;
-  }
-
-  if (typeof markPublicSyncPending_ === 'function') {
-    markPublicSyncPending_('miniapp_admin_team_final:' + game + ':' + nextName);
-  }
 
   var after = MINIAPP_adminWriteFinalTeamState_(sheet, finalRow);
   if (photoPrepared.changed && photoPrepared.sourceUrl) after.photoUrl = photoPrepared.sourceUrl;
@@ -133,12 +122,18 @@ function MINIAPP_adminWriteFinalUpdateTeam_(ctx) {
     leader: nextLeader
   };
   var photoSummary = MINIAPP_adminTeamPhotoSummary_(photoPrepared);
-  if (photoSummary) journalChanges.photo = photoSummary;
-  if (oldMediaCleanup && oldMediaCleanup.warning) {
-    journalChanges.mediaCleanupWarning = oldMediaCleanup.warning;
+  if (photoSummary) {
+    photoSummary.action = hasNewPhoto ? 'uploaded_or_replaced' : 'auto_migrated';
+    journalChanges.photo = photoSummary;
+  }
+  if (renamedMemberships > 0) {
+    journalChanges.cascade = { membershipRenames: renamedMemberships };
   }
 
-  MINIAPP_adminWriteHardenedAppendJournal_(
+  // Commit the source mutation and its root audit event before non-essential
+  // media cleanup/sync scheduling. Those follow-up tasks may fail, but must not
+  // erase the fact that the team and membership cascade already changed.
+  var auditCommit = MINIAPP_adminWriteHardenedAppendJournal_(
     ctx,
     'team',
     key,
@@ -147,6 +142,89 @@ function MINIAPP_adminWriteFinalUpdateTeam_(ctx) {
     after,
     journalChanges
   );
+  var cascadeAudit = null;
+  if (renamedMemberships > 0 && typeof MINIAPP_auditV2Reconcile_ === 'function') {
+    cascadeAudit = MINIAPP_auditV2Reconcile_(ctx.ss, {
+      lockAlreadyHeld: true,
+      parentEventId: auditCommit && auditCommit.eventId || '',
+      transactionId: ctx.transactionId || ctx.requestId || '',
+      source: {
+        type: 'system', channel: 'team-rename-cascade',
+        label: 'Каскад переименования команды'
+      },
+      actor: {
+        type: 'system', telegramId: '', username: '', displayName: '',
+        label: 'Система'
+      },
+      metadata: {
+        oldTeam: originalName,
+        newTeam: nextName,
+        game: game,
+        membershipRenames: renamedMemberships,
+        exactBefore: 'protected-baseline'
+      }
+    });
+  }
+
+  var maintenanceWarnings = [];
+  if (cascadeAudit && cascadeAudit.ok === false) {
+    maintenanceWarnings.push('TEAM_RENAME_CASCADE_AUDIT_FAILED');
+  }
+
+  try {
+    MINIAPP_adminTeamPhotoMarkDirty_(finalRow);
+  } catch (dirtyError) {
+    maintenanceWarnings.push('TEAM_MEDIA_DIRTY_MARK_FAILED');
+    console.warn('Team update media dirty mark warning', dirtyError && dirtyError.message ? dirtyError.message : dirtyError);
+  }
+
+  var oldMediaCleanup = { ok: true, changed: false };
+  if (nextName !== originalName && typeof MINIAPP_adminTeamPhotoCleanupOldIdentity_ === 'function') {
+    try {
+      oldMediaCleanup = MINIAPP_adminTeamPhotoCleanupOldIdentity_(
+        originalName,
+        game,
+        photoPrepared && photoPrepared.stableHash
+      ) || oldMediaCleanup;
+      if (oldMediaCleanup.warning) maintenanceWarnings.push(oldMediaCleanup.warning);
+    } catch (cleanupError) {
+      oldMediaCleanup = { ok: false, warning: 'TEAM_MEDIA_OLD_IDENTITY_CLEANUP_FAILED' };
+      maintenanceWarnings.push(oldMediaCleanup.warning);
+      console.warn('Team update old media cleanup warning', cleanupError && cleanupError.message ? cleanupError.message : cleanupError);
+    }
+  }
+
+  if (typeof markPublicSyncPending_ === 'function') {
+    try { markPublicSyncPending_('miniapp_admin_team_final:' + game + ':' + nextName); }
+    catch (_) { maintenanceWarnings.push('PUBLIC_SYNC_MARK_FAILED'); }
+  }
+
+  if (maintenanceWarnings.length && typeof MINIAPP_auditV2RecordSystemMutation_ === 'function') {
+    MINIAPP_auditV2RecordSystemMutation_(ctx.ss, {
+      lockAlreadyHeld: true,
+      syncBaseline: false,
+      dedupeKey: 'request:' + ctx.requestId + ':maintenance',
+      transactionId: ctx.transactionId || ctx.requestId || '',
+      parentEventId: auditCommit && auditCommit.eventId || '',
+      op: 'teamUpdateMaintenance',
+      entityType: 'team',
+      entityKey: key,
+      row: finalRow,
+      before: {},
+      after: {},
+      diff: [{
+        kind: 'maintenance_warning', field: 'maintenance', path: 'maintenance',
+        label: 'Обслуживание после изменения', before: null,
+        after: maintenanceWarnings.slice()
+      }],
+      source: { type: 'system', channel: 'post-commit-maintenance', label: 'Система' },
+      actor: { type: 'system', label: 'Система' },
+      outcome: {
+        status: 'committed_with_warnings', code: 'POST_COMMIT_WARNINGS',
+        warnings: maintenanceWarnings.slice()
+      }
+    });
+  }
   var revision = MINIAPP_adminWriteTeamRevision_(after);
   after.revision = revision;
 
@@ -164,6 +242,9 @@ function MINIAPP_adminWriteFinalUpdateTeam_(ctx) {
     oldMediaCleanup: oldMediaCleanup && oldMediaCleanup.warning
       ? { ok: false, warning: oldMediaCleanup.warning }
       : { ok: true },
+    auditEventId: auditCommit && auditCommit.eventId || '',
+    cascadeAuditEvents: Number(cascadeAudit && cascadeAudit.events || 0),
+    maintenanceWarnings: maintenanceWarnings,
     message: photoPrepared.changed ? 'Команда и фото обновлены.' : 'Команда обновлена.'
   };
 }
@@ -220,11 +301,6 @@ function MINIAPP_adminWriteFinalCreateTeam_(ctx) {
   SpreadsheetApp.flush();
 
   var finalRow = MINIAPP_adminWriteFindTeamRow_(sheet, name, game) || row;
-  MINIAPP_adminTeamPhotoMarkDirty_(finalRow);
-  if (typeof markPublicSyncPending_ === 'function') {
-    markPublicSyncPending_('miniapp_admin_team_create_final:' + game + ':' + name);
-  }
-
   var after = MINIAPP_adminWriteFinalTeamState_(sheet, finalRow);
   if (photoPrepared.changed && photoPrepared.sourceUrl) after.photoUrl = photoPrepared.sourceUrl;
   var key = game + ' :: ' + name;
@@ -234,9 +310,12 @@ function MINIAPP_adminWriteFinalCreateTeam_(ctx) {
     leader: leader
   };
   var photoSummary = MINIAPP_adminTeamPhotoSummary_(photoPrepared);
-  if (photoSummary) journalChanges.photo = photoSummary;
+  if (photoSummary) {
+    photoSummary.action = 'uploaded';
+    journalChanges.photo = photoSummary;
+  }
 
-  MINIAPP_adminWriteHardenedAppendJournal_(
+  var auditCommit = MINIAPP_adminWriteHardenedAppendJournal_(
     ctx,
     'team',
     key,
@@ -248,6 +327,45 @@ function MINIAPP_adminWriteFinalCreateTeam_(ctx) {
   var revision = MINIAPP_adminWriteTeamRevision_(after);
   after.revision = revision;
 
+  var maintenanceWarnings = [];
+  try {
+    MINIAPP_adminTeamPhotoMarkDirty_(finalRow);
+  } catch (dirtyError) {
+    maintenanceWarnings.push('TEAM_MEDIA_DIRTY_MARK_FAILED');
+    console.warn('Team create media dirty mark warning', dirtyError && dirtyError.message ? dirtyError.message : dirtyError);
+  }
+  if (typeof markPublicSyncPending_ === 'function') {
+    try { markPublicSyncPending_('miniapp_admin_team_create_final:' + game + ':' + name); }
+    catch (_) { maintenanceWarnings.push('PUBLIC_SYNC_MARK_FAILED'); }
+  }
+
+  if (maintenanceWarnings.length && typeof MINIAPP_auditV2RecordSystemMutation_ === 'function') {
+    MINIAPP_auditV2RecordSystemMutation_(ctx.ss, {
+      lockAlreadyHeld: true,
+      syncBaseline: false,
+      dedupeKey: 'request:' + ctx.requestId + ':maintenance',
+      transactionId: ctx.transactionId || ctx.requestId || '',
+      parentEventId: auditCommit && auditCommit.eventId || '',
+      op: 'teamCreateMaintenance',
+      entityType: 'team',
+      entityKey: key,
+      row: finalRow,
+      before: {},
+      after: {},
+      diff: [{
+        kind: 'maintenance_warning', field: 'maintenance', path: 'maintenance',
+        label: 'Обслуживание после добавления', before: null,
+        after: maintenanceWarnings.slice()
+      }],
+      source: { type: 'system', channel: 'post-commit-maintenance', label: 'Система' },
+      actor: { type: 'system', label: 'Система' },
+      outcome: {
+        status: 'committed_with_warnings', code: 'POST_COMMIT_WARNINGS',
+        warnings: maintenanceWarnings.slice()
+      }
+    });
+  }
+
   return {
     ok: true,
     requestId: ctx.requestId,
@@ -258,6 +376,8 @@ function MINIAPP_adminWriteFinalCreateTeam_(ctx) {
     revision: revision,
     record: after,
     photoChanged: !!photoPrepared.changed,
+    auditEventId: auditCommit && auditCommit.eventId || '',
+    maintenanceWarnings: maintenanceWarnings,
     message: photoPrepared.changed ? 'Команда с фото добавлена.' : 'Команда добавлена.'
   };
 }
@@ -315,7 +435,7 @@ function MINIAPP_adminWriteFinalDeleteParticipant_(ctx) {
   var maintenanceWarnings = [];
 
   // Persist idempotency immediately after the destructive Sheet commit.
-  MINIAPP_adminWriteHardenedAppendJournal_(
+  var auditCommit = MINIAPP_adminWriteHardenedAppendJournal_(
     ctx,
     'participant',
     telegramId,
@@ -359,6 +479,33 @@ function MINIAPP_adminWriteFinalDeleteParticipant_(ctx) {
     catch (_) { maintenanceWarnings.push('PUBLIC_SYNC_MARK_FAILED'); }
   }
 
+  if (maintenanceWarnings.length && typeof MINIAPP_auditV2RecordSystemMutation_ === 'function') {
+    MINIAPP_auditV2RecordSystemMutation_(ctx.ss, {
+      lockAlreadyHeld: true,
+      syncBaseline: false,
+      dedupeKey: 'request:' + ctx.requestId + ':maintenance',
+      transactionId: ctx.transactionId || ctx.requestId || '',
+      parentEventId: auditCommit && auditCommit.eventId || '',
+      op: 'participantDeleteMaintenance',
+      entityType: 'participant',
+      entityKey: telegramId,
+      row: row,
+      before: {},
+      after: {},
+      diff: [{
+        kind: 'maintenance_warning', field: 'maintenance', path: 'maintenance',
+        label: 'Обслуживание после удаления', before: null,
+        after: maintenanceWarnings.slice()
+      }],
+      source: { type: 'system', channel: 'post-commit-maintenance', label: 'Система' },
+      actor: { type: 'system', label: 'Система' },
+      outcome: {
+        status: 'committed_with_warnings', code: 'POST_COMMIT_WARNINGS',
+        warnings: maintenanceWarnings.slice()
+      }
+    });
+  }
+
   return {
     ok: true,
     requestId: ctx.requestId,
@@ -367,6 +514,7 @@ function MINIAPP_adminWriteFinalDeleteParticipant_(ctx) {
     entityKey: telegramId,
     row: row,
     deleted: true,
+    auditEventId: auditCommit && auditCommit.eventId || '',
     maintenanceWarnings: maintenanceWarnings,
     message: 'Участник удалён из админской таблицы.'
   };
@@ -449,7 +597,7 @@ function MINIAPP_adminWriteFinalDeleteTeam_(ctx) {
   var maintenanceWarnings = [];
 
   // Persist idempotency immediately after the destructive Sheet commit.
-  MINIAPP_adminWriteHardenedAppendJournal_(
+  var auditCommit = MINIAPP_adminWriteHardenedAppendJournal_(
     ctx,
     'team',
     key,
@@ -482,6 +630,33 @@ function MINIAPP_adminWriteFinalDeleteTeam_(ctx) {
     catch (_) { maintenanceWarnings.push('PUBLIC_SYNC_MARK_FAILED'); }
   }
 
+  if (maintenanceWarnings.length && typeof MINIAPP_auditV2RecordSystemMutation_ === 'function') {
+    MINIAPP_auditV2RecordSystemMutation_(ctx.ss, {
+      lockAlreadyHeld: true,
+      syncBaseline: false,
+      dedupeKey: 'request:' + ctx.requestId + ':maintenance',
+      transactionId: ctx.transactionId || ctx.requestId || '',
+      parentEventId: auditCommit && auditCommit.eventId || '',
+      op: 'teamDeleteMaintenance',
+      entityType: 'team',
+      entityKey: key,
+      row: row,
+      before: {},
+      after: {},
+      diff: [{
+        kind: 'maintenance_warning', field: 'maintenance', path: 'maintenance',
+        label: 'Обслуживание после удаления', before: null,
+        after: maintenanceWarnings.slice()
+      }],
+      source: { type: 'system', channel: 'post-commit-maintenance', label: 'Система' },
+      actor: { type: 'system', label: 'Система' },
+      outcome: {
+        status: 'committed_with_warnings', code: 'POST_COMMIT_WARNINGS',
+        warnings: maintenanceWarnings.slice()
+      }
+    });
+  }
+
   return {
     ok: true,
     requestId: ctx.requestId,
@@ -490,6 +665,7 @@ function MINIAPP_adminWriteFinalDeleteTeam_(ctx) {
     entityKey: key,
     row: row,
     deleted: true,
+    auditEventId: auditCommit && auditCommit.eventId || '',
     mediaCleanup: mediaCleanup,
     maintenanceWarnings: maintenanceWarnings,
     message: 'Команда удалена из админской таблицы.'
