@@ -104,7 +104,7 @@ test('explicit WRITE_BUSY is retried safely with the same request id', () => {
   assert.match(writeSource, /clean\(error\?\.code\) === 'WRITE_BUSY'/);
   assert.match(writeSource, /return await postWriteOnce\(id, op, payload\)/);
   assert.match(writeSource, /Ждём и повторяем автоматически/);
-  assert.match(writeSource, /const VERSION = '0\.6\.0-write\.5-ui\.9'/);
+  assert.match(writeSource, /const VERSION = '0\.6\.0-write\.5-ui\.10'/);
 });
 
 test('all admin-data retry and cache behavior lives in the shared client', () => {
