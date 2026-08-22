@@ -14,12 +14,13 @@ test('Worker exposes the exact v0.6 track only through the authenticated media r
   assert.doesNotMatch(media, /background-v0600[\s\S]{0,220}Cache-Control',\s*'public/i);
 });
 
-test('Worker 1.29 is the deploy entry and preserves the 1.28 wrapper chain', () => {
+test('Worker 1.30 uses the existing deploy entry and preserves the 1.28 wrapper chain', () => {
   const entry = read('worker/src/entry-v1290.js');
   const wrangler = read('worker/wrangler.toml');
   assert.match(entry, /import currentWorker from '\.\/entry-v1280\.js'/);
-  assert.match(entry, /WRAPPER_VERSION = '1\.29\.0'/);
+  assert.match(entry, /WRAPPER_VERSION = '1\.30\.0'/);
   assert.match(entry, /backgroundMusic:\s*BACKGROUND_MUSIC/);
+  assert.match(entry, /snapshotCache:\s*SNAPSHOT_CACHE/);
   assert.match(wrangler, /main = "src\/entry-v1290\.js"/);
 });
 

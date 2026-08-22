@@ -9,6 +9,10 @@ let snapshotState = null;
 let sessionToken = '';
 let activePage = 'home';
 let avatarObserver = null;
+let snapshotLoad = null;
+let snapshotRequestGeneration = 0;
+const AUTH_BODY_TIMEOUT_MS = 5_000;
+const SNAPSHOT_BODY_TIMEOUT_MS = 5_000;
 const avatarBlobCache = new Map();
 const protectedMediaObjectUrls = new Map();
 const protectedMediaLoads = new Map();
@@ -149,7 +153,11 @@ async function workerAuth(initData) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ initData })
   });
-  const data = await response.json().catch(() => ({}));
+  const data = await readJsonWithDeadline(response, AUTH_BODY_TIMEOUT_MS, 'AUTH_BODY_TIMEOUT')
+    .catch(error => {
+      if (error?.code === 'AUTH_BODY_TIMEOUT') throw error;
+      return {};
+    });
   if (!response.ok) {
     const error = new Error(data?.message || `HTTP ${response.status}`);
     error.code = data?.error || `HTTP_${response.status}`;
@@ -158,21 +166,51 @@ async function workerAuth(initData) {
   return data;
 }
 
-async function loadSnapshot() {
+function bodyTimeoutError(code) {
+  const error = new Error(code);
+  error.code = code;
+  error.name = 'TimeoutError';
+  return error;
+}
+
+function readJsonWithDeadline(response, timeoutMs, timeoutCode) {
+  let timeoutId = 0;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(bodyTimeoutError(timeoutCode)), timeoutMs);
+  });
+  return Promise.race([response.json(), timeout]).finally(() => {
+    if (timeoutId) window.clearTimeout(timeoutId);
+  });
+}
+
+async function loadSnapshot(force = false) {
   if (!sessionToken) return;
+  if (snapshotLoad && !force && snapshotLoad.session === sessionToken) return snapshotLoad.promise;
+
+  const generation = ++snapshotRequestGeneration;
+  const sessionAtStart = sessionToken;
   emitAppLifecycle('snapshot-start');
-  try {
+  const request = (async () => {
     const response = await fetch(`${API_URL}/snapshot`, {
       method: 'GET', mode: 'cors', cache: 'no-store',
-      headers: { Authorization: `Bearer ${sessionToken}` }
+      headers: { Authorization: `Bearer ${sessionAtStart}` }
     });
-    const data = await response.json().catch(() => ({}));
+    const data = await readJsonWithDeadline(response, SNAPSHOT_BODY_TIMEOUT_MS, 'SNAPSHOT_BODY_TIMEOUT')
+      .catch(error => {
+        if (error?.code === 'SNAPSHOT_BODY_TIMEOUT') throw error;
+        return {};
+      });
     if (!response.ok || !data?.ok) {
       const error = new Error(data?.message || `HTTP ${response.status}`);
       error.code = data?.error || `HTTP_${response.status}`;
       throw error;
     }
-    snapshotState = data.snapshot || null;
+    return data.snapshot || null;
+  })();
+
+  const pending = request.then(snapshot => {
+    if (generation !== snapshotRequestGeneration || sessionToken !== sessionAtStart) return snapshotState;
+    snapshotState = snapshot;
     const status = document.getElementById('dataStatus');
     if (status && snapshotState) {
       const stats = snapshotState.stats || {};
@@ -180,10 +218,17 @@ async function loadSnapshot() {
     }
     emitAppLifecycle('snapshot-ready', { stats: snapshotState?.stats || {} });
     return snapshotState;
-  } catch (error) {
-    emitAppLifecycle('snapshot-error', { code: String(error?.code || error?.message || 'UNKNOWN') });
-    throw error;
-  }
+  }).catch(error => {
+    if (generation !== snapshotRequestGeneration || sessionToken !== sessionAtStart) return snapshotState;
+    const normalized = error?.name === 'AbortError' ? bodyTimeoutError('SNAPSHOT_TIMEOUT') : error;
+    emitAppLifecycle('snapshot-error', { code: String(normalized?.code || normalized?.message || 'UNKNOWN') });
+    throw normalized;
+  }).finally(() => {
+    if (snapshotLoad?.generation === generation) snapshotLoad = null;
+  });
+
+  snapshotLoad = { generation, session: sessionAtStart, promise: pending };
+  return pending;
 }
 
 async function authenticate() {
@@ -434,7 +479,7 @@ if (BUILD === '0.6.0') {
     fetchProtectedMediaObjectUrl: protectedMediaObjectUrl,
     releaseProtectedMedia,
     reloadSnapshot: async () => {
-      const snapshot = await loadSnapshot();
+      const snapshot = await loadSnapshot(true);
       if (activePage !== 'home') renderPage(activePage);
       return snapshot;
     }

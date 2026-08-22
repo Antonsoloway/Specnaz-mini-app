@@ -1,4 +1,5 @@
 import currentWorker from './entry-v150.js';
+import { loadPrivateSnapshotCached } from './private-snapshot-cache.js';
 
 const WRAPPER_VERSION = '1.7.0';
 const ALLOWED_CHAT_STATE = 'В чате';
@@ -70,7 +71,7 @@ async function handleSnapshot(request, env, ctx) {
   if (!authPayload?.ok) return authResponse;
 
   try {
-    const source = await loadPrivateSnapshot(env);
+    const source = await loadPrivateSnapshotCached(env);
     const snapshot = sanitizeSnapshotByTelegramId(source);
     const headers = new Headers(authResponse.headers);
     headers.set('Content-Type', 'application/json; charset=utf-8');
@@ -86,7 +87,7 @@ async function handleSnapshot(request, env, ctx) {
 
 async function handleAvatarByTelegramId(request, env, ctx, url) {
   try {
-    const source = await loadPrivateSnapshot(env);
+    const source = await loadPrivateSnapshotCached(env);
     const telegramId = cleanTelegramId(url.searchParams.get('telegramId'));
     const owner = (source?.participants || []).find(p =>
       cleanTelegramId(p?.telegramId) === telegramId &&

@@ -1,4 +1,5 @@
 import currentWorker from './entry-v130.js';
+import { loadPrivateSnapshotCached } from './private-snapshot-cache.js';
 
 const WRAPPER_VERSION = '1.4.0';
 
@@ -46,7 +47,7 @@ async function handleAuthWithProfile(request, env, ctx) {
     const telegramId = telegramIdFromInitData(body?.initData || '');
     if (!telegramId) return response;
 
-    const snapshot = await loadPrivateSnapshot(env);
+    const snapshot = await loadPrivateSnapshotCached(env);
     const profile = (snapshot.participants || []).find(
       p => String(p?.telegramId || '') === telegramId
     );

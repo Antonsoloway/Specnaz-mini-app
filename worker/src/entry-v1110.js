@@ -1,4 +1,5 @@
 import currentWorker from './entry-v1100.js';
+import { loadPrivateSnapshotCached } from './private-snapshot-cache.js';
 
 const WRAPPER_VERSION = '1.11.2';
 const ALLOWED_CHAT_STATE = 'В чате';
@@ -52,7 +53,7 @@ async function handleSnapshotWithSearchKeys(request, env, ctx) {
   if (!payload?.ok || !payload?.snapshot) return base;
 
   try {
-    const source = await loadPrivateSnapshot(env);
+    const source = await loadPrivateSnapshotCached(env);
     mergeSearchKeys(payload.snapshot, source);
     const headers = new Headers(base.headers);
     headers.set('Content-Type', 'application/json; charset=utf-8');

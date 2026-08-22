@@ -1045,9 +1045,9 @@ test('v0.6 is the general entry and media remain protected/private', () => {
   assert.match(appSource, /: '0\.5\.59';/);
   assert.match(appSource, /Authorization: `Bearer \$\{sessionAtStart\}`/);
   assert.match(router, /const target = 'app-v0600\.html'/);
-  assert.match(router, /releaseBuild', '20260823-startup-priority-hotfix3'/);
+  assert.match(router, /releaseBuild', '20260823-snapshot-resilience-hotfix4'/);
   assert.match(preview, /music-v0600\.js\?v=20260823-startup-priority-hotfix3/);
-  assert.match(preview, /app\.js\?v=20260822-history-music-hotfix1/);
+  assert.match(preview, /app\.js\?v=20260823-snapshot-resilience-hotfix4/);
   assert.doesNotMatch(router, /app-v0559\.html/);
   assert.match(index, /app-v0600\.html/);
   assert.doesNotMatch(index, /app-v0559\.html/);
