@@ -138,6 +138,32 @@ test('same-session stale data is used only after transient retry exhaustion', as
   assert.deepEqual(fixture.delays, [700, 1600]);
 });
 
+test('admin root force refresh preserves an optimistic same-session payload after transient exhaustion', async () => {
+  const base = payload('base');
+  const optimistic = payload('optimistic', [{ requestId:'delete-team-1' }]);
+  let stage = 'base';
+  const fixture = createClient([], () => stage === 'base'
+    ? response(200, base)
+    : Promise.reject(new TypeError('Failed to fetch')));
+  await fixture.client.load();
+  fixture.client.protect('delete-team-1');
+  assert.equal(fixture.client.accept(optimistic), true);
+
+  stage = 'transient';
+  const background = fixture.client.load({ force:true, commit:false });
+  const manual = fixture.client.load({ force:true, allowStale:true });
+  await assert.rejects(background, error => error.code === 'ADMIN_NETWORK_RETRY_EXHAUSTED');
+  const recovered = await manual;
+  assert.equal(recovered, optimistic);
+  assert.equal(fixture.client.current, optimistic);
+  assert.equal(fixture.calls.length, 4, 'base read plus one shared three-attempt refresh');
+
+  const adminRoot = fs.readFileSync(path.join(ROOT, 'admin-v0600.js'), 'utf8');
+  const writeUi = fs.readFileSync(path.join(ROOT, 'admin-write-v0600-v3.js'), 'utf8');
+  assert.match(adminRoot, /client\.load\(\{ force, allowStale:force \}\)/);
+  assert.match(writeUi, /data-admin-refresh="1"\]'\) && !state\.pendingRequestIds\.size\) state\.payload = null/);
+});
+
 test('changing session invalidates cache before another protected read', async () => {
   const first = payload('session-a');
   const second = payload('session-b');

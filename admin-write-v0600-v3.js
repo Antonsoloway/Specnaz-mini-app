@@ -31,14 +31,14 @@
     if (!document.querySelector('link[data-admin-write-css="1"]')) {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = 'admin-write-v0600.css?v=20260822-1146';
+      link.href = 'admin-write-v0600.css?v=20260822-1227';
       link.dataset.adminWriteCss = '1';
       document.head.appendChild(link);
     }
     if (!document.querySelector('link[data-admin-write-v2-css="1"]')) {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = 'admin-write-v0600-v2.css?v=20260822-1146';
+      link.href = 'admin-write-v0600-v2.css?v=20260822-1227';
       link.dataset.adminWriteV2Css = '1';
       document.head.appendChild(link);
     }
@@ -1072,7 +1072,7 @@
       return;
     }
 
-    if (target?.closest?.('[data-admin-refresh="1"]')) state.payload = null;
+    if (target?.closest?.('[data-admin-refresh="1"]') && !state.pendingRequestIds.size) state.payload = null;
   }, true);
 
   document.addEventListener('submit', event => {
