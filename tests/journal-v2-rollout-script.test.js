@@ -16,6 +16,7 @@ test('journal-v2 rollout shell is syntactically valid and help is read-only', ()
   assert.equal(help.status, 0, help.stderr);
   assert.match(help.stdout, /40-char-merged-sha/);
   assert.match(help.stdout, /--rollback/);
+  assert.match(help.stdout, /--diagnose-source-diff/);
   assert.match(help.stdout, /\$BACKUP\/install-v0600-journal-v2\.sh/);
   assert.match(source, /^umask 077$/m);
 });
@@ -518,6 +519,220 @@ test('read-only diagnose compares source and deployments without mutating comman
   assert.doesNotMatch(result.stdout, /AKfy|Таблица|ROYAL_CRM/);
   const commands = fs.readFileSync(trace, 'utf8').trim().split('\n');
   assert.deepEqual(commands, ['pull', 'list-deployments']);
+  fs.rmSync(fixture, { recursive: true, force: true });
+});
+
+test('read-only source diff prints only status and JSON-escaped paths', () => {
+  const crypto = require('node:crypto');
+  const fixture = fs.mkdtempSync(path.join(process.env.TMPDIR || '/tmp', 'journal-source-diff-'));
+  const backup = path.join(fixture, 'v0600-journal-v2-test');
+  const template = path.join(fixture, 'template');
+  const trace = path.join(fixture, 'trace.txt');
+  fs.mkdirSync(backup);
+  fs.mkdirSync(template);
+
+  const digest = value => crypto.createHash('sha256').update(value).digest('hex');
+  const beforeCore = 'function beforeCore() { return true; }\n';
+  const beforePublic = 'function beforePublic() { return true; }\n';
+  const currentCore = 'function currentCore() { return false; }\n';
+  const currentAudit = 'function currentAudit() { return true; }\n';
+  const manifestConfig = '{"timeZone":"Europe/Moscow"}\n';
+  fs.writeFileSync(path.join(backup, 'live-before.sha256'), [
+    `${digest(manifestConfig)}  appsscript.json`,
+    `${digest(beforeCore)}  01_CORE_MAIN.js`,
+    `${digest(beforePublic)}  02_PUBLIC_SYNC_V4.js`,
+    ''
+  ].join('\n'));
+  fs.writeFileSync(
+    path.join(backup, '.clasp.json.rollback'),
+    JSON.stringify({ scriptId: 'test', rootDir: 'source' })
+  );
+  fs.writeFileSync(path.join(template, '01_CORE_MAIN.js'), currentCore);
+  fs.writeFileSync(path.join(template, '34_MINIAPP_AUDIT_V2.js'), currentAudit);
+  fs.writeFileSync(path.join(template, 'appsscript.json'), manifestConfig);
+  const backupBefore = new Map(fs.readdirSync(backup).map(name => [
+    name,
+    fs.readFileSync(path.join(backup, name))
+  ]));
+
+  const result = spawnSync('bash', ['-c', `
+    source "$1"
+    DIAG_TEMPLATE="$3"
+    DIAG_TRACE="$4"
+    clasp() {
+      printf '%s\n' "$*" >> "$DIAG_TRACE"
+      if [[ "$1" == pull ]]; then
+        mkdir -p source
+        cp "$DIAG_TEMPLATE"/* source/
+        return 0
+      fi
+      return 99
+    }
+    diagnose_source_diff "$2"
+  `, 'source-diff-test', SCRIPT_PATH, backup, template, trace], {
+    encoding: 'utf8',
+    env: { ...process.env, ROYAL_CRM_SOURCE_SHA: '8'.repeat(40) }
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /DIAGNOSE_SOURCE_DIFF_READ_ONLY=true/);
+  assert.match(result.stdout, /SOURCE_PULL_SUCCEEDED=true/);
+  assert.match(result.stdout, /SOURCE_MATCHES_LIVE_BEFORE=false/);
+  assert.match(result.stdout, /SOURCE_DETAILS_AVAILABLE=true/);
+  assert.match(result.stdout, /SOURCE_DIFF_COUNT=3/);
+  assert.match(result.stdout, /SOURCE_DIFF=\{"status":"CHANGED","path":"01_CORE_MAIN\.js"\}/);
+  assert.match(result.stdout, /SOURCE_DIFF=\{"status":"REMOVED","path":"02_PUBLIC_SYNC_V4\.js"\}/);
+  assert.match(result.stdout, /SOURCE_DIFF=\{"status":"ADDED","path":"34_MINIAPP_AUDIT_V2\.js"\}/);
+  assert.match(result.stdout, /MUTATING_COMMANDS_USED=false/);
+  assert.doesNotMatch(result.stdout, /function |[0-9a-f]{64}|AKfy|Таблица|ROYAL_CRM/);
+  assert.equal(result.stderr, '');
+  assert.deepEqual(fs.readFileSync(trace, 'utf8').trim().split('\n'), ['pull']);
+  assert.deepEqual(fs.readdirSync(backup).sort(), [...backupBefore.keys()].sort());
+  for (const [name, value] of backupBefore) {
+    assert.deepEqual(fs.readFileSync(path.join(backup, name)), value);
+  }
+  fs.rmSync(fixture, { recursive: true, force: true });
+});
+
+test('read-only source diff reports an exact match without printing file rows', () => {
+  const crypto = require('node:crypto');
+  const fixture = fs.mkdtempSync(path.join(process.env.TMPDIR || '/tmp', 'journal-source-match-'));
+  const backup = path.join(fixture, 'v0600-journal-v2-test');
+  const template = path.join(fixture, 'template');
+  fs.mkdirSync(backup);
+  fs.mkdirSync(template);
+  const value = 'function exactLive() { return true; }\n';
+  const manifestConfig = '{"timeZone":"Europe/Moscow"}\n';
+  fs.writeFileSync(path.join(template, '01_CORE_MAIN.js'), value);
+  fs.writeFileSync(path.join(template, 'appsscript.json'), manifestConfig);
+  const digest = crypto.createHash('sha256').update(value).digest('hex');
+  const manifestDigest = crypto.createHash('sha256').update(manifestConfig).digest('hex');
+  fs.writeFileSync(path.join(backup, 'live-before.sha256'), [
+    `${digest}  01_CORE_MAIN.js`,
+    `${manifestDigest}  appsscript.json`,
+    ''
+  ].join('\n'));
+  fs.writeFileSync(
+    path.join(backup, '.clasp.json.rollback'),
+    JSON.stringify({ scriptId: 'test', rootDir: 'source' })
+  );
+
+  const result = spawnSync('bash', ['-c', `
+    source "$1"
+    DIAG_TEMPLATE="$3"
+    clasp() {
+      if [[ "$1" == pull ]]; then
+        mkdir -p source
+        cp "$DIAG_TEMPLATE"/* source/
+        return 0
+      fi
+      return 99
+    }
+    diagnose_source_diff "$2"
+  `, 'source-match-test', SCRIPT_PATH, backup, template], {
+    encoding: 'utf8',
+    env: { ...process.env, ROYAL_CRM_SOURCE_SHA: '9'.repeat(40) }
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /SOURCE_MATCHES_LIVE_BEFORE=true/);
+  assert.match(result.stdout, /SOURCE_DETAILS_AVAILABLE=true/);
+  assert.match(result.stdout, /SOURCE_DIFF_COUNT=0/);
+  assert.doesNotMatch(result.stdout, /^SOURCE_DIFF=/m);
+  assert.match(result.stdout, /MUTATING_COMMANDS_USED=false/);
+  fs.rmSync(fixture, { recursive: true, force: true });
+});
+
+test('read-only source diff fails closed on malformed, duplicate, unsafe, or identifier-like manifest rows', () => {
+  const crypto = require('node:crypto');
+  const digest = crypto.createHash('sha256').update('safe').digest('hex');
+  const validManifest = `${digest}  appsscript.json\n`;
+  const cases = [
+    '',
+    `${digest}  safe.js\n`,
+    `${validManifest}${digest}  safe.js\n${digest}  safe.js\n`,
+    `${validManifest}${digest}  ../private.js\n`,
+    `${validManifest}${digest}  .\n`,
+    `${validManifest}${digest}  safe.txt\n`,
+    `${validManifest}${digest}  unsafe\u001b[31m.js\n`,
+    `${validManifest}${digest}  unsafe\u009b.js\n`,
+    `${validManifest}${digest}  unsafe\u202e.js\n`,
+    `${validManifest}${digest}  AKfycbSyntheticDeploymentIdentifier123456.js\n`,
+    `${validManifest}${digest}  1SyntheticSpreadsheetOrScriptIdentifier123456789.js\n`
+  ];
+
+  for (const [index, manifest] of cases.entries()) {
+    const fixture = fs.mkdtempSync(path.join(process.env.TMPDIR || '/tmp', `journal-source-unsafe-${index}-`));
+    const backup = path.join(fixture, 'v0600-journal-v2-test');
+    const template = path.join(fixture, 'template.js');
+    fs.mkdirSync(backup);
+    fs.writeFileSync(template, 'function safeCurrent() { return true; }\n');
+    fs.writeFileSync(path.join(backup, 'live-before.sha256'), manifest);
+    fs.writeFileSync(
+      path.join(backup, '.clasp.json.rollback'),
+      JSON.stringify({ scriptId: 'test', rootDir: 'source' })
+    );
+    const result = spawnSync('bash', ['-c', `
+      source "$1"
+      DIAG_TEMPLATE="$3"
+      clasp() {
+        if [[ "$1" == pull ]]; then
+          mkdir -p source
+          cp "$DIAG_TEMPLATE" source/safe.js
+          printf '{"timeZone":"Europe/Moscow"}\n' > source/appsscript.json
+          return 0
+        fi
+        return 99
+      }
+      diagnose_source_diff "$2"
+    `, 'source-unsafe-test', SCRIPT_PATH, backup, template], {
+      encoding: 'utf8',
+      env: { ...process.env, ROYAL_CRM_SOURCE_SHA: 'a'.repeat(40) }
+    });
+    const combined = result.stdout + result.stderr;
+    assert.equal(result.status, 0, combined);
+    assert.match(result.stdout, /SOURCE_PULL_SUCCEEDED=true/);
+    assert.match(result.stdout, /SOURCE_MATCHES_LIVE_BEFORE=false/);
+    assert.match(result.stdout, /SOURCE_DETAILS_AVAILABLE=false/);
+    assert.doesNotMatch(result.stdout, /^SOURCE_DIFF_COUNT=/m);
+    assert.doesNotMatch(result.stdout, /^SOURCE_DIFF=/m);
+    assert.match(result.stdout, /MUTATING_COMMANDS_USED=false/);
+    assert.doesNotMatch(combined, /AKfy|Synthetic|\.\.\/|\u001b\[31m|\u009b|\u202e|[0-9a-f]{64}|function /);
+    fs.rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('read-only source diff reports pull failure without raw output or stale file rows', () => {
+  const fixture = fs.mkdtempSync(path.join(process.env.TMPDIR || '/tmp', 'journal-source-pull-fail-'));
+  const backup = path.join(fixture, 'v0600-journal-v2-test');
+  const trace = path.join(fixture, 'trace.txt');
+  fs.mkdirSync(backup);
+  fs.writeFileSync(path.join(backup, 'live-before.sha256'), `${'b'.repeat(64)}  safe.js\n`);
+  fs.writeFileSync(
+    path.join(backup, '.clasp.json.rollback'),
+    JSON.stringify({ scriptId: 'test', rootDir: 'source' })
+  );
+  const result = spawnSync('bash', ['-c', `
+    source "$1"
+    DIAG_TRACE="$3"
+    clasp() {
+      printf '%s\n' "$*" >> "$DIAG_TRACE"
+      printf 'AKfycbMustNotLeak function secret-content %s\n' "$PWD"
+      return 17
+    }
+    diagnose_source_diff "$2"
+  `, 'source-pull-fail-test', SCRIPT_PATH, backup, trace], {
+    encoding: 'utf8',
+    env: { ...process.env, ROYAL_CRM_SOURCE_SHA: 'b'.repeat(40) }
+  });
+  const combined = result.stdout + result.stderr;
+  assert.equal(result.status, 0, combined);
+  assert.match(result.stdout, /SOURCE_PULL_SUCCEEDED=false/);
+  assert.match(result.stdout, /SOURCE_MATCHES_LIVE_BEFORE=false/);
+  assert.match(result.stdout, /SOURCE_DETAILS_AVAILABLE=false/);
+  assert.doesNotMatch(result.stdout, /^SOURCE_DIFF_COUNT=/m);
+  assert.doesNotMatch(result.stdout, /^SOURCE_DIFF=/m);
+  assert.match(result.stdout, /MUTATING_COMMANDS_USED=false/);
+  assert.doesNotMatch(combined, /AKfy|secret-content|\/tmp\/|[0-9a-f]{64}/);
+  assert.deepEqual(fs.readFileSync(trace, 'utf8').trim().split('\n'), ['pull']);
   fs.rmSync(fixture, { recursive: true, force: true });
 });
 
