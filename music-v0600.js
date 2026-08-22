@@ -2,7 +2,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.6.0-music.2';
+  const VERSION = '0.6.0-music.3';
   const STORAGE_KEY = 'royal_music_v1';
   const LOCAL_PREFIX = `${STORAGE_KEY}:participant:`;
   const PAYLOAD_VERSION = 2;
@@ -41,6 +41,7 @@
   let authorizationPromise = null;
   let authorizationKey = '';
   let objectUrl = '';
+  let gestureUnlockPending = false;
   let lastObservedTimestamp = 0;
   let lastIssuedTimestamp = 0;
   let lastFailedRecord = null;
@@ -238,7 +239,7 @@
     if (state === 'storage-error') return { icon: '🔇', label: 'Настройка недоступна. Включить музыку' };
     if (state === 'starting') return { icon: '⏳', label: 'Музыка загружается. Нажмите, чтобы выключить' };
     if (state === 'off') return { icon: '🔇', label: 'Включить музыку' };
-    if (state === 'blocked') return { icon: '🔈', label: 'Включить звук' };
+    if (state === 'blocked') return { icon: '🔈', label: 'Коснитесь экрана или нажмите, чтобы включить звук' };
     if (state === 'error') return { icon: '⚠️', label: 'Повторить запуск музыки' };
     return { icon: '🔊', label: 'Выключить музыку' };
   }
@@ -269,6 +270,8 @@
       canRetry = Boolean(lastFailedRecord);
     } else if (storageStatus === 'read-error' && saveStatus !== 'saving') {
       message = 'Не удалось проверить сохранённую настройку. Музыка выключена; при необходимости включите её кнопкой звука.';
+    } else if (state === 'blocked') {
+      message = 'Telegram включит музыку после первого касания экрана.';
     }
     noticeText.textContent = message;
     notice.hidden = !message;
@@ -358,7 +361,8 @@
     const attempt = ++playAttempt;
     setState('starting');
     try {
-      const ready = await ensureSource(generation);
+      let ready = sourceAssigned && sourceOwner === generation;
+      if (!ready) ready = await ensureSource(generation);
       if (!ready || !isCurrent(generation) || attempt !== playAttempt || !preference) return false;
       const result = audio.play();
       if (result && typeof result.then === 'function') await result;
@@ -578,11 +582,6 @@
         return false;
       }
       setState('paused');
-      const startupReady = window.RoyalStartupV0600?.whenRevealed;
-      if (startupReady && typeof startupReady.then === 'function') {
-        try { await startupReady; } catch (_) { return false; }
-      }
-      if (!isCurrent(generation, safeKey) || !authorized || !preference) return false;
       return attemptPlay(false);
     })();
     let tracked = null;
@@ -613,6 +612,21 @@
     if (type === 'fatal' || type === 'access-denied') stop();
   }
 
+  function isMusicControl(target) {
+    return Boolean(
+      target?.closest?.('[data-royal-music-toggle]')
+      || target?.closest?.('[data-royal-music-retry]')
+    );
+  }
+
+  function unlockFromGesture(event) {
+    if (event?.isTrusted === false || isMusicControl(event?.target)) return;
+    if (gestureUnlockPending || terminal || !authorized || !preference || !sourceAssigned) return;
+    if (!['blocked', 'paused', 'error'].includes(state)) return;
+    gestureUnlockPending = true;
+    Promise.resolve(attemptPlay(true)).finally(() => { gestureUnlockPending = false; });
+  }
+
   document.addEventListener('click', event => {
     const retry = event.target?.closest?.('[data-royal-music-retry]');
     if (retry) {
@@ -626,6 +640,12 @@
     event.preventDefault();
     event.stopPropagation();
     toggle();
+  }, true);
+
+  document.addEventListener('pointerup', unlockFromGesture, true);
+  document.addEventListener('touchend', unlockFromGesture, { capture:true, passive:true });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') unlockFromGesture(event);
   }, true);
 
   document.addEventListener('visibilitychange', () => {

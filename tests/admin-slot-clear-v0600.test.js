@@ -151,11 +151,12 @@ test('clear button enables after editing an empty slot field', () => {
 });
 
 test('write UI version and stylesheet cache identify the slot-clear build', () => {
-  assert.match(writeSource, /const VERSION = '0\.6\.0-write\.5-ui\.10'/);
+  assert.match(writeSource, /const VERSION = '0\.6\.0-write\.5-ui\.11'/);
   assert.match(writeSource, /admin-write-v0600\.css\?v=20260822-1227/);
   assert.match(writeSource, /admin-write-v0600-v2\.css\?v=20260822-1227/);
-  assert.match(versionSource, /const CACHE = '20260822-1227'/);
+  assert.match(versionSource, /const CACHE = '20260822-history-music-hotfix1'/);
   assert.match(appRouterSource, /const target = 'app-v0600\.html'/);
-  assert.match(appRouterSource, /releaseBuild', '20260822-v0600'/);
-  assert.equal((appV0600Source.match(/\?v=20260822-1227/g) || []).length, 5);
+  assert.match(appRouterSource, /releaseBuild', '20260822-history-music-hotfix1'/);
+  assert.match(appV0600Source, /version-v0600\.js\?v=20260822-history-music-hotfix1/);
+  assert.equal((appV0600Source.match(/\?v=20260822-1227/g) || []).length, 4);
 });
