@@ -64,6 +64,7 @@ function createMusicHarness(options = {}) {
   const protectedLoads = [];
   const documentListeners = {};
   const windowListeners = {};
+  const windowListenerOptions = {};
   const telegramListeners = {};
   const button = fakeButton();
   const live = { textContent: '' };
@@ -156,7 +157,10 @@ function createMusicHarness(options = {}) {
         localValues.set(key, value);
       }
     },
-    addEventListener(type, handler) { windowListeners[type] = handler; }
+    addEventListener(type, handler, options) {
+      windowListeners[type] = handler;
+      windowListenerOptions[type] = options;
+    }
   };
   sandbox.window = sandbox;
   vm.createContext(sandbox);
@@ -177,6 +181,7 @@ function createMusicHarness(options = {}) {
     document,
     documentListeners,
     windowListeners,
+    windowListenerOptions,
     telegramListeners
   };
 }
@@ -309,7 +314,7 @@ test('default ON starts before startup reveal and requests only the exact protec
   assert.equal(harness.audio.src, 'blob:protected-background');
   assert.equal(harness.audio.volume, 0.15);
   assert.equal(harness.audio.playCalls, 1);
-  assert.equal(harness.controller.version, '0.6.0-music.5');
+  assert.equal(harness.controller.version, '0.6.0-music.6');
   assert.doesNotMatch(musicSource, /fetchProtectedMediaObjectUrl\(['"]audio['"]\)/);
   assert.doesNotMatch(musicSource, /assets\/.*\.(?:mp3|m4a|aac)/i);
 });
@@ -680,6 +685,11 @@ test('window capture supports every Telegram gesture phase and ignores untrusted
     await ticks();
     assert.equal(harness.controller.getState().state, 'playing');
   }
+  const passiveHarness = createMusicHarness({ cloudValue: stored(false, 1350), deviceValue: stored(false, 1350) });
+  for (const type of ['pointerdown', 'pointerup', 'touchstart', 'touchend']) {
+    assert.equal(passiveHarness.windowListenerOptions[type]?.capture, true, `${type} stays on window capture`);
+    assert.equal(passiveHarness.windowListenerOptions[type]?.passive, true, `${type} cannot block page scrolling`);
+  }
   assert.doesNotMatch(musicSource, /Telegram включит музыку после первого касания/);
 });
 
@@ -858,6 +868,7 @@ function createAppHarness() {
   const windowListeners = {};
   const getElement = elementMap();
   let mediaCalls = 0;
+  let verticalSwipeDisableCalls = 0;
   const sandbox = {
     console,
     Promise,
@@ -874,7 +885,8 @@ function createAppHarness() {
         initData: 'signed-init-data',
         initDataUnsafe: { user: { first_name: 'Тест' } },
         ready() {},
-        expand() {}
+        expand() {},
+        disableVerticalSwipes() { verticalSwipeDisableCalls += 1; }
       }
     },
     __ROYAL_BUILD__: '0.6.0',
@@ -913,8 +925,21 @@ function createAppHarness() {
   sandbox.window = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(appSource, sandbox, { filename: 'app.js' });
-  return { sandbox, mediaResponse, revoked, windowListeners, get mediaCalls() { return mediaCalls; } };
+  return {
+    sandbox,
+    mediaResponse,
+    revoked,
+    windowListeners,
+    get mediaCalls() { return mediaCalls; },
+    get verticalSwipeDisableCalls() { return verticalSwipeDisableCalls; }
+  };
 }
+
+test('v0.6 reserves vertical panning for long CRM pages inside Telegram', async () => {
+  const harness = createAppHarness();
+  await ticks();
+  assert.equal(harness.verticalSwipeDisableCalls, 1);
+});
 
 test('protected media allow-list rejects legacy audio and revokes a cancelled exact asset', async () => {
   const harness = createAppHarness();
@@ -1045,9 +1070,9 @@ test('v0.6 is the general entry and media remain protected/private', () => {
   assert.match(appSource, /: '0\.5\.59';/);
   assert.match(appSource, /Authorization: `Bearer \$\{sessionAtStart\}`/);
   assert.match(router, /const target = 'app-v0600\.html'/);
-  assert.match(router, /releaseBuild', '20260823-snapshot-resilience-hotfix4'/);
-  assert.match(preview, /music-v0600\.js\?v=20260823-startup-priority-hotfix3/);
-  assert.match(preview, /app\.js\?v=20260823-snapshot-resilience-hotfix4/);
+  assert.match(router, /releaseBuild', '20260823-scroll-gesture-hotfix5'/);
+  assert.match(preview, /music-v0600\.js\?v=20260823-scroll-gesture-hotfix5/);
+  assert.match(preview, /app\.js\?v=20260823-scroll-gesture-hotfix5/);
   assert.doesNotMatch(router, /app-v0559\.html/);
   assert.match(index, /app-v0600\.html/);
   assert.doesNotMatch(index, /app-v0559\.html/);

@@ -237,6 +237,10 @@ async function authenticate() {
   emitAppLifecycle('auth-start');
   if (!tg) { showFatal('Приложение нужно открыть внутри Telegram.', `build=${BUILD}`); return; }
   tg.ready(); tg.expand();
+  // Long CRM lists own vertical panning. Prevent Telegram's body-level
+  // minimize gesture from intermittently stealing the same swipe; the native
+  // header swipe and close control remain available.
+  try { tg.disableVerticalSwipes?.(); } catch (_) {}
   if (!tg.initData) { showFatal('Telegram не передал данные авторизации.', `build=${BUILD}`); return; }
   const previewUser = tg.initDataUnsafe?.user;
   if (previewUser?.first_name) document.getElementById('hello').textContent = `Привет, ${previewUser.first_name}!`;
