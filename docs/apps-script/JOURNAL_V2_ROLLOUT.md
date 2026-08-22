@@ -200,7 +200,7 @@ diagnose — полный deployment inventory. Результаты старо�
 
 ## Узкий source-only repair stranded file34
 
-Installer `1.5.0` содержит отдельный one-shot режим только для инцидента, где
+Installer `1.5.1` содержит отдельный one-shot режим только для инцидента, где
 полный source-diff равен единственной записи
 `ADDED 34_MINIAPP_AUDIT_V2.js`, а полный deployment inventory точно совпадает
 с pre-rollout backup. Это не общий restore и не замена rollback.
@@ -224,6 +224,15 @@ ROYAL_CRM_CONFIRM_SOURCE_ONLY_REPAIR=REMOVE_ONLY_STRANDED_34_MINIAPP_AUDIT_V2_JS
 старого schema-1 backup полный baseline восстанавливается из безопасно
 проверенного `live-before-full.tgz`; HTML входит в проверку. Saved raw/TSV/ID
 deployment inventory повторно разбираются и взаимно сверяются.
+
+Исторический installer 1.1 сохранял `.clasp.json.rollback` и optional
+`.claspignore.rollback` через `cp -p`, поэтому внутри owner-only backup `0700`
+у них мог сохраниться exact mode `0664`. Installer 1.5.1 принимает этот режим
+только для двух фиксированных clasp-файлов и только при regular non-symlink,
+current-owner, single-link и bounded-size проверках; любые writable биты у
+других evidence-файлов по-прежнему отклоняются. Frozen-копия всегда создаётся
+с mode `0600`, а до/после копирования сверяются inode, size, timestamps, mode,
+owner и link count.
 
 До remote mutation выполняются два clean pull в разные пустые каталоги. Оба
 обязаны показать один и тот же полный payload: baseline плюс один regular

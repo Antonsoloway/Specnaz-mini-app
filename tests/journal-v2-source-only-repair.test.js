@@ -53,6 +53,7 @@ function makeFixture(options = {}) {
     scriptId: 'synthetic-source-repair-script',
     rootDir: options.rootDir || 'source'
   });
+  const claspIgnore = '# historical config\n';
   const baseline = {
     '01_CORE_MAIN.js': 'function stableCore() { return true; }\n',
     'MiniApp.html': '<main>stable html payload</main>\n',
@@ -83,6 +84,11 @@ function makeFixture(options = {}) {
   fs.writeFileSync(path.join(backup, '.clasp.json.rollback'), config, {
     mode: options.configMode || 0o600
   });
+  if (options.claspIgnoreMode) {
+    fs.writeFileSync(path.join(backup, '.claspignore.rollback'), claspIgnore, {
+      mode: options.claspIgnoreMode
+    });
+  }
   fs.writeFileSync(path.join(backup, 'metadata.json'), JSON.stringify({
     schema: options.schema === 1 ? 1 : 2,
     ...(options.schema === 1 ? {} : { sourceManifestSchema: 2 }),
@@ -117,6 +123,9 @@ function makeFixture(options = {}) {
     const archiveProject = path.join(fixture, 'archive-project');
     fs.mkdirSync(archiveProject, { mode: 0o700 });
     fs.writeFileSync(path.join(archiveProject, '.clasp.json'), config, { mode: 0o600 });
+    if (options.claspIgnoreMode) {
+      fs.writeFileSync(path.join(archiveProject, '.claspignore'), claspIgnore, { mode: 0o600 });
+    }
     writeTree(
       (options.rootDir || 'source') === '.'
         ? archiveProject
@@ -293,10 +302,15 @@ test('source-only repair static mutation boundary is one push and no function or
   assert.match(repair, /write_source_repair_push_marker[\s\S]+clasp push -f/);
 });
 
-test('schema1 rootDir dot repair accepts private 0644 config, preserves HTML, and pushes once', () => {
-  const fixture = makeFixture({ schema: 1, rootDir: '.', configMode: 0o644 });
+test('schema1 rootDir dot repair accepts historical 0664 clasp controls inside private root', () => {
+  const fixture = makeFixture({
+    schema: 1,
+    rootDir: '.',
+    configMode: 0o664,
+    claspIgnoreMode: 0o664
+  });
   const result = runRepair(fixture);
-  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(result.stdout, /RESULT=VERIFIED_APPLIED/);
   assert.match(result.stdout, /PUSH_ATTEMPTS=1/);
   assert.match(result.stdout, /PUSH_RESPONSE_OK=true/);
@@ -448,6 +462,40 @@ test('hard-linked backup config is rejected before clasp', () => {
   const config = path.join(fixture.backup, '.clasp.json.rollback');
   const secondLink = path.join(fixture.backup, 'synthetic-config-hardlink');
   fs.linkSync(config, secondLink);
+  const result = runRepair(fixture);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /REASON=EVIDENCE_INVALID/);
+  assert.deepEqual(traceLines(fixture), []);
+  assertSafeTerminal(result);
+  cleanup(fixture);
+});
+
+test('writable non-clasp evidence and non-private backup root remain rejected', async t => {
+  for (const kind of ['metadata-0664', 'backup-0755']) {
+    await t.test(kind, () => {
+      const fixture = makeFixture({ schema: 2 });
+      if (kind === 'metadata-0664') {
+        fs.chmodSync(path.join(fixture.backup, 'metadata.json'), 0o664);
+      } else {
+        fs.chmodSync(fixture.backup, 0o755);
+      }
+      const result = runRepair(fixture);
+      assert.notEqual(result.status, 0);
+      assert.match(result.stdout, /REASON=EVIDENCE_INVALID/);
+      assert.deepEqual(traceLines(fixture), []);
+      assertSafeTerminal(result);
+      cleanup(fixture);
+    });
+  }
+});
+
+test('symlinked backup config remains rejected before clasp', () => {
+  const fixture = makeFixture({ schema: 2 });
+  const config = path.join(fixture.backup, '.clasp.json.rollback');
+  const external = path.join(fixture.fixture, 'external-clasp-config');
+  fs.writeFileSync(external, fs.readFileSync(config), { mode: 0o600 });
+  fs.rmSync(config);
+  fs.symlinkSync(external, config);
   const result = runRepair(fixture);
   assert.notEqual(result.status, 0);
   assert.match(result.stdout, /REASON=EVIDENCE_INVALID/);

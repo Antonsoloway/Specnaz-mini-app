@@ -8,7 +8,7 @@ umask 077
 # deployment ID, never changes business rows, and never enables audit v2 until
 # a fresh baseline and every service-sheet protection gate have been verified.
 
-readonly ROLLOUT_SCRIPT_VERSION="1.5.0"
+readonly ROLLOUT_SCRIPT_VERSION="1.5.1"
 readonly ROOT_BASHPID="$BASHPID"
 readonly REPO="Antonsoloway/Specnaz-mini-app"
 readonly EXPECTED_DESC="Таблица ЧП 1.3"
@@ -1687,15 +1687,26 @@ try:
             continue
         try:
             before = os.fstat(source_fd)
+            permissions = stat.S_IMODE(before.st_mode)
+            # Installer 1.1 copied these two project-control files with cp -p.
+            # A historical Cloud Shell project may therefore have preserved
+            # exact mode 0664 even though the owner-only backup root is 0700.
+            # The exception is intentionally limited to those fixed names and
+            # exact mode; regular-file, owner, single-link and size gates still
+            # apply, and the frozen copy is always newly created as 0600.
+            legacy_private_clasp_mode = (
+                name in {'.clasp.json.rollback', '.claspignore.rollback'}
+                and permissions == 0o664
+            )
             if (
                 not stat.S_ISREG(before.st_mode)
                 or before.st_uid != os.getuid()
                 or before.st_nlink != 1
                 # The backup directory itself is 0700. Older backups may
-                # contain 0644 clasp copies because cp -p preserved their
-                # source mode; reject writable sharing while freezing every
-                # artifact into a new 0600 evidence copy.
-                or before.st_mode & 0o022
+                # contain preserved clasp modes; the exact private-root 0664
+                # compatibility case is defined above. Reject writable sharing
+                # everywhere else and freeze every artifact into a new 0600 copy.
+                or (permissions & 0o022 and not legacy_private_clasp_mode)
                 or before.st_size < 0
                 or before.st_size > limit
             ):
@@ -1721,11 +1732,19 @@ try:
                 before.st_ino,
                 before.st_size,
                 before.st_mtime_ns,
+                before.st_ctime_ns,
+                stat.S_IMODE(before.st_mode),
+                before.st_uid,
+                before.st_nlink,
             ) != (
                 after.st_dev,
                 after.st_ino,
                 after.st_size,
                 after.st_mtime_ns,
+                after.st_ctime_ns,
+                stat.S_IMODE(after.st_mode),
+                after.st_uid,
+                after.st_nlink,
             ):
                 raise SystemExit('backup artifact changed while freezing')
         finally:
