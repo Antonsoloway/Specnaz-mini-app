@@ -1,6 +1,8 @@
 const tg = window.Telegram?.WebApp;
 const API_URL = 'https://royal-crm-miniapp-api.tropical-spoon.workers.dev';
-const BUILD = '0.5.59';
+const BUILD = /^\d+\.\d+\.\d+$/.test(String(window.__ROYAL_BUILD__ || '').trim())
+  ? String(window.__ROYAL_BUILD__).trim()
+  : '0.5.59';
 
 let authState = null;
 let snapshotState = null;
@@ -8,6 +10,74 @@ let sessionToken = '';
 let activePage = 'home';
 let avatarObserver = null;
 const avatarBlobCache = new Map();
+const protectedMediaObjectUrls = new Map();
+const protectedMediaLoads = new Map();
+const protectedMediaGenerations = new Map();
+const protectedMediaAssets = new Set(['background-v0600']);
+
+function emitAppLifecycle(type, detail = {}) {
+  const payload = { ...detail, build: BUILD };
+  if (type === 'auth-ready' && payload.access === true) {
+    window.__ROYAL_AUTH_READY__ = { access: true, build: BUILD };
+  } else if (type === 'fatal' || type === 'access-denied') {
+    window.__ROYAL_AUTH_READY__ = null;
+  }
+  [window.RoyalStartupV0600, window.RoyalMusicV0600].forEach(target => {
+    try { target?.handleAppEvent?.(type, payload); } catch (error) { console.warn(`Lifecycle ${type} hook failed:`, error); }
+  });
+  try {
+    if (typeof window.CustomEvent === 'function') {
+      window.dispatchEvent(new CustomEvent(`royal:${type}`, { detail: payload }));
+    }
+  } catch (_) {}
+}
+
+async function protectedMediaObjectUrl(asset) {
+  const key = String(asset || '').trim();
+  if (!protectedMediaAssets.has(key)) throw new Error('PROJECT_MEDIA_UNKNOWN');
+  if (!sessionToken) throw new Error('PROJECT_MEDIA_SESSION_MISSING');
+  if (protectedMediaObjectUrls.has(key)) return protectedMediaObjectUrls.get(key);
+  const generation = Number(protectedMediaGenerations.get(key) || 0);
+  const existingLoad = protectedMediaLoads.get(key);
+  if (existingLoad?.generation === generation) return existingLoad.promise;
+  const sessionAtStart = sessionToken;
+  const load = (async () => {
+    const response = await fetch(`${API_URL}/project-mayak-media?asset=${encodeURIComponent(key)}`, {
+      method: 'GET', mode: 'cors', cache: 'no-store',
+      headers: { Authorization: `Bearer ${sessionAtStart}` }
+    });
+    if (!response.ok) throw new Error(`PROJECT_MEDIA_HTTP_${response.status}`);
+    const blob = await response.blob();
+    if (!blob || !blob.size || !String(blob.type || '').startsWith('audio/')) {
+      throw new Error('PROJECT_MEDIA_INVALID');
+    }
+    const objectUrl = URL.createObjectURL(blob);
+    if (Number(protectedMediaGenerations.get(key) || 0) !== generation || sessionToken !== sessionAtStart) {
+      try { URL.revokeObjectURL(objectUrl); } catch (_) {}
+      throw new Error('PROJECT_MEDIA_CANCELLED');
+    }
+    protectedMediaObjectUrls.set(key, objectUrl);
+    return objectUrl;
+  })().finally(() => {
+    if (protectedMediaLoads.get(key)?.promise === load) protectedMediaLoads.delete(key);
+  });
+  protectedMediaLoads.set(key, { generation, promise: load });
+  return load;
+}
+
+function releaseProtectedMedia(asset = '') {
+  const keys = asset
+    ? [String(asset)]
+    : [...new Set([...protectedMediaObjectUrls.keys(), ...protectedMediaLoads.keys()])];
+  keys.forEach(key => {
+    protectedMediaGenerations.set(key, Number(protectedMediaGenerations.get(key) || 0) + 1);
+    const objectUrl = protectedMediaObjectUrls.get(key);
+    if (objectUrl) {
+      protectedMediaObjectUrls.delete(key);
+      try { URL.revokeObjectURL(objectUrl); } catch (_) {}
+    }
+  });
+}
 
 function esc(value) {
   return String(value ?? '')
@@ -39,10 +109,12 @@ function setActiveNav(page) {
 }
 
 function showDenied(message) {
+  emitAppLifecycle('access-denied', { message: String(message || '') });
   document.body.innerHTML = `<main class="gate-screen"><div class="gate-icon">🕊️</div><h1>Доступ закрыт</h1><p>${esc(message || 'Извините, вы не состоите в спецназе.')}</p><small>Доступ к приложению есть только у участников ЧАТА ПОБЕДИТЕЛЕЙ со статусом «В чате».</small></main>`;
 }
 
 function showFatal(message, details = '') {
+  emitAppLifecycle('fatal', { message: String(message || ''), code: String(details || '') });
   document.getElementById('panel').innerHTML = `<h2>Не удалось войти</h2><p>${esc(message)}</p>${details ? `<p class="muted">${esc(details)}</p>` : ''}<p class="muted">Закройте приложение и откройте его снова из бота.</p>`;
 }
 
@@ -61,6 +133,14 @@ function renderAuth(data) {
     : 'Командные роли не указаны';
   document.getElementById('panel').innerHTML = `<h2>${esc(role.title || 'Участник')}</h2><p><strong>${esc(user.crmName || user.telegramFirstName || '')}</strong></p><p class="muted">${teamText}</p><p class="muted" id="dataStatus">Загружаем справочник…</p>`;
   setButtonsEnabled(true);
+  emitAppLifecycle('auth-ready', {
+    access: true,
+    user: {
+      participantKey: String(user.participantKey || ''),
+      crmName: String(user.crmName || ''),
+      telegramFirstName: String(user.telegramFirstName || '')
+    }
+  });
 }
 
 async function workerAuth(initData) {
@@ -80,27 +160,36 @@ async function workerAuth(initData) {
 
 async function loadSnapshot() {
   if (!sessionToken) return;
-  const response = await fetch(`${API_URL}/snapshot`, {
-    method: 'GET', mode: 'cors', cache: 'no-store',
-    headers: { Authorization: `Bearer ${sessionToken}` }
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || !data?.ok) {
-    const error = new Error(data?.message || `HTTP ${response.status}`);
-    error.code = data?.error || `HTTP_${response.status}`;
+  emitAppLifecycle('snapshot-start');
+  try {
+    const response = await fetch(`${API_URL}/snapshot`, {
+      method: 'GET', mode: 'cors', cache: 'no-store',
+      headers: { Authorization: `Bearer ${sessionToken}` }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data?.ok) {
+      const error = new Error(data?.message || `HTTP ${response.status}`);
+      error.code = data?.error || `HTTP_${response.status}`;
+      throw error;
+    }
+    snapshotState = data.snapshot || null;
+    const status = document.getElementById('dataStatus');
+    if (status && snapshotState) {
+      const stats = snapshotState.stats || {};
+      status.textContent = `CRM загружена: ${Number(stats.inChat || stats.participants || 0)} участников, ${Number(stats.teams || 0)} команд.`;
+    }
+    emitAppLifecycle('snapshot-ready', { stats: snapshotState?.stats || {} });
+    return snapshotState;
+  } catch (error) {
+    emitAppLifecycle('snapshot-error', { code: String(error?.code || error?.message || 'UNKNOWN') });
     throw error;
-  }
-  snapshotState = data.snapshot || null;
-  const status = document.getElementById('dataStatus');
-  if (status && snapshotState) {
-    const stats = snapshotState.stats || {};
-    status.textContent = `CRM загружена: ${Number(stats.inChat || stats.participants || 0)} участников, ${Number(stats.teams || 0)} команд.`;
   }
 }
 
 async function authenticate() {
   setButtonsEnabled(false);
   document.getElementById('versionBadge').textContent = `v${BUILD}`;
+  emitAppLifecycle('auth-start');
   if (!tg) { showFatal('Приложение нужно открыть внутри Telegram.', `build=${BUILD}`); return; }
   tg.ready(); tg.expand();
   if (!tg.initData) { showFatal('Telegram не передал данные авторизации.', `build=${BUILD}`); return; }
@@ -332,5 +421,19 @@ document.addEventListener('click', e => {
   const userButton = e.target.closest('[data-user-menu]');
   if (userButton) openUserMenu(userButton.dataset.userMenu, userButton.dataset.userName);
 });
+
+if (BUILD === '0.6.0') {
+  window.RoyalAppV0600 = {
+    version: BUILD,
+    fetchProtectedMediaObjectUrl: protectedMediaObjectUrl,
+    releaseProtectedMedia,
+    reloadSnapshot: async () => {
+      const snapshot = await loadSnapshot();
+      if (activePage !== 'home') renderPage(activePage);
+      return snapshot;
+    }
+  };
+  window.addEventListener('pagehide', () => releaseProtectedMedia(), { once: true });
+}
 
 authenticate();

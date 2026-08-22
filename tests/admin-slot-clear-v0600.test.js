@@ -155,7 +155,7 @@ test('write UI version and stylesheet cache identify the slot-clear build', () =
   assert.match(writeSource, /admin-write-v0600\.css\?v=20260822-1227/);
   assert.match(writeSource, /admin-write-v0600-v2\.css\?v=20260822-1227/);
   assert.match(versionSource, /const CACHE = '20260822-1227'/);
-  assert.match(appRouterSource, /startParam === 'v0600-1227'/);
-  assert.match(appRouterSource, /previewBuild', '20260822-1227'/);
-  assert.equal((appV0600Source.match(/\?v=20260822-1227/g) || []).length, 6);
+  assert.match(appRouterSource, /startParam === 'v0600-rc2'/);
+  assert.match(appRouterSource, /previewBuild', '20260822-startup-music-rc2'/);
+  assert.equal((appV0600Source.match(/\?v=20260822-1227/g) || []).length, 5);
 });
