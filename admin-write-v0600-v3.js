@@ -280,7 +280,6 @@
       if (!detail || detail.querySelector('[data-admin-edit-team="1"]')) return;
       detail.insertAdjacentHTML('beforeend','<button type="button" class="royal-admin-edit-record" data-admin-edit-team="1">✏️ Изменить команду</button>');
     });
-    decorateJournal();
   }
 
   function removeEditUi() {
@@ -926,40 +925,6 @@
     return true;
   }
 
-  function journalOperationLabel(op) {
-    return ({
-      updateParticipant:'Изменение участника',
-      createParticipant:'Новый участник',
-      deleteParticipant:'Удаление участника',
-      updateTeam:'Изменение команды',
-      createTeam:'Новая команда',
-      deleteTeam:'Удаление команды'
-    })[clean(op)] || clean(op) || 'Изменение';
-  }
-
-  function decorateJournal() {
-    if (!document.querySelector('[data-admin-tab="journal"].is-active')) return;
-    document.querySelectorAll('.royal-admin-list .royal-admin-record .royal-admin-detail').forEach(detail => {
-      if (detail.dataset.adminJournalDecorated === '1') return;
-      let row;
-      try { row = JSON.parse(clean(detail.textContent)); }
-      catch (_) { return; }
-      const changed = row?.changed && typeof row.changed === 'object'
-        ? Object.keys(row.changed)
-        : [];
-      const admin = clean(row?.adminUsername) || `ID ${clean(row?.adminTelegramId) || '—'}`;
-      detail.dataset.adminJournalDecorated = '1';
-      detail.innerHTML = `
-        <div class="royal-admin-journal-summary">
-          <strong>${esc(journalOperationLabel(row?.op))}</strong>
-          <small>${esc(row?.at || '')} · ${esc(admin)} · строка ${esc(row?.row || '—')}</small>
-          <small>${esc(row?.entityKey || '')}</small>
-        </div>
-        <div class="royal-admin-journal-chips">${changed.map(key => `<span class="royal-admin-journal-chip">${esc(key)}</span>`).join('')}</div>
-        <details class="royal-admin-journal-json"><summary>До / после</summary><pre>${esc(JSON.stringify({before:row?.before,after:row?.after},null,2))}</pre></details>`;
-    });
-  }
-
   function showMessage(text, error=false) {
     const message = clean(text);
     try {
@@ -1104,7 +1069,6 @@
     setTimeout(() => {
       try {
         if (state.editing && isAdminScreen()) injectEditUi();
-        decorateJournal();
       } finally {
         state.observerBusy = false;
       }
