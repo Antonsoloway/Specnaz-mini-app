@@ -8,12 +8,16 @@ umask 077
 # deployment ID, never changes business rows, and never enables audit v2 until
 # a fresh baseline and every service-sheet protection gate have been verified.
 
-readonly ROLLOUT_SCRIPT_VERSION="1.1.0"
+readonly ROLLOUT_SCRIPT_VERSION="1.2.0"
 readonly ROOT_BASHPID="$BASHPID"
 readonly REPO="Antonsoloway/Specnaz-mini-app"
 readonly EXPECTED_DESC="Таблица ЧП 1.3"
 readonly EXPECTED_AUDIT_SCHEMA="2"
 readonly EXPECTED_CHATKEEPER_SECRET_PROPERTY="ROYAL_CRM_CHATKEEPER_WEBHOOK_SECRET"
+readonly ROLLBACK_DISABLE_ATTEMPTS="12"
+readonly ROLLBACK_DISABLE_RETRY_SECONDS="5"
+readonly CLASP_RUN_VISIBILITY_ATTEMPTS="12"
+readonly CLASP_RUN_VISIBILITY_RETRY_SECONDS="5"
 readonly PROJECT_DIR="${ROYAL_CRM_PROJECT_DIR:-${HOME}/table-chp-1.3}"
 readonly BACKUP_ROOT="${ROYAL_CRM_BACKUP_ROOT:-${HOME}/royal-crm-backups}"
 readonly SOURCE_SHA="${ROYAL_CRM_SOURCE_SHA:-}"
@@ -55,6 +59,11 @@ WRITE_VERSION=""
 STATE_MUTATED=0
 IN_ROLLBACK=0
 ROLLOUT_COMPLETE=0
+STAGE1_PUSH_POSSIBLE=0
+STAGE1_DISABLED_CONFIRMED=0
+AUDIT_ACTIVATION_POSSIBLE=0
+AUDIT_ACTIVATION_CONFIRMED=0
+ROLLBACK_DIAGNOSTIC_DIR=""
 
 info() { printf '\n[INFO] %s\n' "$*"; }
 ok() { printf '\n✅ %s\n' "$*"; }
@@ -108,6 +117,9 @@ Explicit rollback from a backup produced by this installer:
   ROYAL_CRM_CONFIRM_ROLLBACK=ROLLBACK_JOURNAL_V2 \
     bash "$BACKUP/install-v0600-journal-v2.sh" --rollback "$BACKUP"
 
+Read-only diagnosis of source/deployment restoration:
+  bash scripts/install-v0600-journal-v2.sh --diagnose "$BACKUP"
+
 Optional:
   ROYAL_CRM_PROJECT_DIR     clasp project containing .clasp.json
   ROYAL_CRM_BACKUP_ROOT     backup parent (default: ~/royal-crm-backups)
@@ -131,6 +143,13 @@ require_rollback_tools() {
   done
   [[ -d "$PROJECT_DIR" ]] || die "Apps Script каталог не найден: $PROJECT_DIR"
   [[ -f "$PROJECT_DIR/.clasp.json" ]] || die ".clasp.json не найден: $PROJECT_DIR"
+}
+
+require_diagnose_tools() {
+  local command_name
+  for command_name in clasp python3; do
+    command -v "$command_name" >/dev/null 2>&1 || die "$command_name не найден"
+  done
 }
 
 validate_source_sha() {
@@ -653,16 +672,48 @@ run_clasp_checked() {
   local function_name="$1"
   local mode="$2"
   local expected_endpoint="${3:-}"
-  local output_file="$TEMP_DIR/clasp-run-${function_name}-$(date +%s%N).txt"
-  local exit_code
-  set +e
-  clasp run "$function_name" >"$output_file" 2>&1
-  exit_code=$?
-  set -e
-  cat "$output_file"
-  [[ "$exit_code" == "0" ]] || die "clasp run $function_name завершился с exit $exit_code"
-  semantic_assert "$mode" "$expected_endpoint" "$output_file" \
-    || die "clasp run $function_name не прошёл semantic validation"
+  local diagnostic_root output_file semantic_file attempt exit_code semantic_code
+  diagnostic_root="${BACKUP_DIR:-$TEMP_DIR}/diagnostics/clasp-run/${function_name}-$(date +%s%N)-${BASHPID}"
+  mkdir -p -m 700 "$diagnostic_root"
+
+  # Apps Script HEAD propagation after clasp push is not instantaneous. A
+  # function-not-found response, an empty transport response or the previous
+  # version's semantic payload must not turn a successful inert push into a
+  # false rollback. Every call is bounded and every attempt is retained.
+  for attempt in $(seq 1 "$CLASP_RUN_VISIBILITY_ATTEMPTS"); do
+    output_file="$diagnostic_root/attempt-${attempt}.txt"
+    semantic_file="$diagnostic_root/attempt-${attempt}.semantic.txt"
+    printf '[INFO] clasp run %s semantic visibility check %s/%s\n' \
+      "$function_name" "$attempt" "$CLASP_RUN_VISIBILITY_ATTEMPTS"
+
+    if clasp run "$function_name" >"$output_file" 2>&1; then
+      exit_code=0
+    else
+      exit_code=$?
+    fi
+    if semantic_assert "$mode" "$expected_endpoint" "$output_file" \
+      >"$semantic_file" 2>&1; then
+      semantic_code=0
+    else
+      semantic_code=$?
+    fi
+    cat "$output_file"
+    if [[ "$exit_code" == "0" && "$semantic_code" == "0" ]]; then
+      cat "$semantic_file"
+      printf 'CLASP_EXIT_OK=true\nSEMANTIC_OK=true\nATTEMPT=%s\n' "$attempt" \
+        >"$diagnostic_root/result.txt"
+      return 0
+    fi
+    if [[ "$attempt" -lt "$CLASP_RUN_VISIBILITY_ATTEMPTS" ]]; then
+      sleep "$CLASP_RUN_VISIBILITY_RETRY_SECONDS"
+    fi
+  done
+
+  printf 'CLASP_EXIT_OK=%s\nSEMANTIC_OK=%s\nATTEMPT=%s\n' \
+    "$([[ "$exit_code" == "0" ]] && printf true || printf false)" \
+    "$([[ "$semantic_code" == "0" ]] && printf true || printf false)" \
+    "$CLASP_RUN_VISIBILITY_ATTEMPTS" >"$diagnostic_root/result.txt"
+  die "clasp run $function_name не стал семантически доступен за $CLASP_RUN_VISIBILITY_ATTEMPTS попыток (last exit=$exit_code, semantic=$semantic_code)"
 }
 
 check_direct_route() {
@@ -727,7 +778,7 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 data = {
-    'schema': 1,
+    'schema': 2,
     'deploymentId': sys.argv[2],
     'deploymentVersionBefore': int(sys.argv[3]),
     'deploymentDescription': sys.argv[4],
@@ -738,6 +789,11 @@ data = {
     'writeVersion': sys.argv[9],
     'chatKeeperSecretProperty': sys.argv[10],
     'chatKeeperSecretPropertyPreservedOnRollback': True,
+    'rolloutPhase': 'prepared',
+    'stage1PushPossible': False,
+    'stage1DisabledConfirmed': False,
+    'auditActivationPossible': False,
+    'auditActivationConfirmed': False,
     'rollbackFiles': [
         '01_CORE_MAIN.js', '02_PUBLIC_SYNC_V4.js', '07_FINAL_ROLE_FIX.js',
         '17_MINIAPP_PERSISTENT_MEDIA.js', '25_MINIAPP_UNIFIED_SNAPSHOT.js',
@@ -748,6 +804,40 @@ data = {
     'serviceSheetsDeletionAllowed': False
 }
 path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+PY
+}
+
+checkpoint_rollout_state() {
+  local phase="$1"
+  [[ -f "$BACKUP_DIR/metadata.json" ]] || die "Rollback metadata отсутствует для checkpoint"
+  python3 - "$BACKUP_DIR/metadata.json" "$phase" \
+    "$STAGE1_PUSH_POSSIBLE" "$STAGE1_DISABLED_CONFIRMED" \
+    "$AUDIT_ACTIVATION_POSSIBLE" "$AUDIT_ACTIVATION_CONFIRMED" <<'PY'
+import json, os, sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+phase = sys.argv[2]
+allowed = {
+    'prepared', 'stage1-push-started', 'stage1-disabled-confirmed',
+    'stage2-source-pushed', 'activation-attempted',
+    'activation-confirmed', 'deployment-updated', 'complete'
+}
+if phase not in allowed:
+    raise SystemExit('invalid rollout checkpoint phase')
+data = json.loads(path.read_text(encoding='utf-8'))
+data.update({
+    'schema': 2,
+    'rolloutPhase': phase,
+    'stage1PushPossible': sys.argv[3] == '1',
+    'stage1DisabledConfirmed': sys.argv[4] == '1',
+    'auditActivationPossible': sys.argv[5] == '1',
+    'auditActivationConfirmed': sys.argv[6] == '1'
+})
+temporary = path.with_name(path.name + '.tmp')
+temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+os.chmod(temporary, 0o600)
+os.replace(temporary, path)
 PY
 }
 
@@ -774,6 +864,22 @@ import json, sys
 from pathlib import Path
 data = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
 value = data[sys.argv[2]]
+if isinstance(value, bool):
+    print('true' if value else 'false')
+else:
+    print(value)
+PY
+}
+
+load_rollback_metadata_optional() {
+  local backup="$1"
+  local field="$2"
+  local fallback="$3"
+  python3 - "$backup/metadata.json" "$field" "$fallback" <<'PY'
+import json, sys
+from pathlib import Path
+data = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+value = data.get(sys.argv[2], sys.argv[3])
 if isinstance(value, bool):
     print('true' if value else 'false')
 else:
@@ -832,6 +938,79 @@ restore_exact_journal_files() {
   fi
 }
 
+prepare_rollback_diagnostics() {
+  local backup="$1"
+  if [[ -z "$ROLLBACK_DIAGNOSTIC_DIR" ]]; then
+    ROLLBACK_DIAGNOSTIC_DIR="$backup/diagnostics/rollback-${STAMP}-$$"
+  fi
+  mkdir -p -m 700 "$ROLLBACK_DIAGNOSTIC_DIR"
+}
+
+confirm_audit_disabled_for_rollback() {
+  local backup="$1"
+  local attempt deactivate_output deactivate_semantic status_output status_semantic
+  local deactivate_exit deactivate_verified status_exit status_verified
+  prepare_rollback_diagnostics "$backup" || return 1
+
+  for attempt in $(seq 1 "$ROLLBACK_DISABLE_ATTEMPTS"); do
+    deactivate_output="$ROLLBACK_DIAGNOSTIC_DIR/deactivate-${attempt}.txt"
+    deactivate_semantic="$ROLLBACK_DIAGNOSTIC_DIR/deactivate-${attempt}.semantic.txt"
+    status_output="$ROLLBACK_DIAGNOSTIC_DIR/status-${attempt}.txt"
+    status_semantic="$ROLLBACK_DIAGNOSTIC_DIR/status-${attempt}.semantic.txt"
+    printf '[INFO] rollback audit-disable check %s/%s\n' \
+      "$attempt" "$ROLLBACK_DISABLE_ATTEMPTS"
+
+    if (cd "$RUN_PROJECT" && clasp run MINIAPP_auditV2Deactivate) \
+      >"$deactivate_output" 2>&1; then
+      deactivate_exit=0
+    else
+      deactivate_exit=$?
+    fi
+    if semantic_assert deactivate '' "$deactivate_output" \
+      >"$deactivate_semantic" 2>&1; then
+      deactivate_verified=0
+    else
+      deactivate_verified=$?
+    fi
+
+    if (cd "$RUN_PROJECT" && clasp run MINIAPP_auditV2Status) \
+      >"$status_output" 2>&1; then
+      status_exit=0
+    else
+      status_exit=$?
+    fi
+    if semantic_assert status-disabled '' "$status_output" \
+      >"$status_semantic" 2>&1; then
+      status_verified=0
+    else
+      status_verified=$?
+    fi
+
+    cat "$deactivate_output"
+    cat "$status_output"
+    if [[ "$status_exit" == "0" && "$status_verified" == "0" ]]; then
+      {
+        printf 'DEACTIVATE_EXIT_OK=%s\n' "$([[ "$deactivate_exit" == "0" ]] && printf true || printf false)"
+        printf 'DEACTIVATE_SEMANTIC_OK=%s\n' "$([[ "$deactivate_verified" == "0" ]] && printf true || printf false)"
+        printf 'STATUS_DISABLED_CONFIRMED=true\n'
+      } >"$ROLLBACK_DIAGNOSTIC_DIR/result.txt"
+      ok "Rollback postcondition confirmed: audit active=false"
+      return 0
+    fi
+
+    if [[ "$attempt" -lt "$ROLLBACK_DISABLE_ATTEMPTS" ]]; then
+      sleep "$ROLLBACK_DISABLE_RETRY_SECONDS"
+    fi
+  done
+
+  {
+    printf 'DEACTIVATE_EXIT_OK=%s\n' "$([[ "$deactivate_exit" == "0" ]] && printf true || printf false)"
+    printf 'DEACTIVATE_SEMANTIC_OK=%s\n' "$([[ "$deactivate_verified" == "0" ]] && printf true || printf false)"
+    printf 'STATUS_DISABLED_CONFIRMED=false\n'
+  } >"$ROLLBACK_DIAGNOSTIC_DIR/result.txt"
+  return 1
+}
+
 rollback_from_backup() {
   local backup="$1"
   local mode="${2:-manual}"
@@ -840,17 +1019,25 @@ rollback_from_backup() {
 
   [[ -f "$backup/metadata.json" ]] || { warn "Rollback metadata отсутствует"; return 1; }
   [[ -d "$backup/live-before-candidate" ]] || { warn "Live-before backup отсутствует"; return 1; }
+  [[ -f "$backup/live-before.sha256" ]] || { warn "Live-before manifest отсутствует"; return 1; }
 
   local rollback_id rollback_version rollback_desc had_34 rollback_audit_version
+  local activation_possible
   rollback_id="$(load_rollback_metadata "$backup" deploymentId)" || return 1
   rollback_version="$(load_rollback_metadata "$backup" deploymentVersionBefore)" || return 1
   rollback_desc="$(load_rollback_metadata "$backup" deploymentDescription)" || return 1
   had_34="$(load_rollback_metadata "$backup" auditFileExistedBefore)" || return 1
   rollback_audit_version="$(load_rollback_metadata "$backup" auditVersion)" || return 1
+  # Schema-1 backups predate durable phase checkpoints. Treat their activation
+  # state as possible, never as safely skipped.
+  activation_possible="$(
+    load_rollback_metadata_optional "$backup" auditActivationPossible true
+  )" || return 1
   [[ "$rollback_desc" == "$EXPECTED_DESC" ]] || { warn "Rollback description mismatch"; return 1; }
   [[ "$rollback_id" =~ ^[A-Za-z0-9_-]{20,}$ ]] || return 1
   [[ "$rollback_version" =~ ^[0-9]+$ ]] || return 1
   [[ -n "$rollback_audit_version" ]] || return 1
+  [[ "$activation_possible" == "true" || "$activation_possible" == "false" ]] || return 1
   AUDIT_VERSION="$rollback_audit_version"
 
   if [[ -z "${TEMP_DIR:-}" || ! -d "$TEMP_DIR" ]]; then
@@ -867,21 +1054,24 @@ rollback_from_backup() {
     resolve_source_dir || return 1
   fi
 
-  info "ROLLBACK: deactivate audit v2 (service sheets stay intact)"
+  prepare_rollback_diagnostics "$backup" || return 1
+  info "ROLLBACK: confirm audit v2 disabled (service sheets stay intact)"
   # The ChatKeeper Script Property is deliberately preserved. The previous
   # deployment/source keeps working, and a later retry does not need the
   # already-removed source credential to be reintroduced.
-  local deactivate_output="$TEMP_DIR/rollback-deactivate.txt"
-  set +e
-  (cd "$RUN_PROJECT" && clasp run MINIAPP_auditV2Deactivate) >"$deactivate_output" 2>&1
-  local deactivate_exit=$?
-  set -e
-  cat "$deactivate_output"
   local deactivate_verified=1
-  if [[ "$deactivate_exit" != "0" ]] \
-    || ! semantic_assert deactivate '' "$deactivate_output"; then
-    warn "Deactivate semantic gate failed; continuing source/deployment restore, rollback will remain incomplete"
-    deactivate_verified=0
+  if [[ "$activation_possible" == "true" ]]; then
+    if ! confirm_audit_disabled_for_rollback "$backup"; then
+      warn "Audit disable postcondition not confirmed after bounded retries; restore will continue but rollback will remain incomplete"
+      deactivate_verified=0
+    fi
+  else
+    # The checkpoint is persisted before Activate is first invoked. Therefore
+    # this installer could not have written the active token. A failed/absent
+    # Stage-1 function is not evidence of an incomplete rollback.
+    printf 'ACTIVATION_POSSIBLE=false\nSTATUS_DISABLED_CONFIRMATION_REQUIRED=false\n' \
+      >"$ROLLBACK_DIAGNOSTIC_DIR/result.txt"
+    ok "Activation was never attempted; audit-disable call is not required"
   fi
 
   info "ROLLBACK: restore the same deployment ID to numeric version $rollback_version"
@@ -892,12 +1082,29 @@ rollback_from_backup() {
   restore_exact_journal_files "$backup" "$had_34" || return 1
   push_current_source || return 1
 
+  info "ROLLBACK: verify factual live source against the saved manifest"
+  (
+    cd "$RUN_PROJECT" || exit 1
+    clasp pull || exit 1
+  ) >"$ROLLBACK_DIAGNOSTIC_DIR/live-source-pull.txt" 2>&1 || return 1
+  resolve_source_dir || return 1
+  full_source_manifest "$SOURCE_DIR" "$ROLLBACK_DIAGNOSTIC_DIR/live-source.sha256" \
+    || return 1
+  cmp -s "$backup/live-before.sha256" \
+    "$ROLLBACK_DIAGNOSTIC_DIR/live-source.sha256" || {
+      warn "Factual live source differs from saved live-before manifest"
+      return 1
+    }
+
   local rollback_raw="$TEMP_DIR/deployments-rollback.txt"
   local rollback_tsv="$TEMP_DIR/deployments-rollback.tsv"
   local rollback_ids="$TEMP_DIR/deployment-ids-rollback.txt"
   (cd "$RUN_PROJECT" && list_deployments_raw "$rollback_raw") || return 1
   parse_deployments "$rollback_raw" "$rollback_tsv" || return 1
   cut -f1 "$rollback_tsv" | LC_ALL=C sort -u >"$rollback_ids"
+  cp -p "$rollback_raw" "$ROLLBACK_DIAGNOSTIC_DIR/deployments.txt"
+  cp -p "$rollback_tsv" "$ROLLBACK_DIAGNOSTIC_DIR/deployments.tsv"
+  cp -p "$rollback_ids" "$ROLLBACK_DIAGNOSTIC_DIR/deployment-ids.txt"
   [[ -f "$backup/deployment-ids-before.txt" ]] || return 1
   cmp -s "$backup/deployment-ids-before.txt" "$rollback_ids" || {
     warn "Rollback deployment inventory differs from the saved pre-rollout inventory"
@@ -993,6 +1200,97 @@ Path(sys.argv[1]).write_text(json.dumps({
 PY
 }
 
+diagnose_backup() {
+  local backup="$1"
+  local diagnosis_project diagnosis_source
+  local source_restored=false deployment_set_restored=false named_deployment_restored=false
+  local rollback_id rollback_version rollback_desc
+
+  TEMP_DIR="$(mktemp -d /tmp/royal-v0600-journal-diagnose.XXXXXX)" \
+    || die "Не удалось создать временный diagnosis каталог"
+  diagnosis_project="$TEMP_DIR/clasp-project"
+  mkdir -p "$diagnosis_project"
+
+  [[ -f "$backup/metadata.json" ]] \
+    && [[ -f "$backup/.clasp.json.rollback" ]] \
+    && [[ -f "$backup/live-before.sha256" ]] \
+    && [[ -f "$backup/deployment-ids-before.txt" ]] \
+    || die "Backup не содержит полный read-only diagnosis набор"
+
+  rollback_id="$(load_rollback_metadata "$backup" deploymentId)" \
+    || die "Diagnosis metadata deploymentId invalid"
+  rollback_version="$(load_rollback_metadata "$backup" deploymentVersionBefore)" \
+    || die "Diagnosis metadata deploymentVersionBefore invalid"
+  rollback_desc="$(load_rollback_metadata "$backup" deploymentDescription)" \
+    || die "Diagnosis metadata deploymentDescription invalid"
+  [[ "$rollback_id" =~ ^[A-Za-z0-9_-]{20,}$ ]] || die "Diagnosis deployment ID invalid"
+  [[ "$rollback_version" =~ ^[0-9]+$ ]] || die "Diagnosis deployment version invalid"
+  [[ "$rollback_desc" == "$EXPECTED_DESC" ]] || die "Diagnosis deployment description invalid"
+
+  cp -p "$backup/.clasp.json.rollback" "$diagnosis_project/.clasp.json"
+  [[ ! -f "$backup/.claspignore.rollback" ]] \
+    || cp -p "$backup/.claspignore.rollback" "$diagnosis_project/.claspignore"
+  diagnosis_source="$(source_dir_for_project "$diagnosis_project")" \
+    || die "Diagnosis rootDir invalid"
+  mkdir -p "$diagnosis_source"
+
+  if (
+    cd "$diagnosis_project" || exit 1
+    clasp pull
+  ) >"$TEMP_DIR/clasp-pull.txt" 2>&1; then
+    full_source_manifest "$diagnosis_source" "$TEMP_DIR/live-current.sha256"
+    if cmp -s "$backup/live-before.sha256" "$TEMP_DIR/live-current.sha256"; then
+      source_restored=true
+    fi
+  fi
+
+  if (
+    cd "$diagnosis_project" || exit 1
+    list_deployments_raw "$TEMP_DIR/deployments-current.txt"
+  ) >/dev/null 2>&1 \
+    && parse_deployments \
+      "$TEMP_DIR/deployments-current.txt" "$TEMP_DIR/deployments-current.tsv" \
+      >/dev/null 2>&1; then
+    cut -f1 "$TEMP_DIR/deployments-current.tsv" | LC_ALL=C sort -u \
+      >"$TEMP_DIR/deployment-ids-current.txt"
+    if cmp -s "$backup/deployment-ids-before.txt" \
+      "$TEMP_DIR/deployment-ids-current.txt"; then
+      deployment_set_restored=true
+    fi
+    if python3 - "$TEMP_DIR/deployments-current.tsv" \
+      "$rollback_id" "$rollback_version" "$rollback_desc" <<'PY'
+import sys
+from pathlib import Path
+rows = [line.split('\t') for line in Path(sys.argv[1]).read_text(encoding='utf-8').splitlines()]
+matches = [
+    row for row in rows
+    if len(row) == 3 and row[0] == sys.argv[2]
+    and row[1] == sys.argv[3] and row[2] == sys.argv[4]
+]
+raise SystemExit(0 if len(matches) == 1 else 1)
+PY
+    then
+      named_deployment_restored=true
+    fi
+  fi
+
+  printf 'DIAGNOSE_READ_ONLY=true\n'
+  printf 'SOURCE_EQUALS_LIVE_BEFORE=%s\n' "$source_restored"
+  printf 'DEPLOYMENT_SET_EQUALS_BEFORE=%s\n' "$deployment_set_restored"
+  printf 'NAMED_DEPLOYMENT_EQUALS_BEFORE=%s\n' "$named_deployment_restored"
+  if [[ "$source_restored" == "true" \
+    && "$deployment_set_restored" == "true" \
+    && "$named_deployment_restored" == "true" ]]; then
+    printf 'SOURCE_AND_DEPLOYMENT_RESTORED=true\n'
+  else
+    printf 'SOURCE_AND_DEPLOYMENT_RESTORED=false\n'
+  fi
+  # This mode deliberately never executes Apps Script functions. Therefore it
+  # cannot claim a live Script Property postcondition.
+  printf 'AUDIT_DISABLED_LIVE_CHECK=false\n'
+  printf 'MUTATING_COMMANDS_USED=false\n'
+}
+
 rollout() {
   require_tools
   validate_source_sha
@@ -1053,6 +1351,8 @@ rollout() {
     || die "Stage 1 содержит лишние source changes"
   # A server can commit the push and then lose the client response. Mark the
   # state before the first remote mutation so that ambiguity always rolls back.
+  STAGE1_PUSH_POSSIBLE=1
+  checkpoint_rollout_state stage1-push-started
   STATE_MUTATED=1
   push_current_source || die "Stage 1 inert audit push не выполнен"
   (
@@ -1061,6 +1361,8 @@ rollout() {
     run_clasp_checked MINIAPP_auditV2Deactivate deactivate || exit 1
     run_clasp_checked MINIAPP_auditV2Status status-disabled || exit 1
   ) || die "Stage 1 deactivate/status gate failed"
+  STAGE1_DISABLED_CONFIRMED=1
+  checkpoint_rollout_state stage1-disabled-confirmed
 
   info "STAGE 2/2 — push exact pinned file34 plus the remaining nine hooks"
   for file_name in "${JOURNAL_FILES[@]}"; do
@@ -1080,10 +1382,25 @@ rollout() {
   (
     cd "$RUN_PROJECT" || exit 1
     run_clasp_checked MINIAPP_auditV2Status status-disabled || exit 1
+  ) || die "Stage 2 disabled precondition gate failed"
+  checkpoint_rollout_state stage2-source-pushed
+
+  # Persist the possibility before the remote call. Activate may commit its
+  # token and then lose the client response, so every later failure must demand
+  # an independently observed active=false postcondition during rollback.
+  AUDIT_ACTIVATION_POSSIBLE=1
+  checkpoint_rollout_state activation-attempted
+  (
+    cd "$RUN_PROJECT" || exit 1
     run_clasp_checked MINIAPP_auditV2Activate activate || exit 1
+  ) || die "Stage 2 activation gate failed"
+  (
+    cd "$RUN_PROJECT" || exit 1
     run_clasp_checked MINIAPP_auditV2Status status-active || exit 1
     run_clasp_checked MINIAPP_adminWritePreflight admin-preflight "$WEBAPP_URL" || exit 1
-  ) || die "Stage 2 activation/preflight gate failed"
+  ) || die "Stage 2 active status/preflight gate failed"
+  AUDIT_ACTIVATION_CONFIRMED=1
+  checkpoint_rollout_state activation-confirmed
 
   info "UPDATE THE SAME EXISTING DEPLOYMENT ID ONLY"
   (
@@ -1092,6 +1409,7 @@ rollout() {
     capture_deployments after || exit 1
   ) || die "Existing deployment update failed"
   assert_same_deployment_set
+  checkpoint_rollout_state deployment-updated
   check_direct_route after "$WRITE_VERSION"
 
   info "EXPORT PRIVATE SNAPSHOT — semantic result, not exit code only"
@@ -1102,6 +1420,7 @@ rollout() {
   verify_private_snapshot
 
   capture_factual_live_after
+  checkpoint_rollout_state complete
   ROLLOUT_COMPLETE=1
   ok "Apps Script journal v2 rollout подтверждён без изменения business rows"
   printf '\nAudit: %s (schema %s)\n' "$AUDIT_VERSION" "$EXPECTED_AUDIT_SCHEMA"
@@ -1116,6 +1435,13 @@ rollout() {
 main() {
   if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     usage
+    exit 0
+  fi
+  if [[ "${1:-}" == "--diagnose" ]]; then
+    [[ "$#" == "2" ]] || die "--diagnose требует ровно один backup directory"
+    require_diagnose_tools
+    BACKUP_DIR="$(validate_backup_dir "$2")" || die "Небезопасный backup directory"
+    diagnose_backup "$BACKUP_DIR"
     exit 0
   fi
   if [[ "${1:-}" == "--rollback" ]]; then

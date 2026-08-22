@@ -69,11 +69,21 @@ ROYAL_CRM_SOURCE_SHA=<MERGED_40_CHAR_SHA> \
 12. Новый `/exec` снова проходит non-mutating probe и возвращает ожидаемую
     write-version.
 13. Результат каждого `clasp run` разбирается семантически. Exit code `0` с
-    Apps Script exception считается ошибкой.
+    Apps Script exception считается ошибкой. После source push installer
+    учитывает ограниченную HEAD propagation: function-not-found, пустой
+    ответ или ответ прежней version повторяются до 12 раз с
+    интервалом 5 секунд (окно не более минуты).
+    Каждая raw/semantic попытка сохраняется в backup; после лимита
+    скрипт fail-closed переходит к rollback.
 14. Private snapshot обязан подтвердить expected write-version, exact endpoint
     и journal schema v2.
 15. Выполняется новый clean `clasp pull`: его полный manifest обязан byte-for-byte
     совпасть с проверенным stage 2. Экспорт и manifest сохраняются в backup.
+
+Перед первым remote push и отдельно **до** вызова activation installer
+атомарно сохраняет phase checkpoints в `metadata.json`. Это отделяет
+неопределённый inert push от случая, когда active token уже мог быть
+записан, но ответ клиенту потерялся.
 
 Скрипт намеренно **не** запускает скачанный из сети sync-script и не пушит
 напрямую в `main`. После успешного rollout он печатает
@@ -85,11 +95,24 @@ ROYAL_CRM_SOURCE_SHA=<MERGED_40_CHAR_SHA> \
 
 При ошибке после первого push скрипт автоматически:
 
-1. удаляет activation property через `MINIAPP_auditV2Deactivate()`;
-2. возвращает **тот же deployment ID** на сохранённую numeric version;
-3. восстанавливает ровно девять прежних hook-файлов;
-4. восстанавливает прежний file34, если он был, иначе удаляет только file34;
-5. выполняет `clasp push` восстановленного source.
+1. если activation уже могла быть вызвана, с ограниченными повторами
+   выполняет `MINIAPP_auditV2Deactivate()`, а затем отдельный
+   `MINIAPP_auditV2Status()`; rollback считает postcondition доказанным
+   только при свежем `active=false`. Потерянный ответ Deactivate не
+   считается ошибкой, если последующий status доказал отключение;
+2. если durable checkpoint доказывает, что activation ещё не вызывалась,
+   не требует недоступную Stage-1 функцию и не создаёт ложный
+   `rollback incomplete`. Backup старой схемы без checkpoint трактуется
+   консервативно: activation могла произойти;
+3. возвращает **тот же deployment ID** на сохранённую numeric version;
+4. восстанавливает ровно девять прежних hook-файлов;
+5. восстанавливает прежний file34, если он был, иначе удаляет только file34;
+6. выполняет `clasp push`, затем новый `clasp pull` и сравнивает factual
+   live manifest с сохранённым `live-before.sha256`;
+7. повторно проверяет полный набор deployment ID и exact previous
+   numeric version. Выводы Deactivate/Status и rollback verification
+   сохраняются в `backup/diagnostics/` и не удаляются вместе с
+   temporary directory.
 
 Служебные листы аудита при rollback не удаляются: они additive и могут
 содержать уже зафиксированные события. Named Script Property ChatKeeper также
@@ -119,3 +142,16 @@ ROYAL_CRM_CONFIRM_ROLLBACK=ROLLBACK_JOURNAL_V2 \
 
 Если автоматический rollback сообщает о неполном результате, не запускайте
 rollout повторно. Сохраните вывод Cloud Shell и backup path для диагностики.
+
+Read-only проверка не вызывает Apps Script функций, не делает push/deploy
+и не печатает deployment ID:
+
+```bash
+bash scripts/install-v0600-journal-v2.sh --diagnose "$BACKUP"
+```
+
+Она выполняет только temporary `clasp pull` и deployment inventory read. Флаг
+`SOURCE_AND_DEPLOYMENT_RESTORED=true` доказывает exact source/deployment
+восстановление. `AUDIT_DISABLED_LIVE_CHECK=false` в этом режиме означает,
+что read-only diagnosis намеренно не читал Script Property; это **не** означает,
+что audit активен.
