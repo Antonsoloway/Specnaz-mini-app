@@ -1,6 +1,6 @@
 /* Royal CRM Mini App — Admin Mode v0.6.0 (read phase) */
 (() => {
-  const VERSION = '0.6.0-read.4';
+  const VERSION = '0.6.0-read.5';
   let adminPayload = null;
   let activeTab = 'participants';
   let participantFilter = 'all';
@@ -64,7 +64,7 @@
   async function fetchAdminData(force = false) {
     const client = window.RoyalAdminDataV0600;
     if (!client?.load) throw new Error('Модуль админских данных не загрузился. Откройте приложение заново.');
-    const data = await client.load({ force });
+    const data = await client.load({ force, allowStale:force });
     adminPayload = data;
     return data;
   }
