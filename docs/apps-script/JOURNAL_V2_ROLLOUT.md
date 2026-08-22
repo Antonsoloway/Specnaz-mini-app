@@ -194,6 +194,66 @@ Apps Script имён; неизвестное изменённое имя даё�
 число различий в таком состоянии неизвестно, а не равно нулю.
 
 Перед source-only repair нужно получить свежий результат **обеих** команд
-installer `1.4.0`: source-diff доказывает полный payload, а общий diagnose —
-полный deployment inventory. Результаты старой версии installer для этого
-решения недостаточны.
+installer `1.4.0` или новее: source-diff доказывает полный payload, а общий
+diagnose — полный deployment inventory. Результаты старой версии installer для
+этого решения недостаточны.
+
+## Узкий source-only repair stranded file34
+
+Installer `1.5.0` содержит отдельный one-shot режим только для инцидента, где
+полный source-diff равен единственной записи
+`ADDED 34_MINIAPP_AUDIT_V2.js`, а полный deployment inventory точно совпадает
+с pre-rollout backup. Это не общий restore и не замена rollback.
+
+На всё время команды закройте Apps Script editor и не запускайте другой
+`clasp`, rollout или source-automation: Apps Script не предоставляет этой
+процедуре server-side compare-and-swap между последним pull и push.
+
+Запускать только installer из уже объединённого exact commit:
+
+```bash
+BACKUP=~/royal-crm-backups/v0600-journal-v2-YYYYMMDD-HHMMSS
+MERGED_SHA=<MERGED_40_CHAR_SHA>
+ROYAL_CRM_CONFIRM_SOURCE_ONLY_REPAIR=REMOVE_ONLY_STRANDED_34_MINIAPP_AUDIT_V2_JS \
+  bash <(curl -fsSL "https://raw.githubusercontent.com/Antonsoloway/Specnaz-mini-app/${MERGED_SHA}/scripts/install-v0600-journal-v2.sh") \
+  --repair-source-only "$BACKUP"
+```
+
+Режим использует только frozen `.clasp.json.rollback` и optional
+`.claspignore.rollback` из private backup, а не текущий рабочий проект. Для
+старого schema-1 backup полный baseline восстанавливается из безопасно
+проверенного `live-before-full.tgz`; HTML входит в проверку. Saved raw/TSV/ID
+deployment inventory повторно разбираются и взаимно сверяются.
+
+До remote mutation выполняются два clean pull в разные пустые каталоги. Оба
+обязаны показать один и тот же полный payload: baseline плюс один regular
+non-symlink file34; все deployments и прежняя numeric version остаются exact.
+Затем удаляется только временная локальная копия file34. Полный staged manifest
+обязан стать byte-for-byte равен baseline, после чего выполняются private
+`clasp status`, durable checkpoint и ровно один `clasp push -f`. Status не
+проверяется только по exit code: его полный tracked-file set обязан точно
+совпасть со staged manifest, поэтому frozen `.claspignore` не может незаметно
+исключить JS/GS/HTML или `appsscript.json` из replacement payload.
+
+Installer не вызывает Apps Script-функции, не читает/пишет Sheets или Script
+Properties и не делает deploy/version/update/rollback. Ответ push не является
+доказательством результата: независимо от его exit code выполняются новый
+clean pull и полный deployment read. Только exact postcondition даёт
+`RESULT=VERIFIED_APPLIED`; потерянный ответ push при доказанном postcondition
+также считается подтверждённым. Любая недоказанная postcondition даёт
+`RESULT=AMBIGUOUS` без retry и rollback.
+
+Перед единственным push в `backup/diagnostics/` атомарно создаётся постоянный
+marker. Он блокирует повторный source-repair после разрыва Cloud Shell,
+timeout или сигнала. При `AMBIGUOUS` не удаляйте marker и не повторяйте команду:
+сначала выполните оба read-only diagnosis режима installer из того же merged
+commit. Успешный repair также не разрешает новый journal rollout автоматически;
+сначала отдельный `--diagnose` обязан подтвердить exact source и deployments,
+а `--diagnose-source-diff` — `SOURCE_DIFF_COUNT=0`.
+
+Жёсткое завершение процесса до push может оставить пустой
+`source-only-repair-active` lock без permanent marker. Не удаляйте его вслепую:
+сначала убедитесь, что процесс действительно завершён, сохраните диагностику и
+выполните read-only diagnosis. Удаление stale lock — отдельное осознанное
+операционное решение; оно никогда не разрешает повтор push после появления
+`source-only-repair-push-attempted.json`.

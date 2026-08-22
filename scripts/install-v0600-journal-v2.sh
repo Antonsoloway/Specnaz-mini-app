@@ -8,7 +8,7 @@ umask 077
 # deployment ID, never changes business rows, and never enables audit v2 until
 # a fresh baseline and every service-sheet protection gate have been verified.
 
-readonly ROLLOUT_SCRIPT_VERSION="1.4.0"
+readonly ROLLOUT_SCRIPT_VERSION="1.5.0"
 readonly ROOT_BASHPID="$BASHPID"
 readonly REPO="Antonsoloway/Specnaz-mini-app"
 readonly EXPECTED_DESC="Таблица ЧП 1.3"
@@ -59,11 +59,17 @@ WRITE_VERSION=""
 STATE_MUTATED=0
 IN_ROLLBACK=0
 ROLLOUT_COMPLETE=0
+SOURCE_ONLY_REPAIR_MODE=0
 STAGE1_PUSH_POSSIBLE=0
 STAGE1_DISABLED_CONFIRMED=0
 AUDIT_ACTIVATION_POSSIBLE=0
 AUDIT_ACTIVATION_CONFIRMED=0
 ROLLBACK_DIAGNOSTIC_DIR=""
+SOURCE_REPAIR_DIAGNOSTIC_DIR=""
+SOURCE_REPAIR_LOCK_DIR=""
+SOURCE_REPAIR_DEPLOY_ID=""
+SOURCE_REPAIR_DEPLOY_VERSION=""
+SOURCE_REPAIR_DEPLOY_DESC=""
 
 info() { printf '\n[INFO] %s\n' "$*"; }
 ok() { printf '\n✅ %s\n' "$*"; }
@@ -73,6 +79,11 @@ cleanup() {
   [[ "$BASHPID" == "$ROOT_BASHPID" ]] || return 0
   if [[ -n "${TEMP_DIR:-}" && -d "$TEMP_DIR" ]]; then
     rm -rf -- "$TEMP_DIR"
+  fi
+  if [[ -n "${SOURCE_REPAIR_LOCK_DIR:-}" \
+    && -d "$SOURCE_REPAIR_LOCK_DIR" \
+    && ! -L "$SOURCE_REPAIR_LOCK_DIR" ]]; then
+    rmdir -- "$SOURCE_REPAIR_LOCK_DIR" >/dev/null 2>&1 || :
   fi
 }
 
@@ -85,7 +96,10 @@ die() {
   if [[ "$BASHPID" != "$ROOT_BASHPID" ]]; then
     exit 1
   fi
-  if [[ "$STATE_MUTATED" == "1" && "$IN_ROLLBACK" == "0" && "$ROLLOUT_COMPLETE" == "0" ]]; then
+  if [[ "$STATE_MUTATED" == "1" \
+    && "$IN_ROLLBACK" == "0" \
+    && "$ROLLOUT_COMPLETE" == "0" \
+    && "$SOURCE_ONLY_REPAIR_MODE" != "1" ]]; then
     warn "Начинаю автоматический rollback; служебные audit-листы не удаляются."
     if ! rollback_from_backup "$BACKUP_DIR" automatic; then
       warn "Автоматический rollback завершился не полностью. Не повторяйте rollout."
@@ -123,6 +137,10 @@ Read-only diagnosis of source/deployment restoration:
 Read-only file-level source mismatch diagnosis (status/path only):
   bash scripts/install-v0600-journal-v2.sh --diagnose-source-diff "$BACKUP"
 
+One-shot source-only repair for the confirmed stranded file34 incident:
+  ROYAL_CRM_CONFIRM_SOURCE_ONLY_REPAIR=REMOVE_ONLY_STRANDED_34_MINIAPP_AUDIT_V2_JS \
+    bash scripts/install-v0600-journal-v2.sh --repair-source-only "$BACKUP"
+
 Optional:
   ROYAL_CRM_PROJECT_DIR     clasp project containing .clasp.json
   ROYAL_CRM_BACKUP_ROOT     backup parent (default: ~/royal-crm-backups)
@@ -152,6 +170,14 @@ require_diagnose_tools() {
   local command_name
   for command_name in clasp python3; do
     command -v "$command_name" >/dev/null 2>&1 || die "$command_name не найден"
+  done
+}
+
+require_source_repair_tools() {
+  local command_name
+  for command_name in clasp python3 tar; do
+    command -v "$command_name" >/dev/null 2>&1 \
+      || die "$command_name не найден"
   done
 }
 
@@ -1572,6 +1598,896 @@ raise SystemExit(0 if actual == expected else 1)
 PY
 }
 
+emit_source_repair_result() {
+  local result="$1"
+  local push_attempts="$2"
+  local push_response_ok="$3"
+  local post_source_ok="$4"
+  local post_deployments_ok="$5"
+  local reason="${6:-NONE}"
+  printf 'SOURCE_ONLY_REPAIR=true\n'
+  printf 'RESULT=%s\n' "$result"
+  printf 'REASON=%s\n' "$reason"
+  printf 'PUSH_ATTEMPTS=%s\n' "$push_attempts"
+  printf 'PUSH_RESPONSE_OK=%s\n' "$push_response_ok"
+  printf 'POST_SOURCE_EQUALS_LIVE_BEFORE=%s\n' "$post_source_ok"
+  printf 'POST_DEPLOYMENT_INVENTORY_EQUALS_BEFORE=%s\n' "$post_deployments_ok"
+  printf 'APPS_SCRIPT_FUNCTIONS_INVOKED_BY_INSTALLER=false\n'
+  printf 'DEPLOYMENT_MUTATIONS_USED=false\n'
+  printf 'AUTOMATIC_ROLLBACK_USED=false\n'
+  printf 'PUSH_RETRY_ALLOWED=false\n'
+}
+
+acquire_source_repair_lock() {
+  local backup="$1"
+  local diagnostics_root="$backup/diagnostics"
+  local marker_file="$diagnostics_root/source-only-repair-push-attempted.json"
+  local candidate_lock="$diagnostics_root/source-only-repair-active"
+
+  if [[ -e "$diagnostics_root" ]]; then
+    [[ -d "$diagnostics_root" && ! -L "$diagnostics_root" ]] || return 1
+  else
+    mkdir -m 700 "$diagnostics_root" || return 1
+  fi
+  chmod 700 "$diagnostics_root" || return 1
+  mkdir -m 700 "$candidate_lock" 2>/dev/null || return 2
+  SOURCE_REPAIR_LOCK_DIR="$candidate_lock"
+  [[ ! -e "$marker_file" && ! -L "$marker_file" ]] || return 3
+}
+
+freeze_source_repair_evidence() {
+  local backup="$1"
+  local destination="$2"
+  local error_file="$3"
+  mkdir -m 700 "$destination" || return 1
+  python3 - "$backup" "$destination" 2>"$error_file" <<'PY'
+import json, os, shutil, stat, sys
+from pathlib import Path
+
+source = Path(sys.argv[1])
+destination = Path(sys.argv[2])
+required = {
+    'metadata.json': 1024 * 1024,
+    'live-before.sha256': 10 * 1024 * 1024,
+    '.clasp.json.rollback': 1024 * 1024,
+    'deployment-ids-before.txt': 5 * 1024 * 1024,
+    'deployments-before.txt': 5 * 1024 * 1024,
+    'deployments-before.tsv': 5 * 1024 * 1024,
+}
+optional = {
+    '.claspignore.rollback': 1024 * 1024,
+    'live-before-full.tgz': 120 * 1024 * 1024,
+}
+
+root_flags = os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0)
+root_flags |= getattr(os, 'O_NOFOLLOW', 0)
+root_fd = os.open(source, root_flags)
+try:
+    root_stat = os.fstat(root_fd)
+    if not stat.S_ISDIR(root_stat.st_mode):
+        raise SystemExit('backup root is not a directory')
+    if root_stat.st_uid != os.getuid() or root_stat.st_mode & 0o077:
+        raise SystemExit('backup root is not private')
+
+    names = dict(required)
+    for name, limit in optional.items():
+        try:
+            os.stat(name, dir_fd=root_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            continue
+        names[name] = limit
+
+    for name, limit in names.items():
+        flags = os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0)
+        try:
+            source_fd = os.open(name, flags, dir_fd=root_fd)
+        except FileNotFoundError:
+            if name in required:
+                raise SystemExit('required backup artifact missing')
+            continue
+        try:
+            before = os.fstat(source_fd)
+            if (
+                not stat.S_ISREG(before.st_mode)
+                or before.st_uid != os.getuid()
+                or before.st_nlink != 1
+                # The backup directory itself is 0700. Older backups may
+                # contain 0644 clasp copies because cp -p preserved their
+                # source mode; reject writable sharing while freezing every
+                # artifact into a new 0600 evidence copy.
+                or before.st_mode & 0o022
+                or before.st_size < 0
+                or before.st_size > limit
+            ):
+                raise SystemExit('unsafe backup artifact')
+            target = destination / name
+            target_fd = os.open(
+                target,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0),
+                0o600,
+            )
+            try:
+                with os.fdopen(os.dup(source_fd), 'rb') as src, os.fdopen(target_fd, 'wb') as dst:
+                    shutil.copyfileobj(src, dst, length=1024 * 1024)
+                    dst.flush()
+                    os.fsync(dst.fileno())
+                target_fd = -1
+            finally:
+                if target_fd >= 0:
+                    os.close(target_fd)
+            after = os.stat(name, dir_fd=root_fd, follow_symlinks=False)
+            if (
+                before.st_dev,
+                before.st_ino,
+                before.st_size,
+                before.st_mtime_ns,
+            ) != (
+                after.st_dev,
+                after.st_ino,
+                after.st_size,
+                after.st_mtime_ns,
+            ):
+                raise SystemExit('backup artifact changed while freezing')
+        finally:
+            os.close(source_fd)
+finally:
+    os.close(root_fd)
+
+metadata = json.loads((destination / 'metadata.json').read_text(encoding='utf-8'))
+schema = int(metadata.get('sourceManifestSchema', 1))
+if schema not in {1, 2}:
+    raise SystemExit('unsupported source manifest schema')
+if schema == 1 and not (destination / 'live-before-full.tgz').is_file():
+    raise SystemExit('legacy complete baseline archive missing')
+directory_fd = os.open(destination, os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0))
+try:
+    os.fsync(directory_fd)
+finally:
+    os.close(directory_fd)
+PY
+}
+
+write_source_repair_state() {
+  local diagnostic_dir="$1"
+  local phase="$2"
+  local push_attempts="$3"
+  local push_response_ok="$4"
+  local post_source_ok="$5"
+  local post_deployments_ok="$6"
+  python3 - "$diagnostic_dir/state.json" "$phase" "$push_attempts" \
+    "$push_response_ok" "$post_source_ok" "$post_deployments_ok" \
+    "$ROLLOUT_SCRIPT_VERSION" <<'PY'
+import json, os, sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+phase = sys.argv[2]
+allowed = {
+    'prepared', 'observed', 'revalidated', 'push-attempted',
+    'postcondition-confirmed', 'complete', 'incomplete'
+}
+if phase not in allowed:
+    raise SystemExit('invalid source repair phase')
+data = {
+    'schema': 1,
+    'mode': 'source-only-repair',
+    'phase': phase,
+    'pushAttempts': int(sys.argv[3]),
+    'pushResponseOk': sys.argv[4] == 'true',
+    'postSourceEqualsLiveBefore': sys.argv[5] == 'true',
+    'postDeploymentInventoryEqualsBefore': sys.argv[6] == 'true',
+    'installerVersion': sys.argv[7],
+    'automaticRollbackAllowed': False,
+    'pushRetryAllowed': False,
+}
+temporary = path.with_name(path.name + '.tmp')
+with temporary.open('w', encoding='utf-8') as handle:
+    json.dump(data, handle, ensure_ascii=False, indent=2)
+    handle.write('\n')
+    handle.flush()
+    os.fsync(handle.fileno())
+os.chmod(temporary, 0o600)
+os.replace(temporary, path)
+directory_fd = os.open(path.parent, os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0))
+try:
+    os.fsync(directory_fd)
+finally:
+    os.close(directory_fd)
+PY
+}
+
+write_source_repair_push_marker() {
+  local backup="$1"
+  local diagnostic_dir="$2"
+  python3 - "$backup/diagnostics/source-only-repair-push-attempted.json" \
+    "$(basename "$diagnostic_dir")" "$ROLLOUT_SCRIPT_VERSION" <<'PY'
+import json, os, sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.dumps({
+    'schema': 1,
+    'mode': 'source-only-repair',
+    'phase': 'push-attempted',
+    'diagnosticRun': sys.argv[2],
+    'installerVersion': sys.argv[3],
+    'pushRetryAllowed': False,
+}, ensure_ascii=False, indent=2) + '\n'
+fd = os.open(
+    path,
+    os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0),
+    0o600,
+)
+try:
+    with os.fdopen(fd, 'w', encoding='utf-8') as handle:
+        handle.write(payload)
+        handle.flush()
+        os.fsync(handle.fileno())
+finally:
+    pass
+directory_fd = os.open(path.parent, os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0))
+try:
+    os.fsync(directory_fd)
+finally:
+    os.close(directory_fd)
+PY
+}
+
+prepare_saved_source_repair_baseline() {
+  local frozen="$1"
+  local baseline="$2"
+  local diagnostic_dir="$3"
+  local had_audit
+
+  prepare_comparable_baseline_manifest \
+    "$frozen" "$baseline" "$TEMP_DIR/source-repair-baseline-project" \
+    >"$diagnostic_dir/baseline-prepare.txt" 2>&1 || return 1
+  source_manifests_equal_safely \
+    "$baseline" "$baseline" "$diagnostic_dir/baseline-validation.txt" \
+    >/dev/null 2>&1 || return 1
+  if python3 - "$baseline" <<'PY'
+from pathlib import Path
+import sys
+rows = [line.split('  ', 1)[1] for line in Path(sys.argv[1]).read_text(encoding='utf-8').splitlines() if line]
+raise SystemExit(0 if '34_MINIAPP_AUDIT_V2.js' not in rows else 1)
+PY
+  then
+    :
+  else
+    return 1
+  fi
+
+  had_audit="$(load_rollback_metadata "$frozen" auditFileExistedBefore)" \
+    || return 1
+  [[ "$had_audit" == "false" ]] || return 1
+
+  parse_deployments \
+    "$frozen/deployments-before.txt" "$TEMP_DIR/source-repair-saved.strict.tsv" \
+    >"$diagnostic_dir/saved-deployments-parse.txt" 2>&1 || return 1
+  normalize_deployment_inventory \
+    "$TEMP_DIR/source-repair-saved.strict.tsv" \
+    "$TEMP_DIR/source-repair-saved.normalized.tsv" \
+    >"$diagnostic_dir/saved-deployments-normalize.txt" 2>&1 || return 1
+  normalize_deployment_inventory \
+    "$frozen/deployments-before.tsv" \
+    "$TEMP_DIR/source-repair-saved-tsv.normalized.tsv" \
+    >>"$diagnostic_dir/saved-deployments-normalize.txt" 2>&1 || return 1
+  cmp -s "$TEMP_DIR/source-repair-saved.normalized.tsv" \
+    "$TEMP_DIR/source-repair-saved-tsv.normalized.tsv" || return 1
+  cut -f1 "$TEMP_DIR/source-repair-saved.strict.tsv" | LC_ALL=C sort -u \
+    >"$TEMP_DIR/source-repair-saved.ids.txt"
+  cmp -s "$frozen/deployment-ids-before.txt" \
+    "$TEMP_DIR/source-repair-saved.ids.txt" || return 1
+
+  SOURCE_REPAIR_DEPLOY_ID="$(load_rollback_metadata "$frozen" deploymentId)" \
+    || return 1
+  SOURCE_REPAIR_DEPLOY_VERSION="$(
+    load_rollback_metadata "$frozen" deploymentVersionBefore
+  )" || return 1
+  SOURCE_REPAIR_DEPLOY_DESC="$(
+    load_rollback_metadata "$frozen" deploymentDescription
+  )" || return 1
+  [[ "$SOURCE_REPAIR_DEPLOY_ID" =~ ^[A-Za-z0-9_-]{20,}$ ]] || return 1
+  [[ "$SOURCE_REPAIR_DEPLOY_VERSION" =~ ^[0-9]+$ ]] || return 1
+  [[ "$SOURCE_REPAIR_DEPLOY_DESC" == "$EXPECTED_DESC" ]] || return 1
+  python3 - "$TEMP_DIR/source-repair-saved.strict.tsv" \
+    "$SOURCE_REPAIR_DEPLOY_ID" "$SOURCE_REPAIR_DEPLOY_VERSION" \
+    "$SOURCE_REPAIR_DEPLOY_DESC" <<'PY' \
+    >"$diagnostic_dir/saved-named-deployment-validation.txt" 2>&1 || return 1
+import sys
+from pathlib import Path
+rows = [line.split('\t') for line in Path(sys.argv[1]).read_text(encoding='utf-8').splitlines()]
+matches = [row for row in rows if row == [sys.argv[2], sys.argv[3], sys.argv[4]]]
+raise SystemExit(0 if len(matches) == 1 else 1)
+PY
+  cp -p "$baseline" "$diagnostic_dir/baseline-full.sha256" || return 1
+  cp -p "$TEMP_DIR/source-repair-saved.normalized.tsv" \
+    "$diagnostic_dir/deployments-saved.normalized.tsv" || return 1
+}
+
+assert_source_repair_project_config() {
+  local frozen="$1"
+  local project="$2"
+  [[ -f "$project/.clasp.json" && ! -L "$project/.clasp.json" ]] || return 1
+  cmp -s "$frozen/.clasp.json.rollback" "$project/.clasp.json" || return 1
+  if [[ -f "$frozen/.claspignore.rollback" ]]; then
+    [[ -f "$project/.claspignore" && ! -L "$project/.claspignore" ]] \
+      || return 1
+    cmp -s "$frozen/.claspignore.rollback" "$project/.claspignore" \
+      || return 1
+  else
+    [[ ! -e "$project/.claspignore" ]] || return 1
+  fi
+  source_dir_for_project "$project" >/dev/null 2>&1 || return 1
+}
+
+assert_clasp_status_matches_manifest() {
+  local status_file="$1"
+  local project="$2"
+  local source_root="$3"
+  local manifest="$4"
+  local output="$5"
+  python3 - "$status_file" "$project" "$source_root" "$manifest" \
+    >"$output" 2>&1 <<'PY'
+import re, sys, unicodedata
+from pathlib import Path, PurePosixPath
+
+status_file, project_arg, source_arg, manifest_file = sys.argv[1:5]
+raw = Path(status_file).read_text(encoding='utf-8', errors='replace')
+raw = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', raw)
+lines = raw.splitlines()
+tracked_headers = [i for i, line in enumerate(lines) if line.strip() == 'Tracked files:']
+untracked_headers = [i for i, line in enumerate(lines) if line.strip() == 'Untracked files:']
+if len(tracked_headers) != 1 or len(untracked_headers) != 1:
+    raise SystemExit('clasp status headers are not exact')
+start, end = tracked_headers[0], untracked_headers[0]
+if start >= end:
+    raise SystemExit('clasp status section order is invalid')
+
+project = Path(project_arg).resolve()
+source = Path(source_arg).resolve()
+try:
+    source_relative = source.relative_to(project).as_posix()
+except ValueError as exc:
+    raise SystemExit('source root is outside repair project') from exc
+
+tracked = []
+for line in lines[start + 1:end]:
+    if not line.strip():
+        continue
+    match = re.fullmatch(r'[\s│]*[├└]─\s+(.+?)\s*', line)
+    if not match:
+        raise SystemExit('unrecognized tracked status row')
+    raw_path = match.group(1)
+    while raw_path.startswith('./'):
+        raw_path = raw_path[2:]
+    candidate = PurePosixPath(raw_path)
+    if source_relative != '.' and candidate.parts[:len(PurePosixPath(source_relative).parts)] \
+            == PurePosixPath(source_relative).parts:
+        candidate = PurePosixPath(*candidate.parts[len(PurePosixPath(source_relative).parts):])
+    normalized = candidate.as_posix()
+    if (
+        candidate.is_absolute()
+        or '..' in candidate.parts
+        or not normalized
+        or normalized == '.'
+        or '\\' in raw_path
+        or candidate.as_posix() != normalized
+        or unicodedata.normalize('NFC', normalized) != normalized
+        or any(unicodedata.category(char).startswith('C') for char in normalized)
+    ):
+        raise SystemExit('unsafe tracked status path')
+    tracked.append(normalized)
+if len(tracked) != len(set(tracked)):
+    raise SystemExit('duplicate tracked status path')
+
+expected = []
+for line in Path(manifest_file).read_text(encoding='utf-8').splitlines():
+    if not line:
+        continue
+    _, relative = line.split('  ', 1)
+    expected.append(relative)
+if sorted(tracked) != sorted(expected):
+    raise SystemExit('clasp tracked payload differs from staged manifest')
+print('CLASP_TRACKED_PAYLOAD_EQUALS_STAGED_MANIFEST=true')
+PY
+}
+
+assert_source_repair_tree_safe() {
+  local root="$1"
+  python3 - "$root" <<'PY'
+import os, stat, sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+root_stat = os.lstat(root)
+if not stat.S_ISDIR(root_stat.st_mode) or stat.S_ISLNK(root_stat.st_mode):
+    raise SystemExit('unsafe repair project root')
+for path in root.rglob('*'):
+    current = os.lstat(path)
+    if stat.S_ISLNK(current.st_mode):
+        raise SystemExit('repair project contains a symlink')
+    if stat.S_ISDIR(current.st_mode):
+        continue
+    if not stat.S_ISREG(current.st_mode) or current.st_nlink != 1:
+        raise SystemExit('repair project contains a special or linked file')
+PY
+}
+
+prepare_fresh_source_repair_project() {
+  local frozen="$1"
+  local project="$2"
+  local pull_output="$3"
+  local manifest="$4"
+  local validation="$5"
+  local source_root
+
+  [[ ! -e "$project" ]] || return 1
+  mkdir -m 700 "$project" || return 1
+  cp -p "$frozen/.clasp.json.rollback" "$project/.clasp.json" || return 1
+  if [[ -f "$frozen/.claspignore.rollback" ]]; then
+    cp -p "$frozen/.claspignore.rollback" "$project/.claspignore" || return 1
+  fi
+  assert_source_repair_project_config "$frozen" "$project" || return 1
+  source_root="$(source_dir_for_project "$project")" || return 1
+  mkdir -p "$source_root" || return 1
+  if ! (
+    cd "$project" || exit 1
+    clasp pull
+  ) >"$pull_output" 2>&1; then
+    return 1
+  fi
+  assert_source_repair_project_config "$frozen" "$project" || return 1
+  assert_source_repair_tree_safe "$project" \
+    >"${validation}.tree" 2>&1 || return 1
+  source_root="$(source_dir_for_project "$project")" || return 1
+  [[ -d "$source_root" && ! -L "$source_root" ]] || return 1
+  complete_source_manifest "$source_root" "$manifest" \
+    >"${validation}.manifest" 2>&1 || return 1
+  source_manifests_equal_safely "$manifest" "$manifest" "$validation" \
+    >/dev/null 2>&1 || return 1
+}
+
+assert_exact_stranded_audit_source() {
+  local baseline="$1"
+  local current="$2"
+  local output="$3"
+  write_safe_source_diff "$baseline" "$current" "$output" || return 1
+  python3 - "$output" <<'PY'
+import sys
+from pathlib import Path
+expected = [
+    'SOURCE_MATCHES_LIVE_BEFORE=false',
+    'SOURCE_DETAILS_AVAILABLE=true',
+    'SOURCE_DIFF_COUNT=1',
+    'SOURCE_DIFF={"status":"ADDED","path":"34_MINIAPP_AUDIT_V2.js"}',
+]
+actual = Path(sys.argv[1]).read_text(encoding='utf-8').splitlines()
+raise SystemExit(0 if actual == expected else 1)
+PY
+}
+
+assert_regular_stranded_audit_file() {
+  local source_root="$1"
+  python3 - "$source_root" <<'PY'
+import os, stat, sys
+root = sys.argv[1]
+root_fd = os.open(
+    root,
+    os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0) | getattr(os, 'O_NOFOLLOW', 0),
+)
+try:
+    current = os.stat(
+        '34_MINIAPP_AUDIT_V2.js', dir_fd=root_fd, follow_symlinks=False
+    )
+    if not stat.S_ISREG(current.st_mode) or current.st_nlink != 1:
+        raise SystemExit('stranded audit file is not a single regular file')
+    fd = os.open(
+        '34_MINIAPP_AUDIT_V2.js',
+        os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0),
+        dir_fd=root_fd,
+    )
+    try:
+        opened = os.fstat(fd)
+        if (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino):
+            raise SystemExit('stranded audit file changed during validation')
+    finally:
+        os.close(fd)
+finally:
+    os.close(root_fd)
+PY
+}
+
+unlink_exact_stranded_audit_file() {
+  local source_root="$1"
+  python3 - "$source_root" <<'PY'
+import os, stat, sys
+root_fd = os.open(
+    sys.argv[1],
+    os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0) | getattr(os, 'O_NOFOLLOW', 0),
+)
+try:
+    before = os.stat(
+        '34_MINIAPP_AUDIT_V2.js', dir_fd=root_fd, follow_symlinks=False
+    )
+    if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+        raise SystemExit('stranded audit file is not safely removable')
+    fd = os.open(
+        '34_MINIAPP_AUDIT_V2.js',
+        os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0),
+        dir_fd=root_fd,
+    )
+    try:
+        opened = os.fstat(fd)
+        if (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino):
+            raise SystemExit('stranded audit file changed before unlink')
+    finally:
+        os.close(fd)
+    os.unlink('34_MINIAPP_AUDIT_V2.js', dir_fd=root_fd)
+finally:
+    os.close(root_fd)
+PY
+}
+
+capture_source_repair_deployments() {
+  local project="$1"
+  local prefix="$2"
+  if ! (
+    cd "$project" || exit 1
+    list_deployments_raw "${prefix}.raw.txt"
+  ) >"${prefix}.command.txt" 2>&1; then
+    return 1
+  fi
+  parse_deployments "${prefix}.raw.txt" "${prefix}.tsv" \
+    >"${prefix}.parse.txt" 2>&1 || return 1
+  normalize_deployment_inventory "${prefix}.tsv" "${prefix}.normalized.tsv" \
+    >"${prefix}.normalize.txt" 2>&1 || return 1
+  cut -f1 "${prefix}.tsv" | LC_ALL=C sort -u >"${prefix}.ids.txt" \
+    || return 1
+}
+
+source_repair_deployments_equal_saved() {
+  local prefix="$1"
+  cmp -s "$TEMP_DIR/source-repair-saved.normalized.tsv" \
+    "${prefix}.normalized.tsv" || return 1
+  cmp -s "$TEMP_DIR/source-repair-saved.ids.txt" "${prefix}.ids.txt" \
+    || return 1
+  python3 - "${prefix}.tsv" "$SOURCE_REPAIR_DEPLOY_ID" \
+    "$SOURCE_REPAIR_DEPLOY_VERSION" "$SOURCE_REPAIR_DEPLOY_DESC" <<'PY'
+import sys
+from pathlib import Path
+rows = [line.split('\t') for line in Path(sys.argv[1]).read_text(encoding='utf-8').splitlines()]
+matches = [row for row in rows if row == [sys.argv[2], sys.argv[3], sys.argv[4]]]
+raise SystemExit(0 if len(matches) == 1 else 1)
+PY
+}
+
+source_repair_not_attempted() {
+  local diagnostic_dir="$1"
+  local reason="$2"
+  write_source_repair_state "$diagnostic_dir" incomplete 0 false false false \
+    >/dev/null 2>&1 || :
+  emit_source_repair_result NOT_ATTEMPTED 0 false false false "$reason"
+  return 1
+}
+
+repair_source_only() {
+  local backup="$1"
+  local frozen baseline first_project first_source first_manifest
+  local second_project second_source second_manifest target_manifest
+  local post_project post_manifest
+  local push_exit=0 push_response_ok=false
+  local post_source_available=false post_source_ok=false
+  local post_deployments_available=false post_deployments_ok=false
+  local lock_status=0
+
+  SOURCE_ONLY_REPAIR_MODE=1
+  TEMP_DIR="$(mktemp -d /tmp/royal-v0600-journal-source-repair.XXXXXX)" \
+    || {
+      emit_source_repair_result NOT_ATTEMPTED 0 false false false TEMP_DIR_FAILED
+      return 1
+    }
+
+  acquire_source_repair_lock "$backup" || lock_status=$?
+  case "$lock_status" in
+    0) ;;
+    2)
+      emit_source_repair_result NOT_ATTEMPTED 0 false false false CONCURRENT_REPAIR
+      return 1
+      ;;
+    3)
+      emit_source_repair_result NOT_ATTEMPTED 0 false false false PRIOR_PUSH_ATTEMPT_RECORDED
+      return 1
+      ;;
+    *)
+      emit_source_repair_result NOT_ATTEMPTED 0 false false false LOCK_FAILED
+      return 1
+      ;;
+  esac
+
+  SOURCE_REPAIR_DIAGNOSTIC_DIR="$backup/diagnostics/source-only-repair-${STAMP}-$$"
+  mkdir -m 700 "$SOURCE_REPAIR_DIAGNOSTIC_DIR" || {
+    emit_source_repair_result NOT_ATTEMPTED 0 false false false DIAGNOSTICS_FAILED
+    return 1
+  }
+  write_source_repair_state \
+    "$SOURCE_REPAIR_DIAGNOSTIC_DIR" prepared 0 false false false \
+    >"$SOURCE_REPAIR_DIAGNOSTIC_DIR/state-write-prepared.txt" 2>&1 || {
+      emit_source_repair_result NOT_ATTEMPTED 0 false false false CHECKPOINT_FAILED
+      return 1
+    }
+
+  frozen="$SOURCE_REPAIR_DIAGNOSTIC_DIR/evidence"
+  freeze_source_repair_evidence \
+    "$backup" "$frozen" "$SOURCE_REPAIR_DIAGNOSTIC_DIR/evidence-freeze-error.txt" \
+    || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" EVIDENCE_INVALID
+      return 1
+    }
+  baseline="$TEMP_DIR/source-repair-baseline-full.sha256"
+  prepare_saved_source_repair_baseline \
+    "$frozen" "$baseline" "$SOURCE_REPAIR_DIAGNOSTIC_DIR" || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" BASELINE_INVALID
+      return 1
+    }
+
+  first_project="$TEMP_DIR/source-repair-first"
+  first_manifest="$TEMP_DIR/source-repair-first.sha256"
+  prepare_fresh_source_repair_project \
+    "$frozen" "$first_project" \
+    "$SOURCE_REPAIR_DIAGNOSTIC_DIR/pull-first.txt" "$first_manifest" \
+    "$SOURCE_REPAIR_DIAGNOSTIC_DIR/source-first.validation" || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" FIRST_PULL_INVALID
+      return 1
+    }
+  capture_source_repair_deployments \
+    "$first_project" "$SOURCE_REPAIR_DIAGNOSTIC_DIR/deployments-first" || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" FIRST_DEPLOYMENT_READ_INVALID
+      return 1
+    }
+  source_repair_deployments_equal_saved \
+    "$SOURCE_REPAIR_DIAGNOSTIC_DIR/deployments-first" \
+    >"$SOURCE_REPAIR_DIAGNOSTIC_DIR/deployments-first.validation.txt" 2>&1 || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" FIRST_DEPLOYMENT_DRIFT
+      return 1
+    }
+  first_source="$(source_dir_for_project "$first_project")" || {
+    source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" FIRST_ROOT_INVALID
+    return 1
+  }
+  tar -czf "$SOURCE_REPAIR_DIAGNOSTIC_DIR/live-before-repair-full.tgz" \
+    -C "$first_project" . \
+    >"$SOURCE_REPAIR_DIAGNOSTIC_DIR/live-before-repair-archive.txt" 2>&1 || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" ARCHIVE_FAILED
+      return 1
+    }
+  cp -p "$first_manifest" \
+    "$SOURCE_REPAIR_DIAGNOSTIC_DIR/live-before-repair.sha256" || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" DIAGNOSTICS_FAILED
+      return 1
+    }
+
+  if source_manifests_equal_safely \
+    "$baseline" "$first_manifest" \
+    "$SOURCE_REPAIR_DIAGNOSTIC_DIR/source-first-vs-baseline.txt" \
+    >/dev/null 2>&1; then
+    write_source_repair_state \
+      "$SOURCE_REPAIR_DIAGNOSTIC_DIR" complete 0 false true true \
+      >"$SOURCE_REPAIR_DIAGNOSTIC_DIR/state-write-complete.txt" 2>&1 || {
+        source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" CHECKPOINT_FAILED
+        return 1
+      }
+    emit_source_repair_result ALREADY_REPAIRED 0 false true true NONE
+    return 0
+  fi
+  assert_exact_stranded_audit_source \
+    "$baseline" "$first_manifest" \
+    "$SOURCE_REPAIR_DIAGNOSTIC_DIR/source-first-diff.txt" || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" SOURCE_PRECONDITION_FAILED
+      return 1
+    }
+  assert_regular_stranded_audit_file "$first_source" \
+    >"$SOURCE_REPAIR_DIAGNOSTIC_DIR/file34-first.validation.txt" 2>&1 || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" SOURCE_PRECONDITION_FAILED
+      return 1
+    }
+  write_source_repair_state \
+    "$SOURCE_REPAIR_DIAGNOSTIC_DIR" observed 0 false false false \
+    >"$SOURCE_REPAIR_DIAGNOSTIC_DIR/state-write-observed.txt" 2>&1 || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" CHECKPOINT_FAILED
+      return 1
+    }
+
+  second_project="$TEMP_DIR/source-repair-second"
+  second_manifest="$TEMP_DIR/source-repair-second.sha256"
+  prepare_fresh_source_repair_project \
+    "$frozen" "$second_project" \
+    "$SOURCE_REPAIR_DIAGNOSTIC_DIR/pull-second.txt" "$second_manifest" \
+    "$SOURCE_REPAIR_DIAGNOSTIC_DIR/source-second.validation" || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" SECOND_PULL_INVALID
+      return 1
+    }
+  capture_source_repair_deployments \
+    "$second_project" "$SOURCE_REPAIR_DIAGNOSTIC_DIR/deployments-second" || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" SECOND_DEPLOYMENT_READ_INVALID
+      return 1
+    }
+  source_repair_deployments_equal_saved \
+    "$SOURCE_REPAIR_DIAGNOSTIC_DIR/deployments-second" \
+    >"$SOURCE_REPAIR_DIAGNOSTIC_DIR/deployments-second.validation.txt" 2>&1 || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" SECOND_DEPLOYMENT_DRIFT
+      return 1
+    }
+  source_manifests_equal_safely \
+    "$first_manifest" "$second_manifest" \
+    "$SOURCE_REPAIR_DIAGNOSTIC_DIR/source-first-vs-second.txt" \
+    >/dev/null 2>&1 || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" SOURCE_CHANGED_DURING_REVALIDATION
+      return 1
+    }
+  assert_exact_stranded_audit_source \
+    "$baseline" "$second_manifest" \
+    "$SOURCE_REPAIR_DIAGNOSTIC_DIR/source-second-diff.txt" || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" SECOND_SOURCE_PRECONDITION_FAILED
+      return 1
+    }
+  second_source="$(source_dir_for_project "$second_project")" || {
+    source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" SECOND_ROOT_INVALID
+    return 1
+  }
+  assert_regular_stranded_audit_file "$second_source" \
+    >"$SOURCE_REPAIR_DIAGNOSTIC_DIR/file34-second.validation.txt" 2>&1 || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" SECOND_SOURCE_PRECONDITION_FAILED
+      return 1
+    }
+  assert_source_repair_project_config "$frozen" "$second_project" || {
+    source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" CONFIG_CHANGED
+    return 1
+  }
+  unlink_exact_stranded_audit_file "$second_source" \
+    >"$SOURCE_REPAIR_DIAGNOSTIC_DIR/file34-unlink.txt" 2>&1 || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" SAFE_UNLINK_FAILED
+      return 1
+    }
+  target_manifest="$TEMP_DIR/source-repair-target.sha256"
+  complete_source_manifest "$second_source" "$target_manifest" \
+    >"$SOURCE_REPAIR_DIAGNOSTIC_DIR/target-manifest.txt" 2>&1 || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" TARGET_MANIFEST_INVALID
+      return 1
+    }
+  source_manifests_equal_safely \
+    "$baseline" "$target_manifest" \
+    "$SOURCE_REPAIR_DIAGNOSTIC_DIR/target-vs-baseline.txt" \
+    >/dev/null 2>&1 || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" TARGET_NOT_EXACT_BASELINE
+      return 1
+    }
+  if ! (
+    cd "$second_project" || exit 1
+    clasp status
+  ) >"$SOURCE_REPAIR_DIAGNOSTIC_DIR/clasp-status-before-push.txt" 2>&1; then
+    source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" STATUS_FAILED
+    return 1
+  fi
+  assert_clasp_status_matches_manifest \
+    "$SOURCE_REPAIR_DIAGNOSTIC_DIR/clasp-status-before-push.txt" \
+    "$second_project" "$second_source" "$target_manifest" \
+    "$SOURCE_REPAIR_DIAGNOSTIC_DIR/clasp-status.validation.txt" || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" STATUS_PAYLOAD_MISMATCH
+      return 1
+    }
+  assert_source_repair_project_config "$frozen" "$second_project" || {
+    source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" CONFIG_CHANGED
+    return 1
+  }
+  assert_source_repair_tree_safe "$second_project" \
+    >"$SOURCE_REPAIR_DIAGNOSTIC_DIR/tree-after-status.validation.txt" 2>&1 || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" TARGET_TREE_CHANGED_BEFORE_PUSH
+      return 1
+    }
+  complete_source_manifest "$second_source" "$TEMP_DIR/source-repair-target-after-status.sha256" \
+    >"$SOURCE_REPAIR_DIAGNOSTIC_DIR/target-after-status-manifest.txt" 2>&1 || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" TARGET_MANIFEST_INVALID
+      return 1
+    }
+  source_manifests_equal_safely \
+    "$baseline" "$TEMP_DIR/source-repair-target-after-status.sha256" \
+    "$SOURCE_REPAIR_DIAGNOSTIC_DIR/target-after-status-vs-baseline.txt" \
+    >/dev/null 2>&1 || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" TARGET_CHANGED_BEFORE_PUSH
+      return 1
+    }
+  write_source_repair_state \
+    "$SOURCE_REPAIR_DIAGNOSTIC_DIR" revalidated 0 false false false \
+    >"$SOURCE_REPAIR_DIAGNOSTIC_DIR/state-write-revalidated.txt" 2>&1 || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" CHECKPOINT_FAILED
+      return 1
+    }
+  write_source_repair_state \
+    "$SOURCE_REPAIR_DIAGNOSTIC_DIR" push-attempted 1 false false false \
+    >"$SOURCE_REPAIR_DIAGNOSTIC_DIR/state-write-push-attempted.txt" 2>&1 || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" CHECKPOINT_FAILED
+      return 1
+    }
+  write_source_repair_push_marker "$backup" "$SOURCE_REPAIR_DIAGNOSTIC_DIR" \
+    >"$SOURCE_REPAIR_DIAGNOSTIC_DIR/push-marker-write.txt" 2>&1 || {
+      source_repair_not_attempted "$SOURCE_REPAIR_DIAGNOSTIC_DIR" PUSH_MARKER_FAILED
+      return 1
+    }
+
+  STATE_MUTATED=1
+  if (
+    cd "$second_project" || exit 1
+    clasp push -f
+  ) >"$SOURCE_REPAIR_DIAGNOSTIC_DIR/clasp-push.txt" 2>&1; then
+    push_exit=0
+    push_response_ok=true
+  else
+    push_exit=$?
+    push_response_ok=false
+  fi
+  printf '%s\n' "$push_exit" >"$SOURCE_REPAIR_DIAGNOSTIC_DIR/clasp-push-exit-code.txt" \
+    || :
+
+  post_project="$TEMP_DIR/source-repair-post"
+  post_manifest="$TEMP_DIR/source-repair-post.sha256"
+  if prepare_fresh_source_repair_project \
+    "$frozen" "$post_project" \
+    "$SOURCE_REPAIR_DIAGNOSTIC_DIR/pull-post.txt" "$post_manifest" \
+    "$SOURCE_REPAIR_DIAGNOSTIC_DIR/source-post.validation"; then
+    post_source_available=true
+    if source_manifests_equal_safely \
+      "$baseline" "$post_manifest" \
+      "$SOURCE_REPAIR_DIAGNOSTIC_DIR/source-post-vs-baseline.txt" \
+      >/dev/null 2>&1; then
+      post_source_ok=true
+    fi
+  fi
+  if capture_source_repair_deployments \
+    "$post_project" "$SOURCE_REPAIR_DIAGNOSTIC_DIR/deployments-post"; then
+    post_deployments_available=true
+    if source_repair_deployments_equal_saved \
+      "$SOURCE_REPAIR_DIAGNOSTIC_DIR/deployments-post" \
+      >"$SOURCE_REPAIR_DIAGNOSTIC_DIR/deployments-post.validation.txt" 2>&1; then
+      post_deployments_ok=true
+    fi
+  fi
+
+  if [[ "$post_source_available" == "true" \
+    && "$post_deployments_available" == "true" \
+    && "$post_source_ok" == "true" \
+    && "$post_deployments_ok" == "true" ]]; then
+    write_source_repair_state \
+      "$SOURCE_REPAIR_DIAGNOSTIC_DIR" postcondition-confirmed 1 \
+      "$push_response_ok" true true \
+      >"$SOURCE_REPAIR_DIAGNOSTIC_DIR/state-write-postcondition.txt" 2>&1 || {
+        emit_source_repair_result \
+          AMBIGUOUS 1 "$push_response_ok" true true CHECKPOINT_NOT_PERSISTED
+        return 1
+      }
+    write_source_repair_state \
+      "$SOURCE_REPAIR_DIAGNOSTIC_DIR" complete 1 \
+      "$push_response_ok" true true \
+      >"$SOURCE_REPAIR_DIAGNOSTIC_DIR/state-write-complete.txt" 2>&1 || {
+        emit_source_repair_result \
+          AMBIGUOUS 1 "$push_response_ok" true true CHECKPOINT_NOT_PERSISTED
+        return 1
+      }
+    emit_source_repair_result \
+      VERIFIED_APPLIED 1 "$push_response_ok" true true NONE
+    return 0
+  fi
+
+  write_source_repair_state \
+    "$SOURCE_REPAIR_DIAGNOSTIC_DIR" incomplete 1 \
+    "$push_response_ok" "$post_source_ok" "$post_deployments_ok" \
+    >"$SOURCE_REPAIR_DIAGNOSTIC_DIR/state-write-incomplete.txt" 2>&1 || :
+  emit_source_repair_result \
+    AMBIGUOUS 1 "$push_response_ok" "$post_source_ok" \
+    "$post_deployments_ok" POSTCONDITION_NOT_PROVEN
+  return 1
+}
+
 diagnose_backup() {
   local backup="$1"
   local diagnosis_project diagnosis_source
@@ -1921,6 +2837,21 @@ main() {
     BACKUP_DIR="$(validate_backup_dir "$2")" || die "Небезопасный backup directory"
     diagnose_source_diff "$BACKUP_DIR"
     exit 0
+  fi
+  if [[ "${1:-}" == "--repair-source-only" ]]; then
+    [[ "$#" == "2" ]] \
+      || die "--repair-source-only требует ровно один backup directory"
+    [[ "${ROYAL_CRM_CONFIRM_SOURCE_ONLY_REPAIR:-}" \
+      == "REMOVE_ONLY_STRANDED_34_MINIAPP_AUDIT_V2_JS" ]] \
+      || die "Для source-only repair задайте точное подтверждение из --help"
+    SOURCE_ONLY_REPAIR_MODE=1
+    require_source_repair_tools
+    BACKUP_DIR="$(validate_backup_dir "$2")" \
+      || die "Небезопасный backup directory"
+    if repair_source_only "$BACKUP_DIR"; then
+      exit 0
+    fi
+    exit 1
   fi
   if [[ "${1:-}" == "--rollback" ]]; then
     [[ "$#" == "2" ]] || die "--rollback требует ровно один backup directory"
