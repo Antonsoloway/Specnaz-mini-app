@@ -1,7 +1,6 @@
 /* Royal CRM Mini App — Admin Mode v0.6.0 (read phase) */
 (() => {
-  const VERSION = '0.6.0-read.3';
-  const ADMIN_READ_RETRY_DELAYS_MS = [0, 700, 1600];
+  const VERSION = '0.6.0-read.4';
   let adminPayload = null;
   let activeTab = 'participants';
   let participantFilter = 'all';
@@ -44,34 +43,6 @@
     return clean(value) || '—';
   }
 
-  function isTransientAdminReadError(error) {
-    const code = clean(error?.code);
-    const message = clean(error?.message).toLocaleLowerCase('ru-RU');
-    return !error?.httpStatus ||
-      [502, 503, 504].includes(Number(error?.httpStatus)) ||
-      ['WORKER_TIMEOUT','NO_GAS_FALLBACK_FOR_ROUTE','HTTP_502','HTTP_503','HTTP_504'].includes(code) ||
-      message.includes('failed to fetch') || message.includes('networkerror') || message.includes('load failed');
-  }
-
-  function wait(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
-
-  async function fetchAdminDataOnce() {
-    const response = await fetch(`${API_URL}/admin-data`, {
-      method: 'GET',
-      mode: 'cors',
-      cache: 'no-store',
-      headers: { Authorization: `Bearer ${sessionToken}` }
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data?.ok || !data?.adminData) {
-      const error = new Error(data?.message || `HTTP ${response.status}`);
-      error.code = data?.error || `HTTP_${response.status}`;
-      error.httpStatus = response.status;
-      throw error;
-    }
-    return data;
-  }
-
   function decorateEntry() {
     const grid = document.querySelector('.grid');
     if (!grid) return;
@@ -91,28 +62,11 @@
   }
 
   async function fetchAdminData(force = false) {
-    if (adminPayload && !force) return adminPayload;
-    if (!sessionToken) throw new Error('SESSION_MISSING');
-
-    let lastError = null;
-    for (let attempt = 0; attempt < ADMIN_READ_RETRY_DELAYS_MS.length; attempt += 1) {
-      if (ADMIN_READ_RETRY_DELAYS_MS[attempt]) await wait(ADMIN_READ_RETRY_DELAYS_MS[attempt]);
-      try {
-        const data = await fetchAdminDataOnce();
-        adminPayload = data;
-        return data;
-      } catch (error) {
-        lastError = error;
-        if (!isTransientAdminReadError(error) || attempt === ADMIN_READ_RETRY_DELAYS_MS.length - 1) break;
-      }
-    }
-
-    if (isTransientAdminReadError(lastError)) {
-      const error = new Error('Связь с сервером прервалась. Нажмите «Повторить».');
-      error.code = 'ADMIN_NETWORK_RETRY_EXHAUSTED';
-      throw error;
-    }
-    throw lastError || new Error('Не удалось загрузить админские данные.');
+    const client = window.RoyalAdminDataV0600;
+    if (!client?.load) throw new Error('Модуль админских данных не загрузился. Откройте приложение заново.');
+    const data = await client.load({ force });
+    adminPayload = data;
+    return data;
   }
 
   function pushOrigin() {
@@ -475,12 +429,30 @@
     version: VERSION,
     open: openAdmin,
     refresh: () => openAdmin(true),
-    clearCache: () => { adminPayload = null; },
+    clearCache: () => {
+      adminPayload = null;
+      window.RoyalAdminDataV0600?.clear?.('admin-ui');
+    },
     acceptPayload: data => {
       if (!data?.ok || !data?.adminData) return false;
+      const client = window.RoyalAdminDataV0600;
+      if (client?.accept && !client.accept(data)) return false;
       adminPayload = data;
       if (document.querySelector('.royal-admin-screen')) renderCurrentTab();
       return true;
     }
   };
+
+  window.RoyalAdminDataV0600?.subscribe?.(event => {
+    if (event?.type === 'accept' && event.payload?.ok && event.payload?.adminData) {
+      adminPayload = event.payload;
+      return;
+    }
+    if (event?.type !== 'clear') return;
+    adminPayload = null;
+    if (!['unauthorized','forbidden','session-changed'].includes(clean(event?.reason))) return;
+    const panel = document.getElementById('panel');
+    if (!panel || !document.querySelector('.royal-admin-screen')) return;
+    panel.innerHTML = `<button type="button" class="royal-back-button" data-royal-back="1">← Назад</button><section class="royal-admin-screen"><div class="royal-admin-error"><strong>Админская сессия завершена.</strong><br>Откройте приложение заново.</div></section>`;
+  });
 })();

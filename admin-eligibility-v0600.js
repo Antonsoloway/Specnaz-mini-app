@@ -1,6 +1,6 @@
 /* Royal CRM Mini App — Admin Mode eligibility v0.6.0 */
 (() => {
-  const VERSION = '0.6.0-read.3';
+  const VERSION = '0.6.0-read.4';
   let eligibility = null;
   let checkPromise = null;
   let retryTimer = 0;
@@ -24,6 +24,8 @@
     authState.role = { ...(authState.role || {}), isChatAdmin: value };
     if (value) {
       authState.permissions = { ...(authState.permissions || {}), canManageAll: true };
+    } else {
+      authState.permissions = { ...(authState.permissions || {}), canManageAll: false };
     }
   }
 
@@ -51,15 +53,12 @@
 
   async function protectedAdminFallback() {
     try {
-      const response = await fetch(`${API_URL}/admin-data`, {
-        method: 'GET', mode: 'cors', cache: 'no-store',
-        headers: { Authorization: `Bearer ${sessionToken}` }
-      });
-      const data = await response.json().catch(() => ({}));
-      if (response.ok && data?.ok && data?.adminData) return true;
-      if (response.status === 401 || response.status === 403) return false;
-      return null;
-    } catch (_) {
+      const client = window.RoyalAdminDataV0600;
+      if (!client?.load) return null;
+      const data = await client.load({ force:true });
+      return data?.ok && data?.adminData ? true : null;
+    } catch (error) {
+      if (error?.httpStatus === 401 || error?.httpStatus === 403) return false;
       return null;
     }
   }
@@ -140,7 +139,10 @@
       if (page === 'home') {
         setTimeout(() => {
           if (eligibility === true) ensureTile();
-          else check(false);
+          else {
+            removeTile();
+            if (eligibility === null) check(false);
+          }
         }, 0);
       }
       return result;
@@ -161,4 +163,12 @@
     get isAdmin() { return eligibility === true; },
     get state() { return eligibility; }
   };
+
+  window.RoyalAdminDataV0600?.subscribe?.(event => {
+    if (event?.type !== 'clear' || !['unauthorized','forbidden','session-changed'].includes(String(event?.reason || ''))) return;
+    eligibility = false;
+    retryCount = 0;
+    markAuthAdmin(false);
+    removeTile();
+  });
 })();

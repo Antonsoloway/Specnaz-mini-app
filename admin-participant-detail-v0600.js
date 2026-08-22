@@ -5,9 +5,7 @@
  * - existing hardened participant editor is reused, no second write flow.
  */
 (() => {
-  const VERSION = '0.6.0-admin-participant-detail.2';
-  let payload = null;
-  let loading = null;
+  const VERSION = '0.6.0-admin-participant-detail.3';
   let decorating = false;
   let scheduled = 0;
 
@@ -66,24 +64,9 @@
   }
 
   async function adminData(force=false) {
-    if (payload && !force) return payload;
-    if (loading && !force) return loading;
-    loading = (async () => {
-      if (!sessionToken) throw new Error('SESSION_MISSING');
-      const response = await fetch(`${API_URL}/admin-data`, {
-        method:'GET', mode:'cors', cache:'no-store',
-        headers:{ Authorization:`Bearer ${sessionToken}` }
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data?.ok || !data?.adminData) {
-        const error = new Error(data?.message || `HTTP ${response.status}`);
-        error.code = data?.error || `HTTP_${response.status}`;
-        throw error;
-      }
-      payload = data;
-      return data;
-    })().finally(() => { loading = null; });
-    return loading;
+    const client = window.RoyalAdminDataV0600;
+    if (!client?.load) throw new Error('Модуль админских данных не загрузился. Откройте приложение заново.');
+    return client.load({ force });
   }
 
   function participantById(data, telegramId) {
@@ -233,11 +216,11 @@
     </button>`;
   }
 
-  async function openRanking(metricKey, sourceId='') {
+  async function openRanking(metricKey, sourceId='', capture=true) {
     const metric = METRICS[metricKey];
     const panel = document.getElementById('panel');
     if (!metric || !panel) return;
-    captureForBack();
+    if (capture) captureForBack();
     panel.hidden = false;
     panel.innerHTML = '<button type="button" class="royal-back-button" data-royal-back="1">← Назад</button><div class="empty-state">Строим рейтинг…</div>';
     try { setActiveNav('players'); } catch (_) {}
@@ -262,15 +245,15 @@
         </section>`;
       requestAnimationFrame(() => { try { window.scrollTo(0,0); } catch (_) {} });
     } catch (error) {
-      panel.innerHTML = `<button type="button" class="royal-back-button" data-royal-back="1">← Назад</button><h2>Рейтинг недоступен</h2><p class="muted">${html(error?.code || error?.message || 'UNKNOWN')}</p>`;
+      panel.innerHTML = `<button type="button" class="royal-back-button" data-royal-back="1">← Назад</button><h2>Рейтинг недоступен</h2><p class="muted">${html(error?.message || error?.code || 'UNKNOWN')}</p><button type="button" class="royal-admin-action is-primary" data-admin-participant-ranking-retry="${html(metricKey)}" data-source-id="${html(sourceId)}">Повторить</button>`;
     }
   }
 
-  async function openParticipant(telegramId) {
+  async function openParticipant(telegramId, capture=true) {
     const wanted = id(telegramId);
     const panel = document.getElementById('panel');
     if (!wanted || !panel) return;
-    captureForBack();
+    if (capture) captureForBack();
     panel.hidden = false;
     panel.innerHTML = '<button type="button" class="royal-back-button" data-royal-back="1">← Назад</button><div class="empty-state">Загружаем участника…</div>';
     try { setActiveNav('players'); } catch (_) {}
@@ -315,7 +298,10 @@
       }
       requestAnimationFrame(() => { try { window.scrollTo(0,0); } catch (_) {} });
     } catch (error) {
-      panel.innerHTML = `<button type="button" class="royal-back-button" data-royal-back="1">← Назад</button><h2>Участник не найден</h2><p class="muted">${html(error?.code || error?.message || 'UNKNOWN')}</p>`;
+      const notFound = clean(error?.code || error?.message) === 'PARTICIPANT_NOT_FOUND';
+      panel.innerHTML = notFound
+        ? `<button type="button" class="royal-back-button" data-royal-back="1">← Назад</button><h2>Участник не найден</h2>`
+        : `<button type="button" class="royal-back-button" data-royal-back="1">← Назад</button><h2>Не удалось загрузить участника</h2><p class="muted">${html(error?.message || error?.code || 'UNKNOWN')}</p><button type="button" class="royal-admin-action is-primary" data-admin-participant-retry="${html(wanted)}">Повторить</button>`;
     }
   }
 
@@ -339,6 +325,22 @@
   }
 
   document.addEventListener('click', event => {
+    const retryParticipant = event.target?.closest?.('[data-admin-participant-retry]');
+    if (retryParticipant) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openParticipant(retryParticipant.dataset.adminParticipantRetry, false);
+      return;
+    }
+
+    const retryRanking = event.target?.closest?.('[data-admin-participant-ranking-retry]');
+    if (retryRanking) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openRanking(retryRanking.dataset.adminParticipantRankingRetry, retryRanking.dataset.sourceId || '', false);
+      return;
+    }
+
     const metricButton = event.target?.closest?.('[data-admin-participant-ranking-metric]');
     if (metricButton) {
       const shell = metricButton.closest('[data-admin-participant="1"]');
@@ -387,5 +389,5 @@
 
   installCss();
   scheduleDecorate();
-  window.RoyalAdminParticipantDetailV0600 = { version:VERSION, open:openParticipant, ranking:openRanking, clear:() => { payload = null; } };
+  window.RoyalAdminParticipantDetailV0600 = { version:VERSION, open:openParticipant, ranking:openRanking, clear:() => window.RoyalAdminDataV0600?.clear?.('participant-detail') };
 })();

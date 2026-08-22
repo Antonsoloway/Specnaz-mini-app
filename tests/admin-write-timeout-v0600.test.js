@@ -16,14 +16,19 @@ const adminReadSource = fs.readFileSync(
   path.join(__dirname, '..', 'admin-v0600.js'),
   'utf8'
 );
+const adminDataClientSource = fs.readFileSync(
+  path.join(__dirname, '..', 'admin-data-client-v0600.js'),
+  'utf8'
+);
 
-function createTransport() {
+function createTransport(options={}) {
   const scheduled = [];
   const nativeCalls = [];
   const window = {
-    location: { search: '' },
+    location: { search: options.search || '' },
     fetch: async (input, init) => {
       nativeCalls.push({ input, init });
+      if (options.fetch) return options.fetch(input, init);
       return new Response('{}', {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
@@ -62,7 +67,16 @@ test('admin writes receive a 60 second transport window', async () => {
   );
   assert.equal(transport.scheduled.at(-1), 60000);
   assert.equal(transport.nativeCalls.length, 1);
-  assert.equal(transport.window.__ROYAL_TRANSPORT_VERSION__, '0.5.14.2');
+  assert.equal(transport.window.__ROYAL_TRANSPORT_VERSION__, '0.5.14.3');
+});
+
+test('admin-data receives one 20 second transport attempt', async () => {
+  const transport = createTransport();
+  await transport.window.fetch(
+    'https://royal-crm-miniapp-api.tropical-spoon.workers.dev/admin-data'
+  );
+  assert.equal(transport.scheduled.at(-1), 20000);
+  assert.equal(transport.nativeCalls.length, 1);
 });
 
 test('ordinary Worker reads keep the five second timeout', async () => {
@@ -73,20 +87,34 @@ test('ordinary Worker reads keep the five second timeout', async () => {
   assert.equal(transport.scheduled.at(-1), 5000);
 });
 
+test('protected admin-data never falls through to unsupported GAS JSONP', async () => {
+  const transport = createTransport({
+    search:'?gas=https%3A%2F%2Fscript.google.com%2Fmacros%2Fs%2Ftest%2Fexec',
+    fetch:async () => { throw new TypeError('Failed to fetch'); }
+  });
+  await assert.rejects(
+    transport.window.fetch('https://royal-crm-miniapp-api.tropical-spoon.workers.dev/admin-data'),
+    /Failed to fetch/
+  );
+  assert.equal(transport.nativeCalls.length, 1);
+});
+
 test('explicit WRITE_BUSY is retried safely with the same request id', () => {
   assert.match(writeSource, /WRITE_BUSY_RETRY_DELAYS_MS = \[700, 1400, 2500\]/);
   assert.match(writeSource, /clean\(error\?\.code\) === 'WRITE_BUSY'/);
   assert.match(writeSource, /return await postWriteOnce\(id, op, payload\)/);
   assert.match(writeSource, /Ждём и повторяем автоматически/);
-  assert.match(writeSource, /const VERSION = '0\.6\.0-write\.5-ui\.8'/);
+  assert.match(writeSource, /const VERSION = '0\.6\.0-write\.5-ui\.9'/);
 });
 
-test('transient admin-data reads retry briefly before showing a friendly error', () => {
-  assert.match(adminReadSource, /ADMIN_READ_RETRY_DELAYS_MS = \[0, 700, 1600\]/);
-  assert.match(writeSource, /ADMIN_READ_RETRY_DELAYS_MS = \[0, 700, 1600\]/);
-  assert.match(adminReadSource, /ADMIN_NETWORK_RETRY_EXHAUSTED/);
-  assert.match(writeSource, /ADMIN_NETWORK_RETRY_EXHAUSTED/);
-  assert.match(adminReadSource, /Связь с сервером прервалась/);
+test('all admin-data retry and cache behavior lives in the shared client', () => {
+  assert.match(adminDataClientSource, /RETRY_DELAYS_MS = Object\.freeze\(\[0, 700, 1600\]\)/);
+  assert.match(adminDataClientSource, /ADMIN_NETWORK_RETRY_EXHAUSTED/);
+  assert.match(adminDataClientSource, /Связь с сервером прервалась/);
+  assert.match(adminReadSource, /RoyalAdminDataV0600/);
+  assert.match(writeSource, /RoyalAdminDataV0600/);
+  assert.doesNotMatch(adminReadSource, /fetch\(`\$\{API_URL\}\/admin-data/);
+  assert.doesNotMatch(writeSource, /fetch\(`\$\{API_URL\}\/admin-data/);
 });
 
 test('queued commit closes immediately and refreshes the private snapshot in background', () => {

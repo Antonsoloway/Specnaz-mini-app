@@ -1,6 +1,8 @@
-/* Royal CRM Mini App — transport v0.5.14.2
+/* Royal CRM Mini App — transport v0.5.14.3
  * No DOM observers and no version rewriting.
  * /auth gets a longer timeout and one automatic retry for transient failures.
+ * /admin-data gets a dedicated read window; retries stay in the shared admin
+ * data client so transport never multiplies protected reads.
  * /admin-write gets a write-specific timeout because a photo mutation also
  * updates Sheets media and snapshots before the Worker can answer.
  */
@@ -11,6 +13,7 @@
   const nativeFetch = window.fetch.bind(window);
   const DEFAULT_TIMEOUT_MS = 5000;
   const AUTH_TIMEOUT_MS = 12000;
+  const ADMIN_DATA_TIMEOUT_MS = 20000;
   const ADMIN_WRITE_TIMEOUT_MS = 60000;
   const AUTH_RETRY_DELAY_MS = 350;
   let callbackSeq = 0;
@@ -58,6 +61,12 @@
     const error = new Error(code);
     error.code = code;
     error.name = 'TimeoutError';
+    return error;
+  }
+
+  function workerRequiredError() {
+    const error = new Error('ADMIN_WORKER_REQUIRED');
+    error.code = 'ADMIN_WORKER_REQUIRED';
     return error;
   }
 
@@ -186,18 +195,27 @@
   window.fetch = async function royalFetch(input, init) {
     const urlString = typeof input === 'string' ? input : String(input?.url || '');
     if (!urlString.startsWith(WORKER_ORIGIN)) return nativeFetch(input, init);
-    if (gasMode) return fallbackFor(urlString, init);
 
     let pathname = '';
     try { pathname = new URL(urlString).pathname; } catch (_) {}
+    if (gasMode) {
+      if (pathname === '/admin-data' || pathname === '/admin-write' || pathname === '/admin-team-photo') {
+        throw workerRequiredError();
+      }
+      return fallbackFor(urlString, init);
+    }
+
     const isAuth = pathname === '/auth';
+    const isAdminData = pathname === '/admin-data';
     const isAdminWrite = pathname === '/admin-write';
     const attempts = isAuth ? 2 : 1;
     const timeoutMs = isAuth
       ? AUTH_TIMEOUT_MS
-      : isAdminWrite
-        ? ADMIN_WRITE_TIMEOUT_MS
-        : DEFAULT_TIMEOUT_MS;
+      : isAdminData
+        ? ADMIN_DATA_TIMEOUT_MS
+        : isAdminWrite
+          ? ADMIN_WRITE_TIMEOUT_MS
+          : DEFAULT_TIMEOUT_MS;
     const timeoutCode = isAuth ? 'AUTH_TIMEOUT' : 'WORKER_TIMEOUT';
     let lastError = null;
 
@@ -215,10 +233,13 @@
       }
     }
 
+    if (isAdminData || isAdminWrite || pathname === '/admin-team-photo') {
+      throw lastError || workerRequiredError();
+    }
     if (!GAS_URL) throw lastError || timeoutError(timeoutCode);
     console.warn('Worker unavailable; using GAS fallback:', lastError?.message || lastError);
     return fallbackFor(urlString, init);
   };
 
-  window.__ROYAL_TRANSPORT_VERSION__ = '0.5.14.2';
+  window.__ROYAL_TRANSPORT_VERSION__ = '0.5.14.3';
 })();
