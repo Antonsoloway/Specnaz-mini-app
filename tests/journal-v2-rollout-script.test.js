@@ -17,6 +17,7 @@ test('journal-v2 rollout shell is syntactically valid and help is read-only', ()
   assert.match(help.stdout, /40-char-merged-sha/);
   assert.match(help.stdout, /--rollback/);
   assert.match(help.stdout, /--diagnose-source-diff/);
+  assert.match(help.stdout, /--repair-source-only/);
   assert.match(help.stdout, /\$BACKUP\/install-v0600-journal-v2\.sh/);
   assert.match(source, /^umask 077$/m);
 });
