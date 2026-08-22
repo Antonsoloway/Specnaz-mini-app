@@ -253,10 +253,14 @@
 
   function renderJournalBody(data) {
     const rows = Array.isArray(data?.adminData?.journal?.rows) ? data.adminData.journal.rows : [];
-    if (!rows.length) {
-      return '<div class="royal-admin-note">📜 Журнал ручных изменений уже заложен в контракт v0.6. Он начнёт заполняться на следующем этапе, когда будет включена защищённая запись в Google Sheets.</div>';
+    const renderer = window.RoyalAdminJournalV0600;
+    if (!renderer?.render) {
+      return '<div class="royal-admin-error"><strong>Журнал временно недоступен.</strong><br>Обновите приложение.</div>';
     }
-    return `<div class="royal-admin-list">${rows.map(row => `<div class="royal-admin-record"><div class="royal-admin-detail">${safeEsc(JSON.stringify(row))}</div></div>`).join('')}</div>`;
+    try { return renderer.render(rows); }
+    catch (_) {
+      return '<div class="royal-admin-error"><strong>Не удалось показать журнал.</strong><br>Исходные служебные данные скрыты. Обновите приложение.</div>';
+    }
   }
 
   function renderCurrentTab() {
@@ -271,6 +275,9 @@
     panel.innerHTML = shellHtml(adminPayload, body);
     setAdminNav();
     applyFilters();
+    if (activeTab === 'journal') {
+      try { window.RoyalAdminJournalV0600?.mount?.(panel); } catch (_) {}
+    }
     try { window.RoyalNav?.enhanceVisibleBack?.(); } catch (_) {}
   }
 
