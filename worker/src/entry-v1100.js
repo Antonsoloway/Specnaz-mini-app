@@ -5,6 +5,7 @@ const MAYAK_MEDIA = {
   'leaderboard-players': { path: 'media/projects/mayak/leaderboard-players.jpg', mime: 'image/jpeg' },
   'leaderboard-team': { path: 'media/projects/mayak/leaderboard-team.jpg', mime: 'image/jpeg' },
   'audio': { path: 'media/projects/mayak/proekt-mayak.mp3', mime: 'audio/mpeg' },
+  'background-v0600': { path: 'media/app/v0600/project-mayak-background.mp3', mime: 'audio/mpeg' },
   'video': { path: 'media/projects/mayak/mayak-video.mp4', mime: 'video/mp4' }
 };
 
