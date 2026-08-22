@@ -12,9 +12,9 @@
   (() => {
     const params = new URLSearchParams(window.location.search || '');
     const startParam = params.get('tgWebAppStartParam') || '';
-    const isV0600Preview = startParam === 'v0600' || startParam === 'v0600-2328' || startParam === 'v0600-1325' || startParam === 'v0600-1435' || startParam === 'v0600-2050' || startParam === 'v0600-2110' || startParam === 'v0600-2130' || startParam === 'v0600-2230' || startParam === 'v0600-2310' || startParam === 'v0600-2350' || startParam === 'v0600-1050';
+    const isV0600Preview = startParam === 'v0600' || startParam === 'v0600-2328' || startParam === 'v0600-1325' || startParam === 'v0600-1435' || startParam === 'v0600-2050' || startParam === 'v0600-2110' || startParam === 'v0600-2130' || startParam === 'v0600-2230' || startParam === 'v0600-2310' || startParam === 'v0600-2350' || startParam === 'v0600-1050' || startParam === 'v0600-1146';
     const target = isV0600Preview ? 'app-v0600.html' : 'app-v0559.html';
-    if (isV0600Preview) params.set('previewBuild', '20260822-1050');
+    if (isV0600Preview) params.set('previewBuild', '20260822-1146');
     const search = params.toString() ? `?${params.toString()}` : '';
     const next = target + search + (window.location.hash || '');
     window.location.replace(next);

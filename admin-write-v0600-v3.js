@@ -1,6 +1,6 @@
 /* Royal CRM Mini App — protected Admin Write/Delete UI v0.6.0-write.5 */
 (() => {
-  const VERSION = '0.6.0-write.5-ui.9';
+  const VERSION = '0.6.0-write.5-ui.10';
   const WRITE_BUSY_RETRY_DELAYS_MS = [700, 1400, 2500];
   const TRANSPORT_RETRY_DELAY_MS = 700;
   const SNAPSHOT_POLL_DELAYS_MS = [2500, 4000, 7000, 12000, 20000, 35000, 60000, 90000, 120000];
@@ -31,14 +31,14 @@
     if (!document.querySelector('link[data-admin-write-css="1"]')) {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = 'admin-write-v0600.css?v=20260821-1435';
+      link.href = 'admin-write-v0600.css?v=20260822-1146';
       link.dataset.adminWriteCss = '1';
       document.head.appendChild(link);
     }
     if (!document.querySelector('link[data-admin-write-v2-css="1"]')) {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = 'admin-write-v0600-v2.css?v=20260821-1435';
+      link.href = 'admin-write-v0600-v2.css?v=20260822-1146';
       link.dataset.adminWriteV2Css = '1';
       document.head.appendChild(link);
     }
@@ -358,17 +358,26 @@
     return roles.map(role => `<option value="${esc(role)}"${clean(selected) === role ? ' selected' : ''}>${esc(role || '—')}</option>`).join('');
   }
 
+  function slotHasData(source) {
+    const value = name => source?.querySelector
+      ? source.querySelector(`[data-write-field="${name}"]`)?.value
+      : source?.[name];
+    return ['game','role','team','nickname'].some(name => !!clean(value(name)));
+  }
+
   function slotHtml(slot) {
     const game = clean(slot?.game);
     const team = clean(slot?.team);
-    return `<section class="royal-admin-slot-editor" data-write-slot="${Number(slot?.slot || 0)}">
-      <div class="royal-admin-slot-title">Слот ${Number(slot?.slot || 0)}</div>
+    const slotNumber = Number(slot?.slot || 0);
+    return `<section class="royal-admin-slot-editor" data-write-slot="${slotNumber}">
+      <div class="royal-admin-slot-title">Слот ${slotNumber}</div>
       <div class="royal-admin-slot-grid">
         <label class="royal-admin-input"><span>Игра</span><select data-write-field="game"><option value="">—</option><option value="Royal Match"${game === 'Royal Match' ? ' selected' : ''}>Royal Match</option><option value="Royal Kingdom"${game === 'Royal Kingdom' ? ' selected' : ''}>Royal Kingdom</option></select></label>
         <label class="royal-admin-input"><span>Роль</span><select data-write-field="role">${roleOptions(team,slot?.role)}</select></label>
         <label class="royal-admin-input is-wide"><span>Команда</span><select data-write-field="team">${teamOptions(game,team)}</select></label>
         <label class="royal-admin-input is-wide"><span>Игровой ник</span><input data-write-field="nickname" maxlength="160" value="${esc(slot?.nickname)}"></label>
       </div>
+      <button type="button" class="royal-admin-slot-clear" data-write-clear-slot="1" aria-label="Очистить данные слота ${slotNumber}"${slotHasData(slot) ? '' : ' disabled'}>Очистить данные</button>
     </section>`;
   }
 
@@ -414,7 +423,7 @@
         <div class="royal-admin-write-section-title">Команды и роли</div>
         ${normalizedSlots(source).map(slotHtml).join('')}
         ${deleteNote}
-        <div data-write-status></div>
+        <div data-write-status aria-live="polite"></div>
         <div class="royal-admin-form-actions">${deleteButton}<button type="button" class="royal-admin-form-button" data-write-close="1">Отмена</button><button type="submit" class="royal-admin-form-button is-save">💾 Сохранить</button></div>
       </form>`,
       { kind:'participant', creating, record:source }
@@ -886,6 +895,35 @@
         roleSelect.value = team ? 'Игрок' : '';
       }
     }
+    syncSlotClearButton(section);
+  }
+
+  function syncSlotClearButton(section) {
+    const button = section?.querySelector?.('[data-write-clear-slot="1"]');
+    if (button) button.disabled = !slotHasData(section);
+  }
+
+  function clearMembershipSlot(button) {
+    const section = button?.closest?.('[data-write-slot]');
+    if (!section) return false;
+    const gameSelect = section.querySelector('[data-write-field="game"]');
+    const teamSelect = section.querySelector('[data-write-field="team"]');
+    const roleSelect = section.querySelector('[data-write-field="role"]');
+    const nicknameInput = section.querySelector('[data-write-field="nickname"]');
+
+    if (gameSelect) gameSelect.value = '';
+    if (teamSelect) {
+      teamSelect.innerHTML = teamOptions('','');
+      teamSelect.value = '';
+    }
+    if (roleSelect) {
+      roleSelect.innerHTML = roleOptions('','');
+      roleSelect.value = '';
+    }
+    if (nicknameInput) nicknameInput.value = '';
+    syncSlotClearButton(section);
+    modalStatus(`Слот ${Number(section.dataset?.writeSlot || 0)} очищен. Нажмите «Сохранить», чтобы применить.`);
+    return true;
   }
 
   function journalOperationLabel(op) {
@@ -946,6 +984,13 @@
     }
     if (target?.matches?.('[data-admin-write-modal="1"]')) {
       closeModal(); return;
+    }
+
+    const clearSlotButton = target?.closest?.('[data-write-clear-slot="1"]');
+    if (clearSlotButton) {
+      event.preventDefault(); event.stopImmediatePropagation();
+      clearMembershipSlot(clearSlotButton);
+      return;
     }
 
     const deleteParticipantButton = target?.closest?.('[data-admin-delete-participant="1"]');
@@ -1041,6 +1086,15 @@
     const field = event.target;
     if (field?.matches?.('[data-write-slot] [data-write-field="game"],[data-write-slot] [data-write-field="team"]')) {
       updateSlotControls(field);
+      return;
+    }
+    syncSlotClearButton(field?.closest?.('[data-write-slot]'));
+  }, true);
+
+  document.addEventListener('input', event => {
+    const field = event.target;
+    if (field?.matches?.('[data-write-slot] [data-write-field="nickname"]')) {
+      syncSlotClearButton(field.closest('[data-write-slot]'));
     }
   }, true);
 
