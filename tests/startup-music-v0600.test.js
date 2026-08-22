@@ -817,7 +817,7 @@ test('v0.6 markup separates dialog controls from the live status region', () => 
   assert.match(preview, /data-royal-music-retry/);
 });
 
-test('v0.6 entry is opt-in and media remain protected/private', () => {
+test('v0.6 is the general entry and media remain protected/private', () => {
   const preview = fs.readFileSync(path.join(ROOT, 'app-v0600.html'), 'utf8');
   const stable = fs.readFileSync(path.join(ROOT, 'app-v0559.html'), 'utf8');
   const router = fs.readFileSync(path.join(ROOT, 'app.html'), 'utf8');
@@ -831,8 +831,11 @@ test('v0.6 entry is opt-in and media remain protected/private', () => {
   assert.doesNotMatch(stable, /__ROYAL_BUILD__/);
   assert.match(appSource, /: '0\.5\.59';/);
   assert.match(appSource, /Authorization: `Bearer \$\{sessionAtStart\}`/);
-  assert.match(router, /app-v0559\.html/);
-  assert.match(index, /app-v0559\.html/);
+  assert.match(router, /const target = 'app-v0600\.html'/);
+  assert.match(router, /releaseBuild', '20260822-v0600'/);
+  assert.doesNotMatch(router, /app-v0559\.html/);
+  assert.match(index, /app-v0600\.html/);
+  assert.doesNotMatch(index, /app-v0559\.html/);
   assert.equal(fs.existsSync(path.join(ROOT, 'assets', 'royal-background-v0600.m4a')), false);
   assert.equal(fs.existsSync(path.join(ROOT, 'assets', 'project-mayak-background.mp3')), false);
 });
