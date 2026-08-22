@@ -2,7 +2,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.6.0-music.4';
+  const VERSION = '0.6.0-music.5';
   const STORAGE_KEY = 'royal_music_v1';
   const LOCAL_PREFIX = `${STORAGE_KEY}:participant:`;
   const PAYLOAD_VERSION = 2;
@@ -42,6 +42,7 @@
   let authorizationKey = '';
   let objectUrl = '';
   let userGestureSeen = false;
+  let snapshotGate = 'standalone';
   let lastObservedTimestamp = 0;
   let lastIssuedTimestamp = 0;
   let lastFailedRecord = null;
@@ -233,6 +234,7 @@
 
   function labels() {
     if (state === 'loading') return { icon: '⏳', label: 'Загружаем настройку музыки' };
+    if (state === 'preparing') return { icon: '⏳', label: 'Готовим музыку' };
     if (saveStatus === 'saving') {
       return { icon: '⏳', label: preference ? 'Музыка включена. Сохраняем настройку' : 'Музыка выключена. Сохраняем настройку' };
     }
@@ -250,7 +252,7 @@
       button.textContent = copy.icon;
       button.dataset.musicState = state;
       button.dataset.musicStorageState = ['error', 'degraded'].includes(saveStatus) ? saveStatus : storageStatus;
-      button.disabled = state === 'loading';
+      button.disabled = state === 'loading' || state === 'preparing';
       button.setAttribute('aria-label', copy.label);
       button.setAttribute('title', copy.label);
       button.setAttribute('aria-pressed', preferenceResolved ? String(Boolean(preference)) : 'mixed');
@@ -394,6 +396,12 @@
   async function attemptPlay(fromGesture = false) {
     const generation = lifecycleGeneration;
     if (!isCurrent(generation) || !authorized || !preference) return false;
+    // The protected media route authorizes through /snapshot itself. Never let
+    // that duplicate, heavy request race the application's critical snapshot.
+    if (!sourceAssigned && !['ready', 'standalone'].includes(snapshotGate)) {
+      setState('paused');
+      return false;
+    }
     if (fromGesture && sourceAssigned && sourceOwner === generation) {
       return playAssignedSourceFromGesture();
     }
@@ -589,9 +597,6 @@
     setState('loading');
 
     const pending = (async () => {
-      // Warm the protected blob in parallel with preference reads. It remains
-      // silent while OFF, but lets the sound button work in one trusted click.
-      void prepareSource(generation).catch(() => false);
       const localResult = readLocalPreference(safeKey);
       const remoteResults = await Promise.all([
         storageGet(cloud, 'cloud', generation),
@@ -625,6 +630,7 @@
 
       if (!preference) {
         setState('off');
+        if (snapshotGate === 'ready') warmOffSource(generation);
         return false;
       }
       setState('paused');
@@ -650,12 +656,63 @@
     setState(preferenceResolved && !preference ? 'off' : 'paused');
   }
 
+  function warmOffSource(generation = lifecycleGeneration) {
+    if (!isCurrent(generation) || preference || snapshotGate !== 'ready') return false;
+    if (sourceAssigned && sourceOwner === generation) {
+      setState('off');
+      return true;
+    }
+    setState('preparing');
+    Promise.resolve(prepareSource(generation)).then(() => {
+      if (isCurrent(generation) && !preference && state === 'preparing') setState('off');
+    }, () => {
+      if (isCurrent(generation) && !preference && state === 'preparing') setState('off');
+    });
+    return true;
+  }
+
+  function startMediaAfterSnapshot() {
+    if (terminal || snapshotGate !== 'ready' || !authorized || !preferenceResolved) return false;
+    if (preference) {
+      void attemptPlay(false);
+      return true;
+    }
+    // Saved OFF stays silent, but warming after the critical snapshot keeps the
+    // sound button a genuine one-click control without competing with startup.
+    return warmOffSource(lifecycleGeneration);
+  }
+
   function handleAppEvent(type, detail = {}) {
     if (type === 'auth-ready') {
+      snapshotGate = 'pending';
       void authorize(detail.user?.participantKey || '');
       return;
     }
+    if (type === 'snapshot-start') {
+      snapshotGate = 'pending';
+      return;
+    }
+    if (type === 'snapshot-ready') {
+      snapshotGate = 'ready';
+      startMediaAfterSnapshot();
+      return;
+    }
+    if (type === 'snapshot-error') {
+      snapshotGate = 'failed';
+      return;
+    }
     if (type === 'fatal' || type === 'access-denied') stop();
+  }
+
+  const startupReveal = window.RoyalStartupV0600?.whenRevealed;
+  if (startupReveal && typeof startupReveal.then === 'function') {
+    Promise.resolve(startupReveal).then(detail => {
+      if (terminal || snapshotGate !== 'failed' || !detail?.degraded) return;
+      // The user explicitly chose limited mode, so no snapshot retry is being
+      // protected anymore and media may start without racing critical data.
+      snapshotGate = 'ready';
+      startMediaAfterSnapshot();
+    }).catch(() => {});
   }
 
   function isMusicControl(target) {
@@ -762,7 +819,7 @@
     resume: () => attemptPlay(false),
     getState: () => ({
       state, storageStatus, saveStatus, preference, preferenceResolved, authorized,
-      sourceAssigned, userGestureSeen, volume: audio.volume, mediaAsset: MEDIA_ASSET
+      sourceAssigned, userGestureSeen, snapshotGate, volume: audio.volume, mediaAsset: MEDIA_ASSET
     })
   };
   window.__ROYAL_MUSIC_VERSION__ = VERSION;

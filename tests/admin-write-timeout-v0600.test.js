@@ -67,7 +67,7 @@ test('admin writes receive a 60 second transport window', async () => {
   );
   assert.equal(transport.scheduled.at(-1), 60000);
   assert.equal(transport.nativeCalls.length, 1);
-  assert.equal(transport.window.__ROYAL_TRANSPORT_VERSION__, '0.5.14.3');
+  assert.equal(transport.window.__ROYAL_TRANSPORT_VERSION__, '0.5.14.4');
 });
 
 test('admin-data receives one 20 second transport attempt', async () => {
@@ -85,6 +85,15 @@ test('ordinary Worker reads keep the five second timeout', async () => {
     'https://royal-crm-miniapp-api.tropical-spoon.workers.dev/snapshot'
   );
   assert.equal(transport.scheduled.at(-1), 5000);
+});
+
+test('protected background music receives its own 30 second download window', async () => {
+  const transport = createTransport();
+  await transport.window.fetch(
+    'https://royal-crm-miniapp-api.tropical-spoon.workers.dev/project-mayak-media?asset=background-v0600'
+  );
+  assert.equal(transport.scheduled.at(-1), 30000);
+  assert.equal(transport.nativeCalls.length, 1);
 });
 
 test('protected admin-data never falls through to unsupported GAS JSONP', async () => {
