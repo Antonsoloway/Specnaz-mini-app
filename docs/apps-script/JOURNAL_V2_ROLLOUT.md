@@ -108,7 +108,9 @@ ROYAL_CRM_SOURCE_SHA=<MERGED_40_CHAR_SHA> \
 4. восстанавливает ровно девять прежних hook-файлов;
 5. восстанавливает прежний file34, если он был, иначе удаляет только file34;
 6. выполняет `clasp push`, затем новый `clasp pull` и сравнивает factual
-   live manifest с сохранённым `live-before.sha256`;
+   полный live manifest (включая HTML) с schema-aware baseline: для старого
+   backup он восстанавливается из проверенного private archive, для нового
+   берётся из сохранённого `live-before.sha256`;
 7. повторно проверяет полный набор deployment ID и exact previous
    numeric version. Выводы Deactivate/Status и rollback verification
    сохраняются в `backup/diagnostics/` и не удаляются вместе с
@@ -150,7 +152,18 @@ Read-only проверка не вызывает Apps Script функций, н�
 bash scripts/install-v0600-journal-v2.sh --diagnose "$BACKUP"
 ```
 
-Она выполняет только temporary `clasp pull` и deployment inventory read. Флаг
+Она выполняет только temporary `clasp pull` и deployment inventory read. Начиная
+с installer `1.4.0`, source manifest охватывает весь Apps Script payload:
+`appsscript.json`, `.js`, `.gs` и `.html` (включая `MiniApp.html`). Для старого
+backup полный baseline безопасно восстанавливается из закрытого
+`live-before-full.tgz`, причём его legacy JS-manifest обязан совпасть с ранее
+сохранённым manifest, а архивные `.clasp.json`/`.claspignore` — с отдельными
+rollback-копиями. Deployment gate строго повторно разбирает сохранённый raw
+вывод, сверяет его с сохранёнными TSV/ID и сравнивает полный нормализованный
+inventory: ID, version и description каждой записи. Неизвестная строка CLI или
+несовпадающее заявленное число deployment приводят к fail-closed результату.
+
+Флаг
 `SOURCE_AND_DEPLOYMENT_RESTORED=true` доказывает exact source/deployment
 восстановление. `AUDIT_DISABLED_LIVE_CHECK=false` в этом режиме означает,
 что read-only diagnosis намеренно не читал Script Property; это **не** означает,
@@ -164,13 +177,23 @@ bash scripts/install-v0600-journal-v2.sh --diagnose "$BACKUP"
 bash scripts/install-v0600-journal-v2.sh --diagnose-source-diff "$BACKUP"
 ```
 
-Он выполняет только temporary `clasp pull` и сравнивает manifest с backup.
+Он выполняет только temporary `clasp pull` и сравнивает полный payload-manifest
+с backup, включая HTML-файлы.
 `SOURCE_DETAILS_AVAILABLE=true` означает, что оба manifest прошли строгую
 проверку структуры, уникальности и безопасных относительных имён. Вывод
 содержит число различий и для каждого source path только статус
 `ADDED`, `REMOVED` или `CHANGED`. Хэши, содержимое файлов, deployment ID,
 Spreadsheet ID и Script Properties не печатаются. Этот режим ничего не
 исправляет: конкретный repair выбирается отдельно после анализа результата.
+File rows разрешены только для заранее проверенного набора публичных/live
+Apps Script имён; неизвестное изменённое имя даёт
+`SOURCE_DETAILS_AVAILABLE=false`, чтобы само имя не раскрыло credential или
+внутренний ID.
 При ошибке pull или небезопасном/malformed manifest режим возвращает
 `SOURCE_DETAILS_AVAILABLE=false` и не печатает ни file rows, ни count:
 число различий в таком состоянии неизвестно, а не равно нулю.
+
+Перед source-only repair нужно получить свежий результат **обеих** команд
+installer `1.4.0`: source-diff доказывает полный payload, а общий diagnose —
+полный deployment inventory. Результаты старой версии installer для этого
+решения недостаточны.

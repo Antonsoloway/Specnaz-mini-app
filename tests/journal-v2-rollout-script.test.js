@@ -108,6 +108,15 @@ test('rollback restores the old deployment and exact source paths without deleti
   assert.match(source, /rm -f -- "\$SOURCE_DIR\/34_MINIAPP_AUDIT_V2\.js"/);
   assert.match(source, /serviceSheetsDeletionAllowed': False/);
   assert.doesNotMatch(source, /deleteSheet\(|\.deleteSheet|Админ аудит.*rm/);
+  const rollback = source.slice(
+    source.indexOf('rollback_from_backup()'),
+    source.indexOf('verify_private_snapshot()')
+  );
+  const baseline = rollback.indexOf('prepare_comparable_baseline_manifest');
+  const deactivate = rollback.indexOf('confirm_audit_disabled_for_rollback');
+  assert.ok(baseline >= 0 && baseline < deactivate, 'full baseline must be proven before rollback mutation');
+  assert.match(rollback, /complete_source_manifest "\$SOURCE_DIR"/);
+  assert.match(rollback, /source_manifests_equal_safely/);
 });
 
 test('route and snapshot checks are non-mutating and fail closed', () => {
@@ -161,6 +170,7 @@ test('metadata writer executes its embedded Python and records exact rollback sc
   fs.rmSync(tempDir, { recursive: true, force: true });
   assert.equal(metadata.deploymentVersionBefore, 42);
   assert.equal(metadata.schema, 2);
+  assert.equal(metadata.sourceManifestSchema, 2);
   assert.equal(metadata.deploymentDescription, 'Таблица ЧП 1.3');
   assert.equal(metadata.rollbackFiles.length, 10);
   assert.equal(metadata.auditFileExistedBefore, false);
@@ -474,16 +484,36 @@ test('read-only diagnose compares source and deployments without mutating comman
   const crypto = require('node:crypto');
   const fixture = fs.mkdtempSync(path.join(process.env.TMPDIR || '/tmp', 'journal-diagnose-'));
   const backup = path.join(fixture, 'v0600-journal-v2-test');
-  const template = path.join(fixture, 'template.js');
+  const template = path.join(fixture, 'template');
   const trace = path.join(fixture, 'trace.txt');
   fs.mkdirSync(backup);
-  fs.writeFileSync(template, 'function liveBefore() { return true; }\n');
-  const digest = crypto.createHash('sha256').update(fs.readFileSync(template)).digest('hex');
-  fs.writeFileSync(path.join(backup, 'live-before.sha256'), `${digest}  01_CORE_MAIN.js\n`);
+  fs.mkdirSync(template);
+  const sourceValue = 'function liveBefore() { return true; }\n';
+  const htmlValue = '<main>exact schema2 html</main>\n';
+  const manifestValue = '{"timeZone":"Europe/Moscow"}\n';
+  fs.writeFileSync(path.join(template, '01_CORE_MAIN.js'), sourceValue);
+  fs.writeFileSync(path.join(template, 'MiniApp.html'), htmlValue);
+  fs.writeFileSync(path.join(template, 'appsscript.json'), manifestValue);
+  const digest = value => crypto.createHash('sha256').update(value).digest('hex');
+  fs.writeFileSync(path.join(backup, 'live-before.sha256'), [
+    `${digest(sourceValue)}  01_CORE_MAIN.js`,
+    `${digest(htmlValue)}  MiniApp.html`,
+    `${digest(manifestValue)}  appsscript.json`,
+    ''
+  ].join('\n'));
   fs.writeFileSync(path.join(backup, '.clasp.json.rollback'), JSON.stringify({ scriptId: 'test', rootDir: 'source' }));
   fs.writeFileSync(path.join(backup, 'deployment-ids-before.txt'), 'AKfycbDiagnoseDeployment1234567890\n');
+  fs.writeFileSync(
+    path.join(backup, 'deployments-before.txt'),
+    'Found 1 deployment.\n- AKfycbDiagnoseDeployment1234567890 @42 - Таблица ЧП 1.3\n'
+  );
+  fs.writeFileSync(
+    path.join(backup, 'deployments-before.tsv'),
+    'AKfycbDiagnoseDeployment1234567890\t42\tТаблица ЧП 1.3\n'
+  );
   fs.writeFileSync(path.join(backup, 'metadata.json'), JSON.stringify({
     schema: 2,
+    sourceManifestSchema: 2,
     deploymentId: 'AKfycbDiagnoseDeployment1234567890',
     deploymentVersionBefore: 42,
     deploymentDescription: 'Таблица ЧП 1.3'
@@ -497,7 +527,7 @@ test('read-only diagnose compares source and deployments without mutating comman
       printf '%s\n' "$*" >> "$DIAG_TRACE"
       if [[ "$1" == pull ]]; then
         mkdir -p source
-        cp "$DIAG_TEMPLATE" source/01_CORE_MAIN.js
+        cp "$DIAG_TEMPLATE"/* source/
         return 0
       fi
       if [[ "$1" == list-deployments ]]; then
@@ -515,10 +545,409 @@ test('read-only diagnose compares source and deployments without mutating comman
   const lines = result.stdout.trim().split('\n');
   assert.ok(lines.every(line => /^[A-Z_]+=(?:true|false)$/.test(line)), result.stdout);
   assert.match(result.stdout, /SOURCE_AND_DEPLOYMENT_RESTORED=true/);
+  assert.match(result.stdout, /DEPLOYMENT_INVENTORY_EQUALS_BEFORE=true/);
   assert.match(result.stdout, /AUDIT_DISABLED_LIVE_CHECK=false/);
   assert.doesNotMatch(result.stdout, /AKfy|Таблица|ROYAL_CRM/);
   const commands = fs.readFileSync(trace, 'utf8').trim().split('\n');
   assert.deepEqual(commands, ['pull', 'list-deployments']);
+  fs.rmSync(fixture, { recursive: true, force: true });
+});
+
+test('read-only diagnose rejects changed non-named deployment metadata even when IDs and named deployment match', () => {
+  const crypto = require('node:crypto');
+  const fixture = fs.mkdtempSync(path.join(process.env.TMPDIR || '/tmp', 'journal-inventory-diff-'));
+  const backup = path.join(fixture, 'v0600-journal-v2-test');
+  const template = path.join(fixture, 'template');
+  fs.mkdirSync(backup);
+  fs.mkdirSync(template);
+  const sourceValue = 'function exactSource() { return true; }\n';
+  const manifestValue = '{"timeZone":"Europe/Moscow"}\n';
+  const digest = value => crypto.createHash('sha256').update(value).digest('hex');
+  fs.writeFileSync(path.join(template, '01_CORE_MAIN.js'), sourceValue);
+  fs.writeFileSync(path.join(template, 'appsscript.json'), manifestValue);
+  fs.writeFileSync(path.join(backup, 'live-before.sha256'), [
+    `${digest(sourceValue)}  01_CORE_MAIN.js`,
+    `${digest(manifestValue)}  appsscript.json`,
+    ''
+  ].join('\n'));
+  fs.writeFileSync(
+    path.join(backup, '.clasp.json.rollback'),
+    JSON.stringify({ scriptId: 'test', rootDir: 'source' })
+  );
+  fs.writeFileSync(path.join(backup, 'deployment-ids-before.txt'), [
+    'AKfycbDiagnoseDeployment1234567890',
+    'AKfycbOtherDeployment123456789012',
+    ''
+  ].join('\n'));
+  fs.writeFileSync(path.join(backup, 'deployments-before.txt'), [
+    'Found 2 deployments.',
+    '- AKfycbDiagnoseDeployment1234567890 @42 - Таблица ЧП 1.3',
+    '- AKfycbOtherDeployment123456789012 @7 - Другой deployment',
+    ''
+  ].join('\n'));
+  fs.writeFileSync(path.join(backup, 'deployments-before.tsv'), [
+    'AKfycbDiagnoseDeployment1234567890\t42\tТаблица ЧП 1.3',
+    'AKfycbOtherDeployment123456789012\t7\tДругой deployment',
+    ''
+  ].join('\n'));
+  fs.writeFileSync(path.join(backup, 'metadata.json'), JSON.stringify({
+    schema: 2,
+    sourceManifestSchema: 2,
+    deploymentId: 'AKfycbDiagnoseDeployment1234567890',
+    deploymentVersionBefore: 42,
+    deploymentDescription: 'Таблица ЧП 1.3'
+  }));
+
+  const result = spawnSync('bash', ['-c', `
+    source "$1"
+    DIAG_TEMPLATE="$3"
+    clasp() {
+      if [[ "$1" == pull ]]; then
+        mkdir -p source
+        cp "$DIAG_TEMPLATE"/* source/
+        return 0
+      fi
+      if [[ "$1" == list-deployments ]]; then
+        printf '%s\n' \
+          '- AKfycbDiagnoseDeployment1234567890 @42 - Таблица ЧП 1.3' \
+          '- AKfycbOtherDeployment123456789012 @8 - Другой deployment'
+        return 0
+      fi
+      return 99
+    }
+    diagnose_backup "$2"
+  `, 'inventory-diff-test', SCRIPT_PATH, backup, template], {
+    encoding: 'utf8',
+    env: { ...process.env, ROYAL_CRM_SOURCE_SHA: 'c'.repeat(40) }
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /SOURCE_EQUALS_LIVE_BEFORE=true/);
+  assert.match(result.stdout, /DEPLOYMENT_SET_EQUALS_BEFORE=true/);
+  assert.match(result.stdout, /NAMED_DEPLOYMENT_EQUALS_BEFORE=true/);
+  assert.match(result.stdout, /DEPLOYMENT_INVENTORY_EQUALS_BEFORE=false/);
+  assert.match(result.stdout, /SOURCE_AND_DEPLOYMENT_RESTORED=false/);
+  assert.doesNotMatch(result.stdout + result.stderr, /AKfy|Таблица|Другой/);
+  fs.rmSync(fixture, { recursive: true, force: true });
+});
+
+test('deployment inventory parser rejects unrecognized lines and declared-count mismatches', () => {
+  const fixture = fs.mkdtempSync(path.join(
+    process.env.TMPDIR || '/tmp',
+    'journal-strict-deployment-parser-'
+  ));
+  const cases = [
+    [
+      'Found 1 deployment.',
+      '- AKfycbDiagnoseDeployment1234567890 @42 - Таблица ЧП 1.3',
+      'description continuation that must not be ignored',
+      ''
+    ].join('\n'),
+    [
+      'Found 2 deployments.',
+      '- AKfycbDiagnoseDeployment1234567890 @42 - Таблица ЧП 1.3',
+      ''
+    ].join('\n')
+  ];
+  for (const [index, raw] of cases.entries()) {
+    const input = path.join(fixture, `raw-${index}.txt`);
+    const output = path.join(fixture, `parsed-${index}.tsv`);
+    fs.writeFileSync(input, raw);
+    const result = spawnSync('bash', ['-c', `
+      source "$1"
+      parse_deployments "$2" "$3"
+    `, 'strict-deployment-parser-test', SCRIPT_PATH, input, output], {
+      encoding: 'utf8',
+      env: { ...process.env, ROYAL_CRM_SOURCE_SHA: '1'.repeat(40) }
+    });
+    assert.notEqual(result.status, 0, `unsafe deployment case ${index} was accepted`);
+  }
+  fs.rmSync(fixture, { recursive: true, force: true });
+});
+
+test('legacy backup archive reconstructs a full payload baseline including MiniApp.html', () => {
+  const crypto = require('node:crypto');
+  const fixture = fs.mkdtempSync(path.join(process.env.TMPDIR || '/tmp', 'journal-legacy-full-baseline-'));
+  const backup = path.join(fixture, 'v0600-journal-v2-test');
+  const project = path.join(fixture, 'project');
+  const sourceDir = project;
+  const extraction = path.join(fixture, 'extracted');
+  const output = path.join(fixture, 'baseline-full.sha256');
+  const current = path.join(fixture, 'current-full.sha256');
+  const validation = path.join(fixture, 'rollback-source.validation');
+  fs.mkdirSync(backup);
+  fs.mkdirSync(project);
+  const core = 'function legacyCore() { return true; }\n';
+  const html = '<main>legacy mini app</main>\n';
+  const manifest = '{"timeZone":"Europe/Moscow"}\n';
+  const digest = value => crypto.createHash('sha256').update(value).digest('hex');
+  fs.writeFileSync(path.join(project, '.clasp.json'), JSON.stringify({ scriptId: 'test', rootDir: '.' }));
+  fs.writeFileSync(path.join(sourceDir, '01_CORE_MAIN.js'), core);
+  fs.writeFileSync(path.join(sourceDir, 'MiniApp.html'), html);
+  fs.writeFileSync(path.join(sourceDir, 'appsscript.json'), manifest);
+  fs.writeFileSync(path.join(backup, '.clasp.json.rollback'), JSON.stringify({ scriptId: 'test', rootDir: '.' }));
+  fs.writeFileSync(path.join(backup, 'metadata.json'), JSON.stringify({ schema: 1 }));
+  fs.writeFileSync(path.join(backup, 'live-before.sha256'), [
+    `${digest(core)}  01_CORE_MAIN.js`,
+    `${digest(manifest)}  appsscript.json`,
+    ''
+  ].join('\n'));
+  const packed = spawnSync('tar', ['-czf', path.join(backup, 'live-before-full.tgz'), '-C', project, '.'], {
+    encoding: 'utf8'
+  });
+  assert.equal(packed.status, 0, packed.stderr);
+
+  const result = spawnSync('bash', ['-c', `
+    source "$1"
+    prepare_comparable_baseline_manifest "$2" "$3" "$4"
+    complete_source_manifest "$5" "$6"
+    source_manifests_equal_safely "$3" "$6" "$7"
+  `, 'legacy-full-baseline-test', SCRIPT_PATH, backup, output, extraction,
+  sourceDir, current, validation], {
+    encoding: 'utf8',
+    env: { ...process.env, ROYAL_CRM_SOURCE_SHA: 'd'.repeat(40) }
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const baseline = fs.readFileSync(output, 'utf8');
+  assert.match(baseline, new RegExp(`${digest(html)}  MiniApp\\.html`));
+  assert.match(baseline, new RegExp(`${digest(core)}  01_CORE_MAIN\\.js`));
+  fs.rmSync(fixture, { recursive: true, force: true });
+});
+
+test('schema1 incident diagnosis proves unchanged HTML, one added file34, and full deployment inventory', () => {
+  const crypto = require('node:crypto');
+  const fixture = fs.mkdtempSync(path.join(
+    process.env.TMPDIR || '/tmp',
+    'journal-schema1-incident-'
+  ));
+  const backup = path.join(fixture, 'v0600-journal-v2-test');
+  const project = path.join(fixture, 'project');
+  const live = path.join(fixture, 'live');
+  fs.mkdirSync(backup);
+  fs.mkdirSync(project);
+  fs.mkdirSync(live);
+  const claspConfig = JSON.stringify({ scriptId: 'test', rootDir: '.' });
+  const core = 'function legacyCore() { return true; }\n';
+  const audit = 'function inertAudit() { return false; }\n';
+  const html = '<main>unchanged mini app</main>\n';
+  const manifest = '{"timeZone":"Europe/Moscow"}\n';
+  const digest = value => crypto.createHash('sha256').update(value).digest('hex');
+  fs.writeFileSync(path.join(project, '.clasp.json'), claspConfig);
+  fs.writeFileSync(path.join(project, '01_CORE_MAIN.js'), core);
+  fs.writeFileSync(path.join(project, 'MiniApp.html'), html);
+  fs.writeFileSync(path.join(project, 'appsscript.json'), manifest);
+  fs.writeFileSync(path.join(live, '01_CORE_MAIN.js'), core);
+  fs.writeFileSync(path.join(live, '34_MINIAPP_AUDIT_V2.js'), audit);
+  fs.writeFileSync(path.join(live, 'MiniApp.html'), html);
+  fs.writeFileSync(path.join(live, 'appsscript.json'), manifest);
+  fs.writeFileSync(path.join(backup, '.clasp.json.rollback'), claspConfig);
+  fs.writeFileSync(path.join(backup, 'metadata.json'), JSON.stringify({
+    schema: 1,
+    deploymentId: 'AKfycbDiagnoseDeployment1234567890',
+    deploymentVersionBefore: 42,
+    deploymentDescription: 'Таблица ЧП 1.3'
+  }));
+  fs.writeFileSync(path.join(backup, 'live-before.sha256'), [
+    `${digest(core)}  01_CORE_MAIN.js`,
+    `${digest(manifest)}  appsscript.json`,
+    ''
+  ].join('\n'));
+  fs.writeFileSync(
+    path.join(backup, 'deployment-ids-before.txt'),
+    'AKfycbDiagnoseDeployment1234567890\n'
+  );
+  fs.writeFileSync(
+    path.join(backup, 'deployments-before.txt'),
+    'Found 1 deployment.\n- AKfycbDiagnoseDeployment1234567890 @42 - Таблица ЧП 1.3\n'
+  );
+  fs.writeFileSync(
+    path.join(backup, 'deployments-before.tsv'),
+    'AKfycbDiagnoseDeployment1234567890\t42\tТаблица ЧП 1.3\n'
+  );
+  const packed = spawnSync('tar', [
+    '-czf', path.join(backup, 'live-before-full.tgz'), '-C', project, '.'
+  ], { encoding: 'utf8' });
+  assert.equal(packed.status, 0, packed.stderr);
+
+  const sourceDiff = spawnSync('bash', ['-c', `
+    source "$1"
+    DIAG_TEMPLATE="$3"
+    clasp() {
+      if [[ "$1" == pull ]]; then
+        cp "$DIAG_TEMPLATE"/* .
+        return 0
+      fi
+      return 99
+    }
+    diagnose_source_diff "$2"
+  `, 'schema1-source-diff-test', SCRIPT_PATH, backup, live], {
+    encoding: 'utf8',
+    env: { ...process.env, ROYAL_CRM_SOURCE_SHA: '2'.repeat(40) }
+  });
+  assert.equal(sourceDiff.status, 0, sourceDiff.stderr);
+  assert.match(sourceDiff.stdout, /SOURCE_DIFF_COUNT=1/);
+  assert.match(
+    sourceDiff.stdout,
+    /SOURCE_DIFF=\{"status":"ADDED","path":"34_MINIAPP_AUDIT_V2\.js"\}/
+  );
+  assert.doesNotMatch(sourceDiff.stdout, /SOURCE_DIFF=.*MiniApp\.html/);
+
+  const diagnosis = spawnSync('bash', ['-c', `
+    source "$1"
+    DIAG_TEMPLATE="$3"
+    clasp() {
+      if [[ "$1" == pull ]]; then
+        cp "$DIAG_TEMPLATE"/* .
+        return 0
+      fi
+      if [[ "$1" == list-deployments ]]; then
+        printf '%s\n' \
+          'Found 1 deployment.' \
+          '- AKfycbDiagnoseDeployment1234567890 @42 - Таблица ЧП 1.3'
+        return 0
+      fi
+      return 99
+    }
+    diagnose_backup "$2"
+  `, 'schema1-diagnosis-test', SCRIPT_PATH, backup, live], {
+    encoding: 'utf8',
+    env: { ...process.env, ROYAL_CRM_SOURCE_SHA: '3'.repeat(40) }
+  });
+  assert.equal(diagnosis.status, 0, diagnosis.stderr);
+  assert.match(diagnosis.stdout, /SOURCE_EQUALS_LIVE_BEFORE=false/);
+  assert.match(diagnosis.stdout, /DEPLOYMENT_INVENTORY_EQUALS_BEFORE=true/);
+  assert.match(diagnosis.stdout, /SOURCE_AND_DEPLOYMENT_RESTORED=false/);
+  assert.doesNotMatch(diagnosis.stdout + diagnosis.stderr, /AKfy|Таблица|[0-9a-f]{64}/);
+  fs.rmSync(fixture, { recursive: true, force: true });
+});
+
+test('legacy baseline rejects archive clasp configuration that differs from saved rollback files', () => {
+  const crypto = require('node:crypto');
+  const fixture = fs.mkdtempSync(path.join(
+    process.env.TMPDIR || '/tmp',
+    'journal-legacy-config-binding-'
+  ));
+  for (const kind of ['clasp', 'claspignore']) {
+    const backup = path.join(fixture, `backup-${kind}`);
+    const project = path.join(fixture, `project-${kind}`);
+    const extraction = path.join(fixture, `extracted-${kind}`);
+    const output = path.join(fixture, `baseline-${kind}.sha256`);
+    fs.mkdirSync(backup);
+    fs.mkdirSync(project);
+    const manifest = '{}\n';
+    const archiveClasp = JSON.stringify({ scriptId: 'archive-project', rootDir: '.' });
+    const savedClasp = kind === 'clasp'
+      ? JSON.stringify({ scriptId: 'different-project', rootDir: '.' })
+      : archiveClasp;
+    fs.writeFileSync(path.join(project, '.clasp.json'), archiveClasp);
+    fs.writeFileSync(path.join(project, '.claspignore'), 'archive-ignore\n');
+    fs.writeFileSync(path.join(project, 'appsscript.json'), manifest);
+    fs.writeFileSync(path.join(backup, '.clasp.json.rollback'), savedClasp);
+    fs.writeFileSync(
+      path.join(backup, '.claspignore.rollback'),
+      kind === 'claspignore' ? 'saved-ignore\n' : 'archive-ignore\n'
+    );
+    fs.writeFileSync(path.join(backup, 'metadata.json'), JSON.stringify({ schema: 1 }));
+    fs.writeFileSync(
+      path.join(backup, 'live-before.sha256'),
+      `${crypto.createHash('sha256').update(manifest).digest('hex')}  appsscript.json\n`
+    );
+    const packed = spawnSync('tar', [
+      '-czf', path.join(backup, 'live-before-full.tgz'), '-C', project, '.'
+    ], { encoding: 'utf8' });
+    assert.equal(packed.status, 0, packed.stderr);
+
+    const result = spawnSync('bash', ['-c', `
+      source "$1"
+      prepare_comparable_baseline_manifest "$2" "$3" "$4"
+    `, 'legacy-config-binding-test', SCRIPT_PATH, backup, output, extraction], {
+      encoding: 'utf8',
+      env: { ...process.env, ROYAL_CRM_SOURCE_SHA: 'f'.repeat(40) }
+    });
+    assert.notEqual(result.status, 0, `${kind} mismatch was accepted`);
+    assert.equal(fs.existsSync(output), false);
+  }
+  fs.rmSync(fixture, { recursive: true, force: true });
+});
+
+test('legacy baseline rejects traversal, symlink, and duplicate archive entries before extraction', () => {
+  const crypto = require('node:crypto');
+  const fixture = fs.mkdtempSync(path.join(
+    process.env.TMPDIR || '/tmp',
+    'journal-legacy-hostile-archive-'
+  ));
+  const idSentinel = 'AKfycbMustNeverLeakFromArchive1234567890';
+  for (const kind of ['traversal', 'symlink', 'duplicate', 'overlong-id']) {
+    const backup = path.join(fixture, `backup-${kind}`);
+    const extraction = path.join(fixture, `extracted-${kind}`);
+    const output = path.join(fixture, `baseline-${kind}.sha256`);
+    fs.mkdirSync(backup);
+    const claspConfig = JSON.stringify({ scriptId: 'test', rootDir: 'source' });
+    const manifestConfig = '{}';
+    fs.writeFileSync(path.join(backup, '.clasp.json.rollback'), claspConfig);
+    fs.writeFileSync(path.join(backup, 'metadata.json'), JSON.stringify({ schema: 1 }));
+    fs.writeFileSync(
+      path.join(backup, 'live-before.sha256'),
+      `${crypto.createHash('sha256').update(manifestConfig).digest('hex')}  appsscript.json\n`
+    );
+    const archive = path.join(backup, 'live-before-full.tgz');
+    const packed = spawnSync('python3', ['-c', `
+import io, json, sys, tarfile
+
+archive, kind = sys.argv[1:]
+with tarfile.open(archive, 'w:gz') as handle:
+    clasp = json.dumps({'scriptId': 'test', 'rootDir': 'source'}, separators=(',', ':')).encode()
+    config = tarfile.TarInfo('.clasp.json')
+    config.size = len(clasp)
+    handle.addfile(config, io.BytesIO(clasp))
+    root = tarfile.TarInfo('source')
+    root.type = tarfile.DIRTYPE
+    root.mode = 0o700
+    handle.addfile(root)
+    if kind == 'traversal':
+        payload = b'unsafe'
+        entry = tarfile.TarInfo('../escape.js')
+        entry.size = len(payload)
+        handle.addfile(entry, io.BytesIO(payload))
+    elif kind == 'symlink':
+        payload = b'{}'
+        appsscript = tarfile.TarInfo('source/appsscript.json')
+        appsscript.size = len(payload)
+        handle.addfile(appsscript, io.BytesIO(payload))
+        entry = tarfile.TarInfo('source/escape.js')
+        entry.type = tarfile.SYMTYPE
+        entry.linkname = '/tmp/escape.js'
+        handle.addfile(entry)
+    elif kind == 'duplicate':
+        for payload in (b'{}', b'{"duplicate":true}'):
+            entry = tarfile.TarInfo('source/appsscript.json')
+            entry.size = len(payload)
+            handle.addfile(entry, io.BytesIO(payload))
+    else:
+        payload = b'secret-content-must-not-leak'
+        entry = tarfile.TarInfo('source/' + 'x' * 260 + '${idSentinel}.js')
+        entry.size = len(payload)
+        handle.addfile(entry, io.BytesIO(payload))
+    if kind == 'traversal':
+        payload = b'{}'
+        appsscript = tarfile.TarInfo('source/appsscript.json')
+        appsscript.size = len(payload)
+        handle.addfile(appsscript, io.BytesIO(payload))
+`, archive, kind], { encoding: 'utf8' });
+    assert.equal(packed.status, 0, packed.stderr);
+
+    const result = spawnSync('bash', ['-c', `
+      source "$1"
+      prepare_comparable_baseline_manifest "$2" "$3" "$4"
+    `, 'legacy-hostile-archive-test', SCRIPT_PATH, backup, output, extraction], {
+      encoding: 'utf8',
+      env: { ...process.env, ROYAL_CRM_SOURCE_SHA: 'e'.repeat(40) }
+    });
+    const combined = result.stdout + result.stderr;
+    assert.notEqual(result.status, 0, `${kind} archive was accepted`);
+    assert.doesNotMatch(combined, /AKfy|secret-content|[0-9a-f]{64}/);
+    assert.equal(fs.existsSync(path.join(fixture, 'escape.js')), false);
+    assert.equal(fs.existsSync(output), false);
+  }
   fs.rmSync(fixture, { recursive: true, force: true });
 });
 
@@ -536,19 +965,27 @@ test('read-only source diff prints only status and JSON-escaped paths', () => {
   const beforePublic = 'function beforePublic() { return true; }\n';
   const currentCore = 'function currentCore() { return false; }\n';
   const currentAudit = 'function currentAudit() { return true; }\n';
+  const beforeHtml = '<main>before</main>\n';
+  const currentHtml = '<main>current</main>\n';
   const manifestConfig = '{"timeZone":"Europe/Moscow"}\n';
   fs.writeFileSync(path.join(backup, 'live-before.sha256'), [
     `${digest(manifestConfig)}  appsscript.json`,
     `${digest(beforeCore)}  01_CORE_MAIN.js`,
     `${digest(beforePublic)}  02_PUBLIC_SYNC_V4.js`,
+    `${digest(beforeHtml)}  MiniApp.html`,
     ''
   ].join('\n'));
   fs.writeFileSync(
     path.join(backup, '.clasp.json.rollback'),
     JSON.stringify({ scriptId: 'test', rootDir: 'source' })
   );
+  fs.writeFileSync(
+    path.join(backup, 'metadata.json'),
+    JSON.stringify({ sourceManifestSchema: 2 })
+  );
   fs.writeFileSync(path.join(template, '01_CORE_MAIN.js'), currentCore);
   fs.writeFileSync(path.join(template, '34_MINIAPP_AUDIT_V2.js'), currentAudit);
+  fs.writeFileSync(path.join(template, 'MiniApp.html'), currentHtml);
   fs.writeFileSync(path.join(template, 'appsscript.json'), manifestConfig);
   const backupBefore = new Map(fs.readdirSync(backup).map(name => [
     name,
@@ -578,10 +1015,11 @@ test('read-only source diff prints only status and JSON-escaped paths', () => {
   assert.match(result.stdout, /SOURCE_PULL_SUCCEEDED=true/);
   assert.match(result.stdout, /SOURCE_MATCHES_LIVE_BEFORE=false/);
   assert.match(result.stdout, /SOURCE_DETAILS_AVAILABLE=true/);
-  assert.match(result.stdout, /SOURCE_DIFF_COUNT=3/);
+  assert.match(result.stdout, /SOURCE_DIFF_COUNT=4/);
   assert.match(result.stdout, /SOURCE_DIFF=\{"status":"CHANGED","path":"01_CORE_MAIN\.js"\}/);
   assert.match(result.stdout, /SOURCE_DIFF=\{"status":"REMOVED","path":"02_PUBLIC_SYNC_V4\.js"\}/);
   assert.match(result.stdout, /SOURCE_DIFF=\{"status":"ADDED","path":"34_MINIAPP_AUDIT_V2\.js"\}/);
+  assert.match(result.stdout, /SOURCE_DIFF=\{"status":"CHANGED","path":"MiniApp\.html"\}/);
   assert.match(result.stdout, /MUTATING_COMMANDS_USED=false/);
   assert.doesNotMatch(result.stdout, /function |[0-9a-f]{64}|AKfy|Таблица|ROYAL_CRM/);
   assert.equal(result.stderr, '');
@@ -615,6 +1053,10 @@ test('read-only source diff reports an exact match without printing file rows', 
     path.join(backup, '.clasp.json.rollback'),
     JSON.stringify({ scriptId: 'test', rootDir: 'source' })
   );
+  fs.writeFileSync(
+    path.join(backup, 'metadata.json'),
+    JSON.stringify({ sourceManifestSchema: 2 })
+  );
 
   const result = spawnSync('bash', ['-c', `
     source "$1"
@@ -645,6 +1087,7 @@ test('read-only source diff fails closed on malformed, duplicate, unsafe, or ide
   const crypto = require('node:crypto');
   const digest = crypto.createHash('sha256').update('safe').digest('hex');
   const validManifest = `${digest}  appsscript.json\n`;
+  const secretShapedPrefix = ['g', 'h', 'p', '_'].join('');
   const cases = [
     '',
     `${digest}  safe.js\n`,
@@ -656,7 +1099,9 @@ test('read-only source diff fails closed on malformed, duplicate, unsafe, or ide
     `${validManifest}${digest}  unsafe\u009b.js\n`,
     `${validManifest}${digest}  unsafe\u202e.js\n`,
     `${validManifest}${digest}  AKfycbSyntheticDeploymentIdentifier123456.js\n`,
-    `${validManifest}${digest}  1SyntheticSpreadsheetOrScriptIdentifier123456789.js\n`
+    `${validManifest}${digest}  1SyntheticSpreadsheetOrScriptIdentifier123456789.js\n`,
+    `${validManifest}${digest}  0AAlternateDriveIdentifier123456789012345.js\n`,
+    `${validManifest}${digest}  ${secretShapedPrefix}syntheticSecretShapedFilename123456789.js\n`
   ];
 
   for (const [index, manifest] of cases.entries()) {
@@ -670,13 +1115,17 @@ test('read-only source diff fails closed on malformed, duplicate, unsafe, or ide
       path.join(backup, '.clasp.json.rollback'),
       JSON.stringify({ scriptId: 'test', rootDir: 'source' })
     );
+    fs.writeFileSync(
+      path.join(backup, 'metadata.json'),
+      JSON.stringify({ sourceManifestSchema: 2 })
+    );
     const result = spawnSync('bash', ['-c', `
       source "$1"
       DIAG_TEMPLATE="$3"
       clasp() {
         if [[ "$1" == pull ]]; then
           mkdir -p source
-          cp "$DIAG_TEMPLATE" source/safe.js
+          cp "$DIAG_TEMPLATE" source/01_CORE_MAIN.js
           printf '{"timeZone":"Europe/Moscow"}\n' > source/appsscript.json
           return 0
         fi
@@ -695,7 +1144,11 @@ test('read-only source diff fails closed on malformed, duplicate, unsafe, or ide
     assert.doesNotMatch(result.stdout, /^SOURCE_DIFF_COUNT=/m);
     assert.doesNotMatch(result.stdout, /^SOURCE_DIFF=/m);
     assert.match(result.stdout, /MUTATING_COMMANDS_USED=false/);
-    assert.doesNotMatch(combined, /AKfy|Synthetic|\.\.\/|\u001b\[31m|\u009b|\u202e|[0-9a-f]{64}|function /);
+    assert.doesNotMatch(
+      combined,
+      /AKfy|Synthetic|0AAlternate|\.\.\/|\u001b\[31m|\u009b|\u202e|[0-9a-f]{64}|function /
+    );
+    assert.equal(combined.includes(secretShapedPrefix), false);
     fs.rmSync(fixture, { recursive: true, force: true });
   }
 });
@@ -709,6 +1162,10 @@ test('read-only source diff reports pull failure without raw output or stale fil
   fs.writeFileSync(
     path.join(backup, '.clasp.json.rollback'),
     JSON.stringify({ scriptId: 'test', rootDir: 'source' })
+  );
+  fs.writeFileSync(
+    path.join(backup, 'metadata.json'),
+    JSON.stringify({ sourceManifestSchema: 2 })
   );
   const result = spawnSync('bash', ['-c', `
     source "$1"

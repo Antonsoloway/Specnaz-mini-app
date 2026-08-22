@@ -8,7 +8,7 @@ umask 077
 # deployment ID, never changes business rows, and never enables audit v2 until
 # a fresh baseline and every service-sheet protection gate have been verified.
 
-readonly ROLLOUT_SCRIPT_VERSION="1.3.0"
+readonly ROLLOUT_SCRIPT_VERSION="1.4.0"
 readonly ROOT_BASHPID="$BASHPID"
 readonly REPO="Antonsoloway/Specnaz-mini-app"
 readonly EXPECTED_DESC="Таблица ЧП 1.3"
@@ -209,7 +209,7 @@ copy_clasp_config() {
   resolve_source_dir
 }
 
-full_source_manifest() {
+legacy_source_manifest() {
   local root="$1"
   local output="$2"
   python3 - "$root" "$output" <<'PY'
@@ -227,6 +227,32 @@ for path in root.rglob('*'):
         rows.append((rel, hashlib.sha256(path.read_bytes()).hexdigest()))
 out.write_text(''.join(f'{digest}  {rel}\n' for rel, digest in sorted(rows)), encoding='utf-8')
 PY
+}
+
+complete_source_manifest() {
+  local root="$1"
+  local output="$2"
+  python3 - "$root" "$output" <<'PY'
+import hashlib, sys
+from pathlib import Path
+
+root = Path(sys.argv[1]).resolve()
+out = Path(sys.argv[2])
+rows = []
+for path in root.rglob('*'):
+    if not path.is_file():
+        continue
+    if path.name == 'appsscript.json' or path.suffix in {'.js', '.gs', '.html'}:
+        rel = path.relative_to(root).as_posix()
+        rows.append((rel, hashlib.sha256(path.read_bytes()).hexdigest()))
+out.write_text(''.join(f'{digest}  {rel}\n' for rel, digest in sorted(rows)), encoding='utf-8')
+PY
+}
+
+# Keep the historical helper contract for rollback code or sourced tooling
+# that still expects the pre-1.4 JS/GS-only manifest.
+full_source_manifest() {
+  legacy_source_manifest "$@"
 }
 
 assert_only_allowed_changes() {
@@ -393,14 +419,25 @@ from pathlib import Path
 
 raw = Path(sys.argv[1]).read_text(encoding='utf-8', errors='replace')
 rows = []
+declared_count = None
 for line in raw.splitlines():
+    if not line.strip():
+        continue
+    count_match = re.fullmatch(r'Found ([0-9]+) deployments?\.', line.strip())
+    if count_match:
+        if declared_count is not None:
+            raise SystemExit('duplicate deployment count header')
+        declared_count = int(count_match.group(1))
+        continue
     match = re.match(r'^\s*-\s+([^\s]+)\s+@([^\s]+)(?:\s+-\s+(.*?))?\s*$', line)
     if not match:
-        continue
+        raise SystemExit('unrecognized deployment inventory line')
     deployment_id, version, description = match.groups()
     rows.append((deployment_id, version, description or ''))
 if not rows:
     raise SystemExit('no deployments could be parsed')
+if declared_count is not None and declared_count != len(rows):
+    raise SystemExit('deployment count does not match parsed inventory')
 Path(sys.argv[2]).write_text(
     ''.join('\t'.join(row) + '\n' for row in rows), encoding='utf-8'
 )
@@ -782,6 +819,7 @@ from pathlib import Path
 path = Path(sys.argv[1])
 data = {
     'schema': 2,
+    'sourceManifestSchema': 2,
     'deploymentId': sys.argv[2],
     'deploymentVersionBefore': int(sys.argv[3]),
     'deploymentDescription': sys.argv[4],
@@ -1046,6 +1084,14 @@ rollback_from_backup() {
   if [[ -z "${TEMP_DIR:-}" || ! -d "$TEMP_DIR" ]]; then
     TEMP_DIR="$(mktemp -d /tmp/royal-v0600-journal-rollback.XXXXXX)" || return 1
   fi
+  local rollback_baseline="$TEMP_DIR/rollback-baseline-full.sha256"
+  prepare_comparable_baseline_manifest \
+    "$backup" "$rollback_baseline" "$TEMP_DIR/rollback-baseline-project" \
+    || { warn "Rollback full source baseline invalid"; return 1; }
+  source_manifests_equal_safely \
+    "$rollback_baseline" "$rollback_baseline" \
+    "$TEMP_DIR/rollback-baseline.validation" \
+    || { warn "Rollback source manifest structure invalid"; return 1; }
   if [[ -z "${RUN_PROJECT:-}" || ! -f "$RUN_PROJECT/.clasp.json" ]]; then
     RUN_PROJECT="$TEMP_DIR/clasp-rollback-project"
     mkdir -p "$RUN_PROJECT" || return 1
@@ -1091,10 +1137,11 @@ rollback_from_backup() {
     clasp pull || exit 1
   ) >"$ROLLBACK_DIAGNOSTIC_DIR/live-source-pull.txt" 2>&1 || return 1
   resolve_source_dir || return 1
-  full_source_manifest "$SOURCE_DIR" "$ROLLBACK_DIAGNOSTIC_DIR/live-source.sha256" \
+  complete_source_manifest "$SOURCE_DIR" "$ROLLBACK_DIAGNOSTIC_DIR/live-source.sha256" \
     || return 1
-  cmp -s "$backup/live-before.sha256" \
-    "$ROLLBACK_DIAGNOSTIC_DIR/live-source.sha256" || {
+  source_manifests_equal_safely \
+    "$rollback_baseline" "$ROLLBACK_DIAGNOSTIC_DIR/live-source.sha256" \
+    "$ROLLBACK_DIAGNOSTIC_DIR/live-source.validation" || {
       warn "Factual live source differs from saved live-before manifest"
       return 1
     }
@@ -1180,7 +1227,7 @@ capture_factual_live_after() {
     cd "$after_project" || exit 1
     clasp pull || exit 1
   ) || die "Factual live-after clasp pull failed"
-  full_source_manifest "$after_source" "$BACKUP_DIR/live-after.sha256"
+  complete_source_manifest "$after_source" "$BACKUP_DIR/live-after.sha256"
   cmp -s "$TEMP_DIR/stage2.sha256" "$BACKUP_DIR/live-after.sha256" \
     || die "Factual live source differs from the exact reviewed stage2 source"
   tar -czf "$BACKUP_DIR/live-after-full.tgz" -C "$after_project" . \
@@ -1203,10 +1250,333 @@ Path(sys.argv[1]).write_text(json.dumps({
 PY
 }
 
+prepare_comparable_baseline_manifest() {
+  local backup="$1"
+  local output="$2"
+  local extraction_root="$3"
+  local manifest_schema baseline_source
+
+  [[ -f "$backup/metadata.json" && ! -L "$backup/metadata.json" ]] || return 1
+  [[ -f "$backup/live-before.sha256" && ! -L "$backup/live-before.sha256" ]] \
+    || return 1
+  [[ -f "$backup/.clasp.json.rollback" && ! -L "$backup/.clasp.json.rollback" ]] \
+    || return 1
+  if [[ -e "$backup/.claspignore.rollback" ]]; then
+    [[ -f "$backup/.claspignore.rollback" \
+      && ! -L "$backup/.claspignore.rollback" ]] || return 1
+  fi
+
+  manifest_schema="$(
+    load_rollback_metadata_optional "$backup" sourceManifestSchema 1
+  )" || return 1
+  case "$manifest_schema" in
+    2)
+      cp -p "$backup/live-before.sha256" "$output" || return 1
+      return 0
+      ;;
+    1) ;;
+    *) return 1 ;;
+  esac
+
+  [[ -f "$backup/live-before-full.tgz" \
+    && ! -L "$backup/live-before-full.tgz" ]] || return 1
+  mkdir -m 700 "$extraction_root" || return 1
+  python3 - "$backup/live-before-full.tgz" "$extraction_root" \
+    2>"${extraction_root}.archive-validation-error.txt" <<'PY' || return 1
+import os, re, shutil, sys, tarfile, unicodedata
+from pathlib import Path, PurePosixPath
+
+archive = Path(sys.argv[1])
+root = Path(sys.argv[2]).resolve()
+members_limit = 1000
+bytes_limit = 100 * 1024 * 1024
+total = 0
+
+with tarfile.open(archive, 'r:gz') as handle:
+    safe_members = []
+    seen = {}
+    for member_index, member in enumerate(handle, start=1):
+        if member_index > members_limit:
+            raise SystemExit('baseline archive has too many entries')
+        raw = member.name
+        while raw.startswith('./'):
+            raw = raw[2:]
+        if raw in {'', '.'}:
+            if member.isdir():
+                continue
+            raise SystemExit('invalid baseline archive root')
+        rel = PurePosixPath(raw)
+        if (
+            rel.is_absolute()
+            or '..' in rel.parts
+            or rel.as_posix() != raw
+            or '\\' in raw
+            or len(raw.encode('utf-8')) > 1024
+            or any(len(part.encode('utf-8')) > 255 for part in rel.parts)
+            or unicodedata.normalize('NFC', raw) != raw
+            or any(
+                unicodedata.category(char).startswith('C')
+                or unicodedata.category(char) in {'Zl', 'Zp'}
+                for char in raw
+            )
+            or re.search(r'AKfy[A-Za-z0-9_-]{12,}', raw)
+            or re.search(r'(?<![A-Za-z0-9_-])1[A-Za-z0-9_-]{30,}', raw)
+            or re.search(r'[0-9a-fA-F]{40,}', raw)
+            or member.issym()
+            or member.islnk()
+            or member.isdev()
+            or member.size < 0
+        ):
+            raise SystemExit('unsafe baseline archive entry')
+        if raw in seen:
+            raise SystemExit('duplicate baseline archive entry')
+        if any(
+            seen.get(parent.as_posix()) == 'file'
+            for parent in rel.parents
+            if parent != PurePosixPath('.')
+        ):
+            raise SystemExit('baseline archive path conflicts with a file')
+        if member.isfile() and any(name.startswith(raw + '/') for name in seen):
+            raise SystemExit('baseline archive file conflicts with a directory')
+        seen[raw] = 'dir' if member.isdir() else 'file'
+        target = (root / Path(*rel.parts)).resolve()
+        if target != root and root not in target.parents:
+            raise SystemExit('baseline archive path escapes root')
+        total += member.size
+        if total > bytes_limit:
+            raise SystemExit('baseline archive is too large')
+        safe_members.append((member, target))
+
+    for member, target in safe_members:
+        if member.isdir():
+            target.mkdir(parents=True, exist_ok=True)
+            os.chmod(target, 0o700)
+            continue
+        if not member.isfile():
+            raise SystemExit('unsupported baseline archive entry')
+        target.parent.mkdir(parents=True, exist_ok=True)
+        source = handle.extractfile(member)
+        if source is None:
+            raise SystemExit('baseline archive file is unreadable')
+        with source, target.open('wb') as destination:
+            shutil.copyfileobj(source, destination)
+        os.chmod(target, 0o600)
+PY
+  [[ -f "$extraction_root/.clasp.json" \
+    && ! -L "$extraction_root/.clasp.json" ]] || return 1
+  cmp -s "$backup/.clasp.json.rollback" "$extraction_root/.clasp.json" \
+    || return 1
+  if [[ -f "$backup/.claspignore.rollback" ]]; then
+    [[ -f "$extraction_root/.claspignore" \
+      && ! -L "$extraction_root/.claspignore" ]] || return 1
+    cmp -s "$backup/.claspignore.rollback" "$extraction_root/.claspignore" \
+      || return 1
+  else
+    [[ ! -e "$extraction_root/.claspignore" ]] || return 1
+  fi
+  cp -p "$backup/.clasp.json.rollback" "$extraction_root/.clasp.json" || return 1
+  if [[ -f "$backup/.claspignore.rollback" ]]; then
+    cp -p "$backup/.claspignore.rollback" "$extraction_root/.claspignore" || return 1
+  else
+    rm -f -- "$extraction_root/.claspignore"
+  fi
+  baseline_source="$(source_dir_for_project "$extraction_root")" || return 1
+  [[ -d "$baseline_source" ]] || return 1
+  legacy_source_manifest "$baseline_source" "$extraction_root/legacy-source.sha256" \
+    || return 1
+  source_manifests_equal_safely \
+    "$backup/live-before.sha256" "$extraction_root/legacy-source.sha256" \
+    "$extraction_root/legacy-source.validation" \
+    || return 1
+  rm -f -- "$extraction_root/legacy-source.validation"
+  complete_source_manifest "$baseline_source" "$output" || return 1
+  source_manifests_equal_safely \
+    "$output" "$output" "$extraction_root/full-source.validation" || return 1
+  rm -f -- "$extraction_root/full-source.validation"
+}
+
+normalize_deployment_inventory() {
+  local input="$1"
+  local output="$2"
+  python3 - "$input" "$output" <<'PY'
+import re, sys, unicodedata
+from pathlib import Path
+
+rows = []
+seen = set()
+for line in Path(sys.argv[1]).read_text(encoding='utf-8').splitlines():
+    if not line:
+        continue
+    row = line.split('\t')
+    if len(row) != 3:
+        raise SystemExit('invalid deployment inventory row')
+    deployment_id, version, description = row
+    if (
+        not re.fullmatch(r'[A-Za-z0-9_-]{20,}', deployment_id)
+        or not re.fullmatch(r'(?:[0-9]+|HEAD)', version)
+        or deployment_id in seen
+        or any(
+            unicodedata.category(char).startswith('C')
+            or unicodedata.category(char) in {'Zl', 'Zp'}
+            for char in description
+        )
+    ):
+        raise SystemExit('invalid deployment inventory row')
+    seen.add(deployment_id)
+    rows.append((deployment_id, version, description))
+if not rows:
+    raise SystemExit('empty deployment inventory')
+Path(sys.argv[2]).write_text(
+    ''.join('\t'.join(row) + '\n' for row in sorted(rows)),
+    encoding='utf-8'
+)
+PY
+}
+
+write_safe_source_diff() {
+  local before="$1"
+  local current="$2"
+  local output="$3"
+  python3 - "$before" "$current" >"$output" 2>/dev/null <<'PY'
+import json, re, sys, unicodedata
+from pathlib import Path, PurePosixPath
+
+# File-level output is intentionally limited to the reviewed public/live source
+# names. A merely well-formed path may itself contain a credential or private
+# identifier, so unknown changed names fail closed without count or file rows.
+SAFE_DIFF_PATHS = {
+    '01_CORE_MAIN.js',
+    '02_PUBLIC_SYNC_V4.js',
+    '04_TELEGRAM_AVATARS.js',
+    '05_RELIABLE_WEBHOOK_QUEUE.js',
+    '06_Reliable_Edit_Trigger.js',
+    '07_FINAL_ROLE_FIX.js',
+    '08_TELEGRAM_NAME_LINKS.js',
+    '09_OPTIMIZATION_SCHEDULE.js',
+    '10_DIAGNOSTICS.js',
+    '11_PERFORMANCE_OPTIMIZATION.js',
+    '12_MINI_APP_API.js',
+    '13_MINI_APP_UI.js',
+    '14_GITHUB_SNAPSHOT_EXPORT.js',
+    '15_MINIAPP_MEDIA_CACHE.js',
+    '16_MINIAPP_MEDIA_SMART_SYNC.js',
+    '17_MINIAPP_PERSISTENT_MEDIA.js',
+    '18_MINIAPP_MENU_CACHE_BUST.js',
+    '19_MINIAPP_FALLBACK_API.js',
+    '20_MINIAPP_TEAM_IDENTITY_MIGRATION.js',
+    '21_MINIAPP_START_WELCOME.js',
+    '22_MINIAPP_BOT_APP_MENU.js',
+    '23_MINIAPP_PROFILE_STATS.js',
+    '24_MINIAPP_SPECNAZ_HISTORY.js',
+    '25_MINIAPP_UNIFIED_SNAPSHOT.js',
+    '26_MINIAPP_MAYAK_MEDIA_SETUP.js',
+    '27_MINIAPP_TEAM_STATUS.js',
+    '28_MINIAPP_ADMIN_DATA.js',
+    '29_MINIAPP_ADMIN_WRITE.js',
+    '30_MINIAPP_ADMIN_WRITE_BACKEND.js',
+    '31_MINIAPP_ADMIN_WRITE_HARDENED.js',
+    '32_MINIAPP_ADMIN_TEAM_PHOTO.js',
+    '33_MINIAPP_ADMIN_WRITE_FINAL.js',
+    '34_MINIAPP_AUDIT_V2.js',
+    'MiniApp.html',
+    'appsscript.json',
+    'Вспом функции.js',
+}
+
+def load_manifest(path):
+    rows = {}
+    for line in Path(path).read_text(encoding='utf-8').splitlines():
+        if not line:
+            continue
+        try:
+            digest, rel = line.split('  ', 1)
+        except ValueError as exc:
+            raise SystemExit('invalid source manifest row') from exc
+        candidate = PurePosixPath(rel)
+        terminal = candidate.name
+        if (
+            not re.fullmatch(r'[0-9a-f]{64}', digest)
+            or candidate.is_absolute()
+            or '..' in candidate.parts
+            or not rel
+            or rel == '.'
+            or terminal in {'', '.', '..'}
+            or candidate.as_posix() != rel
+            or '\\' in rel
+            or len(rel.encode('utf-8')) > 1024
+            or any(len(part.encode('utf-8')) > 255 for part in candidate.parts)
+            or unicodedata.normalize('NFC', rel) != rel
+            or any(
+                unicodedata.category(char).startswith('C')
+                or unicodedata.category(char) in {'Zl', 'Zp'}
+                for char in rel
+            )
+            or re.search(r'AKfy[A-Za-z0-9_-]{12,}', rel)
+            or re.search(r'(?<![A-Za-z0-9_-])1[A-Za-z0-9_-]{30,}', rel)
+            or re.search(r'[0-9a-fA-F]{40,}', rel)
+        ):
+            raise SystemExit('invalid source manifest row')
+        if rel in rows:
+            raise SystemExit('duplicate source manifest path')
+        rows[rel] = digest
+    if not rows or 'appsscript.json' not in rows:
+        raise SystemExit('source manifest missing appsscript.json')
+    for rel in rows:
+        if rel == 'appsscript.json':
+            continue
+        if PurePosixPath(rel).suffix not in {'.js', '.gs', '.html'}:
+            raise SystemExit('source manifest contains non-source path')
+    return rows
+
+before = load_manifest(sys.argv[1])
+current = load_manifest(sys.argv[2])
+changes = []
+for rel in sorted(set(before) | set(current)):
+    if rel not in before:
+        status = 'ADDED'
+    elif rel not in current:
+        status = 'REMOVED'
+    elif before[rel] != current[rel]:
+        status = 'CHANGED'
+    else:
+        continue
+    changes.append({'status': status, 'path': rel})
+
+if any(change['path'] not in SAFE_DIFF_PATHS for change in changes):
+    raise SystemExit('changed source path is not approved for terminal output')
+
+print('SOURCE_MATCHES_LIVE_BEFORE=' + ('true' if not changes else 'false'))
+print('SOURCE_DETAILS_AVAILABLE=true')
+print(f'SOURCE_DIFF_COUNT={len(changes)}')
+for change in changes:
+    print('SOURCE_DIFF=' + json.dumps(change, ensure_ascii=False, separators=(',', ':')))
+PY
+}
+
+source_manifests_equal_safely() {
+  local before="$1"
+  local current="$2"
+  local output="$3"
+  write_safe_source_diff "$before" "$current" "$output" || return 1
+  python3 - "$output" <<'PY'
+import sys
+from pathlib import Path
+
+expected = [
+    'SOURCE_MATCHES_LIVE_BEFORE=true',
+    'SOURCE_DETAILS_AVAILABLE=true',
+    'SOURCE_DIFF_COUNT=0',
+]
+actual = Path(sys.argv[1]).read_text(encoding='utf-8').splitlines()
+raise SystemExit(0 if actual == expected else 1)
+PY
+}
+
 diagnose_backup() {
   local backup="$1"
   local diagnosis_project diagnosis_source
   local source_restored=false deployment_set_restored=false named_deployment_restored=false
+  local deployment_inventory_restored=false
   local rollback_id rollback_version rollback_desc
 
   TEMP_DIR="$(mktemp -d /tmp/royal-v0600-journal-diagnose.XXXXXX)" \
@@ -1214,11 +1584,41 @@ diagnose_backup() {
   diagnosis_project="$TEMP_DIR/clasp-project"
   mkdir -p "$diagnosis_project"
 
-  [[ -f "$backup/metadata.json" ]] \
-    && [[ -f "$backup/.clasp.json.rollback" ]] \
-    && [[ -f "$backup/live-before.sha256" ]] \
-    && [[ -f "$backup/deployment-ids-before.txt" ]] \
+  [[ -f "$backup/metadata.json" && ! -L "$backup/metadata.json" ]] \
+    && [[ -f "$backup/.clasp.json.rollback" \
+      && ! -L "$backup/.clasp.json.rollback" ]] \
+    && [[ -f "$backup/live-before.sha256" \
+      && ! -L "$backup/live-before.sha256" ]] \
+    && [[ -f "$backup/deployment-ids-before.txt" \
+      && ! -L "$backup/deployment-ids-before.txt" ]] \
+    && [[ -f "$backup/deployments-before.txt" \
+      && ! -L "$backup/deployments-before.txt" ]] \
+    && [[ -f "$backup/deployments-before.tsv" \
+      && ! -L "$backup/deployments-before.tsv" ]] \
     || die "Backup не содержит полный read-only diagnosis набор"
+
+  prepare_comparable_baseline_manifest \
+    "$backup" "$TEMP_DIR/baseline-full.sha256" "$TEMP_DIR/baseline-project" \
+    || die "Не удалось доказать полный Apps Script payload baseline"
+  parse_deployments \
+    "$backup/deployments-before.txt" "$TEMP_DIR/deployments-before.strict.tsv" \
+    >/dev/null 2>&1 || die "Saved raw deployment inventory invalid"
+  normalize_deployment_inventory \
+    "$TEMP_DIR/deployments-before.strict.tsv" \
+    "$TEMP_DIR/deployments-before.normalized.tsv" \
+    || die "Saved deployment inventory invalid"
+  normalize_deployment_inventory \
+    "$backup/deployments-before.tsv" \
+    "$TEMP_DIR/deployments-before.saved.normalized.tsv" \
+    || die "Saved deployment TSV invalid"
+  cmp -s "$TEMP_DIR/deployments-before.normalized.tsv" \
+    "$TEMP_DIR/deployments-before.saved.normalized.tsv" \
+    || die "Saved raw and parsed deployment inventory differ"
+  cut -f1 "$TEMP_DIR/deployments-before.strict.tsv" | LC_ALL=C sort -u \
+    >"$TEMP_DIR/deployment-ids-before.strict.txt"
+  cmp -s "$backup/deployment-ids-before.txt" \
+    "$TEMP_DIR/deployment-ids-before.strict.txt" \
+    || die "Saved deployment ID inventory invalid"
 
   rollback_id="$(load_rollback_metadata "$backup" deploymentId)" \
     || die "Diagnosis metadata deploymentId invalid"
@@ -1241,8 +1641,10 @@ diagnose_backup() {
     cd "$diagnosis_project" || exit 1
     clasp pull
   ) >"$TEMP_DIR/clasp-pull.txt" 2>&1; then
-    full_source_manifest "$diagnosis_source" "$TEMP_DIR/live-current.sha256"
-    if cmp -s "$backup/live-before.sha256" "$TEMP_DIR/live-current.sha256"; then
+    complete_source_manifest "$diagnosis_source" "$TEMP_DIR/live-current.sha256"
+    if source_manifests_equal_safely \
+      "$TEMP_DIR/baseline-full.sha256" "$TEMP_DIR/live-current.sha256" \
+      "$TEMP_DIR/source-equality.validation"; then
       source_restored=true
     fi
   fi
@@ -1256,7 +1658,14 @@ diagnose_backup() {
       >/dev/null 2>&1; then
     cut -f1 "$TEMP_DIR/deployments-current.tsv" | LC_ALL=C sort -u \
       >"$TEMP_DIR/deployment-ids-current.txt"
-    if cmp -s "$backup/deployment-ids-before.txt" \
+    if normalize_deployment_inventory \
+      "$TEMP_DIR/deployments-current.tsv" "$TEMP_DIR/deployments-current.normalized.tsv" \
+      >/dev/null 2>&1 \
+      && cmp -s "$TEMP_DIR/deployments-before.normalized.tsv" \
+        "$TEMP_DIR/deployments-current.normalized.tsv"; then
+      deployment_inventory_restored=true
+    fi
+    if cmp -s "$TEMP_DIR/deployment-ids-before.strict.txt" \
       "$TEMP_DIR/deployment-ids-current.txt"; then
       deployment_set_restored=true
     fi
@@ -1281,9 +1690,11 @@ PY
   printf 'SOURCE_EQUALS_LIVE_BEFORE=%s\n' "$source_restored"
   printf 'DEPLOYMENT_SET_EQUALS_BEFORE=%s\n' "$deployment_set_restored"
   printf 'NAMED_DEPLOYMENT_EQUALS_BEFORE=%s\n' "$named_deployment_restored"
+  printf 'DEPLOYMENT_INVENTORY_EQUALS_BEFORE=%s\n' "$deployment_inventory_restored"
   if [[ "$source_restored" == "true" \
     && "$deployment_set_restored" == "true" \
-    && "$named_deployment_restored" == "true" ]]; then
+    && "$named_deployment_restored" == "true" \
+    && "$deployment_inventory_restored" == "true" ]]; then
     printf 'SOURCE_AND_DEPLOYMENT_RESTORED=true\n'
   else
     printf 'SOURCE_AND_DEPLOYMENT_RESTORED=false\n'
@@ -1304,9 +1715,16 @@ diagnose_source_diff() {
   diagnosis_project="$TEMP_DIR/clasp-project"
   mkdir -p "$diagnosis_project"
 
-  [[ -f "$backup/.clasp.json.rollback" ]] \
-    && [[ -f "$backup/live-before.sha256" ]] \
+  [[ -f "$backup/.clasp.json.rollback" \
+    && ! -L "$backup/.clasp.json.rollback" ]] \
+    && [[ -f "$backup/live-before.sha256" \
+      && ! -L "$backup/live-before.sha256" ]] \
+    && [[ -f "$backup/metadata.json" && ! -L "$backup/metadata.json" ]] \
     || die "Backup не содержит полный read-only source-diff набор"
+
+  prepare_comparable_baseline_manifest \
+    "$backup" "$TEMP_DIR/baseline-full.sha256" "$TEMP_DIR/baseline-project" \
+    || die "Не удалось доказать полный Apps Script payload baseline"
 
   cp -p "$backup/.clasp.json.rollback" "$diagnosis_project/.clasp.json"
   [[ ! -f "$backup/.claspignore.rollback" ]] \
@@ -1320,7 +1738,7 @@ diagnose_source_diff() {
     clasp pull
   ) >"$TEMP_DIR/clasp-pull.txt" 2>&1; then
     source_pull_succeeded=true
-    full_source_manifest "$diagnosis_source" "$TEMP_DIR/live-current.sha256"
+    complete_source_manifest "$diagnosis_source" "$TEMP_DIR/live-current.sha256"
   fi
 
   printf 'DIAGNOSE_SOURCE_DIFF_READ_ONLY=true\n'
@@ -1332,74 +1750,9 @@ diagnose_source_diff() {
     return 0
   fi
 
-  if python3 - "$backup/live-before.sha256" "$TEMP_DIR/live-current.sha256" \
-    >"$TEMP_DIR/source-diff-output.txt" 2>/dev/null <<'PY'
-import json, re, sys, unicodedata
-from pathlib import Path, PurePosixPath
-
-def load_manifest(path):
-    rows = {}
-    for line in Path(path).read_text(encoding='utf-8').splitlines():
-        if not line:
-            continue
-        try:
-            digest, rel = line.split('  ', 1)
-        except ValueError as exc:
-            raise SystemExit('invalid source manifest row') from exc
-        candidate = PurePosixPath(rel)
-        terminal = candidate.name
-        if (
-            not re.fullmatch(r'[0-9a-f]{64}', digest)
-            or candidate.is_absolute()
-            or '..' in candidate.parts
-            or not rel
-            or rel == '.'
-            or terminal in {'', '.', '..'}
-            or candidate.as_posix() != rel
-            or any(
-                unicodedata.category(char).startswith('C')
-                or unicodedata.category(char) in {'Zl', 'Zp'}
-                for char in rel
-            )
-            or re.search(r'AKfy[A-Za-z0-9_-]{12,}', rel)
-            or re.search(r'(?<![A-Za-z0-9_-])1[A-Za-z0-9_-]{30,}', rel)
-            or re.search(r'[0-9a-fA-F]{40,}', rel)
-        ):
-            raise SystemExit('invalid source manifest row')
-        if rel in rows:
-            raise SystemExit('duplicate source manifest path')
-        rows[rel] = digest
-    if not rows or 'appsscript.json' not in rows:
-        raise SystemExit('source manifest missing appsscript.json')
-    for rel in rows:
-        if rel == 'appsscript.json':
-            continue
-        if PurePosixPath(rel).suffix not in {'.js', '.gs'}:
-            raise SystemExit('source manifest contains non-source path')
-    return rows
-
-before = load_manifest(sys.argv[1])
-current = load_manifest(sys.argv[2])
-changes = []
-for rel in sorted(set(before) | set(current)):
-    if rel not in before:
-        status = 'ADDED'
-    elif rel not in current:
-        status = 'REMOVED'
-    elif before[rel] != current[rel]:
-        status = 'CHANGED'
-    else:
-        continue
-    changes.append({'status': status, 'path': rel})
-
-print('SOURCE_MATCHES_LIVE_BEFORE=' + ('true' if not changes else 'false'))
-print('SOURCE_DETAILS_AVAILABLE=true')
-print(f'SOURCE_DIFF_COUNT={len(changes)}')
-for change in changes:
-    # JSON escaping prevents control characters or crafted paths from creating
-    # additional terminal lines. Hashes and source contents are never printed.
-    print('SOURCE_DIFF=' + json.dumps(change, ensure_ascii=False, separators=(',', ':')))
-PY
+  if write_safe_source_diff \
+    "$TEMP_DIR/baseline-full.sha256" "$TEMP_DIR/live-current.sha256" \
+    "$TEMP_DIR/source-diff-output.txt"
   then
     cat "$TEMP_DIR/source-diff-output.txt"
   else
@@ -1434,7 +1787,7 @@ rollout() {
   tar -czf "$BACKUP_DIR/live-before-full.tgz" -C "$RUN_PROJECT" . \
     || die "Не удалось создать live-before backup"
   write_candidate_backup "$SOURCE_DIR" "$BACKUP_DIR/live-before-candidate"
-  full_source_manifest "$SOURCE_DIR" "$BACKUP_DIR/live-before.sha256"
+  complete_source_manifest "$SOURCE_DIR" "$BACKUP_DIR/live-before.sha256"
   cp -p "$RUN_PROJECT/.clasp.json" "$BACKUP_DIR/.clasp.json.rollback"
   [[ ! -f "$RUN_PROJECT/.claspignore" ]] \
     || cp -p "$RUN_PROJECT/.claspignore" "$BACKUP_DIR/.claspignore.rollback"
@@ -1462,7 +1815,7 @@ rollout() {
 
   info "STAGE 1/2 — push only an inert file34"
   cp -p "$TEMP_DIR/34-inert.js" "$SOURCE_DIR/34_MINIAPP_AUDIT_V2.js"
-  full_source_manifest "$SOURCE_DIR" "$TEMP_DIR/stage1.sha256"
+  complete_source_manifest "$SOURCE_DIR" "$TEMP_DIR/stage1.sha256"
   assert_only_allowed_changes \
     "$BACKUP_DIR/live-before.sha256" "$TEMP_DIR/stage1.sha256" \
     '34_MINIAPP_AUDIT_V2.js' '34_MINIAPP_AUDIT_V2.js' \
@@ -1490,7 +1843,7 @@ rollout() {
     node --check "$SOURCE_DIR/$file_name" >/dev/null \
       || die "Final syntax check failed: $file_name"
   done
-  full_source_manifest "$SOURCE_DIR" "$TEMP_DIR/stage2.sha256"
+  complete_source_manifest "$SOURCE_DIR" "$TEMP_DIR/stage2.sha256"
   assert_only_allowed_changes \
     "$BACKUP_DIR/live-before.sha256" "$TEMP_DIR/stage2.sha256" \
     '01_CORE_MAIN.js,02_PUBLIC_SYNC_V4.js,07_FINAL_ROLE_FIX.js,17_MINIAPP_PERSISTENT_MEDIA.js,25_MINIAPP_UNIFIED_SNAPSHOT.js,29_MINIAPP_ADMIN_WRITE.js,30_MINIAPP_ADMIN_WRITE_BACKEND.js,31_MINIAPP_ADMIN_WRITE_HARDENED.js,33_MINIAPP_ADMIN_WRITE_FINAL.js,34_MINIAPP_AUDIT_V2.js' \
