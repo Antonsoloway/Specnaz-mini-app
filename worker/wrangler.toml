@@ -1,5 +1,5 @@
 name = "royal-crm-miniapp-api"
-main = "src/entry-v1280.js"
+main = "src/entry-v1290.js"
 compatibility_date = "2026-08-15"
 
 [vars]
@@ -34,6 +34,6 @@ invocation_logs = true
 # royal-crm-media-cache.
 # Cloudflare Builds source: GitHub main, root path /worker.
 
-# entry-v1280 schedules a signed admin-snapshot-refresh call with ctx.waitUntil
-# immediately after a committed /admin-write response. The Apps Script one-off
-# clock trigger and unified five-minute trigger remain durable fallbacks.
+# entry-v1290 preserves the v1.28 signed background snapshot refresh, adds the
+# authenticated v0.6 background-music asset, and keeps the Apps Script one-off
+# clock trigger plus unified five-minute trigger as durable fallbacks.

@@ -258,7 +258,7 @@ test('all write paths use commit-first metadata and short lock scope', () => {
   assert.match(workerSource, /action: 'admin-snapshot-refresh'/);
   assert.match(workerWrapperSource, /WRAPPER_VERSION = '1\.28\.0'/);
   assert.match(workerWrapperSource, /worker-wait-until-signed-refresh/);
-  assert.match(wranglerSource, /main = "src\/entry-v1280\.js"/);
+  assert.match(wranglerSource, /main = "src\/entry-v1290\.js"/);
   assert.match(unifiedSource, /DIRECT_DISPATCH_WITH_QUEUE_FALLBACK_V127/);
   assert.match(unifiedSource, /function MINIAPP_flushQueuedUnifiedSnapshot\(\)/);
   assert.match(unifiedSource, /lock\.releaseLock\(\)[\s\S]*MINIAPP_exportAdminSnapshotToGitHub\(\)/);
