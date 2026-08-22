@@ -155,3 +155,22 @@ bash scripts/install-v0600-journal-v2.sh --diagnose "$BACKUP"
 восстановление. `AUDIT_DISABLED_LIVE_CHECK=false` в этом режиме означает,
 что read-only diagnosis намеренно не читал Script Property; это **не** означает,
 что audit активен.
+
+Если общий diagnose вернул `SOURCE_EQUALS_LIVE_BEFORE=false`, rollout остаётся
+заблокированным. Для определения только состава расхождения используется
+отдельный read-only режим:
+
+```bash
+bash scripts/install-v0600-journal-v2.sh --diagnose-source-diff "$BACKUP"
+```
+
+Он выполняет только temporary `clasp pull` и сравнивает manifest с backup.
+`SOURCE_DETAILS_AVAILABLE=true` означает, что оба manifest прошли строгую
+проверку структуры, уникальности и безопасных относительных имён. Вывод
+содержит число различий и для каждого source path только статус
+`ADDED`, `REMOVED` или `CHANGED`. Хэши, содержимое файлов, deployment ID,
+Spreadsheet ID и Script Properties не печатаются. Этот режим ничего не
+исправляет: конкретный repair выбирается отдельно после анализа результата.
+При ошибке pull или небезопасном/malformed manifest режим возвращает
+`SOURCE_DETAILS_AVAILABLE=false` и не печатает ни file rows, ни count:
+число различий в таком состоянии неизвестно, а не равно нулю.

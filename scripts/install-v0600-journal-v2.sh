@@ -8,7 +8,7 @@ umask 077
 # deployment ID, never changes business rows, and never enables audit v2 until
 # a fresh baseline and every service-sheet protection gate have been verified.
 
-readonly ROLLOUT_SCRIPT_VERSION="1.2.0"
+readonly ROLLOUT_SCRIPT_VERSION="1.3.0"
 readonly ROOT_BASHPID="$BASHPID"
 readonly REPO="Antonsoloway/Specnaz-mini-app"
 readonly EXPECTED_DESC="Таблица ЧП 1.3"
@@ -119,6 +119,9 @@ Explicit rollback from a backup produced by this installer:
 
 Read-only diagnosis of source/deployment restoration:
   bash scripts/install-v0600-journal-v2.sh --diagnose "$BACKUP"
+
+Read-only file-level source mismatch diagnosis (status/path only):
+  bash scripts/install-v0600-journal-v2.sh --diagnose-source-diff "$BACKUP"
 
 Optional:
   ROYAL_CRM_PROJECT_DIR     clasp project containing .clasp.json
@@ -1291,6 +1294,121 @@ PY
   printf 'MUTATING_COMMANDS_USED=false\n'
 }
 
+diagnose_source_diff() {
+  local backup="$1"
+  local diagnosis_project diagnosis_source
+  local source_pull_succeeded=false
+
+  TEMP_DIR="$(mktemp -d /tmp/royal-v0600-journal-source-diff.XXXXXX)" \
+    || die "Не удалось создать временный source-diff каталог"
+  diagnosis_project="$TEMP_DIR/clasp-project"
+  mkdir -p "$diagnosis_project"
+
+  [[ -f "$backup/.clasp.json.rollback" ]] \
+    && [[ -f "$backup/live-before.sha256" ]] \
+    || die "Backup не содержит полный read-only source-diff набор"
+
+  cp -p "$backup/.clasp.json.rollback" "$diagnosis_project/.clasp.json"
+  [[ ! -f "$backup/.claspignore.rollback" ]] \
+    || cp -p "$backup/.claspignore.rollback" "$diagnosis_project/.claspignore"
+  diagnosis_source="$(source_dir_for_project "$diagnosis_project")" \
+    || die "Source-diff rootDir invalid"
+  mkdir -p "$diagnosis_source"
+
+  if (
+    cd "$diagnosis_project" || exit 1
+    clasp pull
+  ) >"$TEMP_DIR/clasp-pull.txt" 2>&1; then
+    source_pull_succeeded=true
+    full_source_manifest "$diagnosis_source" "$TEMP_DIR/live-current.sha256"
+  fi
+
+  printf 'DIAGNOSE_SOURCE_DIFF_READ_ONLY=true\n'
+  printf 'SOURCE_PULL_SUCCEEDED=%s\n' "$source_pull_succeeded"
+  if [[ "$source_pull_succeeded" != "true" ]]; then
+    printf 'SOURCE_MATCHES_LIVE_BEFORE=false\n'
+    printf 'SOURCE_DETAILS_AVAILABLE=false\n'
+    printf 'MUTATING_COMMANDS_USED=false\n'
+    return 0
+  fi
+
+  if python3 - "$backup/live-before.sha256" "$TEMP_DIR/live-current.sha256" \
+    >"$TEMP_DIR/source-diff-output.txt" 2>/dev/null <<'PY'
+import json, re, sys, unicodedata
+from pathlib import Path, PurePosixPath
+
+def load_manifest(path):
+    rows = {}
+    for line in Path(path).read_text(encoding='utf-8').splitlines():
+        if not line:
+            continue
+        try:
+            digest, rel = line.split('  ', 1)
+        except ValueError as exc:
+            raise SystemExit('invalid source manifest row') from exc
+        candidate = PurePosixPath(rel)
+        terminal = candidate.name
+        if (
+            not re.fullmatch(r'[0-9a-f]{64}', digest)
+            or candidate.is_absolute()
+            or '..' in candidate.parts
+            or not rel
+            or rel == '.'
+            or terminal in {'', '.', '..'}
+            or candidate.as_posix() != rel
+            or any(
+                unicodedata.category(char).startswith('C')
+                or unicodedata.category(char) in {'Zl', 'Zp'}
+                for char in rel
+            )
+            or re.search(r'AKfy[A-Za-z0-9_-]{12,}', rel)
+            or re.search(r'(?<![A-Za-z0-9_-])1[A-Za-z0-9_-]{30,}', rel)
+            or re.search(r'[0-9a-fA-F]{40,}', rel)
+        ):
+            raise SystemExit('invalid source manifest row')
+        if rel in rows:
+            raise SystemExit('duplicate source manifest path')
+        rows[rel] = digest
+    if not rows or 'appsscript.json' not in rows:
+        raise SystemExit('source manifest missing appsscript.json')
+    for rel in rows:
+        if rel == 'appsscript.json':
+            continue
+        if PurePosixPath(rel).suffix not in {'.js', '.gs'}:
+            raise SystemExit('source manifest contains non-source path')
+    return rows
+
+before = load_manifest(sys.argv[1])
+current = load_manifest(sys.argv[2])
+changes = []
+for rel in sorted(set(before) | set(current)):
+    if rel not in before:
+        status = 'ADDED'
+    elif rel not in current:
+        status = 'REMOVED'
+    elif before[rel] != current[rel]:
+        status = 'CHANGED'
+    else:
+        continue
+    changes.append({'status': status, 'path': rel})
+
+print('SOURCE_MATCHES_LIVE_BEFORE=' + ('true' if not changes else 'false'))
+print('SOURCE_DETAILS_AVAILABLE=true')
+print(f'SOURCE_DIFF_COUNT={len(changes)}')
+for change in changes:
+    # JSON escaping prevents control characters or crafted paths from creating
+    # additional terminal lines. Hashes and source contents are never printed.
+    print('SOURCE_DIFF=' + json.dumps(change, ensure_ascii=False, separators=(',', ':')))
+PY
+  then
+    cat "$TEMP_DIR/source-diff-output.txt"
+  else
+    printf 'SOURCE_MATCHES_LIVE_BEFORE=false\n'
+    printf 'SOURCE_DETAILS_AVAILABLE=false\n'
+  fi
+  printf 'MUTATING_COMMANDS_USED=false\n'
+}
+
 rollout() {
   require_tools
   validate_source_sha
@@ -1442,6 +1560,13 @@ main() {
     require_diagnose_tools
     BACKUP_DIR="$(validate_backup_dir "$2")" || die "Небезопасный backup directory"
     diagnose_backup "$BACKUP_DIR"
+    exit 0
+  fi
+  if [[ "${1:-}" == "--diagnose-source-diff" ]]; then
+    [[ "$#" == "2" ]] || die "--diagnose-source-diff требует ровно один backup directory"
+    require_diagnose_tools
+    BACKUP_DIR="$(validate_backup_dir "$2")" || die "Небезопасный backup directory"
+    diagnose_source_diff "$BACKUP_DIR"
     exit 0
   fi
   if [[ "${1:-}" == "--rollback" ]]; then
