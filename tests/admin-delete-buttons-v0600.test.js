@@ -54,6 +54,14 @@ function baseSandbox(panel, payload) {
   sandbox.window.addEventListener = () => {};
   sandbox.window.scrollTo = () => {};
   sandbox.window.RoyalNav = { pushCurrent(){} };
+  sandbox.window.RoyalAdminDataV0600 = {
+    load:async () => payload,
+    accept:() => true,
+    clear(){},
+    subscribe(){ return () => {}; },
+    protect(){},
+    release(){}
+  };
   return sandbox;
 }
 

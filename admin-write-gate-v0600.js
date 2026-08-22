@@ -1,6 +1,6 @@
 /* Royal CRM Mini App — final admin edit/delete gate v0.6.0-write.5 */
 (() => {
-  const VERSION = '0.6.0-write.5-gate.1';
+  const VERSION = '0.6.0-write.5-gate.2';
   let checking = false;
 
   const clean = value => String(value == null ? '' : value).trim();
@@ -17,17 +17,9 @@
   }
 
   async function finalPermission() {
-    if (!sessionToken) throw new Error('Сессия приложения не готова. Откройте приложение заново.');
-    const response = await fetch(`${API_URL}/admin-data`, {
-      method:'GET',
-      mode:'cors',
-      cache:'no-store',
-      headers:{Authorization:`Bearer ${sessionToken}`}
-    });
-    const data = await response.json().catch(()=>({}));
-    if (!response.ok || !data?.ok) {
-      throw new Error(data?.message || 'Не удалось проверить админские права.');
-    }
+    const client = window.RoyalAdminDataV0600;
+    if (!client?.load) throw new Error('Модуль админских данных не загрузился. Откройте приложение заново.');
+    const data = await client.load({ force:true });
 
     const write = data?.adminData?.write || {};
     const photo = write?.teamPhoto || {};
@@ -83,7 +75,7 @@
         alertUser('Модуль редактирования ещё загружается. Нажмите кнопку ещё раз через секунду.');
         return;
       }
-      await window.RoyalAdminWriteV0600.toggle();
+      await window.RoyalAdminWriteV0600.toggle(result.data);
     } catch (error) {
       alertUser(error?.message || 'Не удалось проверить доступ к редактированию.');
     } finally {

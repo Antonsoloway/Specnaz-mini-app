@@ -5,9 +5,7 @@
  * existing hardened team editor and opens full all-team rankings for E/F/H/I/J/K.
  */
 (() => {
-  const VERSION = '0.6.0-admin-team-detail.4';
-  let payload = null;
-  let loading = null;
+  const VERSION = '0.6.0-admin-team-detail.5';
 
   const TEAM_METRICS = Object.freeze({
     players:{ field:'players', label:'Игроков', cardLabel:'Игроков E', column:'E' },
@@ -67,24 +65,9 @@
   }
 
   async function adminData(force=false) {
-    if (payload && !force) return payload;
-    if (loading && !force) return loading;
-    loading = (async () => {
-      if (!sessionToken) throw new Error('SESSION_MISSING');
-      const response = await fetch(`${API_URL}/admin-data`, {
-        method:'GET', mode:'cors', cache:'no-store',
-        headers:{ Authorization:`Bearer ${sessionToken}` }
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data?.ok || !data?.adminData) {
-        const error = new Error(data?.message || `HTTP ${response.status}`);
-        error.code = data?.error || `HTTP_${response.status}`;
-        throw error;
-      }
-      payload = data;
-      return data;
-    })().finally(() => { loading = null; });
-    return loading;
+    const client = window.RoyalAdminDataV0600;
+    if (!client?.load) throw new Error('Модуль админских данных не загрузился. Откройте приложение заново.');
+    return client.load({ force });
   }
 
   function membershipsFor(p, teamName, teamGame) {
@@ -209,11 +192,11 @@
     document.head.appendChild(style);
   }
 
-  async function openRanking(metricKey, sourceName='', sourceGame='') {
+  async function openRanking(metricKey, sourceName='', sourceGame='', capture=true) {
     const metric = TEAM_METRICS[metricKey];
     const panel = document.getElementById('panel');
     if (!metric || !panel) return;
-    captureAdminForBack();
+    if (capture) captureAdminForBack();
     panel.hidden = false;
     panel.innerHTML = '<button type="button" class="royal-back-button" data-royal-back="1">← Назад</button><div class="empty-state">Строим рейтинг…</div>';
     try { setActiveNav('teams'); } catch (_) {}
@@ -238,14 +221,14 @@
         </section>`;
       requestAnimationFrame(() => { try { window.scrollTo(0,0); } catch (_) {} });
     } catch (error) {
-      panel.innerHTML = `<button type="button" class="royal-back-button" data-royal-back="1">← Назад</button><h2>Рейтинг недоступен</h2><p class="muted">${html(error?.code || error?.message || 'UNKNOWN')}</p>`;
+      panel.innerHTML = `<button type="button" class="royal-back-button" data-royal-back="1">← Назад</button><h2>Рейтинг недоступен</h2><p class="muted">${html(error?.message || error?.code || 'UNKNOWN')}</p><button type="button" class="royal-admin-action is-primary" data-admin-team-ranking-retry="${html(metricKey)}" data-source-name="${html(sourceName)}" data-source-game="${html(sourceGame)}">Повторить</button>`;
     }
   }
 
-  async function openTeam(name, teamGame) {
+  async function openTeam(name, teamGame, capture=true) {
     const panel = document.getElementById('panel');
     if (!panel || !name || !teamGame) return;
-    captureAdminForBack();
+    if (capture) captureAdminForBack();
 
     panel.hidden = false;
     panel.innerHTML = '<button type="button" class="royal-back-button" data-royal-back="1">← Назад</button><div class="empty-state">Загружаем команду…</div>';
@@ -297,11 +280,30 @@
       });
       requestAnimationFrame(() => { try { window.scrollTo(0,0); } catch (_) {} });
     } catch (error) {
-      panel.innerHTML = `<button type="button" class="royal-back-button" data-royal-back="1">← Назад</button><h2>Команда не найдена</h2><p class="muted">${html(error?.code || error?.message || 'UNKNOWN')}</p>`;
+      const notFound = clean(error?.code || error?.message) === 'TEAM_NOT_FOUND';
+      panel.innerHTML = notFound
+        ? `<button type="button" class="royal-back-button" data-royal-back="1">← Назад</button><h2>Команда не найдена</h2>`
+        : `<button type="button" class="royal-back-button" data-royal-back="1">← Назад</button><h2>Не удалось загрузить команду</h2><p class="muted">${html(error?.message || error?.code || 'UNKNOWN')}</p><button type="button" class="royal-admin-action is-primary" data-admin-team-retry="1" data-team-name="${html(name)}" data-team-game="${html(teamGame)}">Повторить</button>`;
     }
   }
 
   document.addEventListener('click', event => {
+    const retryTeam = event.target?.closest?.('[data-admin-team-retry]');
+    if (retryTeam) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openTeam(retryTeam.dataset.teamName, retryTeam.dataset.teamGame, false);
+      return;
+    }
+
+    const retryRanking = event.target?.closest?.('[data-admin-team-ranking-retry]');
+    if (retryRanking) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openRanking(retryRanking.dataset.adminTeamRankingRetry, retryRanking.dataset.sourceName || '', retryRanking.dataset.sourceGame || '', false);
+      return;
+    }
+
     const metricButton = event.target?.closest?.('[data-admin-team-ranking-metric]');
     if (metricButton) {
       const shell = metricButton.closest('[data-admin-team="1"]');
@@ -340,5 +342,5 @@
   }, true);
 
   installCss();
-  window.RoyalAdminTeamDetailV0600 = { version:VERSION, open:openTeam, ranking:openRanking, clear:() => { payload = null; } };
+  window.RoyalAdminTeamDetailV0600 = { version:VERSION, open:openTeam, ranking:openRanking, clear:() => window.RoyalAdminDataV0600?.clear?.('team-detail') };
 })();

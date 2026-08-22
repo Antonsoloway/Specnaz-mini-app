@@ -1,9 +1,8 @@
 /* Royal CRM Mini App — protected Admin Write/Delete UI v0.6.0-write.5 */
 (() => {
-  const VERSION = '0.6.0-write.5-ui.8';
+  const VERSION = '0.6.0-write.5-ui.9';
   const WRITE_BUSY_RETRY_DELAYS_MS = [700, 1400, 2500];
   const TRANSPORT_RETRY_DELAY_MS = 700;
-  const ADMIN_READ_RETRY_DELAYS_MS = [0, 700, 1600];
   const SNAPSHOT_POLL_DELAYS_MS = [2500, 4000, 7000, 12000, 20000, 35000, 60000, 90000, 120000];
   const PUBLIC_SNAPSHOT_POLL_DELAYS_MS = [2500, 3500, 5000, 8000, 12000, 18000, 30000, 45000];
   const PUBLIC_SNAPSHOT_WATCH_MS = 20000;
@@ -69,50 +68,10 @@
       numeric(record?.players) === 0;
   }
 
-  function isTransientAdminReadError(error) {
-    const code = clean(error?.code);
-    const message = clean(error?.message).toLocaleLowerCase('ru-RU');
-    return !error?.httpStatus ||
-      [502, 503, 504].includes(Number(error?.httpStatus)) ||
-      ['WORKER_TIMEOUT','NO_GAS_FALLBACK_FOR_ROUTE','HTTP_502','HTTP_503','HTTP_504'].includes(code) ||
-      message.includes('failed to fetch') || message.includes('networkerror') || message.includes('load failed');
-  }
-
-  async function fetchAdminSnapshotOnce() {
-    if (!sessionToken) throw new Error('SESSION_MISSING');
-    const response = await fetch(`${API_URL}/admin-data`, {
-      method:'GET', mode:'cors', cache:'no-store',
-      headers:{ Authorization:`Bearer ${sessionToken}` }
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data?.ok || !data?.adminData) {
-      const error = new Error(data?.message || `HTTP ${response.status}`);
-      error.code = data?.error || `HTTP_${response.status}`;
-      error.httpStatus = response.status;
-      throw error;
-    }
-    return data;
-  }
-
-  async function fetchAdminSnapshot() {
-    let lastError = null;
-    for (let attempt = 0; attempt < ADMIN_READ_RETRY_DELAYS_MS.length; attempt += 1) {
-      if (ADMIN_READ_RETRY_DELAYS_MS[attempt]) {
-        await new Promise(resolve => setTimeout(resolve, ADMIN_READ_RETRY_DELAYS_MS[attempt]));
-      }
-      try {
-        return await fetchAdminSnapshotOnce();
-      } catch (error) {
-        lastError = error;
-        if (!isTransientAdminReadError(error) || attempt === ADMIN_READ_RETRY_DELAYS_MS.length - 1) break;
-      }
-    }
-    if (isTransientAdminReadError(lastError)) {
-      const error = new Error('Связь с сервером прервалась. Повторите загрузку.');
-      error.code = 'ADMIN_NETWORK_RETRY_EXHAUSTED';
-      throw error;
-    }
-    throw lastError || new Error('Не удалось загрузить админские данные.');
+  async function fetchAdminSnapshot(force=true, allowStale=false) {
+    const client = window.RoyalAdminDataV0600;
+    if (!client?.load) throw new Error('Модуль админских данных не загрузился. Откройте приложение заново.');
+    return client.load({ force, allowStale, commit:false });
   }
 
   // ADMIN_PUBLIC_SNAPSHOT_LIVE_REFRESH_V0600
@@ -219,25 +178,29 @@
     }, Math.max(1000, Number(delay) || PUBLIC_SNAPSHOT_WATCH_MS));
   }
 
-  async function loadAdmin(force=false) {
+  async function loadAdmin(force=false, allowStale=false) {
     // PENDING_WRITE_MONOTONIC_SNAPSHOT_V0600
     // A private snapshot may lag behind a committed response for a few seconds.
     // While our own requestIds are still pending, the optimistic payload is the
     // newest authoritative client state and must not be replaced by that lagging
     // snapshot. This also lets an admin safely open the next edit immediately.
     if (state.payload && (!force || state.pendingRequestIds.size)) return state.payload;
-    if (state.loading && !force) return state.loading;
+    if (state.loading) return state.loading;
     const payloadBeforeFetch = state.payload;
-    state.loading = fetchAdminSnapshot().then(data => {
+    state.loading = fetchAdminSnapshot(force, allowStale).then(data => {
       if (state.pendingRequestIds.size) {
         const allPendingConfirmed = [...state.pendingRequestIds]
           .every(requestId => journalContains(data,requestId));
         if (!allPendingConfirmed && (state.payload || payloadBeforeFetch)) {
           return state.payload || payloadBeforeFetch;
         }
-        if (allPendingConfirmed) state.pendingRequestIds.clear();
+        if (allPendingConfirmed) {
+          state.pendingRequestIds.forEach(requestId => window.RoyalAdminDataV0600?.release?.(requestId));
+          state.pendingRequestIds.clear();
+        }
       }
       state.payload = data;
+      window.RoyalAdminDataV0600?.accept?.(data);
       return data;
     }).finally(() => { state.loading = null; });
     return state.loading;
@@ -329,14 +292,20 @@
     }
   }
 
-  async function toggleEditing() {
+  async function toggleEditing(verifiedPayload=null) {
     if (state.editing) {
       state.editing = false;
       removeEditUi();
       return;
     }
     try {
-      await loadAdmin(true);
+      if (verifiedPayload?.ok && verifiedPayload?.adminData) {
+        state.payload = verifiedPayload;
+        window.RoyalAdminDataV0600?.accept?.(verifiedPayload);
+        try { window.RoyalAdminV0600?.acceptPayload?.(verifiedPayload); } catch (_) {}
+      } else {
+        await loadAdmin(true);
+      }
       const meta = writeMeta();
       const allowed = Array.isArray(meta?.operations) ? meta.operations : [];
       if (!meta?.enabled || meta?.transport !== 'worker-signed-hmac' || allowed.length < 4) {
@@ -762,7 +731,10 @@
 
       const confirmed = [...state.pendingRequestIds]
         .filter(requestId => journalContains(data,requestId));
-      confirmed.forEach(requestId => state.pendingRequestIds.delete(requestId));
+      confirmed.forEach(requestId => {
+        state.pendingRequestIds.delete(requestId);
+        window.RoyalAdminDataV0600?.release?.(requestId);
+      });
       if (state.pendingRequestIds.size) continue;
 
       state.payload = data;
@@ -774,7 +746,10 @@
 
   async function refreshAfterMutation(result) {
     if (result?.adminSnapshot?.queued === true) {
-      if (result?.requestId) state.pendingRequestIds.add(clean(result.requestId));
+      if (result?.requestId) {
+        state.pendingRequestIds.add(clean(result.requestId));
+        window.RoyalAdminDataV0600?.protect?.(result.requestId);
+      }
       applyCommittedResult(result);
       closeModal();
       showMessage(result?.message || 'Изменение сохранено. Данные обновляются в фоне.');
@@ -1007,13 +982,13 @@
 
     if (target?.closest?.('[data-admin-create-participant="1"]')) {
       event.preventDefault(); event.stopImmediatePropagation();
-      try { await loadAdmin(true); openParticipantModal(null,true); }
+      try { await loadAdmin(false); openParticipantModal(null,true); }
       catch (error) { showMessage(error?.message || 'Не удалось обновить данные.', true); }
       return;
     }
     if (target?.closest?.('[data-admin-create-team="1"]')) {
       event.preventDefault(); event.stopImmediatePropagation();
-      try { await loadAdmin(true); openTeamModal(null,true); }
+      try { await loadAdmin(false); openTeamModal(null,true); }
       catch (error) { showMessage(error?.message || 'Не удалось обновить данные.', true); }
       return;
     }
@@ -1022,7 +997,7 @@
     if (editParticipant) {
       event.preventDefault(); event.stopImmediatePropagation();
       try {
-        await loadAdmin(true);
+        await loadAdmin(false);
         const participant = findParticipantByNode(editParticipant);
         if (!participant) {
           showMessage('Эта карточка уже изменилась. Нажмите «Обновить» и откройте её снова.', true);
@@ -1039,7 +1014,7 @@
     if (editTeam) {
       event.preventDefault(); event.stopImmediatePropagation();
       try {
-        await loadAdmin(true);
+        await loadAdmin(false);
         const team = findTeamByNode(editTeam);
         if (!team) {
           showMessage('Эта команда уже изменилась. Нажмите «Обновить» и откройте её снова.', true);
@@ -1101,4 +1076,13 @@
     canDeleteTeam,
     get enabled(){ return state.editing; }
   };
+
+  window.RoyalAdminDataV0600?.subscribe?.(event => {
+    if (event?.type !== 'clear' || !['unauthorized','forbidden','session-changed'].includes(clean(event?.reason))) return;
+    state.payload = null;
+    state.editing = false;
+    state.pendingRequestIds.clear();
+    closeModal();
+    removeEditUi();
+  });
 })();
