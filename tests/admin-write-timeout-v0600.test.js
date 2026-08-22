@@ -104,7 +104,7 @@ test('explicit WRITE_BUSY is retried safely with the same request id', () => {
   assert.match(writeSource, /clean\(error\?\.code\) === 'WRITE_BUSY'/);
   assert.match(writeSource, /return await postWriteOnce\(id, op, payload\)/);
   assert.match(writeSource, /Ждём и повторяем автоматически/);
-  assert.match(writeSource, /const VERSION = '0\.6\.0-write\.5-ui\.10'/);
+  assert.match(writeSource, /const VERSION = '0\.6\.0-write\.5-ui\.11'/);
 });
 
 test('all admin-data retry and cache behavior lives in the shared client', () => {
@@ -140,4 +140,6 @@ test('v0.6 refreshes public and visible admin snapshots after the one-off trigge
   assert.match(writeSource, /loadSnapshot\(\)/);
   assert.match(writeSource, /RoyalAdminV0600\?\.acceptPayload/);
   assert.match(writeSource, /document\.addEventListener\('visibilitychange'/);
+  assert.match(writeSource, /PUBLIC_REFRESH_PRESERVED_SELECTOR[\s\S]*\.changelog-screen/);
+  assert.match(writeSource, /panel\.querySelector\(PUBLIC_REFRESH_PRESERVED_SELECTOR\)/);
 });

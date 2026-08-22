@@ -394,23 +394,29 @@ function setupAvatarLoading(root) {
 
 function renderPage(page) {
   if (!authState?.access) return;
+  const panel = document.getElementById('panel');
+  if (page === 'changelog' && panel?.querySelector('.changelog-screen')) {
+    setActiveNav(page);
+    panel.hidden = false;
+    return;
+  }
   setActiveNav(page);
   const role = authState.role?.title || 'Участник';
   const memberships = authState.memberships || [];
   if (page === 'home') {
     const stats = snapshotState?.stats || {};
     const loaded = snapshotState ? `<p class="muted">CRM: ${Number(stats.inChat || stats.participants || 0)} участников · ${Number(stats.teams || 0)} команд</p>` : '<p class="muted">CRM загружается…</p>';
-    document.getElementById('panel').innerHTML = `<h2>${esc(role)}</h2><p>Доступ подтверждён.</p>${loaded}`; return;
+    panel.innerHTML = `<h2>${esc(role)}</h2><p>Доступ подтверждён.</p>${loaded}`; return;
   }
   if (page === 'profile') {
     const items = memberships.length ? memberships.map(m => `<li>${esc(m.team || 'Без команды')} — ${esc(m.role || 'Без роли')}</li>`).join('') : '<li>Командные роли не указаны</li>';
-    document.getElementById('panel').innerHTML = `<h2>Мой профиль</h2><p>Основная роль: <strong>${esc(role)}</strong></p><ul>${items}</ul>`; return;
+    panel.innerHTML = `<h2>Мой профиль</h2><p>Основная роль: <strong>${esc(role)}</strong></p><ul>${items}</ul>`; return;
   }
   if (page === 'players') { renderParticipantsPage(); return; }
   if (page === 'teams') { renderTeamsPage(); return; }
   const labels = { help: ['Спецназ', 'Доступ подтверждён. Здесь появятся заявки помощи.'], projects: ['Проекты', 'Здесь появятся Маяк и другие проекты.'] };
   const [title, text] = labels[page] || [page, 'Раздел готовится.'];
-  document.getElementById('panel').innerHTML = `<h2>${esc(title)}</h2><p>${esc(text)}</p>`;
+  panel.innerHTML = `<h2>${esc(title)}</h2><p>${esc(text)}</p>`;
 }
 
 document.addEventListener('click', e => {

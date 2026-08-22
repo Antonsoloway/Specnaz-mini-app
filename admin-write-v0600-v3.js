@@ -1,11 +1,13 @@
 /* Royal CRM Mini App — protected Admin Write/Delete UI v0.6.0-write.5 */
 (() => {
-  const VERSION = '0.6.0-write.5-ui.10';
+  const VERSION = '0.6.0-write.5-ui.11';
   const WRITE_BUSY_RETRY_DELAYS_MS = [700, 1400, 2500];
   const TRANSPORT_RETRY_DELAY_MS = 700;
   const SNAPSHOT_POLL_DELAYS_MS = [2500, 4000, 7000, 12000, 20000, 35000, 60000, 90000, 120000];
   const PUBLIC_SNAPSHOT_POLL_DELAYS_MS = [2500, 3500, 5000, 8000, 12000, 18000, 30000, 45000];
   const PUBLIC_SNAPSHOT_WATCH_MS = 20000;
+  const PUBLIC_REFRESH_PRESERVED_SELECTOR =
+    '.team-detail-head,.participant-detail-card,.specnaz-menu-head,.hero-list,.history-list,.guide-head,.changelog-screen';
   const state = {
     editing:false,
     payload:null,
@@ -103,9 +105,7 @@
     if (isAdminScreen() || state.modal) return;
     const panel = document.getElementById('panel');
     if (!panel) return;
-    if (panel.querySelector(
-      '.team-detail-head,.participant-detail-card,.specnaz-menu-head,.hero-list,.history-list,.guide-head'
-    )) return;
+    if (panel.querySelector(PUBLIC_REFRESH_PRESERVED_SELECTOR)) return;
 
     const participantSearch = document.getElementById('participantSearch');
     if (participantSearch && typeof renderParticipantsPage === 'function') {

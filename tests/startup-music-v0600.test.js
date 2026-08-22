@@ -298,27 +298,23 @@ test('an absurd future timestamp is rejected instead of poisoning later writes',
   });
 });
 
-test('default ON waits for startup reveal and requests only the exact protected asset', async () => {
+test('default ON starts before startup reveal and requests only the exact protected asset', async () => {
   const gate = deferred();
   const harness = createMusicHarness({ cloudValue: '', deviceValue: '', startupPromise: gate.promise });
-  const authorized = harness.controller.authorize('opaque_participant_default');
-  await ticks();
+  await harness.controller.authorize('opaque_participant_default');
 
   assert.equal(harness.controller.getState().preference, true);
-  assert.equal(harness.controller.getState().state, 'paused');
-  assert.equal(harness.protectedLoads.length, 0);
-  gate.resolve({ degraded: false });
-  await authorized;
-
+  assert.equal(harness.controller.getState().state, 'playing');
   assert.deepEqual(harness.protectedLoads, ['background-v0600']);
   assert.equal(harness.audio.src, 'blob:protected-background');
   assert.equal(harness.audio.volume, 0.15);
   assert.equal(harness.audio.playCalls, 1);
+  assert.equal(harness.controller.version, '0.6.0-music.3');
   assert.doesNotMatch(musicSource, /fetchProtectedMediaObjectUrl\(['"]audio['"]\)/);
   assert.doesNotMatch(musicSource, /assets\/.*\.(?:mp3|m4a|aac)/i);
 });
 
-test('sound toggle turns an ON preference off while startup playback is paused', async () => {
+test('sound toggle turns an ON preference off before startup reveal', async () => {
   const gate = deferred();
   const harness = createMusicHarness({
     cloudValue: stored(true, 600),
@@ -327,19 +323,19 @@ test('sound toggle turns an ON preference off while startup playback is paused',
   });
   const authorized = harness.controller.authorize('opaque_participant_paused');
   await ticks();
-  assert.equal(harness.controller.getState().state, 'paused');
+  assert.equal(harness.controller.getState().state, 'playing');
 
   harness.controller.toggle();
   assert.equal(harness.controller.getState().state, 'off');
   assert.equal(harness.controller.getState().preference, false);
-  assert.equal(harness.audio.playCalls, 0);
+  assert.equal(harness.audio.playCalls, 1);
   assert.doesNotMatch(harness.live.textContent, /сохранена/i, 'success must wait for storage callbacks');
   await ticks();
   assert.ok(harness.storageCalls.some(call => call.method === 'setItem' && savedValue(call)?.enabled === false));
 
   gate.resolve({ degraded: false });
   await authorized;
-  assert.equal(harness.audio.playCalls, 0);
+  assert.equal(harness.audio.playCalls, 1);
 });
 
 test('failed CloudStorage sync exposes a separate visible retry and never announces premature success', async () => {
@@ -485,7 +481,13 @@ test('autoplay denial stays ON, and detached external media does not block resum
   });
   await harness.controller.authorize('opaque_participant_lifecycle');
   assert.equal(harness.controller.getState().state, 'blocked');
-  harness.controller.toggle();
+  assert.equal(harness.notice.hidden, false);
+  assert.match(harness.noticeText.textContent, /первого касания/);
+  harness.documentListeners.pointerup({
+    isTrusted: true,
+    target: { closest() { return null; } }
+  });
+  assert.equal(harness.audio.playCalls, 2, 'play is retried synchronously inside the first ordinary gesture');
   await ticks();
   assert.equal(harness.controller.getState().state, 'playing');
 
@@ -496,6 +498,37 @@ test('autoplay denial stays ON, and detached external media does not block resum
   harness.documentListeners.visibilitychange();
   await ticks();
   assert.equal(harness.audio.playCalls, 3, 'visibility resume prunes disconnected external media');
+});
+
+test('first-touch unlock ignores sound controls and never overrides a saved OFF preference', async () => {
+  const off = createMusicHarness({
+    cloudValue: stored(false, 1100),
+    deviceValue: stored(false, 1100)
+  });
+  await off.controller.authorize('opaque_participant_saved_off');
+  off.documentListeners.pointerup({
+    isTrusted: true,
+    target: { closest() { return null; } }
+  });
+  await ticks();
+  assert.equal(off.controller.getState().preference, false);
+  assert.equal(off.audio.playCalls, 0);
+
+  const blocked = createMusicHarness({
+    cloudValue: stored(true, 1200),
+    deviceValue: stored(true, 1200),
+    play(call) {
+      if (call === 1) {
+        const error = new Error('autoplay blocked');
+        error.name = 'NotAllowedError';
+        return Promise.reject(error);
+      }
+      return Promise.resolve();
+    }
+  });
+  await blocked.controller.authorize('opaque_participant_control_exclusion');
+  blocked.documentListeners.pointerup({ isTrusted: true, target: blocked.button });
+  assert.equal(blocked.audio.playCalls, 1, 'the global gesture handler leaves the sound control to its click handler');
 });
 
 function startupElement() {
@@ -832,7 +865,9 @@ test('v0.6 is the general entry and media remain protected/private', () => {
   assert.match(appSource, /: '0\.5\.59';/);
   assert.match(appSource, /Authorization: `Bearer \$\{sessionAtStart\}`/);
   assert.match(router, /const target = 'app-v0600\.html'/);
-  assert.match(router, /releaseBuild', '20260822-v0600'/);
+  assert.match(router, /releaseBuild', '20260822-history-music-hotfix1'/);
+  assert.match(preview, /music-v0600\.js\?v=20260822-history-music-hotfix1/);
+  assert.match(preview, /app\.js\?v=20260822-history-music-hotfix1/);
   assert.doesNotMatch(router, /app-v0559\.html/);
   assert.match(index, /app-v0600\.html/);
   assert.doesNotMatch(index, /app-v0559\.html/);
