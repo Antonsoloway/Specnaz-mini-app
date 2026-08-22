@@ -1,4 +1,4 @@
-/* Royal CRM Mini App — transport v0.5.14.3
+/* Royal CRM Mini App — transport v0.5.14.4
  * No DOM observers and no version rewriting.
  * /auth gets a longer timeout and one automatic retry for transient failures.
  * /admin-data gets a dedicated read window; retries stay in the shared admin
@@ -15,6 +15,7 @@
   const AUTH_TIMEOUT_MS = 12000;
   const ADMIN_DATA_TIMEOUT_MS = 20000;
   const ADMIN_WRITE_TIMEOUT_MS = 60000;
+  const PROTECTED_MEDIA_TIMEOUT_MS = 30000;
   const AUTH_RETRY_DELAY_MS = 350;
   let callbackSeq = 0;
   let gasMode = false;
@@ -208,6 +209,7 @@
     const isAuth = pathname === '/auth';
     const isAdminData = pathname === '/admin-data';
     const isAdminWrite = pathname === '/admin-write';
+    const isProtectedMedia = pathname === '/project-mayak-media';
     const attempts = isAuth ? 2 : 1;
     const timeoutMs = isAuth
       ? AUTH_TIMEOUT_MS
@@ -215,7 +217,9 @@
         ? ADMIN_DATA_TIMEOUT_MS
         : isAdminWrite
           ? ADMIN_WRITE_TIMEOUT_MS
-          : DEFAULT_TIMEOUT_MS;
+          : isProtectedMedia
+            ? PROTECTED_MEDIA_TIMEOUT_MS
+            : DEFAULT_TIMEOUT_MS;
     const timeoutCode = isAuth ? 'AUTH_TIMEOUT' : 'WORKER_TIMEOUT';
     let lastError = null;
 
@@ -241,5 +245,5 @@
     return fallbackFor(urlString, init);
   };
 
-  window.__ROYAL_TRANSPORT_VERSION__ = '0.5.14.3';
+  window.__ROYAL_TRANSPORT_VERSION__ = '0.5.14.4';
 })();
