@@ -90,6 +90,30 @@ function MINIAPP_exportUnifiedSnapshotToGitHub(options) {
       }) || teamNameRepair;
       if (Number(teamNameRepair.changed || 0) > 0) SpreadsheetApp.flush();
     }
+    if (Number(teamNameRepair.changed || 0) > 0 &&
+        typeof MINIAPP_auditV2Reconcile_ === 'function') {
+      try {
+        MINIAPP_auditV2Reconcile_(SpreadsheetApp.openById(SPREADSHEET_ID), {
+          lockAlreadyHeld: true,
+          source: {
+            type: 'system', channel: 'unified-snapshot-repair',
+            label: 'Системная сверка названий команд'
+          },
+          actor: {
+            type: 'system', telegramId: '', username: '', displayName: '',
+            label: 'Система'
+          },
+          transactionId: 'snapshot_repair_' + Utilities.getUuid(),
+          metadata: {
+            repairedMemberships: Number(teamNameRepair.changed || 0),
+            checkedMemberships: Number(teamNameRepair.checked || 0),
+            exactBefore: 'protected-baseline'
+          }
+        });
+      } catch (auditError) {
+        console.warn('Unified repair audit warning: ' + String(auditError && auditError.message || auditError));
+      }
+    }
 
     var stable = MINIAPP_buildStableSnapshot_();
     if (typeof MINIAPP_attachTeamStatusesToSnapshot_ !== 'function') {

@@ -276,18 +276,58 @@ function MINIAPP_adminWriteHardenedCreateParticipant_(ctx) {
   }
 
   SpreadsheetApp.flush();
-  MINIAPP_adminWriteRefreshParticipantLinks_(ctx.ss, value);
-  if (typeof markPublicSyncPending_ === 'function') {
-    markPublicSyncPending_('miniapp_admin_participant_create_hardened:' + telegramId);
-  }
-  if (typeof queueTelegramAvatarRefresh_ === 'function') {
-    try { queueTelegramAvatarRefresh_(telegramId, 'miniapp_admin_create'); } catch (_) {}
-  }
-
   var after = MINIAPP_adminWriteHardenedParticipantRecord_(sheet, row);
-  MINIAPP_adminWriteHardenedAppendJournal_(ctx, 'participant', telegramId, row, before, after, value);
+  // The source row + journal are the commit boundary. Link refresh, sync marks
+  // and avatar scheduling are post-commit maintenance and cannot be allowed to
+  // suppress the audit event after the participant already exists.
+  var auditCommit = MINIAPP_adminWriteHardenedAppendJournal_(
+    ctx, 'participant', telegramId, row, before, after, value
+  );
   var revision = MINIAPP_adminWriteHardenedParticipantRevision_(after);
   after.revision = revision;
+
+  var maintenanceWarnings = [];
+  try {
+    MINIAPP_adminWriteRefreshParticipantLinks_(ctx.ss, value);
+  } catch (linksError) {
+    maintenanceWarnings.push('PARTICIPANT_LINKS_REFRESH_FAILED');
+    console.warn('Participant create links warning', linksError && linksError.message ? linksError.message : linksError);
+  }
+  if (typeof markPublicSyncPending_ === 'function') {
+    try { markPublicSyncPending_('miniapp_admin_participant_create_hardened:' + telegramId); }
+    catch (_) { maintenanceWarnings.push('PUBLIC_SYNC_MARK_FAILED'); }
+  }
+  if (typeof queueTelegramAvatarRefresh_ === 'function') {
+    try { queueTelegramAvatarRefresh_(telegramId, 'miniapp_admin_create'); }
+    catch (_) { maintenanceWarnings.push('AVATAR_REFRESH_QUEUE_FAILED'); }
+  }
+
+  if (maintenanceWarnings.length && typeof MINIAPP_auditV2RecordSystemMutation_ === 'function') {
+    MINIAPP_auditV2RecordSystemMutation_(ctx.ss, {
+      lockAlreadyHeld: true,
+      syncBaseline: false,
+      dedupeKey: 'request:' + ctx.requestId + ':maintenance',
+      transactionId: ctx.transactionId || ctx.requestId || '',
+      parentEventId: auditCommit && auditCommit.eventId || '',
+      op: 'participantCreateMaintenance',
+      entityType: 'participant',
+      entityKey: telegramId,
+      row: row,
+      before: {},
+      after: {},
+      diff: [{
+        kind: 'maintenance_warning', field: 'maintenance', path: 'maintenance',
+        label: 'Обслуживание после добавления', before: null,
+        after: maintenanceWarnings.slice()
+      }],
+      source: { type: 'system', channel: 'post-commit-maintenance', label: 'Система' },
+      actor: { type: 'system', label: 'Система' },
+      outcome: {
+        status: 'committed_with_warnings', code: 'POST_COMMIT_WARNINGS',
+        warnings: maintenanceWarnings.slice()
+      }
+    });
+  }
 
   return {
     ok: true,
@@ -298,6 +338,8 @@ function MINIAPP_adminWriteHardenedCreateParticipant_(ctx) {
     row: row,
     revision: revision,
     record: after,
+    auditEventId: auditCommit && auditCommit.eventId || '',
+    maintenanceWarnings: maintenanceWarnings,
     message: 'Участник добавлен.'
   };
 }
@@ -331,10 +373,13 @@ function MINIAPP_adminWriteHardenedUpdateTeam_(ctx) {
     return MINIAPP_adminWriteError_('TEAM_EXISTS', 'Команда с таким названием уже существует в этой игре.');
   }
 
+  var renamedMemberships = 0;
   if (nextName !== originalName) {
     sheet.getRange(row, 2).setValue(nextName);
     if (typeof finalRoleCascadeTeamRename_ === 'function') {
-      finalRoleCascadeTeamRename_(ctx.ss, game, originalName, nextName);
+      renamedMemberships = Number(
+        finalRoleCascadeTeamRename_(ctx.ss, game, originalName, nextName) || 0
+      );
     }
   }
   if (nextLeader !== before.leader) {
@@ -355,10 +400,16 @@ function MINIAPP_adminWriteHardenedUpdateTeam_(ctx) {
   var finalRow = MINIAPP_adminWriteFindTeamRow_(sheet, nextName, game) || row;
   var after = MINIAPP_adminWriteTeamRecord_(sheet, finalRow);
   var key = game + ' :: ' + nextName;
-  MINIAPP_adminWriteHardenedAppendJournal_(ctx, 'team', key, finalRow, before, after, {
+  var journalChanges = {
     name: nextName,
     leader: nextLeader
-  });
+  };
+  if (renamedMemberships > 0) {
+    journalChanges.cascade = { membershipRenames: renamedMemberships };
+  }
+  MINIAPP_adminWriteHardenedAppendJournal_(
+    ctx, 'team', key, finalRow, before, after, journalChanges
+  );
 
   return {
     ok: true,
@@ -545,11 +596,18 @@ function MINIAPP_adminWriteHardenedMeta_() {
     writableTeamFields: ['name', 'leader'],
     createTeamFields: ['game', 'name', 'leader'],
     formulaFieldsProtected: ['status', 'membershipGames', 'lastChange', 'teamStats', 'teamStatus'],
-    journal: true
+    journal: true,
+    journalSchema: typeof MINIAPP_AUDIT_V2_SCHEMA_VERSION !== 'undefined'
+      ? MINIAPP_AUDIT_V2_SCHEMA_VERSION : 1,
+    journalVersion: typeof MINIAPP_AUDIT_V2_VERSION !== 'undefined'
+      ? MINIAPP_AUDIT_V2_VERSION : MINIAPP_ADMIN_WRITE_HARDENED_VERSION
   };
 }
 
 function MINIAPP_adminWriteHardenedJournalData_() {
+  if (typeof MINIAPP_auditV2JournalData_ === 'function') {
+    return MINIAPP_auditV2JournalData_();
+  }
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   var sheet = ss.getSheetByName(MINIAPP_ADMIN_WRITE_JOURNAL_SHEET);
   if (!sheet || sheet.getLastRow() < 2) {
@@ -581,6 +639,17 @@ function MINIAPP_adminWriteHardenedJournalData_() {
 }
 
 function MINIAPP_adminWriteHardenedAppendJournal_(ctx, entityType, entityKey, row, before, after, changed) {
+  if (typeof MINIAPP_auditV2RecordMiniAppMutation_ === 'function') {
+    var audit = MINIAPP_auditV2RecordMiniAppMutation_(
+      ctx, entityType, entityKey, row, before, after, changed
+    );
+    if (!audit || audit.ok === false) {
+      throw new Error('AUDIT_V2_APPEND_FAILED:' + String(audit && audit.error || 'UNKNOWN'));
+    }
+    if (!audit.skipped) return audit;
+    // Source may be deployed before the controlled v2 activation. Preserve
+    // the existing A:L journal/idempotency contract during that window.
+  }
   var sheet = MINIAPP_adminWriteEnsureJournal_(ctx.ss);
   sheet.appendRow([
     new Date(),

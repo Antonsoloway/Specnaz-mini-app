@@ -170,6 +170,29 @@ function finalRoleInstalledOnEdit_(e) {
       }
     });
 
+    if (typeof MINIAPP_auditV2Reconcile_ === 'function') {
+      try {
+        MINIAPP_auditV2Reconcile_(ss, {
+          lockAlreadyHeld: true,
+          source: {
+            type: 'manual_sheet', channel: 'google-sheets-role-normalizer',
+            label: 'Google Sheets'
+          },
+          actor: typeof MINIAPP_auditV2SheetActor_ === 'function'
+            ? MINIAPP_auditV2SheetActor_(e) : null,
+          transactionId: 'role_edit_' + Utilities.getUuid(),
+          metadata: {
+            sheet: sheetName,
+            range: e.range.getA1Notation(),
+            normalizedSlots: touchedSlots.map(function(slot) { return slot.number; }),
+            exactBefore: 'protected-baseline'
+          }
+        });
+      } catch (auditError) {
+        console.warn('Role edit audit warning: ' + String(auditError && auditError.message || auditError));
+      }
+    }
+
     markPublicSyncPending_('role_edit:' + e.range.getA1Notation());
   } finally {
     if (mutationStarted && typeof finishPublicDataMutation_ === 'function') {
@@ -255,6 +278,30 @@ function finalRoleHandleTeamsSheetEdit_(e) {
     );
 
     const movedRows = finalRoleNormalizeTeamsOrder_(sheet);
+    if (typeof MINIAPP_auditV2Reconcile_ === 'function') {
+      try {
+        MINIAPP_auditV2Reconcile_(sheet.getParent(), {
+          lockAlreadyHeld: true,
+          source: {
+            type: 'manual_sheet', channel: 'google-sheets-team-normalizer',
+            label: 'Google Sheets'
+          },
+          actor: typeof MINIAPP_auditV2SheetActor_ === 'function'
+            ? MINIAPP_auditV2SheetActor_(e) : null,
+          transactionId: 'teams_edit_' + Utilities.getUuid(),
+          metadata: {
+            sheet: sheet.getName(),
+            range: range.getA1Notation(),
+            renamedMemberships: renamedMemberships,
+            repairedMemberships: Number(repaired && repaired.changed || 0),
+            movedRows: movedRows,
+            exactBefore: 'protected-baseline'
+          }
+        });
+      } catch (auditError) {
+        console.warn('Team edit audit warning: ' + String(auditError && auditError.message || auditError));
+      }
+    }
     markPublicSyncPending_(
       'teams_edit:' + range.getA1Notation() +
       ':renamed=' + renamedMemberships +
@@ -984,5 +1031,3 @@ function finalRoleColumnLetter_(column) {
 
   return result;
 }
-
-

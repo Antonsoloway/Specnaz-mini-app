@@ -30,7 +30,7 @@
 const CRM_VERSION = '2.2.6';
 const COMPATIBLE_STRUCTURE_VERSIONS = ['2.0.0', '2.0.1', '2.0.2', '2.1', '2.1.1', '2.2', '2.2.0', '2.2.1', '2.2.2', '2.2.3', '2.2.4', '2.2.5', '2.2.6'];
 const SPREADSHEET_ID = '1kkADcKysWdoGy95O36z9jCaoGUUHN0g4XH4LwVtAK_o';
-const SECRET = 'mayak_crm_2026';
+const CHATKEEPER_WEBHOOK_SECRET_PROPERTY = 'ROYAL_CRM_CHATKEEPER_WEBHOOK_SECRET';
 
 const SHEET_BASE = 'База участников';
 const SHEET_TEAMS = 'Команды';
@@ -142,6 +142,27 @@ function doGet(e) {
 }
 
 /**
+ * ChatKeeper webhook authentication is runtime-only configuration. A missing
+ * or unreadable Script Property must reject the request; source fallbacks are
+ * intentionally forbidden because this repository is public.
+ */
+function chatKeeperWebhookSecret_() {
+  try {
+    return clean_(
+      PropertiesService.getScriptProperties()
+        .getProperty(CHATKEEPER_WEBHOOK_SECRET_PROPERTY)
+    );
+  } catch (err) {
+    return '';
+  }
+}
+
+function isValidChatKeeperWebhookSecret_(providedSecret) {
+  const configuredSecret = chatKeeperWebhookSecret_();
+  return !!configuredSecret && clean_(providedSecret) === configuredSecret;
+}
+
+/**
  * Внутренняя обработка одного webhook после извлечения из надёжной очереди.
  * Внешняя doPost(e) должна оставаться ТОЛЬКО в 05_RELIABLE_WEBHOOK_QUEUE.gs.
  *
@@ -171,7 +192,7 @@ function processWebhookImmediately_(e) {
     ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     logRef = startWebhookLog_(ss, event, eventKey, raw, data);
 
-    if (clean_(data.secret) !== SECRET) {
+    if (!isValidChatKeeperWebhookSecret_(data.secret)) {
       result = { status: 'WRONG_SECRET' };
     } else if (!isRoyalCrmV2Ready_(ss)) {
       result = {
@@ -206,6 +227,40 @@ function processWebhookImmediately_(e) {
         result = processWebhook_(ss, player, eventKey);
 
         if (result.status !== 'ERROR' && result.status !== 'RETRY_LOCKED') {
+          // AUDIT_V2_BOT_HOOK
+          // processWebhook_ owns all ChatKeeper participant mutations and this
+          // execution already holds ScriptLock. Reconcile exact source fields
+          // against the protected baseline before the event is marked done.
+          // Duplicate/wrong-secret/lock-retry paths never reach this branch;
+          // validation-only outcomes create no event because there is no diff.
+          if (typeof MINIAPP_auditV2Reconcile_ === 'function') {
+            try {
+              const botAudit = MINIAPP_auditV2Reconcile_(ss, {
+                lockAlreadyHeld: true,
+                source: {
+                  type: 'bot', channel: 'chatkeeper-webhook',
+                  label: 'Бот / ChatKeeper'
+                },
+                actor: {
+                  type: 'service', telegramId: '', username: '', displayName: '',
+                  label: 'Бот'
+                },
+                transactionId: 'webhook:' + eventKey,
+                metadata: {
+                  event: event,
+                  eventKey: eventKey,
+                  resultStatus: String(result.status || ''),
+                  exactBefore: 'protected-baseline'
+                }
+              });
+              if (botAudit && botAudit.ok === false) {
+                console.warn('Webhook audit reconcile warning: ' + String(botAudit.error || 'UNKNOWN'));
+              }
+            } catch (auditError) {
+              console.warn('Webhook audit hook failed: ' + String(auditError && auditError.message || auditError));
+            }
+          }
+
           markProcessedEvent_(
             ss,
             eventKey,
@@ -350,6 +405,29 @@ function weeklyRoyalCrmMaintenance() {
     rebuildCounterSnapshot_(ss);
     removeEmptySpecnazDividers_(ss.getSheetByName(SHEET_HISTORY));
       hideTechnicalColumnsAndSheets_(ss);
+    if (typeof MINIAPP_auditV2Reconcile_ === 'function') {
+      try {
+        MINIAPP_auditV2Reconcile_(ss, {
+          lockAlreadyHeld: true,
+          source: {
+            type: 'system', channel: 'weekly-maintenance',
+            label: 'Еженедельное обслуживание'
+          },
+          actor: {
+            type: 'system', telegramId: '', username: '', displayName: '',
+            label: 'Система'
+          },
+          transactionId: 'weekly_maintenance:' + Utilities.getUuid(),
+          metadata: {
+            maintenance: 'weekly',
+            exactBefore: 'protected-baseline',
+            formulaOnlyChangesExcluded: true
+          }
+        });
+      } catch (auditError) {
+        console.warn('Weekly maintenance audit warning: ' + String(auditError && auditError.message || auditError));
+      }
+    }
     markPublicSyncPending_('weekly_maintenance');
 
     SpreadsheetApp.flush();
@@ -399,6 +477,26 @@ function handleSpreadsheetChange(e) {
     applyAllRoleValidations_(ss);
     rebuildCounterSnapshot_(ss);
     hideTechnicalColumnsAndSheets_(ss);
+    if (typeof MINIAPP_auditV2Reconcile_ === 'function') {
+      try {
+        MINIAPP_auditV2Reconcile_(ss, {
+          lockAlreadyHeld: true,
+          source: {
+            type: 'manual_sheet', channel: 'spreadsheet-structural-change',
+            label: 'Google Sheets · структурное изменение'
+          },
+          actor: MINIAPP_auditV2SheetActor_(e),
+          transactionId: 'structure:' + changeType + ':' + Utilities.getUuid(),
+          metadata: {
+            changeType: changeType,
+            exactBefore: 'protected-baseline',
+            formulaOnlyChangesExcluded: true
+          }
+        });
+      } catch (auditError) {
+        console.warn('Structural change audit warning: ' + String(auditError && auditError.message || auditError));
+      }
+    }
     markPublicSyncPending_('spreadsheet_change:' + (changeType || 'UNKNOWN'));
 
     SpreadsheetApp.flush();
@@ -3612,6 +3710,3 @@ function installSpecnazRichHistory() {
     next_step: 'Обновите существующее развёртывание, затем запустите runPublicSyncNow'
   };
 }
-
-
-
