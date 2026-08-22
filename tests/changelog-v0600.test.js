@@ -37,7 +37,7 @@ test('v0.6 changelog groups every verified area and keeps a flat compatibility l
   assert.equal(current.version, '0.6.0');
   assert.deepEqual(
     Array.from(current.sections, section => section.title),
-    ['Админ-режим', 'Участники', 'Команды и фотографии', 'Синхронизация и надёжность', 'Безопасность']
+    ['Админ-режим', 'Участники', 'Команды и фотографии', 'Синхронизация и надёжность', 'Запуск и музыка', 'Безопасность']
   );
   assert.equal(
     current.changes.length,
@@ -66,9 +66,15 @@ test('rendered v0.6 history is grouped, escaped and has no raw technical payload
   assert.doesNotMatch(panel.innerHTML, /requestId|endpointPinned|dataHash|membership-слот/);
 });
 
-test('only implemented preview features are described before startup and music land', () => {
+test('implemented startup and music features are included in the v0.6 history', () => {
   assert.match(source, /Очистить данные/);
   assert.match(source, /временный сетевой сбой кнопки «Обновить»/);
   assert.match(source, /создавать команды/);
-  assert.doesNotMatch(source, /стартов\w* заставк|фонов\w* музык|Добро пожаловать/iu);
+  assert.match(source, /стартовая заставка с видео голубя/);
+  assert.match(source, /персональное приветствие с именем участника/);
+  assert.match(source, /Добавлена фоновая музыка/);
+  assert.match(source, /сохраняется индивидуально для участника/);
+  assert.match(source, /Музыкальный файл не публикуется/);
+  const preview = fs.readFileSync(path.join(__dirname, '..', 'app-v0600.html'), 'utf8');
+  assert.match(preview, /changelog-v0600\.js\?v=20260822-startup-music-rc2/);
 });

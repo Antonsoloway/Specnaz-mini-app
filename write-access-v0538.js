@@ -7,6 +7,7 @@
   const tg = window.Telegram?.WebApp || null;
   let state = 'idle';
   let gate = null;
+  let previewRequestScheduled = false;
 
   function userAlreadyAllows() {
     try { return tg?.initDataUnsafe?.user?.allows_write_to_pm === true; }
@@ -78,6 +79,18 @@
 
   function requireAfterAuth(data) {
     if (!data || data.access !== true) return;
+    const startupReady = window.RoyalStartupV0600?.whenRevealed;
+    if (startupReady && typeof startupReady.then === 'function') {
+      if (previewRequestScheduled) return;
+      previewRequestScheduled = true;
+      Promise.resolve(startupReady).then(() => {
+        if (window.RoyalStartupV0600?.terminal) return;
+        window.setTimeout(() => {
+          if (!window.RoyalStartupV0600?.terminal) requestAccess();
+        }, 120);
+      }).catch(() => { previewRequestScheduled = false; });
+      return;
+    }
     window.setTimeout(requestAccess, 120);
   }
 
@@ -99,6 +112,12 @@
       requireAfterAuth(data);
       return result;
     };
+  }
+
+  if (window.RoyalStartupV0600 && typeof window.addEventListener === 'function') {
+    window.addEventListener('royal:auth-ready', event => requireAfterAuth(event?.detail));
+    const durableAuth = window.__ROYAL_AUTH_READY__;
+    if (durableAuth?.access === true && durableAuth.build === '0.6.0') requireAfterAuth(durableAuth);
   }
 
   document.addEventListener('click', event => {
