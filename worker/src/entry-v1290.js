@@ -1,7 +1,8 @@
 import currentWorker from './entry-v1280.js';
 
-const WRAPPER_VERSION = '1.29.0';
+const WRAPPER_VERSION = '1.30.0';
 const BACKGROUND_MUSIC = 'private-authenticated-v0600';
+const SNAPSHOT_CACHE = 'shared-raw-singleflight-60s';
 
 export default {
   async fetch(request, env, ctx) {
@@ -16,7 +17,8 @@ export default {
         ok: true,
         service: 'royal-crm-miniapp-api',
         version: WRAPPER_VERSION,
-        backgroundMusic: BACKGROUND_MUSIC
+        backgroundMusic: BACKGROUND_MUSIC,
+        snapshotCache: SNAPSHOT_CACHE
       }, 200);
     }
 

@@ -1,4 +1,5 @@
 import currentWorker from './entry-v140.js';
+import { loadPrivateSnapshotCached } from './private-snapshot-cache.js';
 
 const WRAPPER_VERSION = '1.5.1';
 const ALLOWED_CHAT_STATE = 'В чате';
@@ -43,7 +44,7 @@ async function handleSnapshotWithSpecnaz(request, env, ctx) {
   if (!payload?.ok || !payload?.snapshot) return response;
 
   try {
-    const source = await loadPrivateSnapshot(env);
+    const source = await loadPrivateSnapshotCached(env);
     payload.snapshot = sanitizeSnapshotForApp(source, payload.snapshot);
 
     const headers = new Headers(response.headers);

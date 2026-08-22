@@ -1,12 +1,9 @@
-const SNAPSHOT_MEMORY_TTL_MS = 60_000;
+import { loadPrivateSnapshotCached } from './private-snapshot-cache.js';
+
 const SESSION_TTL_SEC = 6 * 60 * 60;
 const INIT_DATA_MAX_AGE_SEC = 5 * 60;
 const ALLOWED_CHAT_STATE = 'В чате';
 const WORKER_VERSION = '1.6.0';
-
-let snapshotMemory = null;
-let snapshotFetchedAt = 0;
-let snapshotEtag = '';
 
 export default {
   async fetch(request, env) {
@@ -283,48 +280,11 @@ function permissions(roleCode) {
 }
 
 async function loadSnapshot(env) {
-  const now = Date.now();
-  if (snapshotMemory && now - snapshotFetchedAt < SNAPSHOT_MEMORY_TTL_MS) return snapshotMemory;
-
-  const repo = String(env.DATA_REPO || '').trim();
-  const branch = String(env.DATA_BRANCH || 'main').trim();
-  const path = String(env.DATA_PATH || 'snapshot.json').trim();
-  if (!repo) throw appError(500, 'DATA_REPO_MISSING');
-
-  const encodedPath = path.split('/').map(encodeURIComponent).join('/');
-  const url = `https://api.github.com/repos/${repo}/contents/${encodedPath}?ref=${encodeURIComponent(branch)}`;
-  const headers = {
-    Authorization: `Bearer ${env.GITHUB_TOKEN}`,
-    Accept: 'application/vnd.github+json',
-    'X-GitHub-Api-Version': '2022-11-28',
-    'User-Agent': 'Royal-CRM-MiniApp-Worker'
-  };
-  if (snapshotEtag) headers['If-None-Match'] = snapshotEtag;
-
-  const response = await fetch(url, { headers });
-  if (response.status === 304 && snapshotMemory) {
-    snapshotFetchedAt = now;
-    return snapshotMemory;
-  }
-  if (!response.ok) {
+  try {
+    return await loadPrivateSnapshotCached(env);
+  } catch {
     throw appError(502, 'SNAPSHOT_FETCH_FAILED', 'Не удалось загрузить актуальные данные CRM.');
   }
-
-  const body = await response.json();
-  const encoded = String(body.content || '').replace(/\s+/g, '');
-  if (!encoded) throw appError(502, 'SNAPSHOT_EMPTY');
-
-  let snapshot;
-  try {
-    snapshot = JSON.parse(decodeBase64Utf8(encoded));
-  } catch {
-    throw appError(502, 'SNAPSHOT_PARSE_FAILED');
-  }
-
-  snapshotMemory = snapshot;
-  snapshotFetchedAt = now;
-  snapshotEtag = response.headers.get('ETag') || '';
-  return snapshot;
 }
 
 async function sanitizeSnapshot(snapshot, env) {
