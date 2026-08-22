@@ -2,7 +2,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.6.0-music.5';
+  const VERSION = '0.6.0-music.6';
   const STORAGE_KEY = 'royal_music_v1';
   const LOCAL_PREFIX = `${STORAGE_KEY}:participant:`;
   const PAYLOAD_VERSION = 2;
@@ -752,8 +752,8 @@
   }
 
   // Window capture runs before navigation guards that may stop propagation.
-  window.addEventListener('pointerdown', unlockFromGesture, true);
-  window.addEventListener('pointerup', unlockFromGesture, true);
+  window.addEventListener('pointerdown', unlockFromGesture, { capture:true, passive:true });
+  window.addEventListener('pointerup', unlockFromGesture, { capture:true, passive:true });
   window.addEventListener('touchstart', unlockFromGesture, { capture:true, passive:true });
   window.addEventListener('touchend', unlockFromGesture, { capture:true, passive:true });
   window.addEventListener('click', handleCapturedClick, true);

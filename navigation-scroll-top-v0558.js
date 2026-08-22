@@ -1,10 +1,14 @@
-/* Royal CRM Mini App — Forward top / Back restore v0.5.58
+/* Royal CRM Mini App — Forward top / Back restore v0.5.58.1
  * Forward navigation opens every new screen at scrollY=0.
  * Back navigation is left to RoyalNav v0.5.21, which restores the captured scrollY.
  */
 (() => {
-  const VERSION = '0.5.58';
+  const VERSION = '0.5.58.1';
+  const AVATAR_SELECTOR = '.person-avatar-wrap,.hero-avatar,.history-avatar,.self-avatar';
+  const TAP_SLOP_SQ = 196;
+  const TAP_MAX_MS = 900;
   let token = 0;
+  let avatarPress = null;
 
   function hardTop() {
     try { window.scrollTo(0, 0); } catch (_) {}
@@ -53,12 +57,53 @@
   }, true);
 
   // Participant profile is opened from pointerup in participant-profile-v0523.js.
+  // Track the complete press so a vertical swipe ending over an avatar can never
+  // be mistaken for forward navigation and reset the user's scroll position.
+  window.addEventListener('pointerdown', event => {
+    const avatar = event.target?.closest?.(AVATAR_SELECTOR);
+    const panel = document.getElementById('panel');
+    if (!avatar || avatar.closest?.('.participant-detail-card')) {
+      avatarPress = null;
+      return;
+    }
+    avatarPress = {
+      pointerId: event.pointerId,
+      x: Number(event.clientX || 0),
+      y: Number(event.clientY || 0),
+      at: Date.now(),
+      avatar,
+      panelFirst: panel?.firstElementChild || null
+    };
+  }, { capture:true, passive:true });
+
+  window.addEventListener('pointermove', event => {
+    const saved = avatarPress;
+    if (!saved || saved.pointerId !== event.pointerId) return;
+    const dx = Number(event.clientX || 0) - saved.x;
+    const dy = Number(event.clientY || 0) - saved.y;
+    if ((dx * dx + dy * dy) > TAP_SLOP_SQ) avatarPress = null;
+  }, { capture:true, passive:true });
+
   window.addEventListener('pointerup', event => {
-    const target = event.target;
-    if (!target) return;
-    if (!target.closest?.('.person-avatar-wrap,.hero-avatar,.history-avatar,.self-avatar')) return;
-    scheduleForwardTop();
-  }, true);
+    const saved = avatarPress;
+    avatarPress = null;
+    if (!saved || saved.pointerId !== event.pointerId) return;
+    const avatar = event.target?.closest?.(AVATAR_SELECTOR);
+    if (!avatar || avatar !== saved.avatar) return;
+    const dx = Number(event.clientX || 0) - saved.x;
+    const dy = Number(event.clientY || 0) - saved.y;
+    if ((dx * dx + dy * dy) > TAP_SLOP_SQ || Date.now() - saved.at > TAP_MAX_MS) return;
+
+    // Run after the profile handler. Only a real render may move the new screen
+    // to the top; a tap that did not navigate must preserve the current scroll.
+    setTimeout(() => {
+      const panel = document.getElementById('panel');
+      if (!panel || panel.firstElementChild === saved.panelFirst) return;
+      topAfterForwardRender();
+    }, 0);
+  }, { capture:true, passive:true });
+
+  window.addEventListener('pointercancel', () => { avatarPress = null; }, { capture:true, passive:true });
 
   // Changelog opening is intercepted earlier on window capture, so wrap only its
   // forward open method. RoyalNav Back restores the previous scroll independently.
