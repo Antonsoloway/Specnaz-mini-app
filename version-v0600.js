@@ -1,7 +1,7 @@
 /* Royal CRM Mini App — v0.6.1 visible version guard + final admin-write loader */
 (() => {
   const VERSION = '0.6.1';
-  const CACHE = '20260824-v061-team-photo-refresh1';
+  const CACHE = '20260824-v061-screen-twitch1';
 
   function apply() {
     window.__ROYAL_BUILD__ = VERSION;
@@ -38,6 +38,26 @@
     script.src = `team-photo-refresh-v061.js?v=${CACHE}`;
     script.async = false;
     script.dataset.teamPhotoRefreshV061 = '1';
+    let continued = false;
+    const proceed = () => {
+      if (continued) return;
+      continued = true;
+      next();
+    };
+    script.addEventListener('load', proceed, { once:true });
+    script.addEventListener('error', proceed, { once:true });
+    document.body.appendChild(script);
+  }
+
+  function loadV061BackgroundRefreshGuard(next) {
+    if (window.__ROYAL_BACKGROUND_REFRESH_GUARD_V061__ || document.querySelector('script[data-background-refresh-guard-v061="1"]')) {
+      next();
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = `v061-background-refresh-guard.js?v=${CACHE}`;
+    script.async = false;
+    script.dataset.backgroundRefreshGuardV061 = '1';
     let continued = false;
     const proceed = () => {
       if (continued) return;
@@ -203,5 +223,5 @@
     observer.observe(badge, { childList:true, characterData:true, subtree:true });
   }
   window.__ROYAL_UI_VERSION__ = VERSION;
-  loadV061TeamPhotoRefresh(loadFinalGate);
+  loadV061TeamPhotoRefresh(() => loadV061BackgroundRefreshGuard(loadFinalGate));
 })();
