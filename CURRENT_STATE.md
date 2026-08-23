@@ -348,3 +348,16 @@ Repo config на 23.08.2026:
 - Telegram menu verification = **CONFIRMED**.
 - После операции live Apps Script повторно синхронизирован в `apps-script-live/`.
 - Предыдущий final recovery остановился на небезопасном shell heredoc при записи handoff; эта версия пишет handoff через Python без shell command substitution.
+
+
+---
+
+## v0.6.1 own-profile team navigation — 23.08.2026 [V061_SELF_PROFILE_TEAM_LINK_20260823]
+
+- `profile-team-link-v061.js` обновлён до `0.6.1-profile-team-link.2`.
+- На главной странице membership-плашки в собственной карточке профиля получают безопасный ordinary team route и становятся кликабельными.
+- Для team identity передаётся пара `название + игра`, поэтому одинаковые названия в Royal Match / Royal Kingdom не смешиваются.
+- Legacy `profile-card-v0523.js` не менялся: rollback v0.5.59 сохранён.
+- Release/cache marker = `20260823-v061-self-team-link1`; Telegram menu verification = **CONFIRMED**.
+- `changelog-v0601.js` дополнен этой возможностью.
+- Изменение frontend-only; Sheets/CRM данные не изменялись. Device smoke перехода из своей карточки остаётся acceptance check пользователя.

@@ -264,3 +264,21 @@ searchKeys и searchIndexVersion.
 - `CURRENT_STATE.md` и `WORK_HISTORY.md` обновлены безопасно через Python, без shell interpolation.
 
 **Результат проверки Telegram menu:** `CONFIRMED`. Final acceptance музыки — device smoke после полного закрытия Mini App и нового открытия через кнопку бота.
+
+
+---
+
+### 23.08.2026 18:00+03 — переход из своей карточки в команду [V061_SELF_PROFILE_TEAM_LINK_20260823]
+
+**Запрос:** с главной страницы Mini App из собственной карточки профиля открыть свою команду нажатием на membership-плашку.
+
+**Выполнено:**
+- расширен только v0.6.1-модуль `profile-team-link-v061.js`; legacy renderer v0.5.59 не изменён;
+- `.self-membership` после рендера получает `data-team` с encoded `[team, game]`, keyboard semantics и touch-friendly behavior;
+- существующий ordinary team router и `team-identity-fix.js` сохраняют точную identity `name + game`;
+- MutationObserver повторно декорирует профиль после auth/snapshot rerender;
+- `app-v0600.html`, `app-v0601.html`, `app.html` и v0.6.1 changelog переведены на marker `20260823-v061-self-team-link1`;
+- Telegram bot menu marker применён через временный tokenized web-app invoker и temporary route удалён; verification = `CONFIRMED`;
+- live Apps Script mirror синхронизирован после rollout.
+
+**Проверка:** repo/runtime delivery подготовлены; финальный device smoke — на главной нажать плашку своей команды и убедиться, что открылась карточка именно нужной игры.
