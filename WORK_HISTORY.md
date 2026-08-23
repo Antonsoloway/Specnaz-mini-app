@@ -18,24 +18,32 @@
 карточек сами по себе не были причиной.
 
 **Исправление:**
-- добавлен Worker wrapper `entry-v1310.js` / version `1.31.0`;
+- добавлен Worker wrapper `entry-v1310.js` / version `1.31.1`;
 - штатный avatar route остаётся первым и не меняется для записей с fileId;
 - только после authenticated `AVATAR_NOT_FOUND` Worker повторно подтверждает
   участника через разрешённый snapshot и делает on-demand
   `getUserProfilePhotos` через Telegram Bot API;
-- выбранный Telegram photo обслуживается через существующий защищённый
-  `/avatar?fileId=...` flow; bot token и fileId в браузер не передаются;
+- после `getFile` Worker сам проксирует image bytes авторизованному клиенту;
+  bot token, Telegram file path и discovered fileId в браузер не передаются;
 - массового avatar prewarm нет, frontend продолжает использовать общий
   persistent cache и прежний network concurrency limit;
 - `worker/wrangler.toml` переключён на `src/entry-v1310.js`.
 
-**Коммиты:** `d5b8055` — новый Worker fallback; `a34b6bd` — активный Worker
-entrypoint; `2e3b877` — синхронизация `CURRENT_STATE.md` с v0.6.1 и hotfix.
+**Неудачный промежуточный подход:** первая версия wrapper пыталась передать
+новый Telegram fileId в legacy `/avatar?fileId=...`. Дополнительная проверка
+цепочки показала, что legacy route намеренно разрешает только fileId, уже
+присутствующие в snapshot, поэтому новый live fileId получил бы
+`AVATAR_NOT_ALLOWED`. До финализации flow исправлен на direct server-side
+proxy после той же snapshot participant allow-list.
+
+**Коммиты:** `d5b8055` — первичный Worker wrapper; `a34b6bd` — активный Worker
+entrypoint; `647a4c2` — исправленный live-photo proxy; `2ffcd6a` — актуальный
+`CURRENT_STATE.md` с v0.6.1 avatar hotfix.
 
 **Проверка:** проблемный класс записей подтверждён на актуальном snapshot;
-новый Worker-файл прошёл `node --check`, после commit файлы повторно прочитаны
-из GitHub `main`. Если Telegram не отдаёт фото из-за privacy/API, сохраняется
-прежний 404/placeholder contract.
+финальный Worker-файл прошёл `node --check`, цепочка legacy avatar authorization
+прочитана до базового handler. Если Telegram не отдаёт фото из-за privacy/API,
+сохраняется прежний 404/placeholder contract.
 
 **Граница rollout:** repo обновлён. Cloudflare production `/health` и реальный
 Telegram WebView после auto-build в этом чате независимо не подтверждены;
