@@ -473,3 +473,15 @@ Repo config на 23.08.2026:
 - The bridge overrides the active ordinary team-detail loader and admin persistent-team loader while leaving v0.5.59 source files unchanged. Admin list/detail images are re-applied after legacy cache writes so stale memory cannot win the race.
 - Frontend/menu marker = `20260824-v061-team-photo-refresh1`. Existing Apps Script deployment `Таблица ЧП 1.3` preserved; temporary verifier removed; live mirror synced.
 - Device acceptance pending: replace a team photo with different content and verify the new image appears immediately in admin detail and after reopening the ordinary team card.
+
+
+---
+
+## v0.6.1 periodic screen twitch — 24.08.2026 [V061_SCREEN_TWITCH_WATCHDOG_FIX_20260824]
+
+- User confirmed the prior team-photo replacement fix: a newly uploaded team photo appears after the cache-identity correction.
+- Previous rank/compositor attempt did NOT remove the periodic full-screen twitch on the device; do not describe it as verified.
+- Actual interval correlation found in `admin-write-v0600-v3.js`: `scheduleLiveSnapshotRefresh(5000)` starts a permanent watchdog, then `PUBLIC_SNAPSHOT_WATCH_MS=20000` reloads public snapshot every 20s, plus a 1s restart after visibility return. This matches the recorded ~20–25s cadence much more closely than rank shimmer.
+- v0.6.1 now loads `v061-background-refresh-guard.js` before `admin-write-v0600-v3.js`; it suppresses only that legacy 5s/20s/visibility watchdog callback. Mutation-specific snapshot polling after real admin writes is preserved.
+- Frontend/menu marker = `20260824-v061-screen-twitch1`; Telegram menu confirmed. Existing deployment `Таблица ЧП 1.3` preserved; temporary verifier route removed; live Apps Script mirror synchronized.
+- Device acceptance still required: keep several ordinary/admin pages open 60–90s without interaction and confirm that the former periodic twitch no longer occurs.

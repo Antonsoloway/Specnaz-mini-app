@@ -151,3 +151,8 @@ Admin-preview `v0.6.0` дополнительно использует:
 
 - Production Google Sheets MUST remain Restricted: no `anyone` reader/writer permission; Apps Script accesses them as the deploying owner.
 - Secrets/tokens/webhook credentials MUST live only in Script Properties, Cloudflare secrets or another private secret store; literal credentials are forbidden in public GitHub source/mirror/docs.
+
+
+### Mini App background refresh / visual stability
+
+- Do not run a permanent full public/admin snapshot reload watchdog on a fixed short interval inside the Mini App. Background refresh after explicit writes or user actions is allowed; continuous polling that can repaint Telegram WebView must be opt-in and proven visually stable.

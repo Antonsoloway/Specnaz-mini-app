@@ -402,3 +402,14 @@ searchKeys и searchIndexVersion.
 - Added `team-photo-refresh-v061.js`; photo content version now participates in v0.6.1 cache identity and successful admin photo writes force immediate reload.
 - Release marker `20260824-v061-team-photo-refresh1` published; Telegram menu confirmed; existing `Таблица ЧП 1.3` deployment preserved and live mirror synced.
 - Periodic Android screen twitch remains unresolved and is intentionally deferred.
+
+
+---
+
+### 24.08.2026 — second screen-twitch diagnosis/fix [V061_SCREEN_TWITCH_WATCHDOG_FIX_20260824]
+
+- Device feedback rejected the first rank-polling hypothesis: twitch remained unchanged.
+- Traced a separate always-on `admin-write` live snapshot watchdog: first 5s, then every 20s, with public `/snapshot` reload even when data did not change.
+- Added `v061-background-refresh-guard.js`, loaded before admin-write, which identifies the exact watchdog callback by source (`refreshPublicSnapshotOnce` + `refreshVisibleAdminSnapshot` + `scheduleLiveSnapshotRefresh`) and suppresses only those timers.
+- Write correctness preserved: `refreshPublicSnapshotAfterMutation()` uses independent Promise timers and remains active after committed participant/team changes.
+- Cache/menu marker `20260824-v061-screen-twitch1` published and verified; stable Apps Script deployment retained; live mirror resynced.
