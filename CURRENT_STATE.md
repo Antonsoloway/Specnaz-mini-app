@@ -461,3 +461,15 @@ Repo config на 23.08.2026:
 - `rank-visual-stability-v061.css`: переливание больше не перемещает широкий pseudo-element за пределы rank badge; блик анимирует background-position внутри clip-mask самой плашки. Crest/wings не обрезаются.
 - Frontend/menu marker = `20260824-v061-visual-stability1`; Telegram menu подтверждён. Существующий deployment `Таблица ЧП 1.3` сохранён, temporary invoker удалён, live Apps Script mirror синхронизирован.
 - Device acceptance: оставить приложение открытым минимум 45–60 секунд на нескольких страницах и проверить отсутствие периодического twitch; отдельно проверить, что shimmer остаётся внутри плашки звания.
+
+
+---
+
+## v0.6.1 team photo replacement cache — 24.08.2026 [V061_TEAM_PHOTO_REFRESH_20260824]
+
+- Device test showed that the previous Android visual-stability attempt did not remove the periodic whole-screen twitch; that issue is parked for separate diagnosis and must not be marked resolved.
+- A team photo replacement was confirmed committed by admin journal and both private/public snapshots, while the device still rendered the previous image. Root cause: legacy ordinary/admin persistent media caches use stable `team:<name>\n<game>` identity and could reuse the old in-memory/disk blob for up to 30 minutes after photo content changed.
+- `team-photo-refresh-v061.js` adds a v0.6.1 content-versioned photo layer. Public photo identity follows current snapshot photo source; admin identity uses the protected photo content version. Successful admin photo writes invalidate the same team+game immediately and refetch the current image without waiting for the legacy refresh window.
+- The bridge overrides the active ordinary team-detail loader and admin persistent-team loader while leaving v0.5.59 source files unchanged. Admin list/detail images are re-applied after legacy cache writes so stale memory cannot win the race.
+- Frontend/menu marker = `20260824-v061-team-photo-refresh1`. Existing Apps Script deployment `Таблица ЧП 1.3` preserved; temporary verifier removed; live mirror synced.
+- Device acceptance pending: replace a team photo with different content and verify the new image appears immediately in admin detail and after reopening the ordinary team card.

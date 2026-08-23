@@ -391,3 +391,14 @@ searchKeys и searchIndexVersion.
 - shimmer переписан с `translateX()` широкого pseudo-element на background-position внутри фиксированной rounded clip-mask; декоративные элементы звания снаружи плашки сохранены;
 - `app.html` / `app-v0601.html` / общий runtime / changelog переведены на `20260824-v061-visual-stability1`;
 - Telegram menu cache-bust применён через существующий `Таблица ЧП 1.3`, temporary route удалён, live Apps Script mirror синхронизирован.
+
+
+---
+
+### 24.08.2026 — immediate team-photo replacement [V061_TEAM_PHOTO_REFRESH_20260824]
+
+- Backend/photo storage was not the failure: the replacement write reached the journal and fresh private/public snapshots.
+- Fixed the client stale-photo path caused by 30-minute stable-key memory/IndexedDB reuse after replacing content for the same team+game.
+- Added `team-photo-refresh-v061.js`; photo content version now participates in v0.6.1 cache identity and successful admin photo writes force immediate reload.
+- Release marker `20260824-v061-team-photo-refresh1` published; Telegram menu confirmed; existing `Таблица ЧП 1.3` deployment preserved and live mirror synced.
+- Periodic Android screen twitch remains unresolved and is intentionally deferred.
