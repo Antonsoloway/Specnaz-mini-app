@@ -11,8 +11,8 @@
   <script>
   (() => {
     const params = new URLSearchParams(window.location.search || '');
-    const target = 'app-v0600.html';
-    params.set('releaseBuild', '20260823-scroll-gesture-hotfix5');
+    const target = 'app-v0601.html';
+    params.set('releaseBuild', '20260823-v061-entry');
     const search = params.toString() ? `?${params.toString()}` : '';
     const next = target + search + (window.location.hash || '');
     window.location.replace(next);
