@@ -131,9 +131,7 @@ function MINIAPP_adminWriteBackendExecute_(e) {
       return MINIAPP_adminWriteError_('WRITE_BUSY', 'База занята другой операцией. Повторите через несколько секунд.');
     }
 
-    var journalDuplicate = MINIAPP_adminWriteFindJournalRequest_(
-      requestId, { lockAlreadyHeld: true }
-    );
+    var journalDuplicate = MINIAPP_adminWriteFindJournalRequest_(requestId);
     if (journalDuplicate) {
       var duplicateResult = {
         ok: true,
@@ -168,10 +166,6 @@ function MINIAPP_adminWriteBackendExecute_(e) {
       ss: ss,
       adminId: adminId,
       adminUsername: MINIAPP_adminWriteUsername_(profile.username || '') || '',
-      adminDisplayName: MINIAPP_adminWriteValue_(profile.name || profile.telegramName || ''),
-      lockAlreadyHeld: true,
-      transactionId: requestId,
-      auditChannel: 'worker-signed-hmac',
       requestId: requestId,
       op: op,
       payload: payload
@@ -352,12 +346,6 @@ function MINIAPP_adminWritePreflight() {
   if (typeof MINIAPP_adminWriteFinalDispatch_ !== 'function') issues.push('WRITE_33_FINAL_DISPATCH_MISSING');
   if (typeof MINIAPP_adminWriteFinalMeta_ !== 'function') issues.push('WRITE_33_FINAL_META_MISSING');
   if (typeof MINIAPP_adminWriteFinalJournalData_ !== 'function') issues.push('WRITE_33_FINAL_JOURNAL_MISSING');
-  if (typeof MINIAPP_auditV2RecordMiniAppMutation_ !== 'function') issues.push('AUDIT_V2_FACADE_MISSING');
-  if (typeof MINIAPP_auditV2JournalData_ !== 'function') issues.push('AUDIT_V2_READER_MISSING');
-  if (typeof MINIAPP_auditV2BootstrapBaseline !== 'function') issues.push('AUDIT_V2_BASELINE_MISSING');
-  if (typeof MINIAPP_auditV2Activate !== 'function') issues.push('AUDIT_V2_ACTIVATE_MISSING');
-  if (typeof MINIAPP_auditV2Deactivate !== 'function') issues.push('AUDIT_V2_DEACTIVATE_MISSING');
-  if (typeof MINIAPP_auditV2Status !== 'function') issues.push('AUDIT_V2_STATUS_MISSING');
   if (typeof MINIAPP_adminWriteFinalDeleteParticipant_ !== 'function') issues.push('WRITE_33_PARTICIPANT_DELETE_MISSING');
   if (typeof MINIAPP_adminWriteFinalDeleteTeam_ !== 'function') issues.push('WRITE_33_TEAM_DELETE_MISSING');
   if (typeof MINIAPP_teamGithubUpsert_ !== 'function') issues.push('PERSISTENT_TEAM_MEDIA_UPSERT_MISSING');
@@ -374,20 +362,6 @@ function MINIAPP_adminWritePreflight() {
   if (!PropertiesService.getScriptProperties().getProperty(tokenProperty)) {
     issues.push('BOT_TOKEN_MISSING');
   }
-
-  var auditPreflight = typeof MINIAPP_auditV2Preflight_ === 'function'
-    ? MINIAPP_auditV2Preflight_()
-    : { ok: false, baselineInitialized: false };
-  if (!auditPreflight.active) issues.push('AUDIT_V2_NOT_ACTIVE');
-  if (!auditPreflight.baselineInitialized) issues.push('AUDIT_V2_BASELINE_NOT_INITIALIZED');
-  if (!auditPreflight.journalSchemaReady) issues.push('AUDIT_V2_JOURNAL_SCHEMA_NOT_READY');
-  if (!auditPreflight.indexPresent) issues.push('AUDIT_V2_INDEX_NOT_READY');
-  if (!auditPreflight.journalHidden) issues.push('AUDIT_V2_JOURNAL_NOT_HIDDEN');
-  if (!auditPreflight.journalProtected) issues.push('AUDIT_V2_JOURNAL_NOT_PROTECTED');
-  if (!auditPreflight.indexHidden) issues.push('AUDIT_V2_INDEX_NOT_HIDDEN');
-  if (!auditPreflight.indexProtected) issues.push('AUDIT_V2_INDEX_NOT_PROTECTED');
-  if (!auditPreflight.baselineHidden) issues.push('AUDIT_V2_BASELINE_NOT_HIDDEN');
-  if (!auditPreflight.baselineProtected) issues.push('AUDIT_V2_BASELINE_NOT_PROTECTED');
 
   var endpointInfo = typeof MINIAPP_adminWriteResolvedEndpoint_ === 'function'
     ? MINIAPP_adminWriteResolvedEndpoint_()
@@ -420,23 +394,6 @@ function MINIAPP_adminWritePreflight() {
     counterHistoryInvariant: typeof processManualCounterEdits_ === 'function',
     baseSortInvariant: typeof sortBaseByChatState_ === 'function',
     teamRenameCascadeInvariant: typeof finalRoleCascadeTeamRename_ === 'function',
-    audit: {
-      version: typeof MINIAPP_AUDIT_V2_VERSION !== 'undefined' ? MINIAPP_AUDIT_V2_VERSION : '',
-      schemaVersion: typeof MINIAPP_AUDIT_V2_SCHEMA_VERSION !== 'undefined'
-        ? MINIAPP_AUDIT_V2_SCHEMA_VERSION : 0,
-      miniAppFacade: typeof MINIAPP_auditV2RecordMiniAppMutation_ === 'function',
-      manualHook: typeof MINIAPP_auditV2HandleManualEdit_ === 'function',
-      botHook: typeof MINIAPP_auditV2RecordBotMutation_ === 'function',
-      systemHook: typeof MINIAPP_auditV2RecordSystemMutation_ === 'function',
-      activationGate: 'versioned-script-property-after-secured-fresh-baseline',
-      activateFunction: typeof MINIAPP_auditV2Activate === 'function',
-      deactivateFunction: typeof MINIAPP_auditV2Deactivate === 'function',
-      statusFunction: typeof MINIAPP_auditV2Status === 'function',
-      baselineBootstrapRequired: false,
-      activationPerformsBootstrap: true,
-      preflight: auditPreflight,
-      status: auditPreflight
-    },
     snapshotRefresh: typeof MINIAPP_queueAdminSnapshotRefresh_ === 'function'
       ? 'commit-first-queued-private-trigger'
       : 'synchronous-compatibility-fallback',

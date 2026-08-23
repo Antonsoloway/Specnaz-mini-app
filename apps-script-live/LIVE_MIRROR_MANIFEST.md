@@ -1,7 +1,7 @@
 # Live Apps Script mirror
 
 > Generated from the live Apps Script project via `clasp pull`.
-> Generated at: 2026-08-21T21:24:35+00:00
+> Generated at: 2026-08-23T14:00:07+00:00
 > Local source folder: `~/table-chp-1.3`
 > `.clasp.json`, Script Properties, bot tokens, GitHub tokens and other secrets are intentionally NOT stored here.
 
@@ -40,6 +40,7 @@ d4af10ffc84c8e9226e0ebab0ea2486fa075472ccf4dc520f3da8515b0702f12  30_MINIAPP_ADM
 93303f7310d880ec9b91e9c8725dff4aba4b7333325dc56bd9faa20fe777250b  31_MINIAPP_ADMIN_WRITE_HARDENED.js
 83557bf01550da2ad38d94f86620bb995f2d6ee6146f8ef53e72efc492661e0d  32_MINIAPP_ADMIN_TEAM_PHOTO.js
 0a1ba5a3a5fd501718005ab38822750d32621c91718ff579073d60353681aac9  33_MINIAPP_ADMIN_WRITE_FINAL.js
+00cbc78bd19bd326dabefa2932accbc2af56150f04c7c80dcb9724989f9b0b39  34_MINIAPP_AUDIT_V2.js
 d81026ded8b851437b932bcebf3281f850a6050a31a99028f4db22b6fdeb32c6  appsscript.json
 eb5762e2d74064ef11a3ec431ea52b7c903e1641866cf4263d51b52104375ee5  Вспом функции.js
 ```

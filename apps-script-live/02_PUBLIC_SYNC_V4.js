@@ -190,21 +190,6 @@ function handlePublicSyncEdit(e) {
   const relevant = [SHEET_BASE, SHEET_TEAMS, SHEET_HISTORY];
   if (relevant.indexOf(sheetName) === -1) return;
 
-  // AUDIT_V2_MANUAL_HOOK
-  // The installable public-sync trigger already receives every relevant edit.
-  // Reconcile against the protected baseline before publishing the snapshot;
-  // a journal warning must never suppress the existing sync path.
-  if (typeof MINIAPP_auditV2HandleManualEdit_ === 'function') {
-    try {
-      var auditResult = MINIAPP_auditV2HandleManualEdit_(e);
-      if (auditResult && auditResult.ok === false) {
-        console.warn('Manual audit reconcile warning: ' + String(auditResult.error || 'UNKNOWN'));
-      }
-    } catch (auditError) {
-      console.warn('Manual audit hook failed: ' + String(auditError && auditError.message || auditError));
-    }
-  }
-
   const reason = 'edit:' + sheetName + '!' + e.range.getA1Notation();
   markPublicSyncPending_(reason);
   MINIAPP_requestImmediateUnifiedSnapshot_('manual-sheet-' + reason);
@@ -224,29 +209,6 @@ function handlePublicSyncChange(e) {
   } catch (err) {}
 
   if (activeSheetName && activeSheetName !== SHEET_TEAMS) return;
-
-  // onChange does not expose an exact edited range or old CellImage. The same
-  // protected baseline still captures source A:D identity/presence changes;
-  // media byte replacement is journalled by the persistent-media worker hook.
-  if (typeof MINIAPP_auditV2Reconcile_ === 'function') {
-    try {
-      var auditSource = e && e.source ? e.source : SpreadsheetApp.openById(SPREADSHEET_ID);
-      MINIAPP_auditV2Reconcile_(auditSource, {
-        source: { type: 'manual_sheet', channel: 'google-sheets-onchange', label: 'Google Sheets' },
-        actor: typeof MINIAPP_auditV2SheetActor_ === 'function'
-          ? MINIAPP_auditV2SheetActor_(e) : null,
-        transactionId: 'sheet_change_' + Utilities.getUuid(),
-        metadata: {
-          sheet: activeSheetName || SHEET_TEAMS,
-          changeType: changeType,
-          exactBefore: 'protected-baseline',
-          rangeAvailable: false
-        }
-      });
-    } catch (auditError) {
-      console.warn('Manual change audit hook failed: ' + String(auditError && auditError.message || auditError));
-    }
-  }
   const reason = 'photo_change:' + changeType + (activeSheetName ? ':' + activeSheetName : '');
   markPublicSyncPending_(reason);
   MINIAPP_requestImmediateUnifiedSnapshot_('manual-sheet-' + reason);
@@ -2925,3 +2887,4 @@ function installPublicSyncV60Stable() {
     next_step: 'Запустите installRoyalCrmPublicRecovery из файла 08_TELEGRAM_NAME_LINKS.gs'
   };
 }
+
