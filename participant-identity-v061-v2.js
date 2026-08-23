@@ -1,11 +1,11 @@
-/* Royal CRM Mini App — v0.6.1 participant identity consistency v3
+/* Royal CRM Mini App — v0.6.1 participant identity consistency v4
  * Visible identity everywhere: CRM name, clickable @username when present,
  * Telegram display name. Raw Telegram ID stays technical-only outside admin.
  * Event-driven; no global DOM observer.
  */
 (() => {
   'use strict';
-  const VERSION = '0.6.1-participant-identity.3';
+  const VERSION = '0.6.1-participant-identity.4';
   if (String(window.__ROYAL_BUILD__ || '') !== '0.6.1') return;
 
   const clean = value => String(value == null ? '' : value).trim();
@@ -100,6 +100,9 @@
     const anchor=nameAnchor(title); if(anchor) after(anchor,[user,tgName]);
   }
 
+  // Admin participant list has its own MutationObserver that rewrites summary
+  // innerHTML. Do not compete with it. Keep Telegram name on a persistent
+  // attribute rendered through CSS, and intercept username taps at window level.
   function decorateAdminSummary(record){
     if(!record?.matches?.('details[data-admin-participant="1"]')) return;
     const p=participant(rootId(record));
@@ -108,26 +111,12 @@
     const small=main?.querySelector('small');
     if(!p||!strong||!small) return;
     if(clean(p.name)) setText(strong,p.name);
-    small.classList.add('royal-admin-participant-list-meta');
-
-    const u=cleanUsername(p.username);
-    let user=small.querySelector('.royal-admin-participant-list-user');
-    if(u){
-      if(!user||user.tagName!=='BUTTON'){
-        const button=document.createElement('button'); button.type='button'; button.className='royal-admin-participant-list-user royal-participant-username-v061';
-        if(user) user.replaceWith(button); else small.prepend(button); user=button;
-      }
-      if(user.dataset.userMenu!==u) user.dataset.userMenu=u;
-      const display=visibleName(p); if(user.dataset.userName!==display) user.dataset.userName=display;
-      setText(user,`@${u}`);
-    }else if(user) user.remove();
-
-    let tg=small.querySelector('.royal-admin-participant-list-tgname-v061');
+    small.classList.add('royal-admin-participant-list-meta','royal-admin-identity-meta-v061');
     const tgValue=clean(p.telegramName);
-    if(tgValue){
-      if(!tg){ tg=document.createElement('span'); tg.className='royal-admin-participant-list-tgname-v061'; small.insertBefore(tg,small.querySelector('.royal-admin-participant-list-teams')||null); }
-      setText(tg,tgValue);
-    }else if(tg) tg.remove();
+    if(small.dataset.royalTelegramName!==tgValue) small.dataset.royalTelegramName=tgValue;
+    const u=cleanUsername(p.username);
+    if(record.dataset.royalAdminUsername!==u) record.dataset.royalAdminUsername=u;
+    if(record.dataset.royalAdminUserName!==visibleName(p)) record.dataset.royalAdminUserName=visibleName(p);
   }
 
   function decorateAdminRanking(row){
@@ -174,16 +163,16 @@
   function initial(delay){ window.setTimeout(()=>decorateVisible(),delay); }
 
   function installCss(){
-    if(document.querySelector('style[data-participant-identity-v061="3"]')) return;
-    const style=document.createElement('style'); style.dataset.participantIdentityV061='3';
+    if(document.querySelector('style[data-participant-identity-v061="4"]')) return;
+    const style=document.createElement('style'); style.dataset.participantIdentityV061='4';
     style.textContent=`
       .royal-participant-username-v061{display:inline-flex!important;align-items:center;width:max-content;max-width:100%;margin:2px 0 0;padding:0;border:0;background:transparent;color:#55a9e8;font:800 16px/1.25 inherit;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;touch-action:manipulation}
       .royal-participant-telegram-name-v061{display:block;max-width:100%;margin-top:2px;color:#8fa3b1;font-size:14px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .person-main,.team-member-main,.hero-main,.participant-detail-identity,.self-profile-identity,.directory-person-head,.history-person{min-width:0}
       .person-main>.participant-name-achievements-row,.team-member-main>.participant-name-achievements-row,.hero-main>.participant-name-achievements-row{align-items:flex-start}
       .person-main>.participant-name-achievements-row>.person-title,.team-member-main>.participant-name-achievements-row>strong,.hero-main>.participant-name-achievements-row>strong{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;overflow-wrap:anywhere;line-height:1.08}
-      .royal-admin-participant-list-user{appearance:none;-webkit-appearance:none;padding:0;border:0;background:transparent;text-align:left}
-      .royal-admin-participant-list-tgname-v061{color:#8fa3b1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .royal-admin-identity-meta-v061[data-royal-telegram-name]:not([data-royal-telegram-name=""])::after{content:attr(data-royal-telegram-name);display:block;color:#8fa3b1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .royal-admin-participant-list-user{cursor:pointer;color:#55a9e8!important}
       .royal-admin-ranking-identity-v061{display:block;color:#5aa8dd;font-size:11px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       @media(max-width:430px){.participant-achievements-row{max-width:48%!important}.royal-participant-username-v061{font-size:15px}.royal-participant-telegram-name-v061{font-size:13px}}
     `;
@@ -200,7 +189,19 @@
   window.addEventListener('focus',()=>schedule(0));
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') schedule(0); });
 
-  document.addEventListener('click',event=>{
+  // Run before admin document-capture navigation so @username remains an
+  // independent Telegram action instead of opening the admin participant page.
+  window.addEventListener('click',event=>{
+    const adminUser=event.target?.closest?.('details[data-admin-participant="1"] .royal-admin-participant-list-user');
+    if(adminUser){
+      const record=adminUser.closest('details[data-admin-participant="1"]');
+      const u=cleanUsername(record?.dataset?.royalAdminUsername || adminUser.textContent);
+      if(u){
+        event.preventDefault(); event.stopImmediatePropagation();
+        try { if(typeof openUserMenu==='function') openUserMenu(u,record?.dataset?.royalAdminUserName||`@${u}`); } catch (_) {}
+      }
+      return;
+    }
     const user=event.target?.closest?.('.royal-participant-username-v061[data-user-menu]');
     if(!user||user.tagName==='BUTTON') return;
     try { event.preventDefault(); event.stopPropagation(); if(typeof openUserMenu==='function') openUserMenu(user.dataset.userMenu,user.dataset.userName||user.textContent); } catch (_) {}
