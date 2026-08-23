@@ -187,7 +187,7 @@ info "APPEND PROJECT HANDOFF: CURRENT_STATE + WORK_HISTORY"
 DOC_REPO="$TMP_REPO/docs-repo"
 gh repo clone "$REPO" "$DOC_REPO" -- --depth=1 >/dev/null
 cd "$DOC_REPO"
-cat >> CURRENT_STATE.md <<EOF
+cat >> CURRENT_STATE.md <<'EOF'
 
 ---
 
@@ -196,13 +196,13 @@ cat >> CURRENT_STATE.md <<EOF
 - Пользователь подтвердил в Telegram production, что проблемные participant avatars после Apps Script/snapshot hotfix снова загружаются.
 - Live Apps Script сохраняет last-known avatar file_id при transient ERROR и unified snapshot уже публикует его; NO_PHOTO по-прежнему не используется как фотография.
 - Причина текущей ошибки музыки после перехода на v0.6.1: `app.js` экспортировал `RoyalAppV0600` только при точном `BUILD === '0.6.0'`, поэтому build 0.6.1 терял защищённый audio loader.
-- Root fix: runtime API теперь активен для всей ветки `0.6.x`; `app-v0600.html` получил новые cache-bust markers `$BUILD_MARKER`.
-- Telegram bot menu URL также переведён на `?cb=$BUILD_MARKER`, чтобы новый запуск Mini App не переиспользовал старый WebView/HTML cache.
+- Root fix: runtime API теперь активен для всей ветки `0.6.x`; `app-v0600.html` получил новые cache-bust markers `20260823-v061-music-live3`.
+- Telegram bot menu URL также переведён на `?cb=20260823-v061-music-live3`, чтобы новый запуск Mini App не переиспользовал старый WebView/HTML cache.
 - Использован только существующий Apps Script deployment `Таблица ЧП 1.3`; новый deployment не создавался.
 - После Apps Script push live mirror повторно синхронизирован в `apps-script-live/`.
 EOF
 
-cat >> WORK_HISTORY.md <<EOF
+cat >> WORK_HISTORY.md <<'EOF'
 
 ---
 
@@ -218,7 +218,7 @@ cat >> WORK_HISTORY.md <<EOF
 
 **Изменено:**
 - `app.js`: protected runtime export расширен на всю ветку `0.6.x`;
-- `app-v0600.html`, `app-v0601.html`, `app.html`: cache/release markers → `$BUILD_MARKER`;
+- `app-v0600.html`, `app-v0601.html`, `app.html`: cache/release markers → `20260823-v061-music-live3`;
 - `changelog-v0601.js`: зафиксирован фактический music/runtime/cache fix;
 - live `22_MINIAPP_BOT_APP_MENU.js`: menu cache-bust обновлён, `MINIAPP_setupBotAppMenu` применён;
 - существующий deployment `Таблица ЧП 1.3` обновлён без создания нового;
