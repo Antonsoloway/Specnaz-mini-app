@@ -1,7 +1,7 @@
 import currentWorker from './entry-v1310.js';
 
-const WRAPPER_VERSION = '1.32.0';
-const AVATAR_FALLBACK = 'private-last-known+telegram-live';
+const WRAPPER_VERSION = '1.32.1';
+const AVATAR_FALLBACK = 'private-media-cache+last-known+telegram-live';
 const AVATAR_REGISTRY_PATH = 'avatar-last-known.json';
 const AVATAR_REGISTRY_TTL_MS = 5 * 60 * 1000;
 
@@ -33,7 +33,8 @@ export default {
         service: 'royal-crm-miniapp-api',
         version: WRAPPER_VERSION,
         avatarFallback: AVATAR_FALLBACK,
-        avatarRegistry: 'private-github-last-known'
+        avatarRegistry: 'private-github-last-known',
+        avatarMediaFallback: 'private-github-raw-cache'
       }, 200);
     }
 
@@ -55,17 +56,29 @@ async function handleMissingAvatar(request, env, ctx, url, notFoundResponse) {
     : []).find(item => cleanTelegramId(item?.telegramId) === telegramId);
   if (!participant) return notFoundResponse;
 
+  let lastKnownFileId = '';
+  try {
+    lastKnownFileId = await getLastKnownAvatarFileId(env, telegramId);
+    if (lastKnownFileId) {
+      const cached = await readPrivateCachedAvatar(env, lastKnownFileId);
+      if (cached) {
+        return mediaResponse(snapshotResponse, cached.bytes, cached.contentType, 'private-media-cache');
+      }
+    }
+  } catch (error) {
+    console.warn('avatar private media fallback failed', error?.message || 'unknown');
+  }
+
   const botToken = String(env.BOT_TOKEN || '').trim();
   if (!botToken) return notFoundResponse;
 
-  try {
-    const lastKnownFileId = await getLastKnownAvatarFileId(env, telegramId);
-    if (lastKnownFileId) {
+  if (lastKnownFileId) {
+    try {
       const response = await proxyTelegramAvatarFile(snapshotResponse, lastKnownFileId, botToken, 'private-last-known');
       if (response) return response;
+    } catch (error) {
+      console.warn('avatar last-known Telegram fallback failed', error?.message || 'unknown');
     }
-  } catch (error) {
-    console.warn('avatar last-known fallback failed', error?.message || 'unknown');
   }
 
   try {
@@ -122,6 +135,42 @@ async function loadAvatarRegistry(env) {
   avatarRegistryCache = parsed && typeof parsed === 'object' ? parsed : { avatars: {} };
   avatarRegistryExpiresAt = Date.now() + AVATAR_REGISTRY_TTL_MS;
   return avatarRegistryCache;
+}
+
+async function readPrivateCachedAvatar(env, fileId) {
+  const repo = String(env.DATA_REPO || '').trim();
+  const branch = String(env.DATA_BRANCH || 'main').trim();
+  const token = String(env.GITHUB_TOKEN || '').trim();
+  if (!repo || !token || !fileId) return null;
+
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(fileId));
+  const hash = [...new Uint8Array(digest)]
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('');
+  const path = `media/avatars/${hash}.bin`;
+  const encodedPath = path.split('/').map(encodeURIComponent).join('/');
+
+  const response = await fetch(
+    `https://api.github.com/repos/${repo}/contents/${encodedPath}?ref=${encodeURIComponent(branch)}`,
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github.raw+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'User-Agent': 'Royal-CRM-MiniApp-Worker'
+      },
+      cache: 'no-store'
+    }
+  );
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`avatar media ${response.status}`);
+
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (!bytes.length) return null;
+  const contentType = normalizeImageType(response.headers.get('Content-Type'), bytes);
+  if (!contentType.startsWith('image/')) return null;
+  return { bytes, contentType };
 }
 
 async function authorizeSnapshot(request, env, ctx) {
