@@ -1,5 +1,5 @@
 name = "royal-crm-miniapp-api"
-main = "src/entry-v1340.js"
+main = "src/entry-v1350.js"
 compatibility_date = "2026-08-15"
 
 [vars]
@@ -9,3 +9,33 @@ DATA_BRANCH = "main"
 DATA_PATH = "snapshot.json"
 ADMIN_DATA_PATH = "admin-snapshot.json"
 TELEGRAM_CHAT_ID = "-1002109152418"
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[observability.logs]
+invocation_logs = true
+
+# Secrets stay in Cloudflare Variables and Secrets:
+# BOT_TOKEN
+# GITHUB_TOKEN
+# SESSION_SECRET
+# BOT_TOKEN is also used server-side as the HMAC key for Worker -> Apps Script
+# admin-write requests and short-lived Google Sheets CellImage source URLs.
+# It is never exposed to the browser or GitHub.
+#
+# entry-v1330 bypasses the old nested /snapshot wrapper fan-out: it verifies
+# the existing Worker session once, reads the shared private snapshot cache
+# once, then sanitizes a Telegram-ID-based public snapshot directly.
+#
+# entry-v1340 applies the same repaired snapshot authorization path to
+# /admin-data, then performs the fresh Telegram admin check and private admin
+# snapshot read before exposing write.5 permissions.
+#
+# entry-v1350 restores /contact-by-id on the repaired path. The route verifies
+# the current session directly, confirms requester + target are both still
+# in-chat in the private snapshot, and only then asks the bot to send the
+# tg://user?id profile button to the requester's private chat.
+#
+# Cloudflare Builds source: GitHub main, root path /worker.
