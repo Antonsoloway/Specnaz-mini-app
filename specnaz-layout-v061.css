@@ -51,7 +51,8 @@
   margin-top:7px;
 }
 
-/* Rank/achievement strip must never share the same horizontal lane with a long name. */
+/* Name stays on its own line. Every achievement is one strict right-side stack:
+   Admin -> rank -> future achievements (MAYAK etc.). Nothing wraps back to the left. */
 #panel .hero-main>.participant-name-achievements-row{
   display:block!important;
   width:100%!important;
@@ -72,13 +73,46 @@
 #panel .hero-main .participant-achievements-row{
   display:flex!important;
   position:static!important;
+  flex-direction:column!important;
   width:100%!important;
   max-width:100%!important;
   margin:7px 0 2px!important;
   justify-content:flex-start!important;
-  align-items:center!important;
-  flex-wrap:wrap!important;
+  align-items:flex-end!important;
+  flex-wrap:nowrap!important;
   gap:5px!important;
+}
+#panel .hero-main .participant-achievements-row>.participant-admin-rank-stack,
+#panel .hero-main .participant-achievements-row>.rank-list-slot,
+#panel .hero-main .participant-achievements-row>.hero-rank,
+#panel .hero-main .participant-achievements-row>.rank-badge--compact,
+#panel .hero-main .participant-achievements-row>.participant-achievements-future-slot{
+  align-self:flex-end!important;
+  margin-left:auto!important;
+  margin-right:0!important;
+}
+#panel .hero-main .participant-admin-rank-stack{
+  width:max-content!important;
+  max-width:100%!important;
+  align-items:flex-end!important;
+}
+#panel .hero-main .participant-achievements-future-slot{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:flex-end!important;
+  justify-content:flex-start!important;
+  flex-wrap:nowrap!important;
+  width:max-content!important;
+  max-width:100%!important;
+  gap:5px!important;
+  margin-left:auto!important;
+  margin-right:0!important;
+}
+#panel .hero-main .participant-achievement-slot,
+#panel .hero-main .mayak-achievement-v0536{
+  align-self:flex-end!important;
+  margin-left:auto!important;
+  margin-right:0!important;
 }
 #panel .hero-main .rank-list-slot,
 #panel .hero-main .hero-rank{
