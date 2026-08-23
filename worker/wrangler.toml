@@ -1,5 +1,5 @@
 name = "royal-crm-miniapp-api"
-main = "src/entry-v1320.js"
+main = "src/entry-v1330.js"
 compatibility_date = "2026-08-15"
 
 [vars]
@@ -47,3 +47,9 @@ invocation_logs = true
 # registry before live Bot API lookup. This preserves historical file_id values
 # for participants whose daily getUserProfilePhotos refresh currently returns
 # USER_NOT_FOUND, without exposing private IDs/file IDs in the public repo.
+#
+# entry-v1330 terminates the normal /snapshot request at the top wrapper after
+# exact session verification + in-chat allow-list. It reads the already shared
+# private snapshot cache once and emits the current telegramId-only public
+# contract directly, bypassing the legacy multi-wrapper sanitization/HMAC
+# fanout that could exhaust a mobile startup request before the body arrived.
