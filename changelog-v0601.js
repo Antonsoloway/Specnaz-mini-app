@@ -1,9 +1,73 @@
 /* Royal CRM Mini App — changelog v0.6.1 */
 (() => {
-  window.RoyalChangelog0601 = {
-    version: '0.6.1',
-    items: [
-      'Переход из профиля участника в карточку своей команды.'
-    ]
+  const VERSION = '0.6.1';
+  const previous = Array.isArray(window.RoyalChangelog?.releases)
+    ? window.RoyalChangelog.releases.filter(item => String(item?.version || '') !== VERSION)
+    : [];
+
+  const SECTIONS = [
+    {
+      title:'Исправления и улучшения',
+      changes:[
+        'Текущая версия приложения переведена на v0.6.1. Номер версии и история изменений теперь обновляются вместе с релизом.',
+        'Добавлен переход из профиля участника прямо в карточку его команды.',
+        'Исправляется восстановление аватаров участников, у которых фотография есть в Telegram, но avatarFileId отсутствует в актуальном snapshot.',
+        'Для проблемных аватаров добавлена безопасная серверная цепочка: текущий snapshot → приватный ранее сохранённый avatar file_id → приватный медиакэш → live Telegram fallback.',
+        'Ранее сохранённые фотографии участников используются только после проверки авторизованного участника через защищённый snapshot; приватные Telegram ID, file_id и bot token не публикуются в браузере.',
+        'Последующие исправления, которые входят в v0.6.1, будут дописываться в эту карточку истории изменений.'
+      ]
+    }
+  ];
+
+  const CURRENT_RELEASE = {
+    version: VERSION,
+    title: 'Исправления v0.6.1',
+    sections: SECTIONS,
+    changes: SECTIONS.flatMap(section => section.changes)
   };
+  const RELEASES = [CURRENT_RELEASE, ...previous];
+
+  function esc(value) {
+    return String(value ?? '')
+      .replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')
+      .replaceAll('"','&quot;').replaceAll("'",'&#039;');
+  }
+
+  function listHtml(changes) {
+    const items = (Array.isArray(changes) ? changes : [])
+      .filter(item => typeof item === 'string' && item.trim())
+      .map(item => `<li>${esc(item)}</li>`).join('');
+    return `<ul>${items}</ul>`;
+  }
+
+  function bodyHtml(release) {
+    if (!Array.isArray(release?.sections) || !release.sections.length) {
+      return listHtml(release?.changes);
+    }
+    return release.sections.map(section => {
+      const title = String(section?.title || '').trim();
+      return `<section class="release-group">${title ? `<h3>${esc(title)}</h3>` : ''}${listHtml(section?.changes)}</section>`;
+    }).join('');
+  }
+
+  function releaseHtml(release,index) {
+    return `<details class="release-card${release?.version === VERSION ? ' is-current' : ''}" ${index === 0 ? 'open' : ''}><summary class="release-summary"><span class="release-version">v${esc(release?.version)}</span><span class="release-title">${esc(release?.title)}</span><span class="release-arrow">›</span></summary><div class="release-body">${bodyHtml(release)}</div></details>`;
+  }
+
+  function renderChangelog() {
+    try { window.RoyalNav?.pushCurrent?.(); } catch (_) {}
+    try { if (typeof setActiveNav === 'function') setActiveNav('changelog'); } catch (_) {}
+    document.body.classList.add('royal-section-screen');
+    document.querySelectorAll('.bottom-nav .nav').forEach(btn => btn.classList.remove('active'));
+    const panel = document.getElementById('panel');
+    if (!panel) return;
+    panel.hidden = false;
+    panel.innerHTML = `<div class="changelog-screen"><button type="button" class="royal-back-button" data-royal-back="1">← Назад</button><div class="changelog-head"><h2>История изменений</h2><p class="changelog-developer">Разработчик: <a href="https://t.me/ansoloway" target="_blank" rel="noopener">@ansoloway</a></p><p class="changelog-developer">Помощь в разработке, тесты: <a href="https://t.me/sfinks_spb" target="_blank" rel="noopener">@sfinks_spb</a> · <a href="https://t.me/O_Chaplygina" target="_blank" rel="noopener">@O_Chaplygina</a> · <a href="https://t.me/Yanochka_2404" target="_blank" rel="noopener">@Yanochka_2404</a> · <a href="https://t.me/DmitryRoyal" target="_blank" rel="noopener">@DmitryRoyal</a></p><p>Что добавлялось и менялось в приложении Чата Победителей.</p><span class="changelog-current">● Текущая версия v${VERSION}</span></div><div class="changelog-list">${RELEASES.map(releaseHtml).join('')}</div><div class="release-note">Новая версия добавляется сюда первой, предыдущая история сохраняется.</div></div>`;
+    try { window.RoyalNav?.enhanceVisibleBack?.(); } catch (_) {}
+    requestAnimationFrame(() => requestAnimationFrame(() => { try { window.scrollTo(0,0); } catch (_) {} }));
+  }
+
+  window.RoyalChangelog0601 = CURRENT_RELEASE;
+  window.RoyalChangelog = { version:VERSION, releases:RELEASES, open:renderChangelog };
+  window.__ROYAL_CHANGELOG_VERSION__ = VERSION;
 })();
