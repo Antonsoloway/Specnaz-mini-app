@@ -335,3 +335,19 @@ searchKeys и searchIndexVersion.
 **Rollout:** existing Apps Script deployment `Таблица ЧП 1.3` сохранён; temporary menu invoker удалён; live Apps Script mirror синхронизирован; Telegram menu verification = `CONFIRMED`.
 
 **Acceptance:** pending повторный Android Telegram smoke по нескольким history links подряд.
+
+
+---
+
+### 23.08.2026 — единая карточка участника во всём v0.6.1 [V061_PARTICIPANT_IDENTITY_20260823]
+
+**Запрос:** на всех страницах приложения, включая админ-режим, показывать CRM-имя, имя Telegram и Telegram @username/ссылку при наличии.
+
+**Выполнено:**
+- создан v0.6.1-only identity decorator `0.6.1-participant-identity.4` без изменения legacy v0.5.59 renderers;
+- identity достраивается из public snapshot и, для admin-only записей, из cached protected admin snapshot;
+- существующие @username стали единым независимым Telegram action; при наличии реального @username fallback `Связаться` не дублируется;
+- admin list/detail/team member/ranking дополнены теми же identity fields; raw ID остаётся только в admin detail;
+- CSS не даёт rank/achievement strip перекрывать имя на узких Android экранах;
+- `app.html` → `app-v0601.html` → `app-v0600.html` переведены на `20260823-v061-identity2`; Telegram menu verification = `CONFIRMED`;
+- changelog v0.6.1 дополнен.

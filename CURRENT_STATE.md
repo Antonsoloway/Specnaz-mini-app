@@ -406,3 +406,17 @@ Repo config на 23.08.2026:
 - Активный frontend/menu marker = `20260823-v061-history-link2`; Telegram menu verification = **CONFIRMED**.
 - Кнопка `Связаться` без username ранее подтверждена пользователем как работающая после Worker v1.35.0.
 - Production acceptance history-link v2 остаётся device smoke: несколько разных ссылок подряд с возвратом в Mini App.
+
+
+---
+
+## v0.6.1 participant identity consistency — 23.08.2026 [V061_PARTICIPANT_IDENTITY_20260823]
+
+- Добавлен `participant-identity-v061-v2.js` = `0.6.1-participant-identity.4`.
+- Во всех participant surfaces v0.6.1 унифицирована видимая identity: **CRM name → кликабельный @username (если есть) → Telegram display name**.
+- Покрыты ordinary participant list, team members, self/profile detail, Specnaz hero/history, directory cards, admin participant list/detail, admin team members и admin participant rankings.
+- В ordinary UI raw Telegram ID визуально не раскрывается; admin detail сохраняет ID как защищённое admin-only поле.
+- Узкие карточки получили перенос CRM-name и меньший reserved rank strip, чтобы identity не перекрывалась значками звания/ачивок.
+- Rollback v0.5.59 не изменён: новый модуль исполняется только при `__ROYAL_BUILD__ === '0.6.1'`.
+- Release/cache marker = `20260823-v061-identity2`; Telegram menu verification = **CONFIRMED**.
+- Device smoke всех основных participant surfaces остаётся acceptance check пользователя.
