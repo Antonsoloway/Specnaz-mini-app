@@ -6,6 +6,35 @@
 > номера строк и before/after payload хранятся только в приватном operational
 > handoff и admin journal.
 
+## 2026-08-23 20:14+03 — v0.6.1: snapshot startup resilience
+
+**Симптом:** после успешной Telegram-авторизации периодически появлялся startup
+screen `Данные пока не загрузились` с browser network error `Failed to fetch`.
+Проблема не была связана с закрытием Google Sheets: auth уже проходил, а сбой
+возникал на последующем public `/snapshot` request.
+
+**Корневая причина:** shared `transport-v0514.js` давал `/auth` один transient
+retry, но `/snapshot` выполнялся только одной попыткой. Краткий сетевой сбой
+между Telegram WebView и Cloudflare Worker сразу переводил startup в degraded.
+
+**Исправление:**
+- `v061-runtime-compat.js` обновлён до `0.6.1-runtime.2`;
+- только Worker `/snapshot` получает bounded retry с коротким backoff при network
+  failure и HTTP 429/502/503/504;
+- после исчерпания первой серии lifecycle `snapshot-error` запускает один
+  automatic background `reloadSnapshot()`, поэтому успешное восстановление
+  закрывает degraded startup без обязательного нажатия `Повторить загрузку`;
+- auth/admin write/admin data/media routes этим bridge не меняются;
+- `app-v0600.html`, `app-v0601.html`, `app.html` и changelog получили marker
+  `20260823-v061-snapshot-resilience1`, чтобы Telegram WebView запросил свежий
+  runtime;
+- `changelog-v0601.js` дополнен этой правкой.
+
+**Rollout boundary:** frontend опубликован в GitHub main. Device acceptance —
+несколько полных закрытий/открытий Mini App через Telegram; если сеть реально
+недоступна после всех bounded attempts, ограниченный режим остаётся штатным
+fallback.
+
 ## 2026-08-23 14:12 — v0.6.1 теперь видна в самом Mini App
 
 **Задача:** сделать номер фактически выпускаемой версии видимым пользователю,
@@ -248,7 +277,6 @@ searchKeys и searchIndexVersion.
 - Использовать обезличенные сценарии и агрегаты; согласованные public credits
   остаются в отдельном блоке проекта.
 
-
 ---
 
 ### 23.08.2026 17:50+03 — v0.6.1 music menu final recovery [V061_MUSIC_MENU_FINAL2_20260823]
@@ -264,7 +292,6 @@ searchKeys и searchIndexVersion.
 - `CURRENT_STATE.md` и `WORK_HISTORY.md` обновлены безопасно через Python, без shell interpolation.
 
 **Результат проверки Telegram menu:** `CONFIRMED`. Final acceptance музыки — device smoke после полного закрытия Mini App и нового открытия через кнопку бота.
-
 
 ---
 
@@ -283,7 +310,6 @@ searchKeys и searchIndexVersion.
 
 **Проверка:** repo/runtime delivery подготовлены; финальный device smoke — на главной нажать плашку своей команды и убедиться, что открылась карточка именно нужной игры.
 
-
 ---
 
 ### 23.08.2026 18:40+03 — Sheets lockdown + webhook credential staging [SECURITY_SHEETS_WEBHOOK_STAGE_20260823]
@@ -291,7 +317,6 @@ searchKeys и searchIndexVersion.
 **Выполнено:** обе production-таблицы закрыты от anonymous link access; live Apps Script сохранён на существующем deployment; webhook credential вынесен из публичного кода в Script Properties; включено dual-secret окно ротации без остановки действующих webhook-событий; live mirror после push синхронизирован обратно в GitHub.
 
 **Важно:** новый secret нигде не коммитится и не пишется в handoff. Старый public credential остаётся временно валиден только как `previous` до ручного переключения ChatKeeper, после чего должен быть удалён финализатором.
-
 
 ---
 
