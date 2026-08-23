@@ -1,5 +1,5 @@
 name = "royal-crm-miniapp-api"
-main = "src/entry-v1360.js"
+main = "src/entry-v1370.js"
 compatibility_date = "2026-08-15"
 
 [vars]
@@ -43,5 +43,11 @@ invocation_logs = true
 # the requester receives a clear privacy explanation instead of a generic
 # server error, and the bot may send the same explanation without a profile
 # button. Normal allowed profile buttons are unchanged.
+#
+# entry-v1370 hardens the fallback further: any Telegram rejection that reaches
+# the generic BOT_API_ERROR branch triggers a second plain DM without a profile
+# button. If that succeeds, the Mini App gets a precise explanatory response
+# instead of the generic "Не удалось отправить кнопку" error. No privacy or
+# platform restriction is bypassed.
 #
 # Cloudflare Builds source: GitHub main, root path /worker.
