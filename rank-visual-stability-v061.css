@@ -1,0 +1,43 @@
+/* Royal CRM v0.6.1 — keep the animated rank shimmer inside the pill.
+ * The crest/wings intentionally remain allowed outside the compact badge.
+ * Only the light sweep is clipped to the pill's own rounded rectangle.
+ */
+.rank-badge--compact::after{
+  top:2px!important;
+  right:2px!important;
+  bottom:2px!important;
+  left:2px!important;
+  width:auto!important;
+  z-index:1!important;
+  transform:none!important;
+  border-radius:16px!important;
+  background:
+    linear-gradient(105deg,
+      transparent 0 38%,
+      rgba(255,255,255,.28) 47%,
+      transparent 56% 100%)!important;
+  background-size:260% 100%!important;
+  background-position:140% 0;
+  opacity:0;
+  clip-path:inset(0 round 16px);
+  contain:paint;
+  pointer-events:none;
+  will-change:background-position,opacity;
+}
+.rank-badge--tiny::after{
+  border-radius:14px!important;
+  clip-path:inset(0 round 14px);
+}
+.rank-badge--compact.rank-is-visible::after{
+  animation:rankSweepInsideV061 6.2s ease-in-out infinite!important;
+}
+@keyframes rankSweepInsideV061{
+  0%,64%{background-position:140% 0;opacity:0}
+  70%{opacity:.82}
+  86%{background-position:-40% 0;opacity:0}
+  100%{background-position:-40% 0;opacity:0}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .rank-badge--compact.rank-is-visible::after{animation:none!important;opacity:0!important}
+}
