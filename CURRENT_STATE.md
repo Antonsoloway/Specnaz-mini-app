@@ -22,12 +22,12 @@
 - data repo: `Antonsoloway/royal-crm-data`;
 - постоянный entrypoint: `app.html`;
 - обычный запуск → **`app-v0601.html` / release v0.6.1**;
-- `app-v0601.html` сохраняет query/hash и передаёт запуск в общий runtime `app-v0600.html` с `releaseBuild=20260823-v061-history-link2`;
+- `app-v0601.html` сохраняет query/hash и передаёт запуск в общий runtime `app-v0600.html` с `releaseBuild=20260824-v061-visual-stability1`;
 - `app-v0559.html` / v0.5.59 сохранён как rollback target, но больше не является текущей default-версией;
 - bot: `@doveofpeace_bot`.
 
 Текущий release delivery:
-- `app.html` → `app-v0601.html`, cache marker **`20260823-v061-history-link2`**;
+- `app.html` → `app-v0601.html`, cache marker **`20260824-v061-visual-stability1`**;
 - внешний release номер = **v0.6.1**; общий runtime всё ещё переиспользует `app-v0600.html` и его v0.6-модули;
 - `v061-runtime-compat.js` = **`0.6.1-runtime.2`**: защищённый `/snapshot` получает bounded transient retry и один автоматический recovery после исчерпания первой серии;
 - `app-v0600.html` принудительно загружает этот runtime bridge с cache-bust `20260823-v061-snapshot-resilience1`;
@@ -448,3 +448,16 @@ Repo config на 23.08.2026:
 - Предыдущие `AssertionError` были ложным отрицательным результатом verification-script: heredoc занимал stdin Python и не давал ему прочитать JSON из curl.
 - Существующий deployment `Таблица ЧП 1.3` сохранён, временный route удалён, live Apps Script mirror синхронизирован.
 - Device smoke визуального выравнивания остаётся acceptance check пользователя.
+
+
+---
+
+## v0.6.1 Android visual stability — 24.08.2026 [V061_VISUAL_STABILITY_20260824]
+
+- Предыдущее выравнивание achievement stack `Админ → звание → МАЯК` подтверждено пользователем на устройстве.
+- По присланной записи зафиксированы два одно-кадровых визуальных провала примерно в 10.87s и 31.49s; интервал около 20.6s. Это не keyframe видео: в момент сбоя WebView кратко показывает placeholder/перекомпоновку изображения и сразу возвращает исходный кадр.
+- Найден постоянный legacy rank visibility polling: `rank-system-v0524.js` каждые 1.6s делал `getBoundingClientRect()` для всех `.rank-badge--compact`, плюс такой же scan на scroll/resize. Для v0.6.1 он теперь перехватывается только на время загрузки legacy rank module и не запускается.
+- `v061-visual-stability.js` переключает `rank-is-visible` через `IntersectionObserver`; новые динамические карточки подхватываются `MutationObserver` без периодического layout scan. Legacy v0.5.59 исходники не изменены.
+- `rank-visual-stability-v061.css`: переливание больше не перемещает широкий pseudo-element за пределы rank badge; блик анимирует background-position внутри clip-mask самой плашки. Crest/wings не обрезаются.
+- Frontend/menu marker = `20260824-v061-visual-stability1`; Telegram menu подтверждён. Существующий deployment `Таблица ЧП 1.3` сохранён, temporary invoker удалён, live Apps Script mirror синхронизирован.
+- Device acceptance: оставить приложение открытым минимум 45–60 секунд на нескольких страницах и проверить отсутствие периодического twitch; отдельно проверить, что shimmer остаётся внутри плашки звания.

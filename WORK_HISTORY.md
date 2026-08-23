@@ -377,3 +377,17 @@ searchKeys и searchIndexVersion.
 - Release marker `20260823-v061-specnaz-layout2` опубликован в app entrypoint/runtime.
 - Исправлен сам deployment verifier: старый shell pipeline сочетал pipe с heredoc, поэтому Python получал не JSON ответа, а собственный stdin и всегда завершался ошибкой.
 - Корректная повторная проверка подтвердила bot menu `20260823-v061-specnaz-layout2`; temporary invoker удалён и live mirror синхронизирован.
+
+
+---
+
+### 24.08.2026 — устранение периодического twitch и overflow переливания звания [V061_VISUAL_STABILITY_20260824]
+
+**Симптом:** на видео интерфейс кратко дёргается по всему Mini App; два эпизода разделены примерно 20.6 сек. Световое переливание rank badge визуально выходит далеко за границы плашки.
+
+**Выполнено:**
+- не меняя rollback v0.5.59, добавлен v0.6.1 boot-guard, который не даёт legacy rank module зарегистрировать 1.6-секундный global geometry poll и его scroll/resize geometry listeners;
+- вместо него установлен `IntersectionObserver`, который активирует анимацию только у реально видимых rank badges и не заставляет длинные списки периодически пересчитывать layout;
+- shimmer переписан с `translateX()` широкого pseudo-element на background-position внутри фиксированной rounded clip-mask; декоративные элементы звания снаружи плашки сохранены;
+- `app.html` / `app-v0601.html` / общий runtime / changelog переведены на `20260824-v061-visual-stability1`;
+- Telegram menu cache-bust применён через существующий `Таблица ЧП 1.3`, temporary route удалён, live Apps Script mirror синхронизирован.
