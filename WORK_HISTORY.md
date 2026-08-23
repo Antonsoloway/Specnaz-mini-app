@@ -6,6 +6,41 @@
 > номера строк и before/after payload хранятся только в приватном operational
 > handoff и admin journal.
 
+## 2026-08-23 13:38 — v0.6.1: восстановление Telegram-аватаров без snapshot fileId
+
+**Задача:** исправить карточки участников, у которых в Mini App показывалась
+буквенная заглушка, хотя в Telegram у пользователя есть фото профиля.
+
+**Диагноз:** свежий snapshot подтверждает, что у части действующих участников
+`avatarFileId` пустой. Старый `/avatar?telegramId=...` считал это окончательным
+отсутствием аватара и возвращал `AVATAR_NOT_FOUND`, поэтому frontend после
+нескольких retry оставлял placeholder. Persistent IndexedDB cache и DOM
+карточек сами по себе не были причиной.
+
+**Исправление:**
+- добавлен Worker wrapper `entry-v1310.js` / version `1.31.0`;
+- штатный avatar route остаётся первым и не меняется для записей с fileId;
+- только после authenticated `AVATAR_NOT_FOUND` Worker повторно подтверждает
+  участника через разрешённый snapshot и делает on-demand
+  `getUserProfilePhotos` через Telegram Bot API;
+- выбранный Telegram photo обслуживается через существующий защищённый
+  `/avatar?fileId=...` flow; bot token и fileId в браузер не передаются;
+- массового avatar prewarm нет, frontend продолжает использовать общий
+  persistent cache и прежний network concurrency limit;
+- `worker/wrangler.toml` переключён на `src/entry-v1310.js`.
+
+**Коммиты:** `d5b8055` — новый Worker fallback; `a34b6bd` — активный Worker
+entrypoint; `2e3b877` — синхронизация `CURRENT_STATE.md` с v0.6.1 и hotfix.
+
+**Проверка:** проблемный класс записей подтверждён на актуальном snapshot;
+новый Worker-файл прошёл `node --check`, после commit файлы повторно прочитаны
+из GitHub `main`. Если Telegram не отдаёт фото из-за privacy/API, сохраняется
+прежний 404/placeholder contract.
+
+**Граница rollout:** repo обновлён. Cloudflare production `/health` и реальный
+Telegram WebView после auto-build в этом чате независимо не подтверждены;
+GitHub commit не считается production-доказательством.
+
 ## 2026-08-22 09:30 — публичный handoff синхронизирован и обезличен
 
 **Задача:** привести публичную документацию к фактическим версиям frontend,
