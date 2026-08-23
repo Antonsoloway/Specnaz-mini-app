@@ -22,15 +22,16 @@
 - data repo: `Antonsoloway/royal-crm-data`;
 - постоянный entrypoint: `app.html`;
 - обычный запуск → **`app-v0601.html` / release v0.6.1**;
-- `app-v0601.html` сохраняет query/hash и передаёт запуск в общий runtime `app-v0600.html` с `releaseBuild=20260823-v061-entry`;
+- `app-v0601.html` сохраняет query/hash и передаёт запуск в общий runtime `app-v0600.html` с `releaseBuild=20260823-v061-snapshot-resilience1`;
 - `app-v0559.html` / v0.5.59 сохранён как rollback target, но больше не является текущей default-версией;
 - bot: `@doveofpeace_bot`.
 
 Текущий release delivery:
-- `app.html` → `app-v0601.html`, cache marker **`20260823-v061-entry`**;
+- `app.html` → `app-v0601.html`, cache marker **`20260823-v061-snapshot-resilience1`**;
 - внешний release номер = **v0.6.1**; общий runtime всё ещё переиспользует `app-v0600.html` и его v0.6-модули;
-- в repo присутствуют `profile-team-link-v061.js` и `changelog-v0601.js`; перед утверждением, что они активны в runtime, проверять их фактическое подключение из конечного entrypoint;
-- `app-v0600.html` на 23.08 использует актуальные startup/music/transport/scroll hotfix cache-busts;
+- `v061-runtime-compat.js` = **`0.6.1-runtime.2`**: защищённый `/snapshot` получает bounded transient retry и один автоматический recovery после исчерпания первой серии;
+- `app-v0600.html` принудительно загружает этот runtime bridge с cache-bust `20260823-v061-snapshot-resilience1`;
+- `profile-team-link-v061.js` и `changelog-v0601.js` подключены из конечного runtime;
 - launch `search + hash` сохраняется на обоих redirect-этапах, Telegram initData теряться не должен;
 - GitHub commit и release entrypoint не считаются доказательством Cloudflare/runtime deploy без отдельной проверки.
 
@@ -244,7 +245,8 @@ Participant metric rankings:
 - team key: `team:<normalized team>\n<normalized game>`;
 - cache-first: memory/disk → network;
 - avatar network concurrency остаётся ≤ 2 в persistent flow;
-- с Worker `1.31.1` отсутствие `avatarFileId` у участника `В чате` больше не означает немедленный буквенный placeholder: после штатного authenticated `AVATAR_NOT_FOUND` Worker повторно подтверждает participant allow-list через `/snapshot`, делает узкий on-demand `getUserProfilePhotos`, выбирает наибольший размер и сам проксирует Telegram image bytes;
+- production Worker `1.32.1` при отсутствии canonical avatarFileId сначала проверяет авторизованный participant allow-list, затем может использовать private last-known registry/private media cache и только после этого live Telegram fallback;
+- private cached avatar bytes и last-known fileId остаются server-side и не раскрываются браузеру;
 - live fileId не передаётся в legacy `/avatar?fileId` route, потому что тот специально разрешает только fileId, уже зафиксированные в snapshot;
 - Telegram fallback не делает массового prewarm и не раскрывает bot token/fileId браузеру;
 - team photo background refresh не чаще ~30 мин;
@@ -259,17 +261,17 @@ Participant metric rankings:
 Frontend Worker origin: `https://royal-crm-miniapp-api.tropical-spoon.workers.dev`.
 
 Repo config на 23.08.2026:
-- `worker/wrangler.toml` → **`src/entry-v1310.js`**;
-- `entry-v1310.js` объявляет Worker **`1.31.1`** и `avatarFallback=telegram-getUserProfilePhotos`;
-- commits hotfix: `d5b8055` (первичный wrapper), `a34b6bd` (переключение wrangler main), `647a4c2` (корректный direct live-photo proxy после snapshot allow-list);
+- `worker/wrangler.toml` → **`src/entry-v1320.js`**;
+- `entry-v1320.js` объявляет production wrapper **`1.32.1`**;
+- avatar contract: `private-media-cache+last-known+telegram-live`, private last-known registry + private GitHub media fallback;
+- wrapper сохраняет базовую auth/snapshot/admin/media реализацию предыдущей цепочки и не меняет существующие admin write policies;
 - Cloudflare Builds настроен на GitHub `main`, root path `/worker`; commit в repo ожидаемо запускает deploy, но GitHub commit сам по себе не является runtime-подтверждением;
-- последняя независимо подтверждённая в документации production-цепочка до этого hotfix сохраняла signed background snapshot refresh и pinned deployment guard;
 - `/admin-data` — admin-only private read;
 - `/admin-write` — authenticated admin mutation;
 - `/admin-team-photo` — protected private media route;
 - public `/snapshot`, `/team-photo`, `/contact-by-id`, auth/media routes не должны регрессировать.
 
-`entry-v1310.js` оборачивает текущий `entry-v1290.js` и не заменяет существующую auth/media реализацию. Live-avatar fallback запускается только после штатного authenticated `AVATAR_NOT_FOUND`, повторно подтверждает присутствие участника в разрешённом snapshot и лишь затем обращается к Telegram Bot API. После `getUserProfilePhotos`/`getFile` Worker проксирует image bytes тем же авторизованным клиентским запросом; discovered live fileId не публикуется и не пытается пройти legacy snapshot-fileId allow-list. Если Telegram не отдаёт фото или privacy не позволяет его получить, сохраняется прежний 404/placeholder contract.
+`entry-v1320.js` сначала повторно авторизует участника через protected `/snapshot`, затем для missing avatar может прочитать private last-known registry и private cached bytes; если private cache не помогает — использует Telegram fallback. Bot token, private fileId и private media paths не выдаются клиенту.
 
 ---
 
@@ -301,6 +303,7 @@ Repo config на 23.08.2026:
 14. Участник не `Вышел`: delete-кнопки нет и прямой `deleteParticipant` отклоняется. `Вышел`: отмена confirm ничего не меняет; подтверждение очищает source-поля, запись исчезает из admin list, formula arrays T/W:AA остаются.
 15. Команда `Активен`/`На паузе`, `Неактивен` с E>0 или с фактической membership-ссылкой: delete запрещён. Только `Неактивен` + E=0 + refs=0 после confirm очищает A:D и исчезает из admin list; E:L formulas остаются.
 16. Проверить Android и iPhone/iPad Telegram WebView.
+17. Для startup snapshot: краткий сетевой `Failed to fetch`/429/502/503/504 не должен сразу оставлять пользователя на degraded screen; runtime делает bounded retry и один automatic recovery. Если все попытки реально исчерпаны, ограниченный режим остаётся доступен.
 
 ---
 
@@ -332,7 +335,8 @@ Repo config на 23.08.2026:
 - **admin team roster participant navigation must resolve to admin participant detail before legacy ordinary avatar-pointer and `.team-member` click routers; `@username` remains an independent action;**
 - admin participant detail from private snapshot + U/AB/AC/AD rankings;
 - admin team detail from private snapshot including inactive;
-- admin team metric rankings E/F/H/I/J/K from full private team set.
+- admin team metric rankings E/F/H/I/J/K from full private team set;
+- v0.6.1 startup snapshot resilience: transient Worker/network errors are retried client-side before degraded mode is treated as final.
 
 После принятой/проверенной правки обязательно обновлять этот файл и добавлять новую верхнюю запись в `WORK_HISTORY.md`.
 
@@ -349,7 +353,6 @@ Repo config на 23.08.2026:
 - После операции live Apps Script повторно синхронизирован в `apps-script-live/`.
 - Предыдущий final recovery остановился на небезопасном shell heredoc при записи handoff; эта версия пишет handoff через Python без shell command substitution.
 
-
 ---
 
 ## v0.6.1 own-profile team navigation — 23.08.2026 [V061_SELF_PROFILE_TEAM_LINK_20260823]
@@ -362,7 +365,6 @@ Repo config на 23.08.2026:
 - `changelog-v0601.js` дополнен этой возможностью.
 - Изменение frontend-only; Sheets/CRM данные не изменялись. Device smoke перехода из своей карточки остаётся acceptance check пользователя.
 
-
 ---
 
 ## Security hardening — 23.08.2026 [SECURITY_SHEETS_WEBHOOK_STAGE_20260823]
@@ -374,7 +376,6 @@ Repo config на 23.08.2026:
 - Начата безопасная staged rotation: новый current secret хранится только в Script Properties/локальном защищённом файле Cloud Shell; прежний secret временно принят как previous, чтобы не остановить действующий ChatKeeper webhook до переключения отправителя.
 - Финальный security шаг: заменить secret в ChatKeeper на новый current, затем удалить previous property отдельным финализатором.
 
-
 ---
 
 ## Webhook secret rotation finalized — 23.08.2026 [SECURITY_WEBHOOK_ROTATION_FINAL_20260823]
@@ -383,3 +384,14 @@ Repo config на 23.08.2026:
 - `ROYAL_CRM_WEBHOOK_SECRET_PREVIOUS` удалён из Script Properties; публично раскрытый legacy credential больше не принимается.
 - Единственный действующий webhook secret хранится только в Script Properties; в текущем public Apps Script mirror literal credential отсутствует.
 - Existing deployment `Таблица ЧП 1.3` сохранён; temporary migration route удалён.
+
+---
+
+## v0.6.1 snapshot startup resilience — 23.08.2026 [V061_SNAPSHOT_RESILIENCE_20260823]
+
+- Повторяющийся startup screen `Данные пока не загрузились / Failed to fetch` локализован в public `/snapshot` path: auth уже мог быть успешным, но transport выполнял snapshot network request только один раз.
+- `v061-runtime-compat.js` обновлён до `0.6.1-runtime.2` и оборачивает только Worker `/snapshot`: повторяет transient network failure и HTTP 429/502/503/504 с коротким bounded backoff.
+- Если первая серия всё же исчерпана и lifecycle выдаёт `snapshot-error`, выполняется один automatic background `reloadSnapshot()`; успешный `snapshot-ready` сам закрывает degraded startup без обязательного ручного нажатия.
+- Auth/admin-write/admin-data/media contracts не менялись; security lockdown Sheets и webhook secret rotation не откатывались.
+- `app.html`, `app-v0601.html`, runtime bridge и changelog переведены на cache marker `20260823-v061-snapshot-resilience1`.
+- `changelog-v0601.js` дополнен этой правкой; требуется device smoke повторным закрытием/открытием Mini App через Telegram.
