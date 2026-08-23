@@ -282,3 +282,12 @@ searchKeys и searchIndexVersion.
 - live Apps Script mirror синхронизирован после rollout.
 
 **Проверка:** repo/runtime delivery подготовлены; финальный device smoke — на главной нажать плашку своей команды и убедиться, что открылась карточка именно нужной игры.
+
+
+---
+
+### 23.08.2026 18:40+03 — Sheets lockdown + webhook credential staging [SECURITY_SHEETS_WEBHOOK_STAGE_20260823]
+
+**Выполнено:** обе production-таблицы закрыты от anonymous link access; live Apps Script сохранён на существующем deployment; webhook credential вынесен из публичного кода в Script Properties; включено dual-secret окно ротации без остановки действующих webhook-событий; live mirror после push синхронизирован обратно в GitHub.
+
+**Важно:** новый secret нигде не коммитится и не пишется в handoff. Старый public credential остаётся временно валиден только как `previous` до ручного переключения ChatKeeper, после чего должен быть удалён финализатором.

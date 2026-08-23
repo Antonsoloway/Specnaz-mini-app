@@ -361,3 +361,15 @@ Repo config на 23.08.2026:
 - Release/cache marker = `20260823-v061-self-team-link1`; Telegram menu verification = **CONFIRMED**.
 - `changelog-v0601.js` дополнен этой возможностью.
 - Изменение frontend-only; Sheets/CRM данные не изменялись. Device smoke перехода из своей карточки остаётся acceptance check пользователя.
+
+
+---
+
+## Security hardening — 23.08.2026 [SECURITY_SHEETS_WEBHOOK_STAGE_20260823]
+
+- Обе рабочие Google Sheets переведены из `anyone:writer` в Restricted; Drive metadata после изменения показывает только owner permission и `shared=false`.
+- Это не меняет runtime-модель: Apps Script deployment `Таблица ЧП 1.3` остаётся `executeAs=USER_DEPLOYING`, поэтому `SpreadsheetApp.openById(...)` продолжает работать от имени владельца.
+- Публичный Apps Script web-app endpoint не закрывался: внешний API по-прежнему требует доступ через deployment, а не прямой доступ к Sheets.
+- Hardcoded webhook credential удалён из текущего live source и перенесён в Script Properties.
+- Начата безопасная staged rotation: новый current secret хранится только в Script Properties/локальном защищённом файле Cloud Shell; прежний secret временно принят как previous, чтобы не остановить действующий ChatKeeper webhook до переключения отправителя.
+- Финальный security шаг: заменить secret в ChatKeeper на новый current, затем удалить previous property отдельным финализатором.

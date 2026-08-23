@@ -145,3 +145,9 @@ Admin-preview `v0.6.0` дополнительно использует:
 - production Worker `1.28.0` держит endpoint fail-closed и запускает signed snapshot refresh через `ctx.waitUntil()` после committed app write.
 
 Все предыдущие версии сохраняются в истории изменений без удаления.
+
+
+## Security invariants
+
+- Production Google Sheets MUST remain Restricted: no `anyone` reader/writer permission; Apps Script accesses them as the deploying owner.
+- Secrets/tokens/webhook credentials MUST live only in Script Properties, Cloudflare secrets or another private secret store; literal credentials are forbidden in public GitHub source/mirror/docs.
