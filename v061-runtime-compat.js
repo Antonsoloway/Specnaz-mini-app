@@ -2,7 +2,61 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.6.1-runtime.1';
+  const VERSION = '0.6.1-runtime.2';
+  const WORKER_ORIGIN = 'https://royal-crm-miniapp-api.tropical-spoon.workers.dev';
+  const SNAPSHOT_RETRY_DELAYS_MS = [250, 700];
+  let snapshotFetchWrapped = false;
+  let snapshotRecoveryAttempts = 0;
+  let snapshotRecoveryTimer = 0;
+
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  function isSnapshotRequest(input) {
+    try {
+      const raw = typeof input === 'string' ? input : String(input?.url || '');
+      if (!raw.startsWith(WORKER_ORIGIN)) return false;
+      return new URL(raw).pathname === '/snapshot';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function isRetryableSnapshotResponse(response) {
+    return [429, 502, 503, 504].includes(Number(response?.status || 0));
+  }
+
+  function installSnapshotFetchRetry() {
+    if (snapshotFetchWrapped || typeof window.fetch !== 'function') return;
+    snapshotFetchWrapped = true;
+    const upstreamFetch = window.fetch.bind(window);
+
+    window.fetch = async function royalV061SnapshotFetch(input, init) {
+      if (!isSnapshotRequest(input)) return upstreamFetch(input, init);
+
+      let lastError = null;
+      let lastResponse = null;
+      const attempts = SNAPSHOT_RETRY_DELAYS_MS.length + 1;
+
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        try {
+          const response = await upstreamFetch(input, init);
+          lastResponse = response;
+          if (!isRetryableSnapshotResponse(response) || attempt === attempts - 1) return response;
+          console.warn(`Snapshot HTTP ${response.status}; retry ${attempt + 1}/${attempts - 1}`);
+        } catch (error) {
+          lastError = error;
+          if (attempt === attempts - 1) throw error;
+          console.warn(`Snapshot fetch failed; retry ${attempt + 1}/${attempts - 1}:`, error?.code || error?.message || error);
+        }
+        await sleep(SNAPSHOT_RETRY_DELAYS_MS[attempt] || 0);
+      }
+
+      if (lastResponse) return lastResponse;
+      throw lastError || new Error('SNAPSHOT_FETCH_FAILED');
+    };
+  }
 
   function exposeRuntime() {
     if (window.RoyalAppV0600?.fetchProtectedMediaObjectUrl) return true;
@@ -48,6 +102,21 @@
     }
   }
 
+  function scheduleSnapshotRecovery() {
+    if (snapshotRecoveryAttempts >= 1 || snapshotRecoveryTimer) return;
+    snapshotRecoveryAttempts += 1;
+    snapshotRecoveryTimer = window.setTimeout(async () => {
+      snapshotRecoveryTimer = 0;
+      try {
+        if (!window.RoyalAppV0600?.reloadSnapshot) return;
+        await window.RoyalAppV0600.reloadSnapshot();
+      } catch (error) {
+        console.warn('v0.6.1 automatic snapshot recovery failed', error?.code || error?.message || error);
+      }
+    }, 900);
+  }
+
+  installSnapshotFetchRetry();
   exposeRuntime();
   replayLifecycle();
 
@@ -55,7 +124,15 @@
     exposeRuntime();
     replayLifecycle();
   });
-  window.addEventListener('royal:snapshot-ready', () => replayLifecycle());
+  window.addEventListener('royal:snapshot-ready', () => {
+    snapshotRecoveryAttempts = 0;
+    if (snapshotRecoveryTimer) {
+      clearTimeout(snapshotRecoveryTimer);
+      snapshotRecoveryTimer = 0;
+    }
+    replayLifecycle();
+  });
+  window.addEventListener('royal:snapshot-error', () => scheduleSnapshotRecovery());
 
   setTimeout(replayLifecycle, 0);
   setTimeout(replayLifecycle, 500);
