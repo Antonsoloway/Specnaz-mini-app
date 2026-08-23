@@ -30,7 +30,8 @@
 const CRM_VERSION = '2.2.6';
 const COMPATIBLE_STRUCTURE_VERSIONS = ['2.0.0', '2.0.1', '2.0.2', '2.1', '2.1.1', '2.2', '2.2.0', '2.2.1', '2.2.2', '2.2.3', '2.2.4', '2.2.5', '2.2.6'];
 const SPREADSHEET_ID = '1kkADcKysWdoGy95O36z9jCaoGUUHN0g4XH4LwVtAK_o';
-const SECRET = 'mayak_crm_2026';
+const ROYAL_CRM_WEBHOOK_SECRET_CURRENT_PROP = 'ROYAL_CRM_WEBHOOK_SECRET_CURRENT';
+const ROYAL_CRM_WEBHOOK_SECRET_PREVIOUS_PROP = 'ROYAL_CRM_WEBHOOK_SECRET_PREVIOUS';
 
 const SHEET_BASE = 'База участников';
 const SHEET_TEAMS = 'Команды';
@@ -117,6 +118,28 @@ const ROLE_HELPER_FIRST_COL = 3; // C
 const ROLE_HELPER_WIDTH_PER_SLOT = 3;
 const NO_TEAM_OPTION = 'НЕТ КОМАНДЫ';
 
+function royalWebhookSecretSafeEqual_(left, right) {
+  left = String(left || '');
+  right = String(right || '');
+  if (!left || !right) return false;
+  var max = Math.max(left.length, right.length);
+  var diff = left.length ^ right.length;
+  for (var i = 0; i < max; i += 1) {
+    diff |= left.charCodeAt(i % left.length) ^ right.charCodeAt(i % right.length);
+  }
+  return diff === 0;
+}
+
+function royalWebhookSecretMatch_(candidate) {
+  var props = PropertiesService.getScriptProperties();
+  var current = String(props.getProperty(ROYAL_CRM_WEBHOOK_SECRET_CURRENT_PROP) || '').trim();
+  var previous = String(props.getProperty(ROYAL_CRM_WEBHOOK_SECRET_PREVIOUS_PROP) || '').trim();
+  var value = String(candidate || '').trim();
+  if (royalWebhookSecretSafeEqual_(value, current)) return 'current';
+  if (royalWebhookSecretSafeEqual_(value, previous)) return 'previous';
+  return '';
+}
+
 function doGet(e) {
   // Telegram Mini App UI: HtmlService на том же Apps Script, без CORS/JSONP.
   if (
@@ -171,7 +194,8 @@ function processWebhookImmediately_(e) {
     ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     logRef = startWebhookLog_(ss, event, eventKey, raw, data);
 
-    if (clean_(data.secret) !== SECRET) {
+    const webhookSecretSlot = royalWebhookSecretMatch_(data.secret);
+    if (!webhookSecretSlot) {
       result = { status: 'WRONG_SECRET' };
     } else if (!isRoyalCrmV2Ready_(ss)) {
       result = {

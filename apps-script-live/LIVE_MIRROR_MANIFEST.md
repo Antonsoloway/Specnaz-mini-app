@@ -1,14 +1,14 @@
 # Live Apps Script mirror
 
 > Generated from the live Apps Script project via `clasp pull`.
-> Generated at: 2026-08-23T15:12:53+00:00
+> Generated at: 2026-08-23T15:48:50+00:00
 > Local source folder: `~/table-chp-1.3`
 > `.clasp.json`, Script Properties, bot tokens, GitHub tokens and other secrets are intentionally NOT stored here.
 
 ## Files and SHA-256
 
 ```text
-43d5647734f76c8c1ad1467eddb91f15926d07dee7f01b25b19cec3835b5c9ee  01_CORE_MAIN.js
+40ca69799d89c80752dc357e79a019569a4d391722319820078480e20eace187  01_CORE_MAIN.js
 57750bbb1ca4c061958c4cbff4218df3f2df66fbf7d15aa920b38e55789b89a1  02_PUBLIC_SYNC_V4.js
 bd18f01e17c53c400a19f75e19d5b613a4a4e7fe7ed0963b71a54247b10f7cf7  04_TELEGRAM_AVATARS.js
 3dda61e3bd89d484cf8d70a61c953236a651c782f49f3c81b0404e0d2a90c9dc  05_RELIABLE_WEBHOOK_QUEUE.js
