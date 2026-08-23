@@ -1,7 +1,7 @@
 # Live Apps Script mirror
 
 > Generated from the live Apps Script project via `clasp pull`.
-> Generated at: 2026-08-23T19:54:24+00:00
+> Generated at: 2026-08-23T20:26:54+00:00
 > Local source folder: `~/table-chp-1.3`
 > `.clasp.json`, Script Properties, bot tokens, GitHub tokens and other secrets are intentionally NOT stored here.
 
@@ -28,7 +28,7 @@ da7af8d8f0ad0d2b48819975db8de10db5b0b425e9c38f14ed90af7ae755e0ee  15_MINIAPP_MED
 f12f183220f0718cf82987c0d11ac6da45cb88c5ff137a3361fde791ff6c85f2  19_MINIAPP_FALLBACK_API.js
 fcf2a2c907d56296f8b46a48c2b3032e2a8fd708071faecde6d060e4302c475e  20_MINIAPP_TEAM_IDENTITY_MIGRATION.js
 a990a460c01c776c447e855e2b43969b8919a06dbb3526fcd556687c73737fa2  21_MINIAPP_START_WELCOME.js
-b496ebb71c19b1f6648cb2bf935c6bc05edf42ddcd225f9c1055d0c77a6216e3  22_MINIAPP_BOT_APP_MENU.js
+30d2a93544d50e7dbfbd6047509ba07ee712fd630f1fbd37685fec09bcc2563d  22_MINIAPP_BOT_APP_MENU.js
 b9aba9427c1d255cf06687fa87d0b3b7726e8ccba344266cf7f9f7c58e29e965  23_MINIAPP_PROFILE_STATS.js
 f1d0ea5b88e5e8d72d737ab8dd87251a700d08eebec5718d490a7994a1f93cce  24_MINIAPP_SPECNAZ_HISTORY.js
 b5e9e40de6904bc4db0295f2fdcf0f5fb26996e1ac84fb58f8bc2298fa8416f1  25_MINIAPP_UNIFIED_SNAPSHOT.js
