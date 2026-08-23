@@ -477,7 +477,7 @@ document.addEventListener('click', e => {
   if (userButton) openUserMenu(userButton.dataset.userMenu, userButton.dataset.userName);
 });
 
-if (BUILD === '0.6.0') {
+if (/^0\.6\./.test(BUILD)) {
   window.RoyalAppV0600 = {
     version: BUILD,
     fetchProtectedMediaObjectUrl: protectedMediaObjectUrl,
