@@ -1,12 +1,12 @@
 /* Royal CRM / Таблица ЧП — 22_MINIAPP_BOT_APP_MENU.js v1.0.36 */
-var MINIAPP_BOT_APP_MENU_VERSION = '1.0.38';
+var MINIAPP_BOT_APP_MENU_VERSION = '1.0.39';
 var MINIAPP_BOT_APP_URL = 'https://antonsoloway.github.io/Specnaz-mini-app/app.html';
 function MINIAPP_setupBotAppMenu() {
   var props=PropertiesService.getScriptProperties();
   var token=String(props.getProperty('TELEGRAM_BOT_TOKEN')||props.getProperty('BOT_TOKEN')||'').trim();
   if(!token) throw new Error('Telegram bot token property is missing');
   var gasUrl=String(ScriptApp.getService().getUrl()||'').trim();
-  var appUrl=MINIAPP_BOT_APP_URL+'?cb=20260823-v061-self-team-link1';
+  var appUrl=MINIAPP_BOT_APP_URL+'?cb=20260823-v061-history-link2';
   if(gasUrl) appUrl+='&gas='+encodeURIComponent(gasUrl);
   var api='https://api.telegram.org/bot'+token+'/';
   var commands=MINIAPP_botAppMenuCall_(api+'setMyCommands',{commands:[{command:'start',description:'🚀 Открыть приложение'}],scope:{type:'all_private_chats'}});
