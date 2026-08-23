@@ -1,5 +1,5 @@
 name = "royal-crm-miniapp-api"
-main = "src/entry-v1310.js"
+main = "src/entry-v1320.js"
 compatibility_date = "2026-08-15"
 
 [vars]
@@ -42,4 +42,8 @@ invocation_logs = true
 # fallback: when an allowed in-chat participant has no avatarFileId in the
 # snapshot, Worker asks Telegram getUserProfilePhotos/getFile on demand and
 # proxies the image bytes server-side after the protected snapshot allow-list.
-# The discovered live fileId/token/file path are never exposed to the browser.
+#
+# entry-v1320 additionally checks the private data-repo last-known avatar
+# registry before live Bot API lookup. This preserves historical file_id values
+# for participants whose daily getUserProfilePhotos refresh currently returns
+# USER_NOT_FOUND, without exposing private IDs/file IDs in the public repo.
