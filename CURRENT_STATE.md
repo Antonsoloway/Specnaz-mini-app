@@ -182,7 +182,7 @@ Participant metric rankings:
 - row показывает место, имя, chat/status, первые memberships и выбранное значение;
 - текущий участник подсвечивается;
 - tap по строке рейтинга → admin participant detail;
-- avatars намеренно не грузятся для всех ranking rows, чтобы не делать media prewarm;
+- avatars намеренно не грузятся для всех 207 ranking rows, чтобы не делать media prewarm;
 - Back использует существующий `RoyalNav` capture.
 
 ### Admin team list/detail
@@ -244,7 +244,8 @@ Participant metric rankings:
 - team key: `team:<normalized team>\n<normalized game>`;
 - cache-first: memory/disk → network;
 - avatar network concurrency остаётся ≤ 2 в persistent flow;
-- с Worker `1.31.0` отсутствие `avatarFileId` у участника `В чате` больше не означает немедленный буквенный placeholder: после authenticated 404 Worker делает узкий on-demand `getUserProfilePhotos`, выбирает наибольший размер и отдаёт изображение через существующий защищённый `/avatar?fileId=...` flow;
+- с Worker `1.31.1` отсутствие `avatarFileId` у участника `В чате` больше не означает немедленный буквенный placeholder: после штатного authenticated `AVATAR_NOT_FOUND` Worker повторно подтверждает participant allow-list через `/snapshot`, делает узкий on-demand `getUserProfilePhotos`, выбирает наибольший размер и сам проксирует Telegram image bytes;
+- live fileId не передаётся в legacy `/avatar?fileId` route, потому что тот специально разрешает только fileId, уже зафиксированные в snapshot;
 - Telegram fallback не делает массового prewarm и не раскрывает bot token/fileId браузеру;
 - team photo background refresh не чаще ~30 мин;
 - без массового сетевого prewarm;
@@ -259,8 +260,8 @@ Frontend Worker origin: `https://royal-crm-miniapp-api.tropical-spoon.workers.de
 
 Repo config на 23.08.2026:
 - `worker/wrangler.toml` → **`src/entry-v1310.js`**;
-- `entry-v1310.js` объявляет Worker **`1.31.0`** и `avatarFallback=telegram-getUserProfilePhotos`;
-- commits hotfix: `d5b8055` (новый wrapper) и `a34b6bd` (переключение wrangler main);
+- `entry-v1310.js` объявляет Worker **`1.31.1`** и `avatarFallback=telegram-getUserProfilePhotos`;
+- commits hotfix: `d5b8055` (первичный wrapper), `a34b6bd` (переключение wrangler main), `647a4c2` (корректный direct live-photo proxy после snapshot allow-list);
 - Cloudflare Builds настроен на GitHub `main`, root path `/worker`; commit в repo ожидаемо запускает deploy, но GitHub commit сам по себе не является runtime-подтверждением;
 - последняя независимо подтверждённая в документации production-цепочка до этого hotfix сохраняла signed background snapshot refresh и pinned deployment guard;
 - `/admin-data` — admin-only private read;
@@ -268,7 +269,7 @@ Repo config на 23.08.2026:
 - `/admin-team-photo` — protected private media route;
 - public `/snapshot`, `/team-photo`, `/contact-by-id`, auth/media routes не должны регрессировать.
 
-`entry-v1310.js` оборачивает текущий `entry-v1290.js` и не заменяет существующую auth/media реализацию. Live-avatar fallback запускается только после штатного authenticated `AVATAR_NOT_FOUND`, повторно подтверждает присутствие участника в разрешённом snapshot и лишь затем обращается к Telegram Bot API. Если Telegram не отдаёт фото или privacy не позволяет его получить, сохраняется прежний 404/placeholder contract.
+`entry-v1310.js` оборачивает текущий `entry-v1290.js` и не заменяет существующую auth/media реализацию. Live-avatar fallback запускается только после штатного authenticated `AVATAR_NOT_FOUND`, повторно подтверждает присутствие участника в разрешённом snapshot и лишь затем обращается к Telegram Bot API. После `getUserProfilePhotos`/`getFile` Worker проксирует image bytes тем же авторизованным клиентским запросом; discovered live fileId не публикуется и не пытается пройти legacy snapshot-fileId allow-list. Если Telegram не отдаёт фото или privacy не позволяет его получить, сохраняется прежний 404/placeholder contract.
 
 ---
 
@@ -315,6 +316,7 @@ Repo config на 23.08.2026:
 - one persistent media cache identities;
 - avatar canonical cache identity `avatar:<avatarFileId>` + `avatar:tg-<id>` fallback для временно отсутствующего fileId;
 - authenticated live Telegram avatar fallback не должен обходить snapshot membership/auth и не должен превращаться в массовый prewarm;
+- live Telegram avatar discovered fileId не должен отправляться через legacy `/avatar?fileId` snapshot allow-list; proxy разрешён только после participant allow-list и остаётся server-side;
 - iOS source-preservation guard;
 - `Связаться` только через Worker/Голубца;
 - existing-participant server whitelist `name + memberships`;
