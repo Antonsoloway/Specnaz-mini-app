@@ -1,5 +1,5 @@
 name = "royal-crm-miniapp-api"
-main = "src/entry-v1290.js"
+main = "src/entry-v1310.js"
 compatibility_date = "2026-08-15"
 
 [vars]
@@ -33,7 +33,12 @@ invocation_logs = true
 # Media identity remains SHA-256(name + game); browser persistence stays in
 # royal-crm-media-cache.
 # Cloudflare Builds source: GitHub main, root path /worker.
-
+#
 # entry-v1290 preserves the v1.28 signed background snapshot refresh, adds the
 # authenticated v0.6 background-music asset, and keeps the Apps Script one-off
 # clock trigger plus unified five-minute trigger as durable fallbacks.
+#
+# entry-v1310 keeps all existing routes and adds a narrow authenticated avatar
+# fallback: when an in-chat participant has no avatarFileId in snapshot.json,
+# Worker asks Telegram getUserProfilePhotos on demand and serves the newest
+# available profile photo through the existing protected /avatar fileId route.
