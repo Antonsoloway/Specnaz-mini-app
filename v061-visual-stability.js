@@ -1,11 +1,11 @@
 /* Royal CRM v0.6.1 — rank/compositor visual stability for Telegram WebView.
- * Replaces the legacy periodic viewport scan with IntersectionObserver.
+ * Replaces legacy periodic/scroll viewport scans with IntersectionObserver.
  */
 (() => {
   if (String(window.__ROYAL_BUILD__ || '') !== '0.6.1') return;
 
-  const VERSION = '0.6.1-visual-stability.1';
-  const suppressed = Number(window.RoyalV061RankIntervalGuard?.restore?.() || 0);
+  const VERSION = '0.6.1-visual-stability.2';
+  const suppressed = window.RoyalV061RankIntervalGuard?.restore?.() || { intervals:0, listeners:0 };
   const observed = new WeakSet();
   let observer = null;
   let mutationObserver = null;
@@ -68,7 +68,7 @@
       mutationObserver.observe(document.documentElement, { childList: true, subtree: true });
     }
   } else {
-    /* Rare fallback: keep the existing scroll/resize listeners but do not recreate the timer. */
+    /* Rare fallback: one layout pass only; no periodic timer is recreated. */
     try { window.RoyalRank?.refreshVisible?.(); } catch (_) {}
   }
 
@@ -80,7 +80,8 @@
 
   window.RoyalV061VisualStability = {
     version: VERSION,
-    suppressedLegacyRankIntervals: suppressed,
+    suppressedLegacyRankIntervals: Number(suppressed.intervals || 0),
+    suppressedLegacyRankListeners: Number(suppressed.listeners || 0),
     refresh() { queueRegister(document.documentElement); }
   };
 })();
