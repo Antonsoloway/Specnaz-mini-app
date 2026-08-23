@@ -291,3 +291,10 @@ searchKeys и searchIndexVersion.
 **Выполнено:** обе production-таблицы закрыты от anonymous link access; live Apps Script сохранён на существующем deployment; webhook credential вынесен из публичного кода в Script Properties; включено dual-secret окно ротации без остановки действующих webhook-событий; live mirror после push синхронизирован обратно в GitHub.
 
 **Важно:** новый secret нигде не коммитится и не пишется в handoff. Старый public credential остаётся временно валиден только как `previous` до ручного переключения ChatKeeper, после чего должен быть удалён финализатором.
+
+
+---
+
+### 23.08.2026 — webhook secret rotation finalized [SECURITY_WEBHOOK_ROTATION_FINAL_20260823]
+
+После переключения ChatKeeper на новый secret удалён temporary previous credential из Script Properties. Live Apps Script повторно синхронизирован в GitHub, hardcoded credential в current source отсутствует, существующий deployment сохранён.

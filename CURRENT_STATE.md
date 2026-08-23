@@ -373,3 +373,13 @@ Repo config на 23.08.2026:
 - Hardcoded webhook credential удалён из текущего live source и перенесён в Script Properties.
 - Начата безопасная staged rotation: новый current secret хранится только в Script Properties/локальном защищённом файле Cloud Shell; прежний secret временно принят как previous, чтобы не остановить действующий ChatKeeper webhook до переключения отправителя.
 - Финальный security шаг: заменить secret в ChatKeeper на новый current, затем удалить previous property отдельным финализатором.
+
+
+---
+
+## Webhook secret rotation finalized — 23.08.2026 [SECURITY_WEBHOOK_ROTATION_FINAL_20260823]
+
+- ChatKeeper sender переведён на новый webhook secret.
+- `ROYAL_CRM_WEBHOOK_SECRET_PREVIOUS` удалён из Script Properties; публично раскрытый legacy credential больше не принимается.
+- Единственный действующий webhook secret хранится только в Script Properties; в текущем public Apps Script mirror literal credential отсутствует.
+- Existing deployment `Таблица ЧП 1.3` сохранён; temporary migration route удалён.
