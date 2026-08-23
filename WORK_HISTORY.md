@@ -351,3 +351,19 @@ searchKeys и searchIndexVersion.
 - CSS не даёт rank/achievement strip перекрывать имя на узких Android экранах;
 - `app.html` → `app-v0601.html` → `app-v0600.html` переведены на `20260823-v061-identity2`; Telegram menu verification = `CONFIRMED`;
 - changelog v0.6.1 дополнен.
+
+
+---
+
+### 23.08.2026 — расширение карточек героев и истории спецназа [V061_SPECNAZ_LAYOUT_20260823]
+
+**Запрос:** после добавления полной participant identity убрать наложение имени/звания/Telegram-данных; если контент не помещается, увеличивать карточку. То же применить к истории спецназа и сделать карточки шире.
+
+**Выполнено:**
+- создан v0.6.1-only `specnaz-layout-v061.css`;
+- hero/history lists выходят ближе к краям panel без изменения глобального shell;
+- hero card на телефонах переведён в grid: место + avatar остаются слева, identity получает полноценную ширину, achievement/rank идёт под именем, score — отдельной строкой;
+- history head на телефонах переведён в grid с отдельной строкой rank и переносимыми identity fields;
+- длинные имена, username, Telegram display name, team/message и scoreline не должны обрезаться/накладываться;
+- `app.html` / `app-v0601.html` / runtime CSS cache переведены на `20260823-v061-specnaz-layout1`;
+- Telegram menu cache обновлён, live Apps Script mirror синхронизирован.

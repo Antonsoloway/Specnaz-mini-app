@@ -420,3 +420,19 @@ Repo config на 23.08.2026:
 - Rollback v0.5.59 не изменён: новый модуль исполняется только при `__ROYAL_BUILD__ === '0.6.1'`.
 - Release/cache marker = `20260823-v061-identity2`; Telegram menu verification = **CONFIRMED**.
 - Device smoke всех основных participant surfaces остаётся acceptance check пользователя.
+
+
+- v0.6.1 participant identity consistency: device smoke подтверждён пользователем 23.08.2026 — отображение CRM-имени, @username и Telegram-имени принято.
+
+
+---
+
+## v0.6.1 Specnaz roomy cards — 23.08.2026 [V061_SPECNAZ_LAYOUT_20260823]
+
+- Добавлен `specnaz-layout-v061.css`, исполняемый только через текущий v0.6.1 entrypoint.
+- `Герои спецназа`: карточки используют больше ширины panel; на мобильном имя/achievement strip/@username/Telegram name идут устойчивым вертикальным потоком, score переносится в отдельную grid-строку и карточка растёт по высоте.
+- `История спецназа`: список и строки расширены; identity + rank на узких экранах раскладываются в отдельные строки, scoreline умеет переноситься.
+- Ничего не должно обрезаться или накладываться; длинные строки используют wrap/overflow-wrap.
+- Legacy `specnaz.css` v0.5.59 не изменён.
+- Release/cache marker = `20260823-v061-specnaz-layout1`; Telegram menu cache принудительно обновлён через существующий Apps Script deployment `Таблица ЧП 1.3`.
+- Device smoke hero/history layout остаётся acceptance check пользователя.
