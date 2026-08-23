@@ -12,7 +12,7 @@
  * Не объявляет doGet/doPost и не вмешивается в webhook/CRM.
  */
 
-const MINIAPP_SNAPSHOT_VERSION = '1.2.0';
+const MINIAPP_SNAPSHOT_VERSION = '1.2.1';
 const MINIAPP_SNAPSHOT_PROP_REPO = 'DATA_GITHUB_REPO';
 const MINIAPP_SNAPSHOT_PROP_TOKEN = 'DATA_GITHUB_TOKEN';
 const MINIAPP_SNAPSHOT_PROP_BRANCH = 'DATA_GITHUB_BRANCH';
@@ -223,7 +223,10 @@ function MINIAPP_snapshotLoadAvatarFileMap_(ss) {
       const fileId = MINIAPP_snapshotValue_(row[2]);
       const status = MINIAPP_snapshotValue_(row[5]);
       if (!telegramId || !fileId) return;
-      if (status && status !== 'OK') return;
+      // ERROR is non-destructive in 04_TELEGRAM_AVATARS: the previous known file_id is retained.
+      // Export that last-known file_id so Mini App can keep showing the cached/known avatar.
+      // NO_PHOTO and unknown statuses remain excluded.
+      if (status && status !== 'OK' && status !== 'ERROR') return;
       out[telegramId] = fileId;
     });
   } catch (error) {
