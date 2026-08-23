@@ -367,3 +367,13 @@ searchKeys и searchIndexVersion.
 - длинные имена, username, Telegram display name, team/message и scoreline не должны обрезаться/накладываться;
 - `app.html` / `app-v0601.html` / runtime CSS cache переведены на `20260823-v061-specnaz-layout1`;
 - Telegram menu cache обновлён, live Apps Script mirror синхронизирован.
+
+
+---
+
+### 23.08.2026 — выравнивание ачивок героев спецназа [V061_SPECNAZ_ACHIEVEMENT_ALIGN_CONFIRMED_20260823]
+
+- Исправлен CSS v0.6.1: общий stack admin/rank/MAYAK прижат вправо, future-slot наследует ту же ширину/выравнивание.
+- Release marker `20260823-v061-specnaz-layout2` опубликован в app entrypoint/runtime.
+- Исправлен сам deployment verifier: старый shell pipeline сочетал pipe с heredoc, поэтому Python получал не JSON ответа, а собственный stdin и всегда завершался ошибкой.
+- Корректная повторная проверка подтвердила bot menu `20260823-v061-specnaz-layout2`; temporary invoker удалён и live mirror синхронизирован.

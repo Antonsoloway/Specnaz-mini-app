@@ -436,3 +436,15 @@ Repo config на 23.08.2026:
 - Legacy `specnaz.css` v0.5.59 не изменён.
 - Release/cache marker = `20260823-v061-specnaz-layout1`; Telegram menu cache принудительно обновлён через существующий Apps Script deployment `Таблица ЧП 1.3`.
 - Device smoke hero/history layout остаётся acceptance check пользователя.
+
+
+---
+
+## v0.6.1 Specnaz achievement alignment — 23.08.2026 [V061_SPECNAZ_ACHIEVEMENT_ALIGN_CONFIRMED_20260823]
+
+- `Герои спецназа`: achievement stack выровнен по правому краю; порядок `Админ → звание → МАЯК`, MAYAK не уезжает влево.
+- Frontend/cache marker = `20260823-v061-specnaz-layout2`.
+- Telegram bot menu URL подтверждён с `20260823-v061-specnaz-layout2` корректным JSON verifier.
+- Предыдущие `AssertionError` были ложным отрицательным результатом verification-script: heredoc занимал stdin Python и не давал ему прочитать JSON из curl.
+- Существующий deployment `Таблица ЧП 1.3` сохранён, временный route удалён, live Apps Script mirror синхронизирован.
+- Device smoke визуального выравнивания остаётся acceptance check пользователя.
