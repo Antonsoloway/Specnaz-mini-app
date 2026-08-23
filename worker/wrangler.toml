@@ -1,5 +1,5 @@
 name = "royal-crm-miniapp-api"
-main = "src/entry-v1350.js"
+main = "src/entry-v1360.js"
 compatibility_date = "2026-08-15"
 
 [vars]
@@ -37,5 +37,11 @@ invocation_logs = true
 # the current session directly, confirms requester + target are both still
 # in-chat in the private snapshot, and only then asks the bot to send the
 # tg://user?id profile button to the requester's private chat.
+#
+# entry-v1360 keeps the same contact path but recognizes Telegram's
+# BUTTON_USER_PRIVACY_RESTRICTED result. That privacy setting is not bypassed:
+# the requester receives a clear privacy explanation instead of a generic
+# server error, and the bot may send the same explanation without a profile
+# button. Normal allowed profile buttons are unchanged.
 #
 # Cloudflare Builds source: GitHub main, root path /worker.
