@@ -1,0 +1,195 @@
+/* Royal CRM Mini App — Specnaz layout hardening for v0.6.1
+ * Roomier hero/history cards after full participant identity was added.
+ * Mobile cards grow vertically instead of clipping or overlapping rank/name/meta.
+ */
+
+/* Use more of the panel width without touching the global app shell. */
+#panel .hero-list,
+#panel .history-list{
+  margin-left:-12px;
+  margin-right:-12px;
+}
+
+/* Heroes: mobile-first, give identity the full useful line and move score below it. */
+#panel .hero-card{
+  display:grid;
+  grid-template-columns:30px 52px minmax(0,1fr);
+  grid-template-rows:auto auto;
+  align-items:center;
+  column-gap:10px;
+  row-gap:4px;
+  min-height:132px;
+  padding:14px 12px;
+  overflow:visible;
+}
+#panel .hero-place{
+  grid-column:1;
+  grid-row:1 / span 2;
+  width:30px;
+  min-width:0;
+  align-self:center;
+}
+#panel .hero-avatar{
+  grid-column:2;
+  grid-row:1 / span 2;
+  align-self:center;
+}
+#panel .hero-main{
+  grid-column:3;
+  grid-row:1;
+  min-width:0;
+  width:100%;
+  align-self:start;
+  padding-top:1px;
+}
+#panel .hero-score{
+  grid-column:3;
+  grid-row:2;
+  justify-self:end;
+  align-self:end;
+  min-width:68px;
+  margin-top:7px;
+}
+
+/* Rank/achievement strip must never share the same horizontal lane with a long name. */
+#panel .hero-main>.participant-name-achievements-row{
+  display:block!important;
+  width:100%!important;
+  min-width:0!important;
+}
+#panel .hero-main>.participant-name-achievements-row>strong,
+#panel .hero-main>.participant-name-achievements-row>.person-title{
+  display:block!important;
+  width:100%!important;
+  max-width:100%!important;
+  white-space:normal!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  overflow-wrap:anywhere!important;
+  word-break:normal!important;
+  line-height:1.12!important;
+}
+#panel .hero-main .participant-achievements-row{
+  display:flex!important;
+  position:static!important;
+  width:100%!important;
+  max-width:100%!important;
+  margin:7px 0 2px!important;
+  justify-content:flex-start!important;
+  align-items:center!important;
+  flex-wrap:wrap!important;
+  gap:5px!important;
+}
+#panel .hero-main .rank-list-slot,
+#panel .hero-main .hero-rank{
+  min-width:0!important;
+  max-width:100%!important;
+}
+#panel .hero-main .rank-badge--compact,
+#panel .hero-main .rank-badge--tiny{
+  max-width:100%!important;
+}
+#panel .hero-main .royal-participant-username-v061,
+#panel .hero-main .telegram-name,
+#panel .hero-main .royal-participant-telegram-name-v061{
+  width:100%;
+  max-width:100%;
+  white-space:normal!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  overflow-wrap:anywhere!important;
+}
+
+/* History: wider rows and vertical identity/rank composition on phones. */
+#panel .history-section{
+  width:100%;
+}
+#panel .history-rows{
+  padding:10px 8px;
+}
+#panel .history-row{
+  width:100%;
+  min-width:0;
+  padding:14px;
+  overflow:visible;
+}
+#panel .history-row-head{
+  display:grid;
+  grid-template-columns:46px minmax(0,1fr);
+  align-items:start;
+  column-gap:11px;
+  row-gap:7px;
+}
+#panel .history-avatar{
+  grid-column:1;
+  grid-row:1 / span 2;
+  width:46px;
+  height:46px;
+  align-self:start;
+}
+#panel .history-person{
+  grid-column:2;
+  grid-row:1;
+  min-width:0;
+}
+#panel .history-person strong,
+#panel .history-person .royal-participant-username-v061,
+#panel .history-person .telegram-name,
+#panel .history-person .royal-participant-telegram-name-v061{
+  max-width:100%;
+  white-space:normal!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  overflow-wrap:anywhere!important;
+}
+#panel .history-rank{
+  grid-column:2;
+  grid-row:2;
+  justify-self:start;
+  max-width:100%;
+  margin:0;
+  white-space:normal;
+}
+#panel .history-scoreline{
+  flex-wrap:wrap;
+  row-gap:6px;
+}
+#panel .history-message,
+#panel .history-team{
+  max-width:100%;
+  overflow-wrap:anywhere;
+  word-break:normal;
+}
+
+/* On wider screens restore score/rank to the right without squeezing identity. */
+@media(min-width:520px){
+  #panel .hero-card{
+    grid-template-columns:34px 52px minmax(0,1fr) 72px;
+    grid-template-rows:auto;
+    min-height:112px;
+  }
+  #panel .hero-place{grid-column:1;grid-row:1;width:34px}
+  #panel .hero-avatar{grid-column:2;grid-row:1}
+  #panel .hero-main{grid-column:3;grid-row:1;align-self:center}
+  #panel .hero-score{grid-column:4;grid-row:1;align-self:center;margin-top:0}
+
+  #panel .history-row-head{
+    grid-template-columns:46px minmax(0,1fr) auto;
+    align-items:center;
+  }
+  #panel .history-avatar{grid-column:1;grid-row:1}
+  #panel .history-person{grid-column:2;grid-row:1}
+  #panel .history-rank{grid-column:3;grid-row:1;justify-self:end}
+}
+
+@media(max-width:380px){
+  #panel .hero-list,
+  #panel .history-list{margin-left:-9px;margin-right:-9px}
+  #panel .hero-card{grid-template-columns:28px 46px minmax(0,1fr);padding:13px 10px;column-gap:9px;min-height:128px}
+  #panel .hero-place{width:28px}
+  #panel .hero-avatar{width:46px;height:46px}
+  #panel .hero-score{min-width:62px}
+  #panel .history-row{padding:13px 11px}
+  #panel .history-row-head{grid-template-columns:42px minmax(0,1fr);column-gap:9px}
+  #panel .history-avatar{width:42px;height:42px}
+}
