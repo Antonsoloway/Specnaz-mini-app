@@ -7,7 +7,9 @@ RAW="https://raw.githubusercontent.com/${REPO}/main"
 EXPECTED_DESC="Таблица ЧП 1.3"
 TARGET_FILE="14_GITHUB_SNAPSHOT_EXPORT.js"
 STAMP="$(date +%Y%m%d-%H%M%S)"
-BACKUP_DIR="$HOME/royal-crm-backups/v061-avatar-snapshot-$STAMP"
+BACKUP_DIR="$HOME/royal-crm-backups/v061-avatar-music-$STAMP"
+TMP_REPO="$(mktemp -d /tmp/royal-v061-repair.XXXXXX)"
+trap 'rm -rf "$TMP_REPO"' EXIT
 
 ok(){ printf '\n✅ %s\n' "$*"; }
 info(){ printf '\n=== %s ===\n' "$*"; }
@@ -44,9 +46,8 @@ printf '%s\n' "$LINE" | grep -q '@HEAD' && fail "Стабильный deployment
 DEPLOY_ID="$(printf '%s\n' "$LINE" | sed -E 's/^[[:space:]]*-[[:space:]]+([^[:space:]]+).*/\1/')"
 [[ "$DEPLOY_ID" =~ ^[A-Za-z0-9_-]{20,}$ ]] || fail "Не удалось извлечь deployment ID"
 
-info "PATCH $TARGET_FILE"
+info "PATCH LIVE APPS SCRIPT AVATAR SNAPSHOT"
 python3 - "$TARGET_FILE" <<'PY'
-import re
 import sys
 from pathlib import Path
 
@@ -74,7 +75,7 @@ PY
 node --check "$TARGET_FILE"
 grep -Fq "const MINIAPP_SNAPSHOT_VERSION = '1.2.1';" "$TARGET_FILE" || fail "version bump missing"
 grep -Fq "status !== 'OK' && status !== 'ERROR'" "$TARGET_FILE" || fail "ERROR last-known policy missing"
-ok "Patch проверен"
+ok "Apps Script patch проверен"
 
 info "CLASP STATUS BEFORE PUSH"
 clasp status
@@ -96,19 +97,97 @@ info "REFRESH UNIFIED SNAPSHOT"
 EXPORT_OUTPUT="$(clasp run MINIAPP_exportUnifiedSnapshotToGitHub 2>&1 || true)"
 [[ -z "$EXPORT_OUTPUT" ]] || printf '%s\n' "$EXPORT_OUTPUT"
 if [[ "$EXPORT_OUTPUT" == *"Exception:"* || "$EXPORT_OUTPUT" == *"Error:"* ]]; then
-  warn "Немедленный clasp run не подтвердился; штатный unified trigger всё равно обновит snapshot. Повторный push не нужен."
+  warn "Немедленный clasp run не подтвердился; штатный unified trigger обновит snapshot. Повторный push не нужен."
 else
   ok "Unified snapshot refresh requested"
 fi
 
-info "SYNC FACTUAL LIVE MIRROR BACK TO GITHUB"
+info "PATCH v0.6.1 FRONTEND: MUSIC RUNTIME + AVATAR CACHE BUST"
+gh repo clone "$REPO" "$TMP_REPO/repo" -- --depth=1 >/dev/null
+cd "$TMP_REPO/repo"
+python3 - <<'PY'
+from pathlib import Path
+
+# The visible 0.6.1 release changed BUILD from 0.6.0 to 0.6.1, while app.js
+# still exposed RoyalAppV0600 only for the exact old value. That made the
+# protected audio loader disappear and music ended in the warning/error state.
+app = Path('app.js')
+text = app.read_text(encoding='utf-8')
+old = "if (BUILD === '0.6.0') {"
+new = "if (/^0\\.6\\./.test(BUILD)) {"
+if new not in text:
+    if text.count(old) != 1:
+        raise SystemExit('[ERROR] app.js v0.6 runtime API guard anchor missing/ambiguous')
+    text = text.replace(old, new, 1)
+app.write_text(text, encoding='utf-8')
+
+html = Path('app-v0600.html')
+text = html.read_text(encoding='utf-8')
+replacements = {
+    'app.js?v=20260823-scroll-gesture-hotfix5': 'app.js?v=20260823-v061-runtime-repair1',
+    'identity-card-ids-v0518.js?v=0.5.59': 'identity-card-ids-v0518.js?v=20260823-v061-avatar-loader2',
+    'changelog-v0601.js?v=20260823-v061-visible-1': 'changelog-v0601.js?v=20260823-v061-runtime-repair1',
+}
+for old, new in replacements.items():
+    if new in text:
+        continue
+    if text.count(old) != 1:
+        raise SystemExit(f'[ERROR] app-v0600 cache anchor missing/ambiguous: {old}')
+    text = text.replace(old, new, 1)
+html.write_text(text, encoding='utf-8')
+
+for filename in ('app.html', 'app-v0601.html'):
+    path = Path(filename)
+    text = path.read_text(encoding='utf-8')
+    old = '20260823-v061-visible-1'
+    new = '20260823-v061-runtime-repair1'
+    if new not in text:
+        if old not in text:
+            raise SystemExit(f'[ERROR] releaseBuild anchor missing in {filename}')
+        text = text.replace(old, new)
+    path.write_text(text, encoding='utf-8')
+
+changelog = Path('changelog-v0601.js')
+text = changelog.read_text(encoding='utf-8')
+needle = "        'Последующие исправления, которые входят в v0.6.1, будут дописываться в эту карточку истории изменений.'"
+items = [
+    "        'Исправлена музыка после перехода на v0.6.1: защищённый runtime API аудио теперь активен для всей ветки 0.6.x, поэтому приватный фон снова загружается с сохранённой настройкой участника.',",
+    "        'Исправлена причина пропадающих аватаров при временной ошибке Telegram: Apps Script snapshot теперь сохраняет последний известный avatar file_id для записей ERROR, но по-прежнему не экспортирует NO_PHOTO.',",
+    "        'Для карточек без avatarFileId принудительно обновлён frontend-loader, чтобы Telegram WebView не использовал старый закэшированный JS.',",
+]
+if items[0] not in text:
+    if needle not in text:
+        raise SystemExit('[ERROR] changelog insertion anchor missing')
+    text = text.replace(needle, '\n'.join(items) + '\n' + needle, 1)
+changelog.write_text(text, encoding='utf-8')
+PY
+
+node --check app.js
+node --check changelog-v0601.js
+node --check identity-card-ids-v0518.js
+git -c core.whitespace=-blank-at-eof diff --check
+git add app.js app-v0600.html app.html app-v0601.html changelog-v0601.js
+if ! git diff --cached --quiet; then
+  git config user.name "Royal CRM v0.6.1 Repair"
+  git config user.email "royal-crm-sync@users.noreply.github.com"
+  git commit -m "Fix v0.6.1 music runtime and avatar delivery" >/dev/null
+  git push origin HEAD:main
+  ok "Frontend v0.6.1 repair pushed"
+else
+  ok "Frontend repair already present"
+fi
+
+info "SYNC FACTUAL LIVE APPS SCRIPT MIRROR BACK TO GITHUB"
+cd "$PROJECT_DIR"
 bash <(curl -fsSL "$RAW/scripts/sync-live-apps-script-to-github.sh")
 
 printf '\n============================================================\n'
-printf '✅✅✅ v0.6.1 AVATAR SNAPSHOT HOTFIX INSTALLED ✅✅✅\n'
+printf '✅✅✅ v0.6.1 AVATAR + MUSIC REPAIR INSTALLED ✅✅✅\n'
 printf 'Apps Script snapshot version: 1.2.1\n'
-printf 'ERROR rows with retained last-known file_id are exported again.\n'
+printf 'Last-known avatar file_id survives transient ERROR status.\n'
 printf 'NO_PHOTO remains excluded.\n'
+printf 'Frontend 0.6.x protected audio runtime restored.\n'
+printf 'Avatar loader and app.js cache markers refreshed.\n'
 printf 'Existing deployment preserved: %s\n' "$EXPECTED_DESC"
-printf 'Live mirror synced back to GitHub.\n'
+printf 'Live Apps Script mirror synced back to GitHub.\n'
 printf '============================================================\n'
