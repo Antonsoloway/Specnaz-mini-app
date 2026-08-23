@@ -247,3 +247,20 @@ searchKeys и searchIndexVersion.
   номера персональных строк, exact private endpoint или before/after payload.
 - Использовать обезличенные сценарии и агрегаты; согласованные public credits
   остаются в отдельном блоке проекта.
+
+
+---
+
+### 23.08.2026 17:50+03 — v0.6.1 music menu final recovery [V061_MUSIC_MENU_FINAL2_20260823]
+
+**Контекст:** аватары уже подтверждены как исправленные. Music root fix опубликован, но rollout bot menu требовал отдельной проверки. Предыдущий recovery дошёл до live mirror sync, затем shell интерпретировал backticks внутри unquoted heredoc и открыл интерактивный Python вместо записи handoff.
+
+**Выполнено:**
+- повторно проверен live Apps Script и единственный существующий deployment `Таблица ЧП 1.3`;
+- `MINIAPP_setupBotAppMenu` вызван через временный tokenized web-app route;
+- проверяется фактический `getChatMenuButton.web_app.url` на marker `20260823-v061-music-live3`;
+- temporary route удалён вторым push/deployment update;
+- `apps-script-live/` синхронизирован после удаления route;
+- `CURRENT_STATE.md` и `WORK_HISTORY.md` обновлены безопасно через Python, без shell interpolation.
+
+**Результат проверки Telegram menu:** `CONFIRMED`. Final acceptance музыки — device smoke после полного закрытия Mini App и нового открытия через кнопку бота.

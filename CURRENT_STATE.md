@@ -335,3 +335,16 @@ Repo config на 23.08.2026:
 - admin team metric rankings E/F/H/I/J/K from full private team set.
 
 После принятой/проверенной правки обязательно обновлять этот файл и добавлять новую верхнюю запись в `WORK_HISTORY.md`.
+
+---
+
+## v0.6.1 music menu recovery — 23.08.2026 [V061_MUSIC_MENU_FINAL2_20260823]
+
+- Participant avatar hotfix подтверждён пользователем на реальном Telegram-устройстве: ранее проблемные фотографии загружаются.
+- Frontend music root fix находится в `main`: `app.js` экспортирует protected audio runtime для всей ветки `0.6.x`; active marker = `20260823-v061-music-live3`.
+- Live `22_MINIAPP_BOT_APP_MENU.js` направляет bot Web App на `app.html?cb=20260823-v061-music-live3`.
+- `clasp run` для этого standalone Apps Script не используется; menu application выполняется через временный tokenized web-app invoker.
+- Temporary route удалён после вызова; сохранён существующий deployment `Таблица ЧП 1.3`, новый deployment не создавался.
+- Telegram menu verification = **CONFIRMED**.
+- После операции live Apps Script повторно синхронизирован в `apps-script-live/`.
+- Предыдущий final recovery остановился на небезопасном shell heredoc при записи handoff; эта версия пишет handoff через Python без shell command substitution.
