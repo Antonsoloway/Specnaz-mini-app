@@ -1,7 +1,7 @@
 /* Royal CRM Mini App — v0.6.1 visible version guard + final admin-write loader */
 (() => {
   const VERSION = '0.6.1';
-  const CACHE = '20260823-v061-visible-1';
+  const CACHE = '20260824-v061-team-photo-refresh1';
 
   function apply() {
     window.__ROYAL_BUILD__ = VERSION;
@@ -26,6 +26,26 @@
     script.src = `profile-team-link-v061.js?v=${CACHE}`;
     script.async = false;
     script.dataset.profileTeamLinkV061 = '1';
+    document.body.appendChild(script);
+  }
+
+  function loadV061TeamPhotoRefresh(next) {
+    if (window.__ROYAL_TEAM_PHOTO_REFRESH_V061__ || document.querySelector('script[data-team-photo-refresh-v061="1"]')) {
+      next();
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = `team-photo-refresh-v061.js?v=${CACHE}`;
+    script.async = false;
+    script.dataset.teamPhotoRefreshV061 = '1';
+    let continued = false;
+    const proceed = () => {
+      if (continued) return;
+      continued = true;
+      next();
+    };
+    script.addEventListener('load', proceed, { once:true });
+    script.addEventListener('error', proceed, { once:true });
     document.body.appendChild(script);
   }
 
@@ -183,5 +203,5 @@
     observer.observe(badge, { childList:true, characterData:true, subtree:true });
   }
   window.__ROYAL_UI_VERSION__ = VERSION;
-  loadFinalGate();
+  loadV061TeamPhotoRefresh(loadFinalGate);
 })();
