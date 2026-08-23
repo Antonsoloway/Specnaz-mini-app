@@ -1,11 +1,32 @@
-/* Royal CRM Mini App — v0.6.0 version guard + final admin-write loader */
+/* Royal CRM Mini App — v0.6.1 visible version guard + final admin-write loader */
 (() => {
-  const VERSION = '0.6.0';
-  const CACHE = '20260822-history-music-hotfix1';
+  const VERSION = '0.6.1';
+  const CACHE = '20260823-v061-visible-1';
 
   function apply() {
+    window.__ROYAL_BUILD__ = VERSION;
     const badge = document.getElementById('versionBadge');
     if (badge && badge.textContent !== `v${VERSION} ›`) badge.textContent = `v${VERSION} ›`;
+    const startupBrand = document.querySelector('.royal-startup-brand');
+    if (startupBrand && startupBrand.textContent !== `Royal CRM v${VERSION}`) startupBrand.textContent = `Royal CRM v${VERSION}`;
+  }
+
+  function loadV061Changelog() {
+    if (window.__ROYAL_CHANGELOG_VERSION__ === VERSION || document.querySelector('script[data-changelog-v0601="1"]')) return;
+    const script = document.createElement('script');
+    script.src = `changelog-v0601.js?v=${CACHE}`;
+    script.async = false;
+    script.dataset.changelogV0601 = '1';
+    document.body.appendChild(script);
+  }
+
+  function loadV061ProfileTeamLink() {
+    if (window.__ROYAL_PROFILE_TEAM_LINK_V061__ || document.querySelector('script[data-profile-team-link-v061="1"]')) return;
+    const script = document.createElement('script');
+    script.src = `profile-team-link-v061.js?v=${CACHE}`;
+    script.async = false;
+    script.dataset.profileTeamLinkV061 = '1';
+    document.body.appendChild(script);
   }
 
   function loadAdminNavigationGuard() {
@@ -151,6 +172,8 @@
   }
 
   apply();
+  loadV061Changelog();
+  loadV061ProfileTeamLink();
   setTimeout(apply, 0);
   setTimeout(apply, 500);
   setTimeout(apply, 1500);
