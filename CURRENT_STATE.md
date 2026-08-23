@@ -1,6 +1,6 @@
 # Royal CRM / «Таблица ЧП» — CURRENT STATE
 
-> **Актуально на 22.08.2026.**
+> **Актуально на 23.08.2026.**
 > Новый чат обязан сначала прочитать `START_HERE.md`, затем этот файл и последние записи `WORK_HISTORY.md`.
 > Фактический runtime / живые Google Sheets / live Apps Script / текущий GitHub имеют приоритет над памятью чатов.
 
@@ -21,25 +21,25 @@
 - основной repo: `Antonsoloway/Specnaz-mini-app`, branch `main`;
 - data repo: `Antonsoloway/royal-crm-data`;
 - постоянный entrypoint: `app.html`;
-- обычный запуск → **`app-v0559.html` / v0.5.59**;
-- `startapp=v0600` / `tgWebAppStartParam=v0600` → **`app-v0600.html` / v0.6.0 admin preview**;
-- текущий cache-forced preview: `startapp=v0600-2350` → тот же `app-v0600.html`, но с уникальным start parameter;
-- обычных пользователей пока не переводить на v0.6;
+- обычный запуск → **`app-v0601.html` / release v0.6.1**;
+- `app-v0601.html` сохраняет query/hash и передаёт запуск в общий runtime `app-v0600.html` с `releaseBuild=20260823-v061-entry`;
+- `app-v0559.html` / v0.5.59 сохранён как rollback target, но больше не является текущей default-версией;
 - bot: `@doveofpeace_bot`.
 
-Текущий preview delivery:
-- `version-v0600.js` cache-bust: **`20260821-2350`**;
-- `app-v0600.html` → `transport-v0514.js?v=20260821-2050`, `changelog-v0600.js?v=20260821-2230`, `admin-v0600.js?v=20260821-2230` и `version-v0600.js?v=20260821-2350`;
-- `app.html` previewBuild: **`20260821-2350`**;
-- `app.html` принимает `v0600`, прежние cache aliases и текущий cache-forced alias `v0600-2350`;
-- GitHub Pages build **`20260821-2350`** сохраняет 60-second write window, commit-first UI, transient read retry и защиту optimistic state до подтверждения pending operations; видимый v0.6 client проверяет public snapshot каждые 20 секунд и после app-write выполняет bounded fast polling нового `dataHash`.
+Текущий release delivery:
+- `app.html` → `app-v0601.html`, cache marker **`20260823-v061-entry`**;
+- внешний release номер = **v0.6.1**; общий runtime всё ещё переиспользует `app-v0600.html` и его v0.6-модули;
+- в repo присутствуют `profile-team-link-v061.js` и `changelog-v0601.js`; перед утверждением, что они активны в runtime, проверять их фактическое подключение из конечного entrypoint;
+- `app-v0600.html` на 23.08 использует актуальные startup/music/transport/scroll hotfix cache-busts;
+- launch `search + hash` сохраняется на обоих redirect-этапах, Telegram initData теряться не должен;
+- GitHub commit и release entrypoint не считаются доказательством Cloudflare/runtime deploy без отдельной проверки.
 
 ---
 
 ## 3. Live Apps Script / admin backend
 
-Подтверждено production-записями и свежими snapshot на 22.08.2026:
-- private admin snapshot: `adminData.version = 0.6.0-write.5`, 207 participants / 129 teams;
+Подтверждено production-записями и свежими snapshot на 22–23.08.2026:
+- private admin snapshot contract: `adminData.version = 0.6.0-write.5`; публичный snapshot 23.08 содержит 207 participants;
 - advertised write endpoint закреплён: `endpointPinned=true`, `endpointSource=deployment-constant`; используется существующий deployment **`Таблица ЧП 1.3`**;
 - optimistic `revision` у participant/team records;
 - write transport: **Mini App → Worker → HMAC → Apps Script → Google Sheets**;
@@ -59,7 +59,7 @@ Production write.5 policy:
 Fast-write / snapshot refresh — production confirmed:
 - все шесть create/update/delete operations используют commit-first contract: Sheet mutation + journal + idempotency cache завершаются под коротким `ScriptLock`, затем сервер сразу возвращает committed result;
 - frontend сохраняет optimistic committed payload до появления всех pending operations в private journal, поэтому отстающий snapshot не может вернуть старую revision между последовательными правками;
-- Worker `1.28.0` после committed app write запускает отдельный HMAC-signed `admin-snapshot-refresh` через `ctx.waitUntil()`;
+- Worker `1.28.0+` после committed app write запускает отдельный HMAC-signed `admin-snapshot-refresh` через `ctx.waitUntil()`;
 - installable Sheet edit/change triggers напрямую выполняют тот же unified public/private flush;
 - Sheet capture выполняется под коротким `ScriptLock`, GitHub publication — после release и под отдельной сериализацией; stale capture не может затереть более свежий;
 - one-off clock и штатный 5-minute trigger остаются durable retry/fallback, а не latency contract;
@@ -110,7 +110,7 @@ Public snapshot:
 
 ---
 
-## 5. Стабильная v0.5.59 — не ломать
+## 5. Rollback v0.5.59 — не ломать
 
 - auth: 12 сек + один transient retry; Android code 20 → `AUTH_TIMEOUT`;
 - `Связаться` для участников без `@username` только через Worker/Голубца, не через прямой `tg://user?id`;
@@ -125,9 +125,9 @@ Public snapshot:
 
 ---
 
-## 6. v0.6 admin preview — frontend
+## 6. v0.6 / v0.6.1 frontend
 
-Основные активные модули:
+Основные активные модули общего v0.6 runtime:
 - `admin-v0600.js` = `0.6.0-read.3` / `admin-eligibility-v0600.js`;
 - `admin-entry-relocation-v0600.js` = `0.6.0-admin-entry-relocation.2`;
 - `admin-write-gate-v0600.js` = `0.6.0-write.5-gate.1`;
@@ -146,7 +146,7 @@ Public snapshot:
 - поиск по participants/teams должен сохранять deterministic hybrid behavior обычного режима;
 - ищет по CRM имени, Telegram имени, `@username`, ID, memberships, игровым никам, ролям, team leader/status/stat fields и доступным `searchKeys`;
 - `BbllllKA ↔ вышка` сохранён;
-- admin avatars используют один persistent cache с ordinary mode; primary key `avatar:<avatarFileId>`, `avatar:tg-<id>` только fallback/migration.
+- admin avatars используют один persistent cache с ordinary mode; primary key `avatar:<avatarFileId>`, `avatar:tg-<id>` — fallback/migration для записей без snapshot fileId.
 
 ### Admin participant list/detail — repo ready, smoke pending
 
@@ -154,7 +154,7 @@ Public snapshot:
 - raw Telegram ID **не показывается визуально**;
 - ID остаётся только скрытым техническим identity для search/avatar/editor;
 - `@username` показывается при наличии;
-- memberships/команды теперь выводятся **отдельными ordinary-style плашками**, через те же `membership-list` / `membership-pill`, что и на обычной странице участников v0.5.59;
+- memberships/команды теперь выводятся **отдельными ordinary-style плашками**, через те же `membership-list` / `membership-pill`, что и на обычной странице участников;
 - каждая плашка показывает `команда + роль + игра`; несколько membership → несколько отдельных плашек;
 - существующие `team-game-colors-v0535.js` и `active-teams-v0559.js` повторно декорируют эти же плашки: сохраняются цвета РМ/РК и золотая рамка для `Активен` по source-of-truth team status;
 - старая единая текстовая строка команд в admin summary скрыта;
@@ -182,7 +182,7 @@ Participant metric rankings:
 - row показывает место, имя, chat/status, первые memberships и выбранное значение;
 - текущий участник подсвечивается;
 - tap по строке рейтинга → admin participant detail;
-- avatars намеренно не грузятся для всех 207 ranking rows, чтобы не делать media prewarm;
+- avatars намеренно не грузятся для всех ranking rows, чтобы не делать media prewarm;
 - Back использует существующий `RoyalNav` capture.
 
 ### Admin team list/detail
@@ -231,7 +231,7 @@ Participant metric rankings:
 - после успеха private snapshot обновляется, cache сбрасывается, удалённая запись исчезает из admin list/table;
 - свежий private snapshot: 207 participants, 129 admin teams; `Вышел` = 16; `Неактивен` = 26, из них E=0 = 25; одна неактивная команда с ненулевым E остаётся заблокированной.
 
-**Статус frontend:** build **`20260821-2350`**, admin read `.3`, write UI `.8`, atomic membership backend и immediate unified refresh подтверждены production-smoke. Последовательные participant edits подтверждены; обе guarded delete операции, admin roster navigation и полный Android/iOS smoke остаются обязательными перед общим v0.6 release.
+**Статус frontend:** default release entrypoint = **v0.6.1**. Общий runtime переиспользует v0.6.0 shell/modules; atomic membership backend и immediate unified refresh подтверждены предыдущим production-smoke. Guarded deletes, admin roster navigation и полный Android/iOS smoke остаются отдельными проверками.
 
 ---
 
@@ -240,8 +240,12 @@ Participant metric rankings:
 Один IndexedDB: **`royal-crm-media-cache / images`**.
 
 - avatar primary key: `avatar:<avatarFileId>`;
+- если snapshot не содержит `avatarFileId`, client использует стабильный fallback key `avatar:tg-<id>`;
 - team key: `team:<normalized team>\n<normalized game>`;
 - cache-first: memory/disk → network;
+- avatar network concurrency остаётся ≤ 2 в persistent flow;
+- с Worker `1.31.0` отсутствие `avatarFileId` у участника `В чате` больше не означает немедленный буквенный placeholder: после authenticated 404 Worker делает узкий on-demand `getUserProfilePhotos`, выбирает наибольший размер и отдаёт изображение через существующий защищённый `/avatar?fileId=...` flow;
+- Telegram fallback не делает массового prewarm и не раскрывает bot token/fileId браузеру;
 - team photo background refresh не чаще ~30 мин;
 - без массового сетевого prewarm;
 - admin `/admin-team-photo` сначала ищет private SHA-256 media по identity `name + game`, `photoUrl` только fallback;
@@ -253,15 +257,18 @@ Participant metric rankings:
 
 Frontend Worker origin: `https://royal-crm-miniapp-api.tropical-spoon.workers.dev`.
 
-Repo config / production:
-- `worker/wrangler.toml` → `src/entry-v1280.js`;
-- последнее записанное production `/health`: `1.28.0 + adminWriteEndpoint=pinned-deployment-config + snapshotDispatch=worker-wait-until-signed-refresh`;
+Repo config на 23.08.2026:
+- `worker/wrangler.toml` → **`src/entry-v1310.js`**;
+- `entry-v1310.js` объявляет Worker **`1.31.0`** и `avatarFallback=telegram-getUserProfilePhotos`;
+- commits hotfix: `d5b8055` (новый wrapper) и `a34b6bd` (переключение wrangler main);
+- Cloudflare Builds настроен на GitHub `main`, root path `/worker`; commit в repo ожидаемо запускает deploy, но GitHub commit сам по себе не является runtime-подтверждением;
+- последняя независимо подтверждённая в документации production-цепочка до этого hotfix сохраняла signed background snapshot refresh и pinned deployment guard;
 - `/admin-data` — admin-only private read;
 - `/admin-write` — authenticated admin mutation;
 - `/admin-team-photo` — protected private media route;
 - public `/snapshot`, `/team-photo`, `/contact-by-id`, auth/media routes не должны регрессировать.
 
-`entry-v1250.js` сохраняет write.4/write.5 capability gates. Production `entry-v1280.js` наследует fail-closed exact-endpoint guard: пока snapshot не содержит доказанный pinned contract, permissions `canEdit/canDelete=false`. После committed write Worker асинхронно отправляет signed refresh; сбой refresh не превращает уже выполненную mutation в ложную ошибку сохранения.
+`entry-v1310.js` оборачивает текущий `entry-v1290.js` и не заменяет существующую auth/media реализацию. Live-avatar fallback запускается только после штатного authenticated `AVATAR_NOT_FOUND`, повторно подтверждает присутствие участника в разрешённом snapshot и лишь затем обращается к Telegram Bot API. Если Telegram не отдаёт фото или privacy не позволяет его получить, сохраняется прежний 404/placeholder contract.
 
 ---
 
@@ -275,14 +282,14 @@ Repo config / production:
 
 ---
 
-## 10. Минимальный smoke v0.6 перед общим релизом
+## 10. Минимальный smoke текущего v0.6.1
 
-1. Обычный `startapp` остаётся v0.5.59; `startapp=v0600` открывает v0.6. Для принудительно свежей проверки build 2350 использовать `startapp=v0600-2350`.
+1. Обычный `app.html` открывает `app-v0601.html`, затем общий v0.6 runtime с сохранением Telegram query/hash; v0.5.59 остаётся rollback target.
 2. Не-админ не получает admin-data/write.
 3. Existing participant editor: только имя + memberships; прямой system-field write отклоняется.
 4. CreateTeam с фото, atomic participant memberships, последовательные edits и background snapshot convergence подтверждены. Повторить smoke на обезличенных тестовых данных и проверить, что committed UI не перезаписывается stale snapshot.
 5. Team rename каскадит memberships; team photo upload/rename cleanup работают.
-6. Admin avatars/team photos повторно читаются из общего persistent cache.
+6. Admin avatars/team photos повторно читаются из общего persistent cache. Для записи без snapshot `avatarFileId`, но с доступным Telegram profile photo, после reload должна появиться фотография и сохраниться под `avatar:tg-<id>` до появления canonical fileId.
 7. Admin search проверяется по имени/@/ID/role/nickname/team + `вышка`.
 8. `Вышел` сравнить с physical order таблицы.
 9. Admin participant list: visible ID отсутствует; каждая membership показана отдельной ordinary-style плашкой `команда + роль + игра`; РМ/РК окраска и золото `Активен` совпадают с обычной страницей; tap по summary, аватару и области плашек → именно admin participant detail, не accordion/public profile/team route.
@@ -306,6 +313,8 @@ Repo config / production:
 - `searchKeys`/`searchIndexVersion`;
 - `BbllllKA ↔ вышка`;
 - one persistent media cache identities;
+- avatar canonical cache identity `avatar:<avatarFileId>` + `avatar:tg-<id>` fallback для временно отсутствующего fileId;
+- authenticated live Telegram avatar fallback не должен обходить snapshot membership/auth и не должен превращаться в массовый prewarm;
 - iOS source-preservation guard;
 - `Связаться` только через Worker/Голубца;
 - existing-participant server whitelist `name + memberships`;
