@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>ЧП — Mini App v0.6.1</title>
+  <script>
+  (() => {
+    const params = new URLSearchParams(window.location.search || '');
+    params.set('releaseBuild', '20260823-v061-entry');
+    const search = params.toString() ? `?${params.toString()}` : '';
+    const next = 'app-v0600.html' + search + (window.location.hash || '');
+    window.location.replace(next);
+  })();
+  </script>
+</head>
+<body></body>
+</html>
