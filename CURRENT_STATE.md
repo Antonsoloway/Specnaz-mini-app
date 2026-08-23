@@ -22,12 +22,12 @@
 - data repo: `Antonsoloway/royal-crm-data`;
 - постоянный entrypoint: `app.html`;
 - обычный запуск → **`app-v0601.html` / release v0.6.1**;
-- `app-v0601.html` сохраняет query/hash и передаёт запуск в общий runtime `app-v0600.html` с `releaseBuild=20260823-v061-snapshot-resilience1`;
+- `app-v0601.html` сохраняет query/hash и передаёт запуск в общий runtime `app-v0600.html` с `releaseBuild=20260823-v061-history-link2`;
 - `app-v0559.html` / v0.5.59 сохранён как rollback target, но больше не является текущей default-версией;
 - bot: `@doveofpeace_bot`.
 
 Текущий release delivery:
-- `app.html` → `app-v0601.html`, cache marker **`20260823-v061-snapshot-resilience1`**;
+- `app.html` → `app-v0601.html`, cache marker **`20260823-v061-history-link2`**;
 - внешний release номер = **v0.6.1**; общий runtime всё ещё переиспользует `app-v0600.html` и его v0.6-модули;
 - `v061-runtime-compat.js` = **`0.6.1-runtime.2`**: защищённый `/snapshot` получает bounded transient retry и один автоматический recovery после исчерпания первой серии;
 - `app-v0600.html` принудительно загружает этот runtime bridge с cache-bust `20260823-v061-snapshot-resilience1`;
@@ -395,3 +395,14 @@ Repo config на 23.08.2026:
 - Auth/admin-write/admin-data/media contracts не менялись; security lockdown Sheets и webhook secret rotation не откатывались.
 - `app.html`, `app-v0601.html`, runtime bridge и changelog переведены на cache marker `20260823-v061-snapshot-resilience1`.
 - `changelog-v0601.js` дополнен этой правкой; требуется device smoke повторным закрытием/открытием Mini App через Telegram.
+
+---
+
+## v0.6.1 repeated Specnaz history links — 23.08.2026 [V061_HISTORY_LINK_RELIABILITY2_20260823]
+
+- Первый history-link hotfix не принят: device smoke показал, что повторные переходы после возврата из Telegram остаются нестабильными.
+- v2 переносит ownership физического Android touch на `window` capture до legacy document click-router; один tap вызывает ровно один `openTelegramLink`, без таймерного повторного deep-link.
+- Для touch используется отдельный touchstart/touchend guard; generated click подавляется тем же capture-router, а после возврата dedupe автоматически переармируется.
+- Активный frontend/menu marker = `20260823-v061-history-link2`; Telegram menu verification = **CONFIRMED**.
+- Кнопка `Связаться` без username ранее подтверждена пользователем как работающая после Worker v1.35.0.
+- Production acceptance history-link v2 остаётся device smoke: несколько разных ссылок подряд с возвратом в Mini App.

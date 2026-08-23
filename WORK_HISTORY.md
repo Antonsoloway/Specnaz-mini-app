@@ -323,3 +323,15 @@ searchKeys и searchIndexVersion.
 ### 23.08.2026 — webhook secret rotation finalized [SECURITY_WEBHOOK_ROTATION_FINAL_20260823]
 
 После переключения ChatKeeper на новый secret удалён temporary previous credential из Script Properties. Live Apps Script повторно синхронизирован в GitHub, hardcoded credential в current source отсутствует, существующий deployment сохранён.
+
+---
+
+### 23.08.2026 — повторные ссылки истории спецназа v2 [V061_HISTORY_LINK_RELIABILITY2_20260823]
+
+**Диагноз:** первая frontend-попытка не прошла device smoke. Старый Specnaz router остаётся document-level click handler, а v1 одновременно использовал pointer/click и delayed повтор `openTelegramLink`, что могло конфликтовать с Telegram chat overlay. Кроме того, frontend-изменение требует нового bot-menu URL, иначе Android WebView может оставить прежний HTML/script cache.
+
+**Исправление:** новый отдельный v0.6.1-модуль получает физический touch на window capture раньше legacy-router, выполняет один native Telegram transition на один tap, не делает timer retry и переармируется после возврата. `app.html`, `app-v0601.html`, runtime script marker и Telegram menu переведены на `20260823-v061-history-link2`.
+
+**Rollout:** existing Apps Script deployment `Таблица ЧП 1.3` сохранён; temporary menu invoker удалён; live Apps Script mirror синхронизирован; Telegram menu verification = `CONFIRMED`.
+
+**Acceptance:** pending повторный Android Telegram smoke по нескольким history links подряд.
