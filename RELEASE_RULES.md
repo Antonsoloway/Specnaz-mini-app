@@ -156,3 +156,8 @@ Admin-preview `v0.6.0` дополнительно использует:
 ### Mini App background refresh / visual stability
 
 - Do not run a permanent full public/admin snapshot reload watchdog on a fixed short interval inside the Mini App. Background refresh after explicit writes or user actions is allowed; continuous polling that can repaint Telegram WebView must be opt-in and proven visually stable.
+
+
+### Admin participant editor surface
+
+- Existing participant edit UI must expose only server-writable participant fields (`name` + memberships). Telegram name and Telegram ID may be shown read-only for verification; bot/system fields (chat state, username, dates, specnaz/screens/activity counters) belong in the admin detail card, not the edit form.

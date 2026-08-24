@@ -485,3 +485,18 @@ Repo config на 23.08.2026:
 - v0.6.1 now loads `v061-background-refresh-guard.js` before `admin-write-v0600-v3.js`; it suppresses only that legacy 5s/20s/visibility watchdog callback. Mutation-specific snapshot polling after real admin writes is preserved.
 - Frontend/menu marker = `20260824-v061-screen-twitch1`; Telegram menu confirmed. Existing deployment `Таблица ЧП 1.3` preserved; temporary verifier route removed; live Apps Script mirror synchronized.
 - Device acceptance still required: keep several ordinary/admin pages open 60–90s without interaction and confirm that the former periodic twitch no longer occurs.
+
+
+- 24.08.2026 device acceptance: **CONFIRMED** — пользователь сообщил, что периодическое дёргание экрана после screen-twitch watchdog fix исчезло.
+
+
+---
+
+## v0.6.1 admin edit UX — 24.08.2026 [V061_ADMIN_EDIT_UX_20260824]
+
+- Existing participant edit form is intentionally minimal: editable = CRM `name` + memberships (team/role/game nickname); Telegram name + Telegram ID remain read-only reference only.
+- Existing participant edit no longer shows chat state, @username, date V, specnaz U, screens AB, activity AC/AD; those remain visible in the admin participant detail card and stay bot/system-owned.
+- Create-participant flow is unchanged.
+- Participant and team edit buttons are moved to the top of their admin detail surfaces; team edit appears before the large team photo so no long scroll is required.
+- Frontend/menu marker = `20260824-v061-admin-edit-ux1`; Telegram menu confirmed. Existing deployment `Таблица ЧП 1.3` preserved; temporary route removed; live Apps Script mirror synchronized.
+- Device smoke pending: open an existing participant edit and team detail on Telegram and verify the compact form/top buttons.

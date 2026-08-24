@@ -413,3 +413,15 @@ searchKeys и searchIndexVersion.
 - Added `v061-background-refresh-guard.js`, loaded before admin-write, which identifies the exact watchdog callback by source (`refreshPublicSnapshotOnce` + `refreshVisibleAdminSnapshot` + `scheduleLiveSnapshotRefresh`) and suppresses only those timers.
 - Write correctness preserved: `refreshPublicSnapshotAfterMutation()` uses independent Promise timers and remains active after committed participant/team changes.
 - Cache/menu marker `20260824-v061-screen-twitch1` published and verified; stable Apps Script deployment retained; live mirror resynced.
+
+
+---
+
+### 24.08.2026 — admin edit form cleanup + top edit actions [V061_ADMIN_EDIT_UX_20260824]
+
+- User requested removal of system-generated participant fields from edit mode.
+- Added `admin-edit-ux-v061.js`: update-participant modal removes chatState/username/date/specnaz/screens/activity fields, preserves editable CRM name + membership slots, and keeps Telegram name/ID read-only for visual verification.
+- Same module moves participant/team edit actions to the top of detail cards, including above the large team photo.
+- Create participant form remains untouched.
+- Screen twitch fix from the preceding release was confirmed working on device by the user.
+- Marker `20260824-v061-admin-edit-ux1` published/verified; existing Apps Script deployment retained; live mirror resynced.
