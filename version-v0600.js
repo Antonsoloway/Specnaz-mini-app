@@ -1,7 +1,7 @@
 /* Royal CRM Mini App — v0.6.1 visible version guard + final admin-write loader */
 (() => {
   const VERSION = '0.6.1';
-  const CACHE = '20260824-v061-screen-twitch1';
+  const CACHE = '20260824-v061-admin-edit-ux1';
 
   function apply() {
     window.__ROYAL_BUILD__ = VERSION;
@@ -26,6 +26,15 @@
     script.src = `profile-team-link-v061.js?v=${CACHE}`;
     script.async = false;
     script.dataset.profileTeamLinkV061 = '1';
+    document.body.appendChild(script);
+  }
+
+  function loadV061AdminEditUx() {
+    if (window.__ROYAL_ADMIN_EDIT_UX_V061__ || document.querySelector('script[data-admin-edit-ux-v061="1"]')) return;
+    const script = document.createElement('script');
+    script.src = `admin-edit-ux-v061.js?v=${CACHE}`;
+    script.async = false;
+    script.dataset.adminEditUxV061 = '1';
     document.body.appendChild(script);
   }
 
@@ -214,6 +223,7 @@
   apply();
   loadV061Changelog();
   loadV061ProfileTeamLink();
+  loadV061AdminEditUx();
   setTimeout(apply, 0);
   setTimeout(apply, 500);
   setTimeout(apply, 1500);
