@@ -4,7 +4,7 @@
   if (String(window.__ROYAL_BUILD__ || '') !== '0.6.1') return;
   if (window.__ROYAL_ADMIN_GHOST_CLICK_GUARD_V061__) return;
 
-  const VERSION = '0.6.1-admin-ghost-click.1';
+  const VERSION = '0.6.1-admin-ghost-click.2';
   const ADMIN_SURFACE = [
     '.royal-admin-screen',
     '.royal-admin-participant-detail',
@@ -14,16 +14,22 @@
     '[data-admin-participant="1"]',
     '[data-admin-team="1"]'
   ].join(',');
-  const FORWARD_TARGET = [
+
+  // IMPORTANT: only targets that are already routed on pointerup by
+  // v061-admin-context-integrity belong here. The normal admin team list
+  // ([data-admin-team] > summary) is intentionally NOT included because its
+  // native admin router opens it on click. Shielding that click makes the row
+  // look dead.
+  const POINTERUP_ROUTED_TARGET = [
     '[data-admin-participant-team="1"]',
     '[data-admin-route-team="1"]',
     '[data-admin-ranking-team="1"]',
     '.royal-admin-participant-detail .participant-profile-membership',
     '[data-admin-ranking-participant="1"]',
     '.royal-admin-team-detail-shell .team-member[data-telegram-id]',
-    '[data-admin-participant="1"] > summary',
-    '[data-admin-team="1"] > summary'
+    '[data-admin-participant="1"] > summary'
   ].join(',');
+
   const TAP_SLOP_SQ = 196;
   const SHIELD_RADIUS_SQ = 2304;
   const MAX_PRESS_MS = 900;
@@ -37,14 +43,14 @@
     return !!target?.closest?.(ADMIN_SURFACE) || !!document.querySelector(ADMIN_SURFACE);
   }
 
-  function forwardTarget(target) {
-    return target?.closest?.(FORWARD_TARGET) || null;
+  function pointerupTarget(target) {
+    return target?.closest?.(POINTERUP_ROUTED_TARGET) || null;
   }
 
   function routeReady(target) {
-    const node = forwardTarget(target);
+    const node = pointerupTarget(target);
     if (!node) return false;
-    if (node.matches?.('[data-admin-participant-team="1"],[data-admin-route-team="1"],[data-admin-ranking-team="1"],.participant-profile-membership,[data-admin-team="1"] > summary')) {
+    if (node.matches?.('[data-admin-participant-team="1"],[data-admin-route-team="1"],[data-admin-ranking-team="1"],.participant-profile-membership')) {
       return typeof window.RoyalAdminTeamDetailV0600?.open === 'function';
     }
     return typeof window.RoyalAdminParticipantDetailV0600?.open === 'function';
@@ -87,11 +93,11 @@
   }
 
   // This module is intentionally loaded before v061-admin-context-integrity.js.
-  // It observes the same physical gesture first, but leaves pointerup routing to
-  // the existing admin router. Only the synthetic click generated afterwards is consumed.
+  // It watches gestures that the context router itself handles on pointerup.
+  // Native click-only admin rows are left untouched.
   window.addEventListener('pointerdown', event => {
     shield = null;
-    if (!adminVisible(event.target) || !forwardTarget(event.target)) {
+    if (!adminVisible(event.target) || !pointerupTarget(event.target)) {
       press = null;
       return;
     }
