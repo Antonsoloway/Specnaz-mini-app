@@ -161,3 +161,7 @@ Admin-preview `v0.6.0` дополнительно использует:
 ### Admin participant editor surface
 
 - Existing participant edit UI must expose only server-writable participant fields (`name` + memberships). Telegram name and Telegram ID may be shown read-only for verification; bot/system fields (chat state, username, dates, specnaz/screens/activity counters) belong in the admin detail card, not the edit form.
+
+- Admin context is sticky: a participant/team navigation that originates from any admin list, detail, ranking, roster, or membership pill must open the corresponding protected admin detail; ordinary/public participant or team routers must never win that transition.
+
+- Moving admin edit controls must not break protected media. Admin team detail must keep/re-arm authenticated team-photo loading after layout/DOM relocation and may use a bounded direct refetch fallback.

@@ -425,3 +425,13 @@ searchKeys и searchIndexVersion.
 - Create participant form remains untouched.
 - Screen twitch fix from the preceding release was confirmed working on device by the user.
 - Marker `20260824-v061-admin-edit-ux1` published/verified; existing Apps Script deployment retained; live mirror resynced.
+
+
+---
+
+### 24.08.2026 — admin navigation + team photo regression [V061_ADMIN_CONTEXT_INTEGRITY_20260824]
+
+- User reported two regressions after admin edit UX: participant team link could open ordinary team detail, and admin team photos could stay on fallback.
+- Added a v0.6.1 admin-context integrity layer that owns pointer/click routing before legacy public handlers and routes participant/team transitions exclusively through `RoyalAdminParticipantDetailV0600` / `RoyalAdminTeamDetailV0600` while an admin surface is active.
+- Added protected team-photo recovery on admin team detail after DOM/button relocation; normal cache bridge is tried first, then a single authenticated direct refetch if necessary.
+- Published cache/menu marker `20260824-v061-admin-integrity1`; existing Apps Script deployment retained; live mirror resynced. Device acceptance pending.

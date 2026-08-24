@@ -500,3 +500,14 @@ Repo config на 23.08.2026:
 - Participant and team edit buttons are moved to the top of their admin detail surfaces; team edit appears before the large team photo so no long scroll is required.
 - Frontend/menu marker = `20260824-v061-admin-edit-ux1`; Telegram menu confirmed. Existing deployment `Таблица ЧП 1.3` preserved; temporary route removed; live Apps Script mirror synchronized.
 - Device smoke pending: open an existing participant edit and team detail on Telegram and verify the compact form/top buttons.
+
+
+---
+
+## v0.6.1 admin context integrity — 24.08.2026 [V061_ADMIN_CONTEXT_INTEGRITY_20260824]
+
+- Periodic screen twitch fix is device-confirmed by the user.
+- Admin navigation invariant strengthened: any participant/team transition originating from admin list/detail/ranking/roster stays on private admin detail pages. Physical Android pointer taps are captured at window level before legacy ordinary routers; ordinary team router also has an admin-context fallback guard.
+- Regression after moving the team edit button upward: admin team photo could remain on castle fallback. `v061-admin-context-integrity.js` now re-arms protected photo loading after admin detail render and performs one authenticated `/admin-team-photo` refetch if the normal media bridge still has no image.
+- Frontend/menu marker = `20260824-v061-admin-integrity1`; Telegram menu confirmed. Existing deployment `Таблица ЧП 1.3` preserved, temporary verifier removed, live Apps Script mirror synchronized.
+- Device smoke pending: participant → team → participant navigation must remain admin-only and team photos must load with the edit button at the top.
