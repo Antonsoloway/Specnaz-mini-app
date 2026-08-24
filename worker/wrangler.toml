@@ -1,5 +1,5 @@
 name = "royal-crm-miniapp-api"
-main = "src/entry-v1370.js"
+main = "src/entry-v1380.js"
 compatibility_date = "2026-08-15"
 
 [vars]
@@ -33,21 +33,18 @@ invocation_logs = true
 # /admin-data, then performs the fresh Telegram admin check and private admin
 # snapshot read before exposing write.5 permissions.
 #
-# entry-v1350 restores /contact-by-id on the repaired path. The route verifies
-# the current session directly, confirms requester + target are both still
-# in-chat in the private snapshot, and only then asks the bot to send the
-# tg://user?id profile button to the requester's private chat.
+# entry-v1360 keeps the privacy-aware /contact-by-id behavior and entry-v1370
+# keeps its plain-DM fallback when Telegram rejects a direct profile button.
 #
-# entry-v1360 keeps the same contact path but recognizes Telegram's
-# BUTTON_USER_PRIVACY_RESTRICTED result. That privacy setting is not bypassed:
-# the requester receives a clear privacy explanation instead of a generic
-# server error, and the bot may send the same explanation without a profile
-# button. Normal allowed profile buttons are unchanged.
-#
-# entry-v1370 hardens the fallback further: any Telegram rejection that reaches
-# the generic BOT_API_ERROR branch triggers a second plain DM without a profile
-# button. If that succeeds, the Mini App gets a precise explanatory response
-# instead of the generic "Не удалось отправить кнопку" error. No privacy or
-# platform restriction is bypassed.
+# entry-v1380 is the admin reliability layer. /admin-write no longer performs
+# the old duplicated /admin-data authorization fan-out before every mutation:
+# it verifies the Worker session once, caches the fresh Telegram admin check
+# briefly, loads the private admin snapshot once, guarantees CORS-safe errors,
+# and retries only transient Worker->Apps Script transport failures using the
+# same requestId. /admin-team-photo also bypasses per-image /admin-data fan-out
+# and reads private team media directly after the same cached admin check.
+# It additionally supports the historical name-only media hash so old cached
+# team images remain visible even when the newer name+game media file and the
+# admin snapshot photoUrl are absent.
 #
 # Cloudflare Builds source: GitHub main, root path /worker.
