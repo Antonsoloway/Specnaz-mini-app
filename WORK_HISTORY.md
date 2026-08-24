@@ -445,3 +445,13 @@ searchKeys и searchIndexVersion.
 - Added `admin-ui-controls-v061.js` and published marker `20260824-v061-admin-ui-controls1`. Telegram menu update and existing Apps Script deployment update completed; live mirror sync completed.
 - Initial release script then failed during `node --check changelog-v0601.js`: its generated third changelog item missed the comma before the permanent final history item. No production rollback was needed.
 - Added safe handoff finalizer; changelog is syntax-checked before commit and CURRENT_STATE / WORK_HISTORY / RELEASE_RULES are completed without touching production deployment.
+
+
+---
+
+### 24.08.2026 — admin team images + ghost edit tap [V061_ADMIN_TEAM_STABILITY_20260824]
+
+- Investigated intermittent admin team image fallback and accidental immediate edit modal.
+- Root interaction: multiple media layers may replace/revoke transient blob URLs while the admin DOM is being re-rendered; Android can also emit a compatibility click after the pointer navigation has already replaced the team-list DOM with team detail.
+- Added a durable session image fallback keyed by team+game and an 850 ms edit-button navigation shield.
+- Published marker `20260824-v061-admin-team-stability1` and refreshed Telegram menu through the existing Apps Script deployment only.

@@ -171,3 +171,7 @@ Admin-preview `v0.6.0` дополнительно использует:
 - Admin search must release the mobile keyboard when focus/gesture moves away from its search field, matching ordinary-mode keyboard behavior.
 
 - Admin create actions are direct: do not reintroduce a separate global «Режим редактирования» switch; keep direct Add team / Add participant actions and per-record edit entry points.
+
+- Once an authenticated admin team image has loaded successfully, a transient media refresh failure must not replace it with the castle fallback during the same Mini App session.
+
+- Admin team detail edit controls must ignore the navigation compatibility/ghost tap that created the detail page; editing starts only from a deliberate tap after the page transition has settled.

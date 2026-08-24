@@ -522,3 +522,14 @@ Repo config на 23.08.2026:
 - Admin search now dismisses the mobile keyboard when pointer focus/scroll gesture leaves the active search field; Enter/Escape also release the field.
 - Frontend + Telegram menu marker = `20260824-v061-admin-ui-controls1`. Existing Apps Script deployment `Таблица ЧП 1.3` was preserved and the live Apps Script mirror was synchronized before this handoff finalization.
 - The first handoff attempt stopped only at changelog syntax validation because the third inserted JS array item lacked a trailing comma; production/frontend/menu work had already completed. This finalizer repairs only changelog/handoff state and does not redeploy Apps Script.
+
+
+---
+
+## v0.6.1 admin team media/navigation stability — 24.08.2026 [V061_ADMIN_TEAM_STABILITY_20260824]
+
+- Device report: admin team image could appear and later fall back to the castle; occasionally opening a team immediately triggered its edit modal.
+- Added `admin-team-stability-v061.js`. Every successful protected admin team image load is cloned into an independent session blob URL and reused as a fallback if legacy media refresh/cache races fail. This covers admin team-list thumbnails and admin team detail photo.
+- Team detail edit control is shielded for 850 ms after a new detail DOM is created, preventing Android compatibility/ghost click from opening edit immediately after the navigation tap.
+- Frontend/menu marker = `20260824-v061-admin-team-stability1`; existing deployment `Таблица ЧП 1.3` preserved; temporary menu verifier removed; live Apps Script mirror synchronized.
+- Device smoke pending: repeatedly open several team cards, return to list, and verify images remain visible and edit opens only on a deliberate second tap.
