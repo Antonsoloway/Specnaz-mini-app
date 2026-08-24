@@ -12,7 +12,7 @@
   (() => {
     const params = new URLSearchParams(window.location.search || '');
     const target = 'app-v0601.html';
-    params.set('releaseBuild', '20260824-v061-admin-list-jump1');
+    params.set('releaseBuild', '20260824-v061-admin-ghost-click1');
     const search = params.toString() ? `?${params.toString()}` : '';
     const next = target + search + (window.location.hash || '');
     window.location.replace(next);
