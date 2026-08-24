@@ -1,5 +1,5 @@
 name = "royal-crm-miniapp-api"
-main = "src/entry-v1380.js"
+main = "src/entry-v1390.js"
 compatibility_date = "2026-08-15"
 
 [vars]
@@ -46,5 +46,11 @@ invocation_logs = true
 # It additionally supports the historical name-only media hash so old cached
 # team images remain visible even when the newer name+game media file and the
 # admin snapshot photoUrl are absent.
+#
+# entry-v1390 adds authenticated access to the five additional v0.6.1
+# background-music files stored only in the private data repository. The
+# existing MAYAK background media route remains unchanged; the frontend uses a
+# shuffle-bag so all six tracks play in randomized order without immediate
+# repeats across playlist cycles.
 #
 # Cloudflare Builds source: GitHub main, root path /worker.
