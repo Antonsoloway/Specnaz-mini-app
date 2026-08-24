@@ -175,3 +175,9 @@ Admin-preview `v0.6.0` дополнительно использует:
 - Once an authenticated admin team image has loaded successfully, a transient media refresh failure must not replace it with the castle fallback during the same Mini App session.
 
 - Admin team detail edit controls must ignore the navigation compatibility/ghost tap that created the detail page; editing starts only from a deliberate tap after the page transition has settled.
+
+- Admin team media loading must be bounded and viewport-prioritized. Never fan out protected `/admin-team-photo` requests for the whole team directory at once; identical requests should be coalesced.
+
+- Admin write transport retries must reuse the exact same requestId/body. Transient network and 408/425/429/502/503/504 failures may be retried; permanent auth/validation/conflict responses must not be replayed as new mutations.
+
+- Active-team decoration must run after asynchronous admin team detail rendering; the active-team indicator must not depend on a later tap/input event.

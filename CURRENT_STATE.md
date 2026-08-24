@@ -533,3 +533,16 @@ Repo config на 23.08.2026:
 - Team detail edit control is shielded for 850 ms after a new detail DOM is created, preventing Android compatibility/ghost click from opening edit immediately after the navigation tap.
 - Frontend/menu marker = `20260824-v061-admin-team-stability1`; existing deployment `Таблица ЧП 1.3` preserved; temporary menu verifier removed; live Apps Script mirror synchronized.
 - Device smoke pending: repeatedly open several team cards, return to list, and verify images remain visible and edit opens only on a deliberate second tap.
+
+
+---
+
+## v0.6.1 admin reliability — 24.08.2026 [V061_ADMIN_RELIABILITY_20260824]
+
+- Device reports combined: many admin team screenshots remained on castle fallback, active-team indicator appeared only after a second tap, and admin save could end in `Failed to fetch` after its single transport retry.
+- `admin-reliability-v061.js` now gates `/admin-team-photo` to 3 concurrent requests, coalesces identical requests and dynamically prioritizes team images near the viewport/admin detail. Far-offscreen requests wait instead of flooding the protected admin-data/media chain. Read-only photo requests also get bounded transient retries.
+- Visible admin team images are explicitly re-armed through the existing protected media loader, so a failed first render no longer requires a tap to retry.
+- `/admin-write` transport/edge failures use bounded retries for network plus HTTP 408/425/429/502/503/504. The exact body and requestId are reused, preserving write idempotency and avoiding duplicate mutations.
+- After async admin team detail render, `RoyalActiveTeams.refresh()` is called immediately and once more after a short settle delay, so the active-team mole is present without an extra tap.
+- Frontend/menu marker = `20260824-v061-admin-reliability1`; existing deployment `Таблица ЧП 1.3` preserved; temporary verifier removed; live Apps Script mirror synchronized.
+- Device acceptance pending: scroll through team list and verify screenshots load as they approach viewport; open an active team and see mole immediately; perform repeated admin saves without `Failed to fetch`.

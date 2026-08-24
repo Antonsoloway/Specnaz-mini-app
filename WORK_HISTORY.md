@@ -455,3 +455,14 @@ searchKeys и searchIndexVersion.
 - Root interaction: multiple media layers may replace/revoke transient blob URLs while the admin DOM is being re-rendered; Android can also emit a compatibility click after the pointer navigation has already replaced the team-list DOM with team detail.
 - Added a durable session image fallback keyed by team+game and an 850 ms edit-button navigation shield.
 - Published marker `20260824-v061-admin-team-stability1` and refreshed Telegram menu through the existing Apps Script deployment only.
+
+
+---
+
+### 24.08.2026 — admin media/write/active-team reliability [V061_ADMIN_RELIABILITY_20260824]
+
+- Investigated three device issues together because they share async/render/network timing in admin mode.
+- Root media issue: multiple v0.6.1 compatibility layers could request every admin team image at once while `/admin-team-photo` itself performs protected admin authorization and private media reads. Some images therefore lost the first race and only retried after another UI interaction. Added bounded/coalesced viewport-priority queue and protected visible-image rearm.
+- Root write symptom: current write client had only one true transport retry; the video showed that retry message followed by `Failed to fetch`. Added additional same-requestId transport/edge retries without changing server mutation semantics.
+- Root mole symptom: legacy active-team decorator wrapped ordinary synchronous team rendering, but admin team detail renders asynchronously. Added explicit post-render refresh for admin detail.
+- Published marker `20260824-v061-admin-reliability1` through the existing Telegram/Apps Script deployment only.
