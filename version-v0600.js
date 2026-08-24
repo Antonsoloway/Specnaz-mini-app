@@ -1,7 +1,7 @@
 /* Royal CRM Mini App — v0.6.1 visible version guard + final admin-write loader */
 (() => {
   const VERSION = '0.6.1';
-  const CACHE = '20260824-v061-music-playlist1';
+  const CACHE = '20260824-v061-admin-participant-cards1';
 
   function apply() {
     window.__ROYAL_BUILD__ = VERSION;
