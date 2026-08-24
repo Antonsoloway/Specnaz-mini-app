@@ -165,3 +165,9 @@ Admin-preview `v0.6.0` дополнительно использует:
 - Admin context is sticky: a participant/team navigation that originates from any admin list, detail, ranking, roster, or membership pill must open the corresponding protected admin detail; ordinary/public participant or team routers must never win that transition.
 
 - Moving admin edit controls must not break protected media. Admin team detail must keep/re-arm authenticated team-photo loading after layout/DOM relocation and may use a bounded direct refetch fallback.
+
+- Admin team list must preserve the same game color language as ordinary mode: Royal Kingdom cards are red and Royal Match cards are blue.
+
+- Admin search must release the mobile keyboard when focus/gesture moves away from its search field, matching ordinary-mode keyboard behavior.
+
+- Admin create actions are direct: do not reintroduce a separate global «Режим редактирования» switch; keep direct Add team / Add participant actions and per-record edit entry points.

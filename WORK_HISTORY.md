@@ -435,3 +435,13 @@ searchKeys и searchIndexVersion.
 - Added a v0.6.1 admin-context integrity layer that owns pointer/click routing before legacy public handlers and routes participant/team transitions exclusively through `RoyalAdminParticipantDetailV0600` / `RoyalAdminTeamDetailV0600` while an admin surface is active.
 - Added protected team-photo recovery on admin team detail after DOM/button relocation; normal cache bridge is tried first, then a single authenticated direct refetch if necessary.
 - Published cache/menu marker `20260824-v061-admin-integrity1`; existing Apps Script deployment retained; live mirror resynced. Device acceptance pending.
+
+
+---
+
+### 24.08.2026 — admin team colors / direct create / keyboard [V061_ADMIN_UI_CONTROLS_20260824]
+
+- Device request: color admin team cards by game (RK red / RM blue), remove global edit-mode button in favor of direct create actions, and make admin search keyboard dismissal match ordinary mode.
+- Added `admin-ui-controls-v061.js` and published marker `20260824-v061-admin-ui-controls1`. Telegram menu update and existing Apps Script deployment update completed; live mirror sync completed.
+- Initial release script then failed during `node --check changelog-v0601.js`: its generated third changelog item missed the comma before the permanent final history item. No production rollback was needed.
+- Added safe handoff finalizer; changelog is syntax-checked before commit and CURRENT_STATE / WORK_HISTORY / RELEASE_RULES are completed without touching production deployment.

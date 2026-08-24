@@ -511,3 +511,14 @@ Repo config на 23.08.2026:
 - Regression after moving the team edit button upward: admin team photo could remain on castle fallback. `v061-admin-context-integrity.js` now re-arms protected photo loading after admin detail render and performs one authenticated `/admin-team-photo` refetch if the normal media bridge still has no image.
 - Frontend/menu marker = `20260824-v061-admin-integrity1`; Telegram menu confirmed. Existing deployment `Таблица ЧП 1.3` preserved, temporary verifier removed, live Apps Script mirror synchronized.
 - Device smoke pending: participant → team → participant navigation must remain admin-only and team photos must load with the edit button at the top.
+
+
+---
+
+## v0.6.1 admin UI controls — 24.08.2026 [V061_ADMIN_UI_CONTROLS_20260824]
+
+- Admin team list mirrors ordinary game colors: Royal Kingdom = red cards, Royal Match = blue cards.
+- Separate global «Режим редактирования» control is removed. The admin header exposes permanent «Добавить команду» and «Добавить участника» actions; existing records keep their direct edit entry points.
+- Admin search now dismisses the mobile keyboard when pointer focus/scroll gesture leaves the active search field; Enter/Escape also release the field.
+- Frontend + Telegram menu marker = `20260824-v061-admin-ui-controls1`. Existing Apps Script deployment `Таблица ЧП 1.3` was preserved and the live Apps Script mirror was synchronized before this handoff finalization.
+- The first handoff attempt stopped only at changelog syntax validation because the third inserted JS array item lacked a trailing comma; production/frontend/menu work had already completed. This finalizer repairs only changelog/handoff state and does not redeploy Apps Script.
