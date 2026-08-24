@@ -4,9 +4,10 @@
   if (String(window.__ROYAL_BUILD__ || '') !== '0.6.1') return;
   if (window.__ROYAL_ADMIN_UI_CONTROLS_V061__) return;
 
-  const VERSION = '0.6.1-admin-ui-controls.1';
+  const VERSION = '0.6.1-admin-ui-controls.2';
   let scheduled = 0;
   let drag = null;
+  let writeReadyPoll = 0;
 
   const clean = value => String(value == null ? '' : value).trim();
   const lower = value => clean(value).toLocaleLowerCase('ru-RU').replace(/ё/g, 'е');
@@ -43,7 +44,6 @@
       const actions = screen.querySelector('.royal-admin-actions');
       if (!actions) return;
 
-      // Editing is now direct from the record itself; the separate mode switch is obsolete.
       actions.querySelectorAll('[data-admin-edit-mode="1"]').forEach(node => node.remove());
       actions.classList.add('v061-admin-direct-actions');
 
@@ -65,7 +65,6 @@
         button.setAttribute('aria-disabled', writeReady ? 'false' : 'true');
       });
 
-      // The old write-mode toolbar is redundant with the two permanent actions above.
       screen.querySelectorAll('[data-admin-write-toolbar="1"],[data-admin-edit-hint="1"]').forEach(node => node.remove());
     });
   }
@@ -123,7 +122,6 @@
     return true;
   }
 
-  // Match ordinary mode: a tap/scroll away from search immediately releases the keyboard.
   window.addEventListener('pointerdown', event => {
     const input = activeAdminSearch();
     if (!input) { drag = null; return; }
@@ -152,17 +150,17 @@
     if (event.key === 'Enter' || event.key === 'Escape') dismissAdminKeyboard();
   }, true);
 
-  function decorate(root = document) {
-    colorTeamRecords(root);
-    ensurePrimaryActions(root);
-    ensureRecordEditButtons(root);
+  function decorate() {
+    colorTeamRecords(document);
+    ensurePrimaryActions(document);
+    ensureRecordEditButtons(document);
   }
 
-  function schedule(root = document) {
+  function schedule() {
     if (scheduled) return;
     scheduled = window.requestAnimationFrame(() => {
       scheduled = 0;
-      decorate(root?.isConnected === false ? document : root);
+      decorate();
     });
   }
 
@@ -217,12 +215,8 @@
       line-height:1.18!important;
       white-space:normal!important;
     }
-    .royal-admin-create-stack-v061 .royal-admin-action:disabled{
-      opacity:.58;
-    }
-    .royal-admin-edit-top-v061{
-      margin:8px 0 14px!important;
-    }
+    .royal-admin-create-stack-v061 .royal-admin-action:disabled{opacity:.58}
+    .royal-admin-edit-top-v061{margin:8px 0 14px!important}
     @media (max-width:390px){
       .royal-admin-actions.v061-admin-direct-actions{gap:9px!important}
       .royal-admin-create-stack-v061{gap:7px}
@@ -233,27 +227,38 @@
 
   const observer = new MutationObserver(records => {
     for (const record of records) {
-      for (const node of record.addedNodes || []) {
-        if (!(node instanceof Element)) continue;
-        if (node.matches?.('.royal-admin-screen,[data-admin-team="1"],[data-admin-participant="1"]') ||
-            node.querySelector?.('.royal-admin-screen,[data-admin-team="1"],[data-admin-participant="1"]')) {
-          schedule(node);
-          return;
-        }
+      if (record.addedNodes?.length || record.removedNodes?.length) {
+        schedule();
+        return;
       }
     }
   });
   observer.observe(document.body, { childList:true, subtree:true });
 
-  [0,120,350,800,1600,3000].forEach(delay => window.setTimeout(() => schedule(document), delay));
-  window.addEventListener('pageshow', () => schedule(document));
-  window.addEventListener('royal:auth-ready', () => schedule(document));
-  window.addEventListener('royal:snapshot-ready', () => schedule(document));
+  [0,120,350,800,1600,3000,5000,8000].forEach(delay => window.setTimeout(schedule, delay));
+  writeReadyPoll = window.setInterval(() => {
+    if (!document.querySelector('.royal-admin-screen')) return;
+    schedule();
+    if (window.RoyalAdminWriteV0600) {
+      window.clearInterval(writeReadyPoll);
+      writeReadyPoll = 0;
+    }
+  }, 500);
+  window.setTimeout(() => {
+    if (writeReadyPoll) {
+      window.clearInterval(writeReadyPoll);
+      writeReadyPoll = 0;
+    }
+  }, 15000);
 
-  decorate(document);
+  window.addEventListener('pageshow', schedule);
+  window.addEventListener('royal:auth-ready', schedule);
+  window.addEventListener('royal:snapshot-ready', schedule);
+
+  decorate();
   window.__ROYAL_ADMIN_UI_CONTROLS_V061__ = {
     version:VERSION,
-    refresh:() => schedule(document),
+    refresh:schedule,
     dismissKeyboard:dismissAdminKeyboard
   };
 })();
