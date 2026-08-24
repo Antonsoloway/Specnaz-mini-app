@@ -466,3 +466,11 @@ searchKeys и searchIndexVersion.
 - Root write symptom: current write client had only one true transport retry; the video showed that retry message followed by `Failed to fetch`. Added additional same-requestId transport/edge retries without changing server mutation semantics.
 - Root mole symptom: legacy active-team decorator wrapped ordinary synchronous team rendering, but admin team detail renders asynchronously. Added explicit post-render refresh for admin detail.
 - Published marker `20260824-v061-admin-reliability1` through the existing Telegram/Apps Script deployment only.
+
+
+---
+
+### 24.08.2026 — original Calloused Strings MP3 [V061_CALLOUSED_STRINGS_ORIGINAL_MP3_20260824]
+
+- Replaced only private `track-06.mp3`; no playlist routing or user music preference behavior changed.
+- Source MP3 was normalized to the existing set and exported without embedded tags/artwork.

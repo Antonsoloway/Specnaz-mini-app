@@ -546,3 +546,12 @@ Repo config на 23.08.2026:
 - After async admin team detail render, `RoyalActiveTeams.refresh()` is called immediately and once more after a short settle delay, so the active-team mole is present without an extra tap.
 - Frontend/menu marker = `20260824-v061-admin-reliability1`; existing deployment `Таблица ЧП 1.3` preserved; temporary verifier removed; live Apps Script mirror synchronized.
 - Device acceptance pending: scroll through team list and verify screenshots load as they approach viewport; open an active team and see mole immediately; perform repeated admin saves without `Failed to fetch`.
+
+
+---
+
+## v0.6.1 music track replacement — 24.08.2026 [V061_CALLOUSED_STRINGS_ORIGINAL_MP3_20260824]
+
+- MIDI-derived Calloused Strings render removed from playlist storage.
+- Private track 06 replaced by the user-supplied original MP3 after metadata/artwork removal and loudness normalization to the existing background set.
+- Random 6-track playlist behavior and asset identity remain unchanged.
