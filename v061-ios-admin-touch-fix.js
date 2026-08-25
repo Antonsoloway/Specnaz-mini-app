@@ -1,155 +1,234 @@
-/* Royal CRM Mini App v0.6.1 — iOS admin modal touch reliability */
+/* Royal CRM Mini App v0.6.1 — iOS admin modal touch reliability v2 */
 (() => {
   'use strict';
   if (String(window.__ROYAL_BUILD__ || '') !== '0.6.1') return;
-  if (window.__ROYAL_IOS_ADMIN_TOUCH_FIX_V061__) return;
 
-  const VERSION = '0.6.1-ios-admin-touch.1';
+  const VERSION = '0.6.1-ios-admin-touch.2';
   const ua = String(navigator.userAgent || '');
   const platform = String(navigator.platform || '');
   const isIOS = /iPad|iPhone|iPod/i.test(ua) || (platform === 'MacIntel' && Number(navigator.maxTouchPoints || 0) > 1);
   if (!isIOS) return;
 
-  const ACTION_SELECTOR = [
-    '[data-write-close="1"]',
-    '[data-write-clear-slot="1"]',
-    '.royal-admin-form-button.is-save',
-    '.royal-admin-form-button.is-delete',
-    '.royal-admin-direct-delete',
-    '[data-admin-create-participant="1"]',
-    '[data-admin-create-team="1"]',
-    '[data-admin-edit-participant="1"]',
-    '[data-admin-edit-team="1"]'
-  ].join(',');
+  try { delete window.__ROYAL_IOS_ADMIN_TOUCH_FIX_V061__; } catch (_) {}
 
-  let touch = null;
+  const BUTTON_SELECTOR = '[data-admin-write-modal="1"] button:not(:disabled)';
+  let press = null;
   let syntheticTarget = null;
   let syntheticUntil = 0;
 
-  function modalFor(target) {
-    return target?.closest?.('[data-admin-write-modal="1"] .royal-admin-modal') || null;
+  const now = () => Date.now();
+  const pointFromPointer = event => ({
+    x: Number(event?.clientX || 0),
+    y: Number(event?.clientY || 0)
+  });
+
+  function isModalButton(target) {
+    const button = target?.closest?.(BUTTON_SELECTOR) || null;
+    if (!button || !button.isConnected || button.disabled) return null;
+    if (button.closest?.('.royal-admin-photo-picker')) return null;
+    return button;
   }
 
-  function actionFor(target) {
-    const action = target?.closest?.(ACTION_SELECTOR) || null;
-    if (!action || action.disabled || !modalFor(action)) return null;
-    return action;
+  function viewportHeight() {
+    const h = Number(window.visualViewport?.height || window.innerHeight || document.documentElement.clientHeight || 0);
+    if (h > 200) document.documentElement.style.setProperty('--v061-ios-admin-vh', `${Math.round(h)}px`);
   }
 
   function decorateBackdrop(backdrop) {
-    if (!backdrop || backdrop.dataset.v061IosTouch === VERSION) return;
+    if (!backdrop) return;
     backdrop.dataset.v061IosTouch = VERSION;
-    backdrop.classList.add('v061-ios-admin-touch');
+    backdrop.classList.add('v061-ios-admin-touch-v2');
+    viewportHeight();
   }
 
   function decorateExisting() {
     document.querySelectorAll('[data-admin-write-modal="1"]').forEach(decorateBackdrop);
   }
 
+  function dispatchButton(button) {
+    if (!button?.isConnected || button.disabled) return false;
+    syntheticTarget = button;
+    syntheticUntil = now() + 900;
+
+    if (String(button.type || '').toLowerCase() === 'submit') {
+      const form = button.form || button.closest('form');
+      if (!form) return false;
+      try {
+        if (typeof form.requestSubmit === 'function') form.requestSubmit(button);
+        else form.dispatchEvent(new Event('submit', { bubbles:true, cancelable:true }));
+        return true;
+      } catch (_) {
+        try {
+          form.dispatchEvent(new Event('submit', { bubbles:true, cancelable:true }));
+          return true;
+        } catch (_) { return false; }
+      }
+    }
+
+    try {
+      button.dispatchEvent(new MouseEvent('click', {
+        bubbles:true,
+        cancelable:true,
+        view:window,
+        button:0
+      }));
+      return true;
+    } catch (_) {
+      try { button.click(); return true; }
+      catch (_) { return false; }
+    }
+  }
+
   const style = document.createElement('style');
-  style.dataset.v061IosAdminTouch = '1';
+  style.dataset.v061IosAdminTouchV2 = '1';
   style.textContent = `
-    [data-admin-write-modal="1"].v061-ios-admin-touch{
+    [data-admin-write-modal="1"].v061-ios-admin-touch-v2{
+      position:fixed!important;
+      inset:0!important;
+      z-index:99999!important;
+      display:block!important;
+      overflow:hidden!important;
       -webkit-backdrop-filter:none!important;
       backdrop-filter:none!important;
-      overflow-y:auto!important;
-      -webkit-overflow-scrolling:touch!important;
-      align-items:flex-start!important;
+      background:rgba(3,8,12,.88)!important;
       touch-action:pan-y!important;
-      overscroll-behavior:contain!important;
+      overscroll-behavior:none!important;
     }
-    [data-admin-write-modal="1"].v061-ios-admin-touch .royal-admin-modal{
-      width:min(680px,100%)!important;
-      max-height:none!important;
-      min-height:100%!important;
-      overflow:visible!important;
-      touch-action:pan-y!important;
+    [data-admin-write-modal="1"].v061-ios-admin-touch-v2 .royal-admin-modal{
+      position:absolute!important;
+      left:0!important;
+      right:0!important;
+      top:0!important;
+      bottom:auto!important;
+      width:100%!important;
+      height:var(--v061-ios-admin-vh,100vh)!important;
+      max-height:var(--v061-ios-admin-vh,100vh)!important;
+      min-height:0!important;
+      margin:0!important;
+      overflow-x:hidden!important;
+      overflow-y:scroll!important;
       -webkit-overflow-scrolling:touch!important;
-      transform:translateZ(0);
+      overscroll-behavior-y:contain!important;
+      touch-action:pan-y!important;
+      transform:none!important;
+      -webkit-transform:none!important;
+      will-change:auto!important;
+      border-radius:0!important;
+      padding-top:max(18px,env(safe-area-inset-top))!important;
+      padding-bottom:calc(28px + env(safe-area-inset-bottom))!important;
     }
-    [data-admin-write-modal="1"].v061-ios-admin-touch button,
-    [data-admin-write-modal="1"].v061-ios-admin-touch input,
-    [data-admin-write-modal="1"].v061-ios-admin-touch select,
-    [data-admin-write-modal="1"].v061-ios-admin-touch label{
-      -webkit-tap-highlight-color:rgba(98,176,235,.16);
-    }
-    [data-admin-write-modal="1"].v061-ios-admin-touch button{
-      touch-action:manipulation!important;
-      cursor:pointer!important;
-      position:relative;
-      z-index:2;
-    }
-    [data-admin-write-modal="1"].v061-ios-admin-touch input,
-    [data-admin-write-modal="1"].v061-ios-admin-touch select{
-      font-size:16px!important;
-      touch-action:manipulation!important;
-      position:relative;
-      z-index:2;
-    }
-    [data-admin-write-modal="1"].v061-ios-admin-touch .royal-admin-form-actions{
-      -webkit-transform:translateZ(0);
-      transform:translateZ(0);
+    [data-admin-write-modal="1"].v061-ios-admin-touch-v2 .royal-admin-form-actions{
+      position:static!important;
+      inset:auto!important;
+      transform:none!important;
+      -webkit-transform:none!important;
       pointer-events:auto!important;
+      background:#101b24!important;
+      padding:12px 0 0!important;
+    }
+    [data-admin-write-modal="1"].v061-ios-admin-touch-v2 .royal-admin-form,
+    [data-admin-write-modal="1"].v061-ios-admin-touch-v2 .royal-admin-slot-editor,
+    [data-admin-write-modal="1"].v061-ios-admin-touch-v2 label,
+    [data-admin-write-modal="1"].v061-ios-admin-touch-v2 button,
+    [data-admin-write-modal="1"].v061-ios-admin-touch-v2 input,
+    [data-admin-write-modal="1"].v061-ios-admin-touch-v2 select,
+    [data-admin-write-modal="1"].v061-ios-admin-touch-v2 textarea{
+      pointer-events:auto!important;
+    }
+    [data-admin-write-modal="1"].v061-ios-admin-touch-v2 button{
+      touch-action:manipulation!important;
+      -webkit-tap-highlight-color:rgba(98,176,235,.18)!important;
+      cursor:pointer!important;
+    }
+    [data-admin-write-modal="1"].v061-ios-admin-touch-v2 input,
+    [data-admin-write-modal="1"].v061-ios-admin-touch-v2 select,
+    [data-admin-write-modal="1"].v061-ios-admin-touch-v2 textarea{
+      touch-action:auto!important;
+      font-size:16px!important;
+      -webkit-user-select:text!important;
+      user-select:text!important;
+    }
+    [data-admin-write-modal="1"].v061-ios-admin-touch-v2 select{
+      -webkit-appearance:menulist!important;
+      appearance:auto!important;
     }
   `;
   document.head.appendChild(style);
 
-  window.addEventListener('touchstart', event => {
-    const action = actionFor(event.target);
-    if (!action || event.touches?.length !== 1) {
-      touch = null;
-      return;
-    }
-    const point = event.touches[0];
-    touch = {
-      action,
-      id: point.identifier,
-      x: Number(point.clientX || 0),
-      y: Number(point.clientY || 0),
-      at: Date.now(),
-      moved: false
+  window.addEventListener('pointerdown', event => {
+    if (event.pointerType && event.pointerType !== 'touch') return;
+    const button = isModalButton(event.target);
+    if (!button) { press = null; return; }
+    const p = pointFromPointer(event);
+    press = {
+      id:event.pointerId,
+      button,
+      x:p.x,
+      y:p.y,
+      at:now(),
+      moved:false
     };
+  }, true);
+
+  window.addEventListener('pointermove', event => {
+    if (!press || press.id !== event.pointerId) return;
+    const p = pointFromPointer(event);
+    const dx = p.x - press.x;
+    const dy = p.y - press.y;
+    if ((dx * dx + dy * dy) > 225) press.moved = true;
   }, { capture:true, passive:true });
 
-  window.addEventListener('touchmove', event => {
-    if (!touch) return;
-    const points = Array.from(event.touches || []);
-    const point = points.find(item => item.identifier === touch.id);
-    if (!point) return;
-    const dx = Number(point.clientX || 0) - touch.x;
-    const dy = Number(point.clientY || 0) - touch.y;
-    if ((dx * dx + dy * dy) > 196) touch.moved = true;
-  }, { capture:true, passive:true });
+  window.addEventListener('pointerup', event => {
+    const saved = press;
+    press = null;
+    if (!saved || saved.id !== event.pointerId || saved.moved || now() - saved.at > 1100) return;
+    const p = pointFromPointer(event);
+    const dx = p.x - saved.x;
+    const dy = p.y - saved.y;
+    if ((dx * dx + dy * dy) > 225 || !saved.button?.isConnected || saved.button.disabled) return;
 
-  window.addEventListener('touchend', event => {
-    const saved = touch;
-    touch = null;
-    if (!saved || saved.moved || Date.now() - saved.at > 1000) return;
-    const changed = Array.from(event.changedTouches || []);
-    const point = changed.find(item => item.identifier === saved.id);
-    if (!point || !saved.action?.isConnected || saved.action.disabled) return;
-
-    const dx = Number(point.clientX || 0) - saved.x;
-    const dy = Number(point.clientY || 0) - saved.y;
-    if ((dx * dx + dy * dy) > 196) return;
-
-    // iOS Telegram WebView occasionally drops the follow-up click for controls
-    // inside the fixed, scrollable admin sheet. Convert the completed tap into
-    // the same normal click path used by the existing admin-write module.
     event.preventDefault();
-    syntheticTarget = saved.action;
-    syntheticUntil = Date.now() + 700;
-    saved.action.click();
-  }, { capture:true, passive:false });
+    event.stopImmediatePropagation();
+    dispatchButton(saved.button);
+  }, true);
 
-  window.addEventListener('touchcancel', () => { touch = null; }, true);
+  window.addEventListener('pointercancel', () => { press = null; }, true);
 
-  // If WebKit still emits its delayed trusted click after the synthetic click,
-  // consume only that duplicate so Save/Delete/Clear never execute twice.
+  if (!window.PointerEvent) {
+    let touch = null;
+    window.addEventListener('touchstart', event => {
+      const button = isModalButton(event.target);
+      if (!button || event.touches?.length !== 1) { touch = null; return; }
+      const p = event.touches[0];
+      touch = { button, id:p.identifier, x:Number(p.clientX||0), y:Number(p.clientY||0), at:now(), moved:false };
+    }, { capture:true, passive:true });
+    window.addEventListener('touchmove', event => {
+      if (!touch) return;
+      const p = Array.from(event.touches || []).find(item => item.identifier === touch.id);
+      if (!p) return;
+      const dx = Number(p.clientX||0) - touch.x;
+      const dy = Number(p.clientY||0) - touch.y;
+      if ((dx*dx + dy*dy) > 225) touch.moved = true;
+    }, { capture:true, passive:true });
+    window.addEventListener('touchend', event => {
+      const saved = touch; touch = null;
+      if (!saved || saved.moved || now()-saved.at > 1100) return;
+      const p = Array.from(event.changedTouches || []).find(item => item.identifier === saved.id);
+      if (!p) return;
+      const dx = Number(p.clientX||0) - saved.x;
+      const dy = Number(p.clientY||0) - saved.y;
+      if ((dx*dx + dy*dy) > 225) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      dispatchButton(saved.button);
+    }, { capture:true, passive:false });
+    window.addEventListener('touchcancel', () => { touch = null; }, true);
+  }
+
   window.addEventListener('click', event => {
-    if (!event.isTrusted || !syntheticTarget || Date.now() >= syntheticUntil) return;
-    const target = event.target?.closest?.(ACTION_SELECTOR);
-    if (target !== syntheticTarget) return;
+    if (!event.isTrusted || !syntheticTarget || now() >= syntheticUntil) return;
+    const button = event.target?.closest?.(BUTTON_SELECTOR) || null;
+    if (button !== syntheticTarget) return;
     syntheticTarget = null;
     syntheticUntil = 0;
     event.preventDefault();
@@ -167,7 +246,12 @@
   });
   observer.observe(document.body, { childList:true, subtree:true });
 
+  viewportHeight();
+  window.visualViewport?.addEventListener?.('resize', viewportHeight, { passive:true });
+  window.visualViewport?.addEventListener?.('scroll', viewportHeight, { passive:true });
+  window.addEventListener('orientationchange', () => setTimeout(viewportHeight, 120), { passive:true });
+  window.addEventListener('pageshow', () => { viewportHeight(); decorateExisting(); });
+
   decorateExisting();
-  window.addEventListener('pageshow', decorateExisting);
   window.__ROYAL_IOS_ADMIN_TOUCH_FIX_V061__ = VERSION;
 })();
