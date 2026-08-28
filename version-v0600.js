@@ -1,7 +1,7 @@
 /* Royal CRM Mini App — v0.6.1 visible version guard + final admin-write loader */
 (() => {
   const VERSION = '0.6.1';
-  const CACHE = '20260825-v061-ios-admin-touch1';
+  const CACHE = '20260828-v061-team-symbol-identity1';
 
   function apply() {
     window.__ROYAL_BUILD__ = VERSION;
@@ -48,14 +48,14 @@
   }
 
   function loadV061TeamPhotoRefresh(next) {
-    if (window.__ROYAL_TEAM_PHOTO_REFRESH_V061__ || document.querySelector('script[data-team-photo-refresh-v061="1"]')) {
+    if (window.__ROYAL_TEAM_PHOTO_REFRESH_V061_V2__ || document.querySelector('script[data-team-photo-refresh-v061-v2="1"]')) {
       next();
       return;
     }
     const script = document.createElement('script');
-    script.src = `team-photo-refresh-v061.js?v=${CACHE}`;
+    script.src = `team-photo-refresh-v061-v2.js?v=${CACHE}`;
     script.async = false;
-    script.dataset.teamPhotoRefreshV061 = '1';
+    script.dataset.teamPhotoRefreshV061V2 = '1';
     let continued = false;
     const proceed = () => {
       if (continued) return;
