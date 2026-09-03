@@ -7,7 +7,7 @@
  * Properties; no owner ID, bot token or webhook secret belongs in source.
  */
 
-const GOLUB_OWNER_WEBHOOK_VERSION = '2.0.0';
+const GOLUB_OWNER_WEBHOOK_VERSION = '2.1.0';
 const GOLUB_OWNER_WEBHOOK_PROP = Object.freeze({
   enabled: 'GOLUB_OWNER_WEBHOOK_ENABLED',
   ownerUserId: 'GOLUB_OWNER_USER_ID',
@@ -81,6 +81,82 @@ function GOLUB_OWNER_hmacHex_(secret, value) {
   }).join('');
 }
 
+function GOLUB_OWNER_signedPost_(endpoint, path, payload, secret) {
+  var timestamp = String(Date.now());
+  var nonce = Utilities.getUuid().replace(/-/g, '');
+  var signature = GOLUB_OWNER_hmacHex_(
+    secret,
+    timestamp + '|' + nonce + '|' + path + '|' + payload
+  );
+  var response = UrlFetchApp.fetch(endpoint, {
+    method:'post',
+    contentType:'application/json; charset=utf-8',
+    payload:payload,
+    headers:{
+      'x-specnaz-timestamp':timestamp,
+      'x-specnaz-nonce':nonce,
+      'x-specnaz-signature':signature
+    },
+    followRedirects:false,
+    muteHttpExceptions:true
+  });
+  return {
+    code:response.getResponseCode(),
+    body:GOLUB_OWNER_safeJson_(response.getContentText())
+  };
+}
+
+function GOLUB_OWNER_workerError_(result) {
+  return result && result.body
+    ? String(result.body.error || '').replace(/[^A-Z0-9_ -]/gi, '').slice(0, 80)
+    : '';
+}
+
+function GOLUB_OWNER_completionText_(body) {
+  var completion = body && body.completion && typeof body.completion === 'object'
+    ? body.completion
+    : null;
+  var choices = completion && Array.isArray(completion.choices) ? completion.choices : [];
+  var message = choices[0] && choices[0].message && typeof choices[0].message === 'object'
+    ? choices[0].message
+    : null;
+  return message ? String(message.content || '').trim() : '';
+}
+
+function GOLUB_OWNER_fallbackAi_(shadowEndpoint, prompt, secret) {
+  var path = '/internal/llm';
+  var endpoint = String(shadowEndpoint || '').replace(/\/internal\/golub-shadow$/, path);
+  var payload = JSON.stringify({
+    purpose:'golub_owner_private_fallback',
+    body:{
+      messages:[
+        {
+          role:'system',
+          content:[
+            'Ты Голубь Мира — будущий голос Чата Победителей (ЧП).',
+            'Сейчас ты общаешься только с владельцем в закрытой личке Telegram.',
+            'Не раскрывай внутренние ключи, маршруты и устройство системы.',
+            'Публичная память ЧП ещё подключается: не выдумывай события, людей и факты из чата.',
+            'Если вопрос требует истории ЧП, честно скажи, что доступ к общей базе пока разворачивается.',
+            'Отвечай по-русски, естественно, кратко и по существу.'
+          ].join('\n')
+        },
+        {role:'user',content:String(prompt || '').slice(0, 5000)}
+      ],
+      temperature:0.2,
+      max_tokens:700
+    }
+  });
+  var result = GOLUB_OWNER_signedPost_(endpoint, path, payload, secret);
+  if (result.code !== 200 || !result.body || result.body.ok !== true) {
+    var workerError = GOLUB_OWNER_workerError_(result);
+    throw new Error('AI_FALLBACK_' + result.code + (workerError ? '_' + workerError : ''));
+  }
+  var answer = GOLUB_OWNER_completionText_(result.body);
+  if (!answer) throw new Error('AI_FALLBACK_EMPTY_ANSWER');
+  return answer.slice(0, 12000);
+}
+
 function GOLUB_OWNER_aiAnswer_(message, sender, props) {
   if (String(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.aiEnabled) || '0') !== '1') {
     throw new Error('AI_DISABLED');
@@ -98,7 +174,7 @@ function GOLUB_OWNER_aiAnswer_(message, sender, props) {
   if (!prompt) {
     return '🕊 Пока я отвечаю на текстовые сообщения. Пришли вопрос текстом.';
   }
-  var payload = JSON.stringify({
+  var shadowPayload = JSON.stringify({
     kind:'golub_shadow_private',
     chatType:'private',
     messageId:Number(message.message_id || 0),
@@ -106,28 +182,22 @@ function GOLUB_OWNER_aiAnswer_(message, sender, props) {
     user:{id:String(sender && sender.id || '')},
     text:prompt.slice(0, 5000)
   });
-  var timestamp = String(Date.now());
-  var nonce = Utilities.getUuid().replace(/-/g, '');
-  var path = '/internal/golub-shadow';
-  var signature = GOLUB_OWNER_hmacHex_(
-    secret,
-    timestamp + '|' + nonce + '|' + path + '|' + payload
+  var shadow = GOLUB_OWNER_signedPost_(
+    endpoint,
+    '/internal/golub-shadow',
+    shadowPayload,
+    secret
   );
-  var response = UrlFetchApp.fetch(endpoint, {
-    method:'post',
-    contentType:'application/json; charset=utf-8',
-    payload:payload,
-    headers:{
-      'x-specnaz-timestamp':timestamp,
-      'x-specnaz-nonce':nonce,
-      'x-specnaz-signature':signature
-    },
-    followRedirects:false,
-    muteHttpExceptions:true
-  });
-  if (response.getResponseCode() !== 200) throw new Error('AI_HTTP_' + response.getResponseCode());
-  var body = GOLUB_OWNER_safeJson_(response.getContentText());
-  var answer = body && body.ok === true ? String(body.answer || '').trim() : '';
+  if (shadow.code === 404 && /^not[-_ ]?found$/i.test(GOLUB_OWNER_workerError_(shadow))) {
+    return GOLUB_OWNER_fallbackAi_(endpoint, prompt, secret);
+  }
+  if (shadow.code !== 200) {
+    var workerError = GOLUB_OWNER_workerError_(shadow);
+    throw new Error('AI_HTTP_' + shadow.code + (workerError ? '_' + workerError : ''));
+  }
+  var answer = shadow.body && shadow.body.ok === true
+    ? String(shadow.body.answer || '').trim()
+    : '';
   if (!answer) throw new Error('AI_EMPTY_ANSWER');
   return answer.slice(0, 12000);
 }
@@ -169,22 +239,22 @@ function GOLUB_OWNER_aiBridgeStatus() {
   return result;
 }
 
-function GOLUB_OWNER_configureAiBridge() {
-  var ui = SpreadsheetApp.getUi();
-  var response = ui.prompt(
-    'Закрытый AI-канал Голубя',
-    'Вставьте существующий SPECNAZ_AI_SHARED_SECRET. Значение будет сохранено только в свойствах скрипта.',
-    ui.ButtonSet.OK_CANCEL
-  );
-  if (response.getSelectedButton() !== ui.Button.OK) return GOLUB_OWNER_aiBridgeStatus();
-  var secret = String(response.getResponseText() || '').trim();
-  if (secret.length < 32) throw new Error('GOLUB_OWNER_BAD_SHARED_SECRET');
-  PropertiesService.getScriptProperties().setProperties({
-    GOLUB_SHADOW_PRIVATE_ENABLED:'1',
-    GOLUB_SHADOW_WORKER_URL:GOLUB_OWNER_DEFAULT_AI_WORKER_URL,
-    GOLUB_SHADOW_SHARED_SECRET:secret
-  }, false);
-  return GOLUB_OWNER_aiBridgeStatus();
+function GOLUB_OWNER_probeAiBridge() {
+  var props = PropertiesService.getScriptProperties();
+  var ownerUserId = String(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.ownerUserId) || '');
+  if (!ownerUserId) throw new Error('OWNER_NOT_CONFIGURED');
+  var answer = GOLUB_OWNER_aiAnswer_({
+    message_id:0,
+    date:Math.floor(Date.now() / 1000),
+    text:'Ответь одним коротким предложением: закрытый канал Голубя готов.'
+  }, {id:ownerUserId}, props);
+  var result = {
+    ok:Boolean(answer),
+    version:GOLUB_OWNER_WEBHOOK_VERSION,
+    answerLength:String(answer || '').length
+  };
+  Logger.log(JSON.stringify(result));
+  return result;
 }
 
 /**
@@ -248,4 +318,3 @@ function GOLUB_OWNER_tryHandleTelegram_(e) {
   // the private update and can create a storm while diagnostics are running.
   return GOLUB_OWNER_json_({ok:true});
 }
-
