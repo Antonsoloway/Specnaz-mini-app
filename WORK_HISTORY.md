@@ -6,6 +6,17 @@
 > номера строк и before/after payload хранятся только в приватном operational
 > handoff и admin journal.
 
+## 2026-09-03 — Golub private AI connected to public-only CHP memory interface
+
+- Existing `Таблица ЧП 1.3` deployment advanced in place from version 102 to 103; the deployment ID and webhook-facing URL are unchanged.
+- `36_GOLUB_OWNER_WEBHOOK_INGRESS.gs` advanced to v2.4.0.
+- The owner-only private path now executes a signed public-CHP query before its provider fallback and passes only bounded canonical evidence to the model.
+- The query contract fixes `realm=chp` and the authoritative CHP chat ID in server code. Private/admin realms cannot be requested by the Telegram message.
+- The owner's private question is used only to compile the query and is not stored in the public D1 event ledger.
+- A live bridge probe returned a non-empty AI answer; sanitized status confirmed that the public-memory signature configuration is present.
+- Telegram webhook verification after deployment showed zero pending updates and no delivery error.
+- Public CHP AI speaking, ChatKeeper routing, Royal CRM queueing and Mini App behavior remain disabled/unchanged by this update.
+
 ## 2026-09-03 — Golub owner-only Telegram webhook installed
 
 С явного разрешения владельца установлен отдельный private ingress для Golub:
