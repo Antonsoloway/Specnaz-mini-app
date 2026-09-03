@@ -18,7 +18,9 @@ const GOLUB_SHADOW_PROP = Object.freeze({
   lastOk: 'GOLUB_SHADOW_LAST_OK',
   lastError: 'GOLUB_SHADOW_LAST_ERROR'
 });
-const GOLUB_SHADOW_DEFAULT_OWNER_ID = '1456874273';
+// Owner identity is configuration, not source. Fail closed when the Script
+// Property has not been set by an authorized one-time bootstrap.
+const GOLUB_SHADOW_DEFAULT_OWNER_ID = '';
 const GOLUB_SHADOW_EVENT_NAMES = Object.freeze([
   'golub_shadow',
   'golub_shadow_private',
