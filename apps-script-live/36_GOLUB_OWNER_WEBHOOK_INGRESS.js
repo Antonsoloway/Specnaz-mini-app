@@ -1,0 +1,131 @@
+/**
+ * GOLUB OWNER WEBHOOK INGRESS v1
+ *
+ * A deliberately small private Telegram ingress for the branded bot
+ * «Голубь Мира». It does not enable AI in CHP and it does not forward private
+ * Telegram messages to Royal CRM. Configuration lives only in Apps Script
+ * Properties; no owner ID, bot token or webhook secret belongs in source.
+ */
+
+const GOLUB_OWNER_WEBHOOK_VERSION = '1.0.0';
+const GOLUB_OWNER_WEBHOOK_PROP = Object.freeze({
+  enabled: 'GOLUB_OWNER_WEBHOOK_ENABLED',
+  ownerUserId: 'GOLUB_OWNER_USER_ID',
+  querySecret: 'GOLUB_OWNER_WEBHOOK_QUERY_SECRET',
+  lastUpdateId: 'GOLUB_OWNER_LAST_UPDATE_ID',
+  lastOk: 'GOLUB_OWNER_LAST_OK',
+  lastError: 'GOLUB_OWNER_LAST_ERROR'
+});
+const GOLUB_OWNER_WEBHOOK_QUERY_PARAM = 'golub_owner_key';
+const GOLUB_OWNER_WEBHOOK_ACK =
+  '🕊 Закрытый канал Голубя подключён. Сообщение получено. ИИ и ответы в ЧП пока не включены.';
+
+function GOLUB_OWNER_json_(body) {
+  return ContentService
+    .createTextOutput(JSON.stringify(body || {}))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function GOLUB_OWNER_raw_(e) {
+  return e && e.postData && e.postData.contents
+    ? String(e.postData.contents)
+    : '';
+}
+
+function GOLUB_OWNER_safeJson_(raw) {
+  try {
+    var parsed = JSON.parse(String(raw || ''));
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function GOLUB_OWNER_safeEqual_(left, right) {
+  left = String(left || '');
+  right = String(right || '');
+  if (!left || !right) return false;
+  var max = Math.max(left.length, right.length);
+  var diff = left.length ^ right.length;
+  for (var index = 0; index < max; index += 1) {
+    diff |= left.charCodeAt(index % left.length) ^ right.charCodeAt(index % right.length);
+  }
+  return diff === 0;
+}
+
+function GOLUB_OWNER_isDirectTelegramUpdate_(data) {
+  return Boolean(
+    data &&
+    typeof data === 'object' &&
+    /^\d+$/.test(String(data.update_id == null ? '' : data.update_id)) &&
+    data.message &&
+    typeof data.message === 'object' &&
+    data.message.chat &&
+    typeof data.message.chat === 'object'
+  );
+}
+
+/**
+ * Called before all existing POST routing.
+ *
+ * Returns null only when the payload is not a direct Telegram update. Once a
+ * direct update is identified it is always consumed with HTTP 200, including
+ * invalid-secret, disabled, group and non-owner traffic. This prevents private
+ * Telegram traffic from leaking into the ChatKeeper/Royal CRM queue.
+ */
+function GOLUB_OWNER_tryHandleTelegram_(e) {
+  var data = GOLUB_OWNER_safeJson_(GOLUB_OWNER_raw_(e));
+  if (!GOLUB_OWNER_isDirectTelegramUpdate_(data)) return null;
+
+  var props = PropertiesService.getScriptProperties();
+  if (String(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.enabled) || '0') !== '1') {
+    return GOLUB_OWNER_json_({ok:true});
+  }
+
+  var expectedSecret = props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.querySecret) || '';
+  var suppliedSecret = e && e.parameter
+    ? String(e.parameter[GOLUB_OWNER_WEBHOOK_QUERY_PARAM] || '')
+    : '';
+  if (!GOLUB_OWNER_safeEqual_(suppliedSecret, expectedSecret)) {
+    return GOLUB_OWNER_json_({ok:true});
+  }
+
+  var message = data.message;
+  var sender = message.from && typeof message.from === 'object' ? message.from : null;
+  var ownerUserId = String(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.ownerUserId) || '');
+  var senderUserId = sender ? String(sender.id == null ? '' : sender.id) : '';
+  var chatType = String(message.chat.type || '');
+  if (!ownerUserId || chatType !== 'private' || senderUserId !== ownerUserId) {
+    return GOLUB_OWNER_json_({ok:true});
+  }
+
+  var updateId = Number(data.update_id);
+  var lastUpdateId = Number(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.lastUpdateId) || -1);
+  if (isFinite(lastUpdateId) && updateId <= lastUpdateId) {
+    return GOLUB_OWNER_json_({ok:true});
+  }
+
+  try {
+    tgAvatarApi_('sendMessage', {
+      chat_id:String(message.chat.id),
+      text:GOLUB_OWNER_WEBHOOK_ACK,
+      disable_web_page_preview:true
+    });
+    props.setProperties({
+      GOLUB_OWNER_LAST_UPDATE_ID:String(updateId),
+      GOLUB_OWNER_LAST_OK:new Date().toISOString(),
+      GOLUB_OWNER_LAST_ERROR:''
+    }, false);
+  } catch (_) {
+    // Do not persist message text, user IDs, bot tokens or exception URLs.
+    props.setProperty(
+      GOLUB_OWNER_WEBHOOK_PROP.lastError,
+      'SEND_FAILED ' + new Date().toISOString()
+    );
+  }
+
+  // Telegram must receive 200 even when delivery fails, otherwise it retries
+  // the private update and can create a storm while diagnostics are running.
+  return GOLUB_OWNER_json_({ok:true});
+}
+
