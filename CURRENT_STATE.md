@@ -14,17 +14,17 @@
 6. После принятой/проверенной работы обновлять `CURRENT_STATE.md` и `WORK_HISTORY.md`; `RELEASE_RULES.md` — при новом постоянном инварианте.
 7. Публичные handoff-файлы не должны содержать реальные Telegram ID, имена участников, requestId, dataHash, номера персональных строк или exact private endpoint; использовать обезличенные сценарии и агрегаты. Согласованные публичные credits сохраняются.
 
-### Golub owner-only Telegram ingress — 03.09.2026
+### Golub owner-only AI + public CHP memory interface — 03.09.2026
 
-- Golub's Telegram webhook is installed on the existing stable web-app deployment formerly at version 93 and now updated in place to version 94. No deployment or public URL was created.
-- Raw Telegram updates are intercepted before Mini App and ChatKeeper/Royal CRM routing. Invalid-key, group and non-owner updates receive a silent HTTP 200 and never enter the reliable CRM queue.
-- Only the configured owner can receive the fixed private transport acknowledgement. Golub AI and all CHP group replies remain disabled.
-- Owner identity, bot token and a random webhook query key live only in Script Properties; none is present in current GitHub source or logged by the installer.
-- The pending-update count had risen from the diagnostic 180 to 193 before installation. `drop_pending_updates=true` cleared that same queue; verified count is now 0, with `allowed_updates=[message]` and `max_connections=1`.
-- The ChatKeeper deployment remains version 33 and the other active deployment remains version 38; neither URL nor version was changed.
-- Live source now includes `36_GOLUB_OWNER_WEBHOOK_INGRESS.gs`, and `doPost` invokes it before existing routes. The one-time installer was deleted after verification. Repository-only AI draft file 35 remains undeployed.
-- End-to-end owner-DM acceptance is confirmed: a fresh post-install private message received the fixed acknowledgement in the same minute. This proves Telegram webhook delivery through version 94, the owner gate and outbound `sendMessage`.
-- The earlier pre-install probe correctly remained unanswered. Acceptance confirms transport only; it does not test or enable Universal Event Store/AI behavior.
+- The same stable `Таблица ЧП 1.3` web-app deployment is now version 103. Its deployment ID and `/exec` URL did not change.
+- Telegram enters through the signed relay. A fresh owner DM completed the full Telegram → relay → Apps Script → AI → Telegram cycle; the recorded ingress and successful send timestamps match.
+- `36_GOLUB_OWNER_WEBHOOK_INGRESS.gs` is version 2.4.0. The fixed acknowledgement is gone: only the configured owner receives an AI answer in private chat.
+- The private fallback now calls a signed Universal Query Contract endpoint before the AI provider. Only canonical public CHP evidence is returned; the owner's private question is not written to the public event store.
+- The public CHP database has bounded live/backfill sequence lanes, durable checkpoints, participant identities and a signed query executor. Historical `observer_updates` transfer is the remaining data-loading step; an empty evidence window produces an honest empty result.
+- Public/group AI replies remain disabled. Group traffic still falls through to the pre-existing Tables 1.3 / ChatKeeper / Royal CRM path.
+- Telegram verification after version 103: relay URL still matches, pending updates `0`, no delivery error, `max_connections=10`, and the approved update allow-list is unchanged.
+- ChatKeeper remains only the branded-bot integration. Existing ChatKeeper/Royal CRM and Mini App routes were not changed.
+- Owner identity, bot token, webhook/query secrets and AI shared secret remain only in protected properties/environment variables.
 
 ---
 
