@@ -22,6 +22,8 @@
 
 Permanent source: `36_GOLUB_OWNER_WEBHOOK_INGRESS.gs` плюс ранний owner-only branch в `05_RELIABLE_WEBHOOK_QUEUE.gs`. Публичная история не содержит Telegram ID, bot token, query key или exact webhook URL.
 
+**End-to-end acceptance:** владелец отправил новое личное сообщение уже после установки webhook и получил фиксированное подтверждение в ту же минуту. Скриншот проверен, но не публиковался, поскольку содержит private-chat context. Цепочка Telegram → deployment version 94 → owner-only gate → Telegram `sendMessage` подтверждена. Более ранний probe до установки остался без ответа, как и ожидалось.
+
 ## 2026-09-03 — Golub webhook / private-DM diagnostic
 
 **Проверено в live production без изменения развертываний:**
