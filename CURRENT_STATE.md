@@ -19,7 +19,7 @@
 - Golub's Telegram webhook is installed on the existing stable web-app deployment formerly at version 93 and now updated in place to version 94. No deployment or public URL was created.
 - Raw Telegram updates are intercepted before Mini App and ChatKeeper/Royal CRM routing. Invalid-key, group and non-owner updates receive a silent HTTP 200 and never enter the reliable CRM queue.
 - Only the configured owner can receive the fixed private transport acknowledgement. Golub AI and all CHP group replies remain disabled.
-- Owner identity, bot token and a random webhook query key live only in Script Properties; none is committed to GitHub or logged by the installer.
+- Owner identity, bot token and a random webhook query key live only in Script Properties; none is present in current GitHub source or logged by the installer.
 - The pending-update count had risen from the diagnostic 180 to 193 before installation. `drop_pending_updates=true` cleared that same queue; verified count is now 0, with `allowed_updates=[message]` and `max_connections=1`.
 - The ChatKeeper deployment remains version 33 and the other active deployment remains version 38; neither URL nor version was changed.
 - Live source now includes `36_GOLUB_OWNER_WEBHOOK_INGRESS.gs`, and `doPost` invokes it before existing routes. The one-time installer was deleted after verification. Repository-only AI draft file 35 remains undeployed.
