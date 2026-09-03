@@ -6,6 +6,19 @@
 > номера строк и before/after payload хранятся только в приватном operational
 > handoff и admin journal.
 
+## 2026-09-03 — Golub webhook / private-DM diagnostic
+
+**Проверено в live production без изменения развертываний:**
+
+- токен Голубя в standalone Apps Script `Таблица ЧП 1.3` работает, Bot API identity подтверждена;
+- Telegram webhook для Голубя сейчас не установлен (`getWebhookInfo.url` пустой);
+- Telegram сообщает 180 ожидающих обновлений;
+- ChatKeeper продолжает отправлять свои события в active version-33 web-app deployment, но это отдельный transport и не доставка raw Telegram updates;
+- owner-only DM probe не появился ни в Royal webhook log, ни в reliable queue;
+- live Apps Script содержит файлы 01–34, repository-only shadow file 35 не опубликован и `doPost` не патчен.
+
+Временная read-only диагностическая функция удалена сразу после выполнения. Пустой bound Apps Script-проект, автоматически созданный Google во время перехода из таблицы, удалён с явного разрешения владельца. Production deployments, webhook и Script Properties не менялись.
+
 ## 2026-08-23 20:14+03 — v0.6.1: snapshot startup resilience
 
 **Симптом:** после успешной Telegram-авторизации периодически появлялся startup
