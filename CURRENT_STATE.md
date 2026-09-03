@@ -23,7 +23,8 @@
 - The pending-update count had risen from the diagnostic 180 to 193 before installation. `drop_pending_updates=true` cleared that same queue; verified count is now 0, with `allowed_updates=[message]` and `max_connections=1`.
 - The ChatKeeper deployment remains version 33 and the other active deployment remains version 38; neither URL nor version was changed.
 - Live source now includes `36_GOLUB_OWNER_WEBHOOK_INGRESS.gs`, and `doPost` invokes it before existing routes. The one-time installer was deleted after verification. Repository-only AI draft file 35 remains undeployed.
-- Next acceptance step: send a new owner DM and confirm the fixed acknowledgement. This does not yet test or enable Universal Event Store/AI behavior.
+- End-to-end owner-DM acceptance is confirmed: a fresh post-install private message received the fixed acknowledgement in the same minute. This proves Telegram webhook delivery through version 94, the owner gate and outbound `sendMessage`.
+- The earlier pre-install probe correctly remained unanswered. Acceptance confirms transport only; it does not test or enable Universal Event Store/AI behavior.
 
 ---
 
