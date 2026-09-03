@@ -6,6 +6,22 @@
 > номера строк и before/after payload хранятся только в приватном operational
 > handoff и admin journal.
 
+## 2026-09-03 — Golub owner-only Telegram webhook installed
+
+С явного разрешения владельца установлен отдельный private ingress для Golub:
+
+- существующее active web-app deployment version 93 обновлено на version 94 без создания нового deployment и без изменения стабильного URL;
+- `doPost` сначала распознаёт прямой raw Telegram update, а затем оставляет прежние Mini App и ChatKeeper/Royal CRM маршруты без изменений;
+- только личное сообщение настроенного владельца получает фиксированное подтверждение транспорта; group/non-owner/invalid-key updates молча подтверждаются HTTP 200 и не попадают в CRM queue;
+- owner identity, bot token и случайный query key хранятся только в Script Properties;
+- очередь Telegram успела вырасти с диагностических 180 до 193 updates; `drop_pending_updates=true` очистил её до подтверждённого нуля;
+- Telegram ограничен `allowed_updates=[message]`, `max_connections=1`;
+- active ChatKeeper deployment version 33 и соседний version 38 не изменены;
+- одноразовый installer удалён после успешного `setWebhook` + `getWebhookInfo` verification;
+- Golub AI и ответы в публичном ЧП не включались; repository-only shadow file 35 не развёртывался.
+
+Permanent source: `36_GOLUB_OWNER_WEBHOOK_INGRESS.gs` плюс ранний owner-only branch в `05_RELIABLE_WEBHOOK_QUEUE.gs`. Публичная история не содержит Telegram ID, bot token, query key или exact webhook URL.
+
 ## 2026-09-03 — Golub webhook / private-DM diagnostic
 
 **Проверено в live production без изменения развертываний:**
