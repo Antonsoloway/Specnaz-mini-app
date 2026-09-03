@@ -15,11 +15,13 @@ const GOLUB_OWNER_WEBHOOK_PROP = Object.freeze({
   lastUpdateId: 'GOLUB_OWNER_LAST_UPDATE_ID',
   lastOk: 'GOLUB_OWNER_LAST_OK',
   lastError: 'GOLUB_OWNER_LAST_ERROR',
-  aiEnabled: 'GOLUB_SHADOW_PRIVATE_ENABLED',
+  aiEnabled: 'GOLUB_OWNER_WEBHOOK_ENABLED',
   aiUrl: 'GOLUB_SHADOW_WORKER_URL',
   aiSecret: 'GOLUB_SHADOW_SHARED_SECRET'
 });
 const GOLUB_OWNER_WEBHOOK_QUERY_PARAM = 'golub_owner_key';
+const GOLUB_OWNER_DEFAULT_AI_WORKER_URL =
+  'https://specnaz-ai-telegram-gateway.soloway3852.workers.dev/internal/golub-shadow';
 const GOLUB_OWNER_AI_UNAVAILABLE =
   '🕊 Сейчас не смог получить ответ от ИИ. Повтори сообщение через минуту.';
 
@@ -83,8 +85,12 @@ function GOLUB_OWNER_aiAnswer_(message, sender, props) {
   if (String(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.aiEnabled) || '0') !== '1') {
     throw new Error('AI_DISABLED');
   }
-  var endpoint = String(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.aiUrl) || '');
-  var secret = String(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.aiSecret) || '');
+  var endpoint = String(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.aiUrl) || GOLUB_OWNER_DEFAULT_AI_WORKER_URL);
+  var secret = String(
+    props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.aiSecret) ||
+    props.getProperty('SPECNAZ_AI_SHARED_SECRET') ||
+    ''
+  );
   if (!/^https:\/\/[^\s]+\/internal\/golub-shadow$/.test(endpoint) || !secret) {
     throw new Error('AI_NOT_CONFIGURED');
   }
@@ -142,6 +148,43 @@ function GOLUB_OWNER_sendAnswer_(chatId, answer) {
     });
     rest = rest.slice(chunk.length).trim();
   }
+}
+
+function GOLUB_OWNER_aiBridgeStatus() {
+  var props = PropertiesService.getScriptProperties();
+  var secret = String(
+    props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.aiSecret) ||
+    props.getProperty('SPECNAZ_AI_SHARED_SECRET') ||
+    ''
+  );
+  var result = {
+    version:GOLUB_OWNER_WEBHOOK_VERSION,
+    ownerWebhookEnabled:String(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.enabled) || '0') === '1',
+    ownerConfigured:Boolean(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.ownerUserId)),
+    workerConfigured:Boolean(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.aiUrl) || GOLUB_OWNER_DEFAULT_AI_WORKER_URL),
+    sharedSecretConfigured:secret.length >= 32,
+    aiReady:secret.length >= 32
+  };
+  Logger.log(JSON.stringify(result));
+  return result;
+}
+
+function GOLUB_OWNER_configureAiBridge() {
+  var ui = SpreadsheetApp.getUi();
+  var response = ui.prompt(
+    'Закрытый AI-канал Голубя',
+    'Вставьте существующий SPECNAZ_AI_SHARED_SECRET. Значение будет сохранено только в свойствах скрипта.',
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (response.getSelectedButton() !== ui.Button.OK) return GOLUB_OWNER_aiBridgeStatus();
+  var secret = String(response.getResponseText() || '').trim();
+  if (secret.length < 32) throw new Error('GOLUB_OWNER_BAD_SHARED_SECRET');
+  PropertiesService.getScriptProperties().setProperties({
+    GOLUB_SHADOW_PRIVATE_ENABLED:'1',
+    GOLUB_SHADOW_WORKER_URL:GOLUB_OWNER_DEFAULT_AI_WORKER_URL,
+    GOLUB_SHADOW_SHARED_SECRET:secret
+  }, false);
+  return GOLUB_OWNER_aiBridgeStatus();
 }
 
 /**
