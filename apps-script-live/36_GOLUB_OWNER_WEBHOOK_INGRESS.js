@@ -1,5 +1,5 @@
 /**
- * GOLUB OWNER WEBHOOK INGRESS v1
+ * GOLUB OWNER WEBHOOK INGRESS v2
  *
  * A deliberately small private Telegram ingress for the branded bot
  * «Голубь Мира». It does not enable AI in CHP and it does not forward private
@@ -7,18 +7,21 @@
  * Properties; no owner ID, bot token or webhook secret belongs in source.
  */
 
-const GOLUB_OWNER_WEBHOOK_VERSION = '1.0.0';
+const GOLUB_OWNER_WEBHOOK_VERSION = '2.0.0';
 const GOLUB_OWNER_WEBHOOK_PROP = Object.freeze({
   enabled: 'GOLUB_OWNER_WEBHOOK_ENABLED',
   ownerUserId: 'GOLUB_OWNER_USER_ID',
   querySecret: 'GOLUB_OWNER_WEBHOOK_QUERY_SECRET',
   lastUpdateId: 'GOLUB_OWNER_LAST_UPDATE_ID',
   lastOk: 'GOLUB_OWNER_LAST_OK',
-  lastError: 'GOLUB_OWNER_LAST_ERROR'
+  lastError: 'GOLUB_OWNER_LAST_ERROR',
+  aiEnabled: 'GOLUB_OWNER_AI_ENABLED',
+  aiUrl: 'GOLUB_OWNER_AI_WORKER_URL',
+  aiSecret: 'GOLUB_OWNER_AI_SHARED_SECRET'
 });
 const GOLUB_OWNER_WEBHOOK_QUERY_PARAM = 'golub_owner_key';
-const GOLUB_OWNER_WEBHOOK_ACK =
-  '🕊 Закрытый канал Голубя подключён. Сообщение получено. ИИ и ответы в ЧП пока не включены.';
+const GOLUB_OWNER_AI_UNAVAILABLE =
+  '🕊 Сейчас не смог получить ответ от ИИ. Повтори сообщение через минуту.';
 
 function GOLUB_OWNER_json_(body) {
   return ContentService
@@ -65,6 +68,82 @@ function GOLUB_OWNER_isDirectTelegramUpdate_(data) {
   );
 }
 
+function GOLUB_OWNER_hmacHex_(secret, value) {
+  var bytes = Utilities.computeHmacSha256Signature(
+    String(value || ''),
+    String(secret || ''),
+    Utilities.Charset.UTF_8
+  );
+  return bytes.map(function(byte) {
+    return ('0' + ((byte + 256) % 256).toString(16)).slice(-2);
+  }).join('');
+}
+
+function GOLUB_OWNER_aiAnswer_(message, sender, props) {
+  if (String(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.aiEnabled) || '0') !== '1') {
+    throw new Error('AI_DISABLED');
+  }
+  var endpoint = String(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.aiUrl) || '');
+  var secret = String(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.aiSecret) || '');
+  if (!/^https:\/\/[^\s]+\/internal\/golub-shadow$/.test(endpoint) || !secret) {
+    throw new Error('AI_NOT_CONFIGURED');
+  }
+  var prompt = String(message.text || message.caption || '').trim();
+  if (!prompt) {
+    return '🕊 Пока я отвечаю на текстовые сообщения. Пришли вопрос текстом.';
+  }
+  var payload = JSON.stringify({
+    kind:'golub_shadow_private',
+    chatType:'private',
+    messageId:Number(message.message_id || 0),
+    date:Number(message.date || Math.floor(Date.now() / 1000)),
+    user:{id:String(sender && sender.id || '')},
+    text:prompt.slice(0, 5000)
+  });
+  var timestamp = String(Date.now());
+  var nonce = Utilities.getUuid().replace(/-/g, '');
+  var path = '/internal/golub-shadow';
+  var signature = GOLUB_OWNER_hmacHex_(
+    secret,
+    timestamp + '|' + nonce + '|' + path + '|' + payload
+  );
+  var response = UrlFetchApp.fetch(endpoint, {
+    method:'post',
+    contentType:'application/json; charset=utf-8',
+    payload:payload,
+    headers:{
+      'x-specnaz-timestamp':timestamp,
+      'x-specnaz-nonce':nonce,
+      'x-specnaz-signature':signature
+    },
+    followRedirects:false,
+    muteHttpExceptions:true
+  });
+  if (response.getResponseCode() !== 200) throw new Error('AI_HTTP_' + response.getResponseCode());
+  var body = GOLUB_OWNER_safeJson_(response.getContentText());
+  var answer = body && body.ok === true ? String(body.answer || '').trim() : '';
+  if (!answer) throw new Error('AI_EMPTY_ANSWER');
+  return answer.slice(0, 12000);
+}
+
+function GOLUB_OWNER_sendAnswer_(chatId, answer) {
+  var rest = String(answer || '').trim();
+  if (!rest) throw new Error('EMPTY_ANSWER');
+  while (rest) {
+    var chunk = rest.slice(0, 3900);
+    if (rest.length > 3900) {
+      var split = Math.max(chunk.lastIndexOf('\n'), chunk.lastIndexOf(' '));
+      if (split > 2400) chunk = chunk.slice(0, split);
+    }
+    tgAvatarApi_('sendMessage', {
+      chat_id:String(chatId),
+      text:chunk,
+      disable_web_page_preview:true
+    });
+    rest = rest.slice(chunk.length).trim();
+  }
+}
+
 /**
  * Called before all existing POST routing.
  *
@@ -106,21 +185,19 @@ function GOLUB_OWNER_tryHandleTelegram_(e) {
   }
 
   try {
-    tgAvatarApi_('sendMessage', {
-      chat_id:String(message.chat.id),
-      text:GOLUB_OWNER_WEBHOOK_ACK,
-      disable_web_page_preview:true
-    });
+    var answer = GOLUB_OWNER_aiAnswer_(message, sender, props);
+    GOLUB_OWNER_sendAnswer_(message.chat.id, answer);
     props.setProperties({
       GOLUB_OWNER_LAST_UPDATE_ID:String(updateId),
       GOLUB_OWNER_LAST_OK:new Date().toISOString(),
       GOLUB_OWNER_LAST_ERROR:''
     }, false);
   } catch (_) {
-    // Do not persist message text, user IDs, bot tokens or exception URLs.
+    // Do not persist message text, user IDs, bot tokens, secrets or exception URLs.
+    try { GOLUB_OWNER_sendAnswer_(message.chat.id, GOLUB_OWNER_AI_UNAVAILABLE); } catch (_) {}
     props.setProperty(
       GOLUB_OWNER_WEBHOOK_PROP.lastError,
-      'SEND_FAILED ' + new Date().toISOString()
+      'AI_OR_SEND_FAILED ' + new Date().toISOString()
     );
   }
 
