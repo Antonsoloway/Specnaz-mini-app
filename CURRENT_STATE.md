@@ -1,6 +1,6 @@
 # Royal CRM / «Таблица ЧП» — CURRENT STATE
 
-> **Актуально на 23.08.2026.**
+> **Актуально на 03.09.2026.**
 > Новый чат обязан сначала прочитать `START_HERE.md`, затем этот файл и последние записи `WORK_HISTORY.md`.
 > Фактический runtime / живые Google Sheets / live Apps Script / текущий GitHub имеют приоритет над памятью чатов.
 
@@ -14,15 +14,16 @@
 6. После принятой/проверенной работы обновлять `CURRENT_STATE.md` и `WORK_HISTORY.md`; `RELEASE_RULES.md` — при новом постоянном инварианте.
 7. Публичные handoff-файлы не должны содержать реальные Telegram ID, имена участников, requestId, dataHash, номера персональных строк или exact private endpoint; использовать обезличенные сценарии и агрегаты. Согласованные публичные credits сохраняются.
 
-### Golub webhook diagnostic — 03.09.2026
+### Golub owner-only Telegram ingress — 03.09.2026
 
-- Live standalone Apps Script `Таблица ЧП 1.3` has healthy Bot API access to Golub through its existing Script Properties token.
-- Telegram `getWebhookInfo` returned an empty URL: Golub currently has no Telegram webhook. Telegram reports 180 pending updates.
-- ChatKeeper events continue to arrive at the active version-33 deployment; they are ChatKeeper payloads and are distinct from raw Telegram updates.
-- The owner-only DM probe did not appear in `Лог вебхуков` or `Очередь вебхуков`.
-- Live source remains files 01–34; repository-only file 35 is not deployed and live `doPost` has no shadow handler.
-- Temporary diagnostic code was removed, the accidentally created empty bound project was deleted with owner approval, and all production deployments were left unchanged.
-- Do not call `setWebhook` until ChatKeeper branded-bot transport and the keep/drop policy for the pending updates are explicitly decided.
+- Golub's Telegram webhook is installed on the existing stable web-app deployment formerly at version 93 and now updated in place to version 94. No deployment or public URL was created.
+- Raw Telegram updates are intercepted before Mini App and ChatKeeper/Royal CRM routing. Invalid-key, group and non-owner updates receive a silent HTTP 200 and never enter the reliable CRM queue.
+- Only the configured owner can receive the fixed private transport acknowledgement. Golub AI and all CHP group replies remain disabled.
+- Owner identity, bot token and a random webhook query key live only in Script Properties; none is committed to GitHub or logged by the installer.
+- The pending-update count had risen from the diagnostic 180 to 193 before installation. `drop_pending_updates=true` cleared that same queue; verified count is now 0, with `allowed_updates=[message]` and `max_connections=1`.
+- The ChatKeeper deployment remains version 33 and the other active deployment remains version 38; neither URL nor version was changed.
+- Live source now includes `36_GOLUB_OWNER_WEBHOOK_INGRESS.gs`, and `doPost` invokes it before existing routes. The one-time installer was deleted after verification. Repository-only AI draft file 35 remains undeployed.
+- Next acceptance step: send a new owner DM and confirm the fixed acknowledgement. This does not yet test or enable Universal Event Store/AI behavior.
 
 ---
 
