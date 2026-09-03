@@ -260,14 +260,19 @@ function GOLUB_OWNER_probeAiBridge() {
 /**
  * Called before all existing POST routing.
  *
- * Returns null only when the payload is not a direct Telegram update. Once a
- * direct update is identified it is always consumed with HTTP 200, including
- * invalid-secret, disabled, group and non-owner traffic. This prevents private
- * Telegram traffic from leaking into the ChatKeeper/Royal CRM queue.
+ * Returns null when the payload is not a direct Telegram update or when it is
+ * group traffic. Group updates must continue through the existing Tables 1.3 /
+ * ChatKeeper route. Once a direct private update is identified it is always
+ * consumed with HTTP 200, including invalid-secret, disabled and non-owner
+ * traffic, so private Telegram messages never leak into Royal CRM.
  */
 function GOLUB_OWNER_tryHandleTelegram_(e) {
   var data = GOLUB_OWNER_safeJson_(GOLUB_OWNER_raw_(e));
   if (!GOLUB_OWNER_isDirectTelegramUpdate_(data)) return null;
+
+  var message = data.message;
+  var chatType = String(message.chat.type || '');
+  if (chatType !== 'private') return null;
 
   var props = PropertiesService.getScriptProperties();
   if (String(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.enabled) || '0') !== '1') {
@@ -282,12 +287,10 @@ function GOLUB_OWNER_tryHandleTelegram_(e) {
     return GOLUB_OWNER_json_({ok:true});
   }
 
-  var message = data.message;
   var sender = message.from && typeof message.from === 'object' ? message.from : null;
   var ownerUserId = String(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.ownerUserId) || '');
   var senderUserId = sender ? String(sender.id == null ? '' : sender.id) : '';
-  var chatType = String(message.chat.type || '');
-  if (!ownerUserId || chatType !== 'private' || senderUserId !== ownerUserId) {
+  if (!ownerUserId || senderUserId !== ownerUserId) {
     return GOLUB_OWNER_json_({ok:true});
   }
 
