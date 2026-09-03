@@ -14,6 +14,16 @@
 6. После принятой/проверенной работы обновлять `CURRENT_STATE.md` и `WORK_HISTORY.md`; `RELEASE_RULES.md` — при новом постоянном инварианте.
 7. Публичные handoff-файлы не должны содержать реальные Telegram ID, имена участников, requestId, dataHash, номера персональных строк или exact private endpoint; использовать обезличенные сценарии и агрегаты. Согласованные публичные credits сохраняются.
 
+### Golub webhook diagnostic — 03.09.2026
+
+- Live standalone Apps Script `Таблица ЧП 1.3` has healthy Bot API access to Golub through its existing Script Properties token.
+- Telegram `getWebhookInfo` returned an empty URL: Golub currently has no Telegram webhook. Telegram reports 180 pending updates.
+- ChatKeeper events continue to arrive at the active version-33 deployment; they are ChatKeeper payloads and are distinct from raw Telegram updates.
+- The owner-only DM probe did not appear in `Лог вебхуков` or `Очередь вебхуков`.
+- Live source remains files 01–34; repository-only file 35 is not deployed and live `doPost` has no shadow handler.
+- Temporary diagnostic code was removed, the accidentally created empty bound project was deleted with owner approval, and all production deployments were left unchanged.
+- Do not call `setWebhook` until ChatKeeper branded-bot transport and the keep/drop policy for the pending updates are explicitly decided.
+
 ---
 
 ## 2. Репозитории / входы
