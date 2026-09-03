@@ -83,6 +83,15 @@ const RCWQ_HEADERS = Object.freeze([
  * или с неверным secret. Поэтому входящее событие не исчезает до диагностики.
  */
 function doPost(e) {
+  // GOLUB_OWNER_WEBHOOK_V1: direct Telegram updates are isolated from the
+  // Mini App and ChatKeeper/Royal CRM routes. Normal production POSTs still
+  // fall through byte-for-byte to the existing handlers below.
+  const golubOwnerTelegram =
+    typeof GOLUB_OWNER_tryHandleTelegram_ === 'function'
+      ? GOLUB_OWNER_tryHandleTelegram_(e)
+      : null;
+  if (golubOwnerTelegram) return golubOwnerTelegram;
+
   const miniAppStartWelcome = MINIAPP_handleStartWelcome_(e);
   if (miniAppStartWelcome) return miniAppStartWelcome;
   // Telegram Mini App API: отдельный маршрут, НЕ попадает в очередь ChatKeeper.
