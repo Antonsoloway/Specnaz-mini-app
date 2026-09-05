@@ -1,5 +1,5 @@
 name = "royal-crm-miniapp-api"
-main = "src/entry-v1390.js"
+main = "src/entry-v1400.js"
 compatibility_date = "2026-08-15"
 
 [vars]
@@ -8,6 +8,7 @@ DATA_REPO = "Antonsoloway/royal-crm-data"
 DATA_BRANCH = "main"
 DATA_PATH = "snapshot.json"
 ADMIN_DATA_PATH = "admin-snapshot.json"
+ACHIEVEMENTS_PATH = "achievements.json"
 TELEGRAM_CHAT_ID = "-1002109152418"
 
 [observability]
@@ -52,5 +53,11 @@ invocation_logs = true
 # existing MAYAK background media route remains unchanged; the frontend uses a
 # shuffle-bag so all six tracks play in randomized order without immediate
 # repeats across playlist cycles.
+#
+# entry-v1400 adds a future-extensible achievement registry stored only in the
+# private data repository. /snapshot and /admin-data receive a sanitized
+# achievements[] projection; authenticated chat admins can update awards via
+# /admin-achievements. The first catalog item is MAYAK and the registry is
+# seeded from the historical 56 project participants.
 #
 # Cloudflare Builds source: GitHub main, root path /worker.
