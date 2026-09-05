@@ -1,6 +1,6 @@
 # Royal CRM / «Таблица ЧП» — CURRENT STATE
 
-> **Актуально на 03.09.2026.**
+> **Актуально на 05.09.2026.**
 > Новый чат обязан сначала прочитать `START_HERE.md`, затем этот файл и последние записи `WORK_HISTORY.md`.
 > Фактический runtime / живые Google Sheets / live Apps Script / текущий GitHub имеют приоритет над памятью чатов.
 
@@ -13,6 +13,13 @@
 5. GitHub commit не равен production/runtime-подтверждению.
 6. После принятой/проверенной работы обновлять `CURRENT_STATE.md` и `WORK_HISTORY.md`; `RELEASE_RULES.md` — при новом постоянном инварианте.
 7. Публичные handoff-файлы не должны содержать реальные Telegram ID, имена участников, requestId, dataHash, номера персональных строк или exact private endpoint; использовать обезличенные сценарии и агрегаты. Согласованные публичные credits сохраняются.
+
+### Golub narrative delivery 2.5.0 — source ready, rollout pending — 05.09.2026
+
+- Production still uses owner ingress 2.4.0 until the guarded shared rollout completes; no live version claim is made from the repository update alone.
+- Source 2.5.0 accepts the signed rich-answer envelope from Universal Query and sends safe Telegram HTML so source URLs appear only behind natural clickable phrases, with link previews disabled.
+- Only validated `t.me` anchors are allowed. Any other markup or visible URL is stripped and sent as clean plain text.
+- This changes only owner-private answer presentation. Owner-only access, public-CHP-only memory, the stable Tables 1.3 deployment, ChatKeeper/Royal CRM routing, webhook configuration and public CHP speech remain unchanged.
 
 ### Golub owner-only AI + public CHP memory interface — 03.09.2026
 
