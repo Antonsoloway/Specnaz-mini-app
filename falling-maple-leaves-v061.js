@@ -1,10 +1,10 @@
-/* Royal CRM Mini App v0.6.1 — visible but unobtrusive falling maple leaves */
+/* Royal CRM Mini App v0.6.1 — vivid falling maple leaves */
 (() => {
   'use strict';
   if (String(window.__ROYAL_BUILD__ || '') !== '0.6.1') return;
   if (window.__ROYAL_AUTUMN_LEAVES_V061__) return;
 
-  const VERSION = '0.6.1-autumn-leaves.2';
+  const VERSION = '0.6.1-autumn-leaves.3';
   const CANVAS_ID = 'royalAutumnLeavesV061';
   const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
 
@@ -23,7 +23,7 @@
   });
 
   const style = document.createElement('style');
-  style.dataset.royalAutumnLeavesV061 = '2';
+  style.dataset.royalAutumnLeavesV061 = '3';
   style.textContent = `
     #${CANVAS_ID}{display:block!important;visibility:visible!important;pointer-events:none!important}
     body>.app{position:relative;z-index:10}
@@ -32,8 +32,6 @@
   document.head.appendChild(style);
   document.body.prepend(canvas);
 
-  // Keep the canvas path conservative for Telegram Android/iOS WebViews.
-  // Some WebViews do not behave reliably with desynchronized contexts.
   const ctx = canvas.getContext('2d');
   if (!ctx) {
     canvas.remove();
@@ -41,7 +39,10 @@
     return;
   }
 
-  const tones = ['#d78b3b', '#c96f32', '#e0a84b', '#b84d35', '#c78738', '#a85e32'];
+  const tones = [
+    '#ffd447', '#f4b83f', '#f29b38', '#ef7f2d', '#e85d2a',
+    '#d94735', '#bd3436', '#8f3431', '#a7682d', '#bc7b36', '#7f8a3b'
+  ];
   let width = 0;
   let height = 0;
   let dpr = 1;
@@ -69,20 +70,20 @@
   }
 
   function makeLeaf(initial = false) {
-    const depth = rand(0.64, 1.0);
+    const depth = rand(0.62, 1.0);
     const lowMotion = reduced();
     return {
-      x: rand(-35, width + 35),
-      y: initial ? rand(-height * 0.12, height * 0.98) : rand(-120, -24),
-      size: rand(16, 29) * depth,
+      x: rand(-45, width + 45),
+      y: initial ? rand(-height * 0.12, height * 0.98) : rand(-150, -28),
+      size: rand(10, 46),
       speed: rand(lowMotion ? 7 : 17, lowMotion ? 12 : 34) * depth,
-      drift: rand(-4.6, 4.6),
+      drift: rand(-4.8, 4.8),
       sway: rand(lowMotion ? 2 : 4.5, lowMotion ? 5 : 12),
       swayRate: rand(0.42, 0.95),
       phase: rand(0, Math.PI * 2),
       rotation: rand(0, Math.PI * 2),
-      spin: rand(lowMotion ? -0.10 : -0.38, lowMotion ? 0.10 : 0.38),
-      alpha: rand(lowMotion ? 0.22 : 0.28, lowMotion ? 0.31 : 0.42) * depth,
+      spin: rand(lowMotion ? -0.10 : -0.40, lowMotion ? 0.10 : 0.40),
+      alpha: 1,
       color: tones[Math.floor(Math.random() * tones.length)],
       age: rand(0, 8)
     };
@@ -112,7 +113,7 @@
     ctx.translate(leaf.x, leaf.y);
     ctx.rotate(leaf.rotation);
     ctx.scale(s, s);
-    ctx.globalAlpha = leaf.alpha;
+    ctx.globalAlpha = 1;
     ctx.fillStyle = leaf.color;
     ctx.beginPath();
     ctx.moveTo(0, -1.0);
@@ -138,8 +139,8 @@
     ctx.closePath();
     ctx.fill();
 
-    ctx.globalAlpha = Math.min(0.34, leaf.alpha * 0.72);
-    ctx.strokeStyle = '#ffd388';
+    ctx.globalAlpha = 0.82;
+    ctx.strokeStyle = '#ffe1a1';
     ctx.lineWidth = 0.028;
     ctx.beginPath();
     ctx.moveTo(0, 0.86);
@@ -163,7 +164,7 @@
         leaf.y += leaf.speed * dt;
         leaf.x += (leaf.drift + Math.sin(leaf.age * leaf.swayRate + leaf.phase) * leaf.sway) * dt;
         leaf.rotation += leaf.spin * dt;
-        if (leaf.y > height + leaf.size * 2 || leaf.x < -90 || leaf.x > width + 90) resetLeaf(leaf);
+        if (leaf.y > height + leaf.size * 2 || leaf.x < -110 || leaf.x > width + 110) resetLeaf(leaf);
       }
       drawLeaf(leaf);
     }
