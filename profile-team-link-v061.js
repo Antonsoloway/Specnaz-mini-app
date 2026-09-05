@@ -2,7 +2,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.6.1-profile-team-link.2';
+  const VERSION = '0.6.1-profile-team-link.3';
   let decorateQueued = false;
 
   function clean(value) {
@@ -21,23 +21,52 @@
     return encodeURIComponent(JSON.stringify([clean(team), canonicalGame(game)]));
   }
 
+  function rawTeamRef(team, game) {
+    return JSON.stringify([clean(team), canonicalGame(game)]);
+  }
+
+  function showOrdinaryTeamSurface() {
+    const panel = document.getElementById('panel');
+    const selfCard = document.getElementById('selfProfileCard');
+    if (selfCard) selfCard.hidden = true;
+    if (panel) {
+      panel.hidden = false;
+      panel.classList.remove('profile-panel');
+    }
+  }
+
   function openTeam(team, game) {
     team = clean(team);
     game = canonicalGame(game);
     if (!team) return false;
 
-    try { window.RoyalNav?.pushCurrent?.(); } catch (_) {}
-
     try {
       if (document.body.classList.contains('admin-mode') && window.RoyalAdminTeamDetailV0600?.open) {
+        try { window.RoyalNav?.pushCurrent?.(); } catch (_) {}
         window.RoyalAdminTeamDetailV0600.open(team, game);
         return true;
       }
-      if (window.RoyalTeamDetail?.open) {
-        window.RoyalTeamDetail.open(team, game);
+
+      // Use the ordinary renderTeamDetail path directly. navigation-v0521 wraps
+      // it and captures Back state for us. The home profile keeps #panel hidden,
+      // so explicitly switch from the home card to the ordinary detail surface.
+      if (typeof renderTeamDetail === 'function') {
+        renderTeamDetail(rawTeamRef(team, game));
+        showOrdinaryTeamSurface();
+        try { window.RoyalNav?.enhanceVisibleBack?.(); } catch (_) {}
+        try { window.RoyalScrollTop?.afterForwardRender?.(); } catch (_) {}
         return true;
       }
-    } catch (_) {}
+
+      if (window.RoyalTeamDetail?.open) {
+        try { window.RoyalNav?.pushCurrent?.(); } catch (_) {}
+        window.RoyalTeamDetail.open(team, game);
+        showOrdinaryTeamSurface();
+        return true;
+      }
+    } catch (error) {
+      console.warn('v0.6.1 profile team navigation failed:', error?.message || error);
+    }
 
     return false;
   }
@@ -63,14 +92,14 @@
   }
 
   function decorateOwnMembership(card) {
-    if (!card || card.dataset.v061OwnTeamReady === '1') return;
+    if (!card || card.dataset.v061OwnTeamReady === VERSION) return;
     const ref = ownMembershipRef(card);
     if (!ref) return;
 
-    // Reuse the ordinary team router. team-identity-fix.js understands the
-    // encoded [name, game] pair, so duplicate team names in RM/RK remain safe.
+    // Keep data-team for existing color/search decorators, but own the click
+    // ourselves so app.js cannot route into a still-hidden home #panel.
     card.dataset.team = encodedTeamRef(ref.team, ref.game);
-    card.dataset.v061OwnTeamReady = '1';
+    card.dataset.v061OwnTeamReady = VERSION;
     card.setAttribute('role', 'button');
     card.setAttribute('tabindex', '0');
     card.setAttribute('aria-label', `Открыть команду ${ref.team}${ref.game ? `, ${ref.game}` : ''}`);
@@ -95,13 +124,24 @@
   }
 
   document.addEventListener('click', event => {
+    const ownMembership = event.target?.closest?.('.self-membership[data-team]');
+    if (ownMembership) {
+      const ref = ownMembershipRef(ownMembership);
+      if (!ref) return;
+      if (openTeam(ref.team, ref.game)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+      return;
+    }
+
     const profileMembership = event.target?.closest?.('.participant-profile-membership');
     if (!profileMembership) return;
     const ref = participantProfileRef(profileMembership);
     if (!ref) return;
     if (openTeam(ref.team, ref.game)) {
       event.preventDefault();
-      event.stopPropagation();
+      event.stopImmediatePropagation();
     }
   }, true);
 

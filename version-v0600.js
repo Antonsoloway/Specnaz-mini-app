@@ -1,7 +1,7 @@
 /* Royal CRM Mini App — v0.6.1 visible version guard + final admin-write loader */
 (() => {
   const VERSION = '0.6.1';
-  const CACHE = '20260828-v061-team-symbol-identity1';
+  const CACHE = '20260905-v061-self-team-link3';
 
   function apply() {
     window.__ROYAL_BUILD__ = VERSION;
