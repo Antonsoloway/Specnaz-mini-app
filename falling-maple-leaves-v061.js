@@ -1,16 +1,12 @@
-/* Royal CRM Mini App v0.6.1 — subtle falling maple leaves background */
+/* Royal CRM Mini App v0.6.1 — visible but unobtrusive falling maple leaves */
 (() => {
   'use strict';
   if (String(window.__ROYAL_BUILD__ || '') !== '0.6.1') return;
   if (window.__ROYAL_AUTUMN_LEAVES_V061__) return;
 
-  const VERSION = '0.6.1-autumn-leaves.1';
+  const VERSION = '0.6.1-autumn-leaves.2';
   const CANVAS_ID = 'royalAutumnLeavesV061';
   const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
-  if (reduceMotion?.matches) {
-    window.__ROYAL_AUTUMN_LEAVES_V061__ = VERSION + '-reduced-motion';
-    return;
-  }
 
   const canvas = document.createElement('canvas');
   canvas.id = CANVAS_ID;
@@ -22,29 +18,30 @@
     height: '100vh',
     pointerEvents: 'none',
     userSelect: 'none',
-    zIndex: '0',
-    opacity: '1',
-    contain: 'strict'
+    zIndex: '6',
+    opacity: '1'
   });
 
   const style = document.createElement('style');
-  style.dataset.royalAutumnLeavesV061 = '1';
+  style.dataset.royalAutumnLeavesV061 = '2';
   style.textContent = `
-    #${CANVAS_ID}{display:block!important}
-    body>.app{position:relative;z-index:1}
-    @media (prefers-reduced-motion:reduce){#${CANVAS_ID}{display:none!important}}
+    #${CANVAS_ID}{display:block!important;visibility:visible!important;pointer-events:none!important}
+    body>.app{position:relative;z-index:10}
+    body>.bottom-nav{z-index:30}
   `;
   document.head.appendChild(style);
   document.body.prepend(canvas);
 
-  const ctx = canvas.getContext('2d', { alpha: true, desynchronized: true });
+  // Keep the canvas path conservative for Telegram Android/iOS WebViews.
+  // Some WebViews do not behave reliably with desynchronized contexts.
+  const ctx = canvas.getContext('2d');
   if (!ctx) {
     canvas.remove();
     window.__ROYAL_AUTUMN_LEAVES_V061__ = VERSION + '-no-canvas';
     return;
   }
 
-  const tones = ['#b76a32', '#c58a42', '#9d5a35', '#b44732', '#9f7037'];
+  const tones = ['#d78b3b', '#c96f32', '#e0a84b', '#b84d35', '#c78738', '#a85e32'];
   let width = 0;
   let height = 0;
   let dpr = 1;
@@ -57,29 +54,35 @@
     return min + Math.random() * (max - min);
   }
 
+  function reduced() {
+    return !!reduceMotion?.matches;
+  }
+
   function leafCount() {
     const memory = Number(navigator.deviceMemory || 0);
     const lowPower = memory > 0 && memory <= 3;
-    if (lowPower) return 7;
-    if (width < 520) return 9;
-    if (width < 900) return 12;
-    return 15;
+    if (reduced()) return width < 520 ? 6 : 8;
+    if (lowPower) return 9;
+    if (width < 520) return 13;
+    if (width < 900) return 16;
+    return 19;
   }
 
   function makeLeaf(initial = false) {
-    const depth = rand(0.58, 1.0);
+    const depth = rand(0.64, 1.0);
+    const lowMotion = reduced();
     return {
-      x: rand(-30, width + 30),
-      y: initial ? rand(-height * 0.18, height * 0.96) : rand(-150, -30),
-      size: rand(13, 26) * depth,
-      speed: rand(14, 29) * depth,
-      drift: rand(-3.8, 3.8),
-      sway: rand(3.5, 10),
-      swayRate: rand(0.45, 0.9),
+      x: rand(-35, width + 35),
+      y: initial ? rand(-height * 0.12, height * 0.98) : rand(-120, -24),
+      size: rand(16, 29) * depth,
+      speed: rand(lowMotion ? 7 : 17, lowMotion ? 12 : 34) * depth,
+      drift: rand(-4.6, 4.6),
+      sway: rand(lowMotion ? 2 : 4.5, lowMotion ? 5 : 12),
+      swayRate: rand(0.42, 0.95),
       phase: rand(0, Math.PI * 2),
       rotation: rand(0, Math.PI * 2),
-      spin: rand(-0.34, 0.34),
-      alpha: rand(0.12, 0.23) * depth,
+      spin: rand(lowMotion ? -0.10 : -0.38, lowMotion ? 0.10 : 0.38),
+      alpha: rand(lowMotion ? 0.22 : 0.28, lowMotion ? 0.31 : 0.42) * depth,
       color: tones[Math.floor(Math.random() * tones.length)],
       age: rand(0, 8)
     };
@@ -88,7 +91,7 @@
   function resize() {
     width = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1);
     height = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 1);
-    dpr = Math.min(1.65, Math.max(1, window.devicePixelRatio || 1));
+    dpr = Math.min(1.75, Math.max(1, window.devicePixelRatio || 1));
     canvas.width = Math.round(width * dpr);
     canvas.height = Math.round(height * dpr);
     canvas.style.width = width + 'px';
@@ -96,6 +99,7 @@
     const count = leafCount();
     if (leaves.length > count) leaves.length = count;
     while (leaves.length < count) leaves.push(makeLeaf(true));
+    draw(0);
   }
 
   function resetLeaf(leaf) {
@@ -134,9 +138,9 @@
     ctx.closePath();
     ctx.fill();
 
-    ctx.globalAlpha = leaf.alpha * 0.55;
-    ctx.strokeStyle = '#f0c783';
-    ctx.lineWidth = 0.025;
+    ctx.globalAlpha = Math.min(0.34, leaf.alpha * 0.72);
+    ctx.strokeStyle = '#ffd388';
+    ctx.lineWidth = 0.028;
     ctx.beginPath();
     ctx.moveTo(0, 0.86);
     ctx.lineTo(0, -0.62);
@@ -148,35 +152,46 @@
     ctx.restore();
   }
 
-  function frame(now) {
-    if (!running) return;
-    raf = requestAnimationFrame(frame);
-    if (now - lastFrame < 31) return;
-    const dt = Math.min(0.05, Math.max(0.001, (now - (lastFrame || now - 32)) / 1000));
-    lastFrame = now;
-
+  function draw(dt) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     for (const leaf of leaves) {
-      leaf.age += dt;
-      leaf.y += leaf.speed * dt;
-      leaf.x += (leaf.drift + Math.sin(leaf.age * leaf.swayRate + leaf.phase) * leaf.sway) * dt;
-      leaf.rotation += leaf.spin * dt;
-      if (leaf.y > height + leaf.size * 2 || leaf.x < -90 || leaf.x > width + 90) resetLeaf(leaf);
+      if (dt > 0) {
+        leaf.age += dt;
+        leaf.y += leaf.speed * dt;
+        leaf.x += (leaf.drift + Math.sin(leaf.age * leaf.swayRate + leaf.phase) * leaf.sway) * dt;
+        leaf.rotation += leaf.spin * dt;
+        if (leaf.y > height + leaf.size * 2 || leaf.x < -90 || leaf.x > width + 90) resetLeaf(leaf);
+      }
       drawLeaf(leaf);
     }
   }
 
+  function frame(now) {
+    if (!running) {
+      raf = 0;
+      return;
+    }
+    raf = requestAnimationFrame(frame);
+    if (now - lastFrame < 31) return;
+    const dt = Math.min(0.05, Math.max(0.001, (now - (lastFrame || now - 32)) / 1000));
+    lastFrame = now;
+    draw(dt);
+  }
+
   function setRunning(next) {
-    running = !!next;
-    if (running && !raf) raf = requestAnimationFrame(frame);
-    if (!running && raf) {
-      cancelAnimationFrame(raf);
+    const value = !!next;
+    if (value === running && (value ? !!raf : !raf)) return;
+    running = value;
+    if (!running) {
+      if (raf) cancelAnimationFrame(raf);
       raf = 0;
       lastFrame = 0;
+      return;
     }
+    if (!raf) raf = requestAnimationFrame(frame);
   }
 
   let resizeTimer = 0;
@@ -186,15 +201,10 @@
   }, { passive: true });
   window.addEventListener('orientationchange', () => window.setTimeout(resize, 180), { passive: true });
   document.addEventListener('visibilitychange', () => setRunning(document.visibilityState !== 'hidden'));
-  reduceMotion?.addEventListener?.('change', event => {
-    if (event.matches) {
-      setRunning(false);
-      canvas.hidden = true;
-    } else {
-      canvas.hidden = false;
-      resize();
-      setRunning(true);
-    }
+  reduceMotion?.addEventListener?.('change', () => {
+    leaves = [];
+    resize();
+    setRunning(document.visibilityState !== 'hidden');
   });
 
   resize();
