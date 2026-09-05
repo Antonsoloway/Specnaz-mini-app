@@ -6,6 +6,13 @@
 > номера строк и before/after payload хранятся только в приватном operational
 > handoff и admin journal.
 
+## 2026-09-05 — Golub hidden Telegram citations prepared
+
+- Owner ingress source advanced from 2.4.0 to 2.5.0 for the pending shared narrative rollout.
+- The signed AI response can now contain a separate Telegram HTML envelope. Only validated Telegram message anchors are retained; users see natural clickable phrases instead of raw URLs, and link previews are disabled.
+- Malformed markup or a visible URL cannot pass through the rich sender and is reduced to clean plain text.
+- Owner-only, public-memory-only, stable-deployment, webhook, ChatKeeper/Royal CRM and public-speech boundaries are unchanged. Production remains on the prior ingress until the guarded rollout succeeds.
+
 ## 2026-09-03 — Golub private AI connected to public-only CHP memory interface
 
 - Existing `Таблица ЧП 1.3` deployment advanced in place from version 102 to 103; the deployment ID and webhook-facing URL are unchanged.
