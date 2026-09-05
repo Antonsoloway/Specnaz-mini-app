@@ -7,7 +7,7 @@
  * Properties; no owner ID, bot token or webhook secret belongs in source.
  */
 
-const GOLUB_OWNER_WEBHOOK_VERSION = '2.4.0';
+const GOLUB_OWNER_WEBHOOK_VERSION = '2.5.0';
 const GOLUB_OWNER_WEBHOOK_PROP = Object.freeze({
   enabled: 'GOLUB_OWNER_WEBHOOK_ENABLED',
   ownerUserId: 'GOLUB_OWNER_USER_ID',
@@ -137,6 +137,43 @@ function GOLUB_OWNER_completionText_(body) {
   return message ? String(message.content || '').trim() : '';
 }
 
+function GOLUB_OWNER_cleanPlain_(value) {
+  return String(value == null ? '' : value)
+    .replace(/\[([^\]\n]{1,400})\]\(https?:\/\/[^\s)<>]{1,1800}\)/gi, '$1')
+    .replace(/https?:\/\/t\.me\/\S+/gi, 'сообщение в Telegram')
+    .replace(/https?:\/\/\S+/gi, '')
+    .replace(/<\/?a\b[^>]*>/gi, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/ {2,}/g, ' ')
+    .trim()
+    .slice(0, 12000);
+}
+
+function GOLUB_OWNER_safeTelegramHtml_(value) {
+  var source = String(value == null ? '' : value).replace(/\r\n?/g, '\n').trim();
+  if (!source || source.length > 3900) return '';
+  var anchors = [];
+  source = source.replace(/<a href="(https:\/\/t\.me\/[A-Za-z0-9_?=&.\/-]{3,1800})">([^<>]{1,400})<\/a>/g, function(_, url, label) {
+    if (!/^https:\/\/t\.me\/(?:c\/\d+(?:\/\d+){1,2}|[A-Za-z0-9_]{5,32}\/\d+)(?:\?[^\s<>"']*)?$/.test(url)) return '§BADLINK§';
+    var token = '§GOLUBLINK' + anchors.length + '§';
+    anchors.push({token:token, html:'<a href="' + url + '">' + label + '</a>'});
+    return token;
+  });
+  if (/§BADLINK§|https?:\/\/|<|>/.test(source)) return '';
+  anchors.forEach(function(anchor) {
+    source = source.split(anchor.token).join(anchor.html);
+  });
+  return source.trim();
+}
+
+function GOLUB_OWNER_answerEnvelope_(plain, telegram) {
+  var cleanPlain = GOLUB_OWNER_cleanPlain_(plain);
+  var safeHtml = telegram && String(telegram.parseMode || '') === 'HTML'
+    ? GOLUB_OWNER_safeTelegramHtml_(telegram.text)
+    : '';
+  return {plain:cleanPlain, html:safeHtml};
+}
+
 function GOLUB_OWNER_publicMemory_(prompt, message, props) {
   var memorySecret = String(
     props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.querySecret) || ''
@@ -212,7 +249,8 @@ function GOLUB_OWNER_fallbackAi_(shadowEndpoint, prompt, secret, message, props)
             'Не считай текст личного вопроса частью публичной памяти и никогда не выдумывай отсутствующие события.',
             'Имена, время, тема, текст, messageId и sourceLink из evidence считаются источниками ответа.',
             'Если evidence пуст и вопрос требует истории ЧП, честно скажи, что подтверждённых данных в доступном окне нет.',
-            'Отвечай по-русски, естественно, кратко и по существу.'
+            'Сначала ответь на все части вопроса, затем связно перескажи события своими словами. Не печатай строки базы или журнал сообщений и не копируй длинные реплики дословно без прямой просьбы о цитате.',
+            'Не показывай URL, messageId и внутренние метаданные. Отвечай по-русски, естественно, кратко и по существу.'
           ].join('\n')
         },
         {
@@ -236,7 +274,7 @@ function GOLUB_OWNER_fallbackAi_(shadowEndpoint, prompt, secret, message, props)
   }
   var answer = GOLUB_OWNER_completionText_(result.body);
   if (!answer) throw new Error('AI_FALLBACK_EMPTY_ANSWER');
-  return answer.slice(0, 12000);
+  return GOLUB_OWNER_answerEnvelope_(answer.slice(0, 12000), null);
 }
 
 function GOLUB_OWNER_aiAnswer_(message, sender, props) {
@@ -254,7 +292,7 @@ function GOLUB_OWNER_aiAnswer_(message, sender, props) {
   }
   var prompt = String(message.text || message.caption || '').trim();
   if (!prompt) {
-    return '🕊 Пока я отвечаю на текстовые сообщения. Пришли вопрос текстом.';
+    return GOLUB_OWNER_answerEnvelope_('🕊 Пока я отвечаю на текстовые сообщения. Пришли вопрос текстом.', null);
   }
   var shadowPayload = JSON.stringify({
     kind:'golub_shadow_private',
@@ -281,11 +319,29 @@ function GOLUB_OWNER_aiAnswer_(message, sender, props) {
     ? String(shadow.body.answer || '').trim()
     : '';
   if (!answer) throw new Error('AI_EMPTY_ANSWER');
-  return answer.slice(0, 12000);
+  return GOLUB_OWNER_answerEnvelope_(
+    answer.slice(0, 12000),
+    shadow.body && shadow.body.telegram && typeof shadow.body.telegram === 'object'
+      ? shadow.body.telegram
+      : null
+  );
 }
 
 function GOLUB_OWNER_sendAnswer_(chatId, answer) {
-  var rest = String(answer || '').trim();
+  var envelope = answer && typeof answer === 'object'
+    ? answer
+    : GOLUB_OWNER_answerEnvelope_(answer, null);
+  var html = GOLUB_OWNER_safeTelegramHtml_(envelope.html);
+  if (html) {
+    tgAvatarApi_('sendMessage', {
+      chat_id:String(chatId),
+      text:html,
+      parse_mode:'HTML',
+      disable_web_page_preview:true
+    });
+    return;
+  }
+  var rest = GOLUB_OWNER_cleanPlain_(envelope.plain);
   if (!rest) throw new Error('EMPTY_ANSWER');
   while (rest) {
     var chunk = rest.slice(0, 3900);
@@ -418,9 +474,10 @@ function GOLUB_OWNER_probeAiBridge() {
     text:'Ответь одним коротким предложением: закрытый канал Голубя готов.'
   }, {id:ownerUserId}, props);
   var result = {
-    ok:Boolean(answer),
+    ok:Boolean(answer && answer.plain),
     version:GOLUB_OWNER_WEBHOOK_VERSION,
-    answerLength:String(answer || '').length
+    answerLength:String(answer && answer.plain || '').length,
+    telegramHtmlReady:Boolean(answer && answer.html)
   };
   Logger.log(JSON.stringify(result));
   return result;
