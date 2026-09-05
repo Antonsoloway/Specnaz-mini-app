@@ -1,0 +1,367 @@
+import currentWorker from './entry-v1390.js';
+
+const WRAPPER_VERSION = '1.40.0';
+const DEFAULT_ACHIEVEMENTS_PATH = 'achievements.json';
+const REGISTRY_TTL_MS = 10 * 1000;
+
+let registryCache = null;
+let registryExpiresAt = 0;
+let registryPending = null;
+
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+
+    if (url.pathname === '/admin-achievements' && request.method === 'OPTIONS') {
+      return achievementPreflight(request, env);
+    }
+
+    if (url.pathname === '/admin-achievements' && request.method === 'POST') {
+      try {
+        return await handleAchievementWrite(request, env, ctx);
+      } catch (error) {
+        console.error('v1400 admin-achievements failed', error?.stack || error?.message || error);
+        return json({
+          ok:false,
+          error:String(error?.code || 'ACHIEVEMENT_WRITE_FAILED'),
+          message:String(error?.publicMessage || 'Не удалось сохранить награды. Повторите попытку.')
+        }, Number(error?.status || 502), achievementCorsHeaders(request, env));
+      }
+    }
+
+    const base = await currentWorker.fetch(request, env, ctx);
+
+    if (request.method === 'GET' && base.ok && (url.pathname === '/snapshot' || url.pathname === '/admin-data')) {
+      try {
+        return await mergeAchievementsIntoResponse(base, env, url.pathname);
+      } catch (error) {
+        console.warn('v1400 achievement merge skipped', url.pathname, error?.message || 'unknown');
+        return base;
+      }
+    }
+
+    if (url.pathname === '/health' && request.method === 'GET') {
+      let data = {};
+      try { data = await base.clone().json(); } catch {}
+      return jsonFrom(base, {
+        ...data,
+        ok:true,
+        service:'royal-crm-miniapp-api',
+        version:WRAPPER_VERSION,
+        achievements:'private-registry+public-projection',
+        achievementAdminWrite:'/admin-achievements'
+      }, 200);
+    }
+
+    return base;
+  }
+};
+
+async function mergeAchievementsIntoResponse(base, env, pathname) {
+  const payload = await base.clone().json();
+  if (!payload?.ok) return base;
+  const registry = await loadRegistry(env, false);
+  const catalog = publicCatalog(registry);
+
+  if (pathname === '/snapshot' && payload?.snapshot && Array.isArray(payload.snapshot.participants)) {
+    payload.snapshot.participants = attachParticipantAchievements(payload.snapshot.participants, registry);
+    payload.snapshot.achievementCatalog = catalog;
+    payload.snapshot.achievementRegistryVersion = String(registry?.version || '1.0.0');
+    return jsonFrom(base, payload, base.status);
+  }
+
+  if (pathname === '/admin-data' && payload?.adminData && Array.isArray(payload.adminData.participants)) {
+    payload.adminData.participants = attachParticipantAchievements(payload.adminData.participants, registry);
+    payload.adminData.achievementCatalog = catalog;
+    payload.achievementCatalog = catalog;
+    return jsonFrom(base, payload, base.status);
+  }
+
+  return base;
+}
+
+function attachParticipantAchievements(participants, registry) {
+  const map = registry?.participants && typeof registry.participants === 'object'
+    ? registry.participants
+    : {};
+  const allowed = new Set(publicCatalog(registry).map(item => item.code));
+  return participants.map(participant => {
+    const telegramId = cleanTelegramId(participant?.telegramId);
+    const source = Array.isArray(map[telegramId]) ? map[telegramId] : [];
+    const achievements = [...new Set(source.map(cleanCode).filter(code => code && allowed.has(code)))];
+    return { ...participant, achievements };
+  });
+}
+
+async function handleAchievementWrite(request, env) {
+  const auth = await authorizeAdminViaAdminData(request, env);
+  if (!auth.response.ok || !auth.payload?.ok || !auth.payload?.adminData) return auth.response;
+
+  let body = null;
+  try { body = await request.json(); }
+  catch { throw appError(400, 'ACHIEVEMENT_BODY_INVALID', 'Некорректные данные наград.'); }
+
+  const telegramId = cleanTelegramId(body?.telegramId);
+  if (!telegramId) throw appError(400, 'PARTICIPANT_ID_INVALID', 'Участник не указан.');
+
+  const participants = Array.isArray(auth.payload.adminData.participants)
+    ? auth.payload.adminData.participants
+    : [];
+  if (!participants.some(item => cleanTelegramId(item?.telegramId) === telegramId)) {
+    throw appError(404, 'PARTICIPANT_NOT_FOUND', 'Участник не найден в админской базе.');
+  }
+
+  const loaded = await loadRegistryRecord(env, true);
+  const catalog = publicCatalog(loaded.registry);
+  const allowed = new Set(catalog.map(item => item.code));
+  if (!Array.isArray(body?.achievements)) {
+    throw appError(400, 'ACHIEVEMENTS_INVALID', 'Список наград имеет неверный формат.');
+  }
+  const requested = [...new Set(body.achievements.map(cleanCode).filter(Boolean))];
+  if (requested.some(code => !allowed.has(code))) {
+    throw appError(400, 'ACHIEVEMENT_UNKNOWN', 'Одна из наград пока не поддерживается.');
+  }
+
+  const next = normalizeRegistry(loaded.registry);
+  next.participants[telegramId] = requested;
+  next.updatedAt = new Date().toISOString();
+
+  const saved = await saveRegistryWithRetry(env, next, loaded.sha);
+  registryCache = saved.registry;
+  registryExpiresAt = Date.now() + REGISTRY_TTL_MS;
+  registryPending = null;
+
+  const result = {
+    ok:true,
+    telegramId,
+    achievements:requested,
+    achievementCatalog:publicCatalog(saved.registry),
+    updatedAt:saved.registry.updatedAt,
+    workerVersion:WRAPPER_VERSION
+  };
+  return jsonFrom(auth.response, result, 200);
+}
+
+async function authorizeAdminViaAdminData(request, env) {
+  const url = new URL(request.url);
+  url.pathname = '/admin-data';
+  url.search = '';
+  const headers = new Headers();
+  const authorization = request.headers.get('Authorization');
+  const origin = request.headers.get('Origin');
+  if (authorization) headers.set('Authorization', authorization);
+  if (origin) headers.set('Origin', origin);
+  const response = await currentWorker.fetch(new Request(url.toString(), { method:'GET', headers }), env, { waitUntil(){} });
+  let payload = null;
+  try { payload = await response.clone().json(); } catch {}
+  return { response, payload };
+}
+
+async function loadRegistry(env, force=false) {
+  if (!force && registryCache && Date.now() < registryExpiresAt) return registryCache;
+  if (!force && registryPending) return registryPending;
+  const task = loadRegistryRecord(env, force).then(record => record.registry);
+  if (!force) registryPending = task;
+  try {
+    const registry = await task;
+    registryCache = registry;
+    registryExpiresAt = Date.now() + REGISTRY_TTL_MS;
+    return registry;
+  } finally {
+    if (!force && registryPending === task) registryPending = null;
+  }
+}
+
+async function loadRegistryRecord(env, force=false) {
+  if (!force && registryCache && Date.now() < registryExpiresAt) {
+    return { registry:registryCache, sha:'' };
+  }
+  const repo = String(env.DATA_REPO || '').trim();
+  const branch = String(env.DATA_BRANCH || 'main').trim();
+  const path = String(env.ACHIEVEMENTS_PATH || DEFAULT_ACHIEVEMENTS_PATH).trim();
+  const token = String(env.GITHUB_TOKEN || '').trim();
+  if (!repo || !token || !path) throw appError(500, 'ACHIEVEMENT_CONFIG_MISSING', 'Хранилище наград не настроено.');
+
+  const response = await fetch(`https://api.github.com/repos/${repo}/contents/${encodePath(path)}?ref=${encodeURIComponent(branch)}`, {
+    method:'GET',
+    headers:githubHeaders(token),
+    cache:'no-store'
+  });
+  if (response.status === 404) {
+    return { registry:normalizeRegistry(null), sha:'' };
+  }
+  if (!response.ok) throw appError(502, 'ACHIEVEMENT_REGISTRY_FETCH_FAILED', 'Не удалось загрузить награды.');
+  const body = await response.json();
+  const encoded = String(body?.content || '').replace(/\s+/g, '');
+  const parsed = encoded ? JSON.parse(base64ToText(encoded)) : null;
+  return { registry:normalizeRegistry(parsed), sha:String(body?.sha || '') };
+}
+
+async function saveRegistryWithRetry(env, registry, sha) {
+  let currentSha = String(sha || '');
+  let currentRegistry = normalizeRegistry(registry);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const result = await writeRegistry(env, currentRegistry, currentSha);
+    if (result.ok) return { registry:currentRegistry, sha:result.sha };
+    if (result.status !== 409 || attempt > 0) {
+      throw appError(result.status === 403 ? 500 : 502, 'ACHIEVEMENT_REGISTRY_WRITE_FAILED', 'Не удалось записать награды.');
+    }
+    const fresh = await loadRegistryRecord(env, true);
+    currentSha = fresh.sha;
+    const merged = normalizeRegistry(fresh.registry);
+    const changedIds = Object.keys(currentRegistry.participants || {});
+    for (const id of changedIds) merged.participants[id] = currentRegistry.participants[id];
+    merged.updatedAt = currentRegistry.updatedAt;
+    currentRegistry = merged;
+  }
+  throw appError(502, 'ACHIEVEMENT_REGISTRY_CONFLICT', 'Награды изменились одновременно. Повторите сохранение.');
+}
+
+async function writeRegistry(env, registry, sha) {
+  const repo = String(env.DATA_REPO || '').trim();
+  const branch = String(env.DATA_BRANCH || 'main').trim();
+  const path = String(env.ACHIEVEMENTS_PATH || DEFAULT_ACHIEVEMENTS_PATH).trim();
+  const token = String(env.GITHUB_TOKEN || '').trim();
+  const payload = {
+    message:'Update participant achievements',
+    content:textToBase64(JSON.stringify(registry, null, 2) + '\n'),
+    branch
+  };
+  if (sha) payload.sha = sha;
+  const response = await fetch(`https://api.github.com/repos/${repo}/contents/${encodePath(path)}`, {
+    method:'PUT',
+    headers:{ ...githubHeaders(token), 'Content-Type':'application/json' },
+    body:JSON.stringify(payload),
+    cache:'no-store'
+  });
+  if (!response.ok) return { ok:false, status:response.status, sha:'' };
+  const body = await response.json().catch(() => ({}));
+  return { ok:true, status:response.status, sha:String(body?.content?.sha || '') };
+}
+
+function normalizeRegistry(value) {
+  const source = value && typeof value === 'object' ? value : {};
+  const catalog = source.catalog && typeof source.catalog === 'object'
+    ? { ...source.catalog }
+    : {};
+  if (!catalog.mayak) {
+    catalog.mayak = {
+      code:'mayak',
+      title:'МАЯК',
+      description:'Участник проекта «МАЯК»',
+      project:'mayak',
+      active:true
+    };
+  }
+  const participants = {};
+  if (source.participants && typeof source.participants === 'object') {
+    for (const [rawId, rawCodes] of Object.entries(source.participants)) {
+      const id = cleanTelegramId(rawId);
+      if (!id) continue;
+      participants[id] = Array.isArray(rawCodes)
+        ? [...new Set(rawCodes.map(cleanCode).filter(Boolean))]
+        : [];
+    }
+  }
+  return {
+    version:String(source.version || '1.0.0'),
+    updatedAt:String(source.updatedAt || ''),
+    catalog,
+    participants
+  };
+}
+
+function publicCatalog(registry) {
+  const source = registry?.catalog && typeof registry.catalog === 'object' ? registry.catalog : {};
+  return Object.values(source)
+    .filter(item => item && item.active !== false)
+    .map(item => ({
+      code:cleanCode(item.code),
+      title:String(item.title || item.code || '').trim(),
+      description:String(item.description || '').trim(),
+      project:String(item.project || '').trim()
+    }))
+    .filter(item => item.code && item.title)
+    .sort((a,b) => a.title.localeCompare(b.title, 'ru', { sensitivity:'base' }));
+}
+
+function cleanTelegramId(value) {
+  const text = String(value == null ? '' : value).trim().replace(/\.0$/, '');
+  return /^\d{5,20}$/.test(text) ? text : '';
+}
+
+function cleanCode(value) {
+  return String(value == null ? '' : value).trim().toLocaleLowerCase('en-US').replace(/[^a-z0-9_-]+/g, '');
+}
+
+function githubHeaders(token) {
+  return {
+    Authorization:`Bearer ${token}`,
+    Accept:'application/vnd.github+json',
+    'X-GitHub-Api-Version':'2022-11-28',
+    'User-Agent':'Royal-CRM-MiniApp-Achievements'
+  };
+}
+
+function encodePath(path) {
+  return String(path || '').split('/').map(encodeURIComponent).join('/');
+}
+
+function base64ToText(encoded) {
+  const binary = atob(encoded);
+  const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function textToBase64(text) {
+  const bytes = new TextEncoder().encode(String(text || ''));
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+function achievementPreflight(request, env) {
+  const headers = achievementCorsHeaders(request, env);
+  headers.set('Access-Control-Allow-Methods','POST, OPTIONS');
+  headers.set('Access-Control-Allow-Headers','Authorization, Content-Type');
+  headers.set('Access-Control-Max-Age','600');
+  return new Response(null, { status:204, headers });
+}
+
+function achievementCorsHeaders(request, env) {
+  const headers = new Headers();
+  const requestOrigin = String(request.headers.get('Origin') || '').trim();
+  const allowed = String(env.FRONTEND_ORIGIN || '').trim();
+  if (requestOrigin && (!allowed || requestOrigin === allowed)) headers.set('Access-Control-Allow-Origin', requestOrigin);
+  else if (allowed) headers.set('Access-Control-Allow-Origin', allowed);
+  headers.set('Vary','Origin');
+  headers.set('Cache-Control','no-store');
+  return headers;
+}
+
+function appError(status, code, publicMessage) {
+  const error = new Error(code);
+  error.status = status;
+  error.code = code;
+  error.publicMessage = publicMessage;
+  return error;
+}
+
+function json(payload, status=200, headers=new Headers()) {
+  const out = new Headers(headers);
+  out.set('Content-Type','application/json; charset=utf-8');
+  out.set('Cache-Control','no-store');
+  return new Response(JSON.stringify(payload), { status, headers:out });
+}
+
+function jsonFrom(response, payload, status) {
+  const headers = new Headers(response.headers);
+  headers.set('Content-Type','application/json; charset=utf-8');
+  headers.set('Cache-Control','no-store');
+  headers.delete('Content-Length');
+  headers.delete('ETag');
+  return new Response(JSON.stringify(payload), { status, headers });
+}
