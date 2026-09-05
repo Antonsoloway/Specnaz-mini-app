@@ -4,7 +4,7 @@
   if (String(window.__ROYAL_BUILD__ || '') !== '0.6.1') return;
   if (window.__ROYAL_ADMIN_ACHIEVEMENTS_V061__) return;
 
-  const VERSION = '0.6.1-admin-achievements.1';
+  const VERSION = '0.6.1-admin-achievements.2';
   const FALLBACK_CATALOG = [
     { code:'mayak', title:'МАЯК', description:'Участник проекта «МАЯК»', project:'mayak' }
   ];
@@ -75,7 +75,7 @@
     };
     try { mutate(window.RoyalAdminDataV0600?.current?.adminData?.participants); } catch (_) {}
     try { mutate(snapshotState?.participants); } catch (_) {}
-    try { window.RoyalMayak?.refresh?.(); } catch (_) {}
+    scheduleMayakReconcile();
     try {
       window.dispatchEvent(new CustomEvent('royal:achievements-updated', {
         detail:{ telegramId:id, achievements:[...next] }
@@ -98,6 +98,32 @@
       .filter(input => input.checked)
       .map(input => cleanCode(input.dataset.achievementCode))
       .filter(Boolean);
+  }
+
+  function makeRequestId() {
+    let random = '';
+    try { random = crypto.randomUUID?.().replace(/-/g, '') || ''; } catch (_) {}
+    if (!random) random = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+    return `ach-${Date.now().toString(36)}-${random.slice(0, 20)}`;
+  }
+
+  function mergeLocalJournal(entry) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return;
+    try {
+      const current = window.RoyalAdminDataV0600?.current;
+      if (!current?.adminData) return;
+      const journal = current.adminData.journal && typeof current.adminData.journal === 'object'
+        ? current.adminData.journal
+        : { version:'0.6.0-read', rows:[] };
+      const rows = Array.isArray(journal.rows) ? journal.rows : [];
+      const key = clean(entry.requestId || entry.eventId);
+      journal.version = `${clean(journal.version) || '0.6.0-read'}+achievements.1`;
+      journal.rows = [
+        entry,
+        ...rows.filter(row => clean(row?.requestId || row?.eventId) !== key)
+      ];
+      current.adminData.journal = journal;
+    } catch (_) {}
   }
 
   function renderPanel(control, telegramId) {
@@ -144,6 +170,7 @@
     const button = panel?.querySelector?.('[data-admin-achievements-save="1"]');
     if (!telegramId || !panel || !button) return;
     const achievements = selectedCodes(panel);
+    const requestId = makeRequestId();
 
     button.disabled = true;
     if (status) {
@@ -162,18 +189,19 @@
           Authorization:`Bearer ${token}`,
           'Content-Type':'application/json'
         },
-        body:JSON.stringify({ telegramId, achievements })
+        body:JSON.stringify({ telegramId, achievements, requestId })
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data?.ok) throw new Error(data?.message || `HTTP ${response.status}`);
 
       const saved = Array.isArray(data.achievements) ? data.achievements.map(cleanCode).filter(Boolean) : achievements;
       setLocalCodes(telegramId, saved);
+      mergeLocalJournal(data.journalEntry);
       const badge = control.querySelector('[data-admin-achievements-count="1"]');
       if (badge) badge.textContent = countLabel(saved);
       if (status) {
         status.className = 'royal-admin-achievement-status-v061 is-ok';
-        status.textContent = 'Награды сохранены.';
+        status.textContent = data.changed === false ? 'Награды без изменений.' : 'Награды сохранены и записаны в журнал.';
       }
       try {
         const current = window.RoyalAdminDataV0600?.current;
@@ -198,6 +226,150 @@
     forms.forEach(ensureControl);
   }
 
+  /* v0.6.1 public MAYAK surfaces now follow the achievement projection. The
+   * historical hardcoded list stays only as a rollback/fallback inside the old
+   * v0.5.36 module. Once snapshot participants carry achievements[], MAYAK
+   * badges and the project participant list are driven by code='mayak'. */
+  function snapshotParticipants() {
+    try { return Array.isArray(snapshotState?.participants) ? snapshotState.participants : []; }
+    catch (_) { return []; }
+  }
+
+  function hasAchievementProjection() {
+    return snapshotParticipants().some(item => Array.isArray(item?.achievements));
+  }
+
+  function hasAchievement(record, code) {
+    if (!Array.isArray(record?.achievements)) return false;
+    return record.achievements.map(cleanCode).includes(cleanCode(code));
+  }
+
+  function mayakParticipants() {
+    const all = snapshotParticipants();
+    if (hasAchievementProjection()) return all.filter(item => hasAchievement(item, 'mayak'));
+    let legacy = [];
+    try { legacy = Array.isArray(window.RoyalMayak?.participantIds) ? window.RoyalMayak.participantIds.map(cleanId) : []; }
+    catch (_) {}
+    const set = new Set(legacy.filter(Boolean));
+    return all.filter(item => set.has(cleanId(item?.telegramId)));
+  }
+
+  function participantById(id) {
+    const key = cleanId(id);
+    return snapshotParticipants().find(item => cleanId(item?.telegramId) === key) || null;
+  }
+
+  function mayakLighthouseSvg() {
+    return `<svg class="mayak-lighthouse-svg" viewBox="0 0 64 64" aria-hidden="true"><path fill="currentColor" d="M28 6h8l2 6h5l5 9H16l5-9h5l2-6Zm-7 18h22l4 34H17l4-34Zm6 5-1 8h12l-1-8H27Zm-2 14-1 9h16l-1-9H25ZM8 23l12 4-.6 5L8 35V23Zm48 0v12l-11.4-3-.6-5L56 23Z"/><path fill="#fff4b0" d="M29 15h6v6h-6z"/></svg>`;
+  }
+
+  function createMayakBadge() {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'mayak-achievement-v0536';
+    button.dataset.openMayakParticipants = '1';
+    button.setAttribute('title', 'Участники проекта «МАЯК»');
+    button.setAttribute('aria-label', 'Достижение МАЯК. Открыть участников проекта');
+    button.innerHTML = `${mayakLighthouseSvg()}<span>МАЯК</span>`;
+    return button;
+  }
+
+  function visibleCardId(card) {
+    return cleanId(
+      card?.dataset?.profileTelegramId ||
+      card?.dataset?.participantTelegramId ||
+      card?.dataset?.directoryTelegramId ||
+      card?.querySelector?.('[data-telegram-id]')?.dataset?.telegramId
+    );
+  }
+
+  function reconcileMayakCard(card) {
+    const row = card?.querySelector?.('.participant-achievements-row');
+    if (!row) return;
+    const participant = participantById(visibleCardId(card));
+    const shouldHave = !!participant && hasAchievement(participant, 'mayak');
+    let slot = row.querySelector(':scope > .participant-achievements-future-slot');
+    const badges = slot ? [...slot.querySelectorAll(':scope > .mayak-achievement-v0536')] : [];
+    if (!shouldHave) {
+      badges.forEach(node => node.remove());
+      row.classList.remove('has-mayak-v0536');
+      return;
+    }
+    if (!slot) {
+      slot = document.createElement('span');
+      slot.className = 'participant-achievements-future-slot';
+      row.appendChild(slot);
+    }
+    if (!slot.querySelector(':scope > .mayak-achievement-v0536')) slot.appendChild(createMayakBadge());
+    row.classList.add('has-mayak-v0536');
+  }
+
+  function reconcileMayakDetail() {
+    const card = document.querySelector('.participant-detail-card');
+    if (!card) return;
+    const id = cleanId(card.querySelector('.participant-detail-avatar[data-telegram-id]')?.dataset?.telegramId);
+    const participant = participantById(id);
+    const shouldHave = !!participant && hasAchievement(participant, 'mayak');
+    const stage = card.querySelector('.rank-premium-stage');
+    if (!stage) return;
+    let strip = card.querySelector('.participant-detail-achievement-strip-v0536');
+    if (!shouldHave) {
+      strip?.remove();
+      return;
+    }
+    if (!strip) {
+      strip = document.createElement('div');
+      strip.className = 'participant-detail-achievement-strip-v0536';
+    }
+    if (stage.nextElementSibling !== strip) stage.insertAdjacentElement('afterend', strip);
+    if (!strip.querySelector('.mayak-achievement-v0536')) strip.appendChild(createMayakBadge());
+  }
+
+  function reconcileMayakUi() {
+    if (!hasAchievementProjection()) return;
+    document.querySelectorAll('.person-card,.team-member,.directory-person-card:not(.directory-person-card--external),.hero-card')
+      .forEach(reconcileMayakCard);
+    reconcileMayakDetail();
+    const count = mayakParticipants().length;
+    document.querySelectorAll('.mayak-participants-button-v0536 small').forEach(node => {
+      node.textContent = `${count} участников · золотое достижение «МАЯК»`;
+    });
+    try {
+      if (window.RoyalMayak && Array.isArray(window.RoyalMayak.participantIds)) {
+        window.RoyalMayak.participantIds = mayakParticipants().map(item => cleanId(item?.telegramId)).filter(Boolean);
+      }
+    } catch (_) {}
+  }
+
+  let reconcileTimer = 0;
+  function scheduleMayakReconcile() {
+    if (reconcileTimer) clearTimeout(reconcileTimer);
+    reconcileTimer = setTimeout(() => {
+      reconcileTimer = 0;
+      reconcileMayakUi();
+      [90, 280, 650].forEach(delay => setTimeout(reconcileMayakUi, delay));
+    }, 0);
+  }
+
+  function renderMayakParticipantsFromAchievements() {
+    const found = mayakParticipants();
+    try { window.RoyalNav?.pushCurrent?.(); } catch (_) {}
+    document.body.classList.add('royal-section-screen');
+    const selfCard = document.getElementById('selfProfileCard');
+    if (selfCard) selfCard.hidden = true;
+    const panel = document.getElementById('panel');
+    if (!panel) return;
+    panel.hidden = false;
+    const cards = typeof participantCard === 'function' ? found.map(participantCard).join('') : '';
+    panel.innerHTML = `<button type="button" class="royal-back-button" data-royal-back="1">← Назад</button><section class="mayak-participants-page-v0536"><span class="guide-head" hidden aria-hidden="true"></span><header><span>${mayakLighthouseSvg()}</span><h2>Участники проекта<br>«МАЯК»</h2></header><div class="people-list">${cards || '<div class="empty-state">Участники пока недоступны.</div>'}</div></section>`;
+    try { setupAvatarLoading(panel); } catch (_) {}
+    try { window.RoyalNav?.enhanceVisibleBack?.(); } catch (_) {}
+    try { window.RoyalTeamGameColors?.refresh?.(); } catch (_) {}
+    try { window.RoyalAdminBadges?.refresh?.(0); } catch (_) {}
+    try { window.RoyalScrollTop?.afterForwardRender?.(); } catch (_) {}
+    scheduleMayakReconcile();
+  }
+
   const style = document.createElement('style');
   style.dataset.adminAchievementsV061 = '1';
   style.textContent = `
@@ -219,6 +391,14 @@
     .royal-admin-achievement-status-v061.is-error{color:#ffc5ca}
   `;
   document.head.appendChild(style);
+
+  window.addEventListener('click', event => {
+    const participants = event.target?.closest?.('[data-open-mayak-participants="1"]');
+    if (!participants || !hasAchievementProjection()) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    renderMayakParticipantsFromAchievements();
+  }, true);
 
   document.addEventListener('click', event => {
     const toggle = event.target?.closest?.('[data-admin-achievements-toggle="1"]');
@@ -245,19 +425,31 @@
   }, true);
 
   const observer = new MutationObserver(records => {
+    let needsDecorate = false;
+    let needsMayak = false;
     for (const record of records) {
       for (const node of record.addedNodes || []) {
         if (!(node instanceof Element)) continue;
-        if (node.matches?.(FORM_SELECTOR) || node.querySelector?.(FORM_SELECTOR)) {
-          decorate(node);
-          return;
-        }
+        if (node.matches?.(FORM_SELECTOR) || node.querySelector?.(FORM_SELECTOR)) needsDecorate = true;
+        if (node.matches?.('.person-card,.team-member,.participant-detail-card,.hero-card,.mayak-project-page-v0536') ||
+            node.querySelector?.('.person-card,.team-member,.participant-detail-card,.hero-card,.mayak-project-page-v0536')) needsMayak = true;
       }
     }
+    if (needsDecorate) decorate(document);
+    if (needsMayak) scheduleMayakReconcile();
   });
   observer.observe(document.body, { childList:true, subtree:true });
 
+  window.addEventListener('royal:auth-ready', scheduleMayakReconcile);
+  window.addEventListener('royal:snapshot-ready', scheduleMayakReconcile);
+  window.addEventListener('royal:achievements-updated', scheduleMayakReconcile);
+  window.addEventListener('pageshow', scheduleMayakReconcile);
+
   decorate(document);
-  window.RoyalAdminAchievementsV061 = { version:VERSION, refresh:() => decorate(document) };
+  scheduleMayakReconcile();
+  window.RoyalAdminAchievementsV061 = {
+    version:VERSION,
+    refresh:() => { decorate(document); scheduleMayakReconcile(); }
+  };
   window.__ROYAL_ADMIN_ACHIEVEMENTS_V061__ = VERSION;
 })();
