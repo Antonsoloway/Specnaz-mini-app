@@ -1,5 +1,5 @@
 name = "royal-crm-miniapp-api"
-main = "src/entry-v1400.js"
+main = "src/entry-v1410.js"
 compatibility_date = "2026-08-15"
 
 [vars]
@@ -54,10 +54,11 @@ invocation_logs = true
 # shuffle-bag so all six tracks play in randomized order without immediate
 # repeats across playlist cycles.
 #
-# entry-v1400 adds a future-extensible achievement registry stored only in the
-# private data repository. /snapshot and /admin-data receive a sanitized
-# achievements[] projection; authenticated chat admins can update awards via
-# /admin-achievements. The first catalog item is MAYAK and the registry is
-# seeded from the historical 56 project participants.
+# entry-v1410 owns the v0.6.1 achievement registry. /snapshot and /admin-data
+# receive a sanitized achievements[] projection; authenticated chat admins can
+# update awards via /admin-achievements. Every real award add/remove is written
+# atomically with the private registry journal and merged into the ordinary
+# admin journal as schema-v2 participant changes. The first catalog item is
+# MAYAK and the registry remains seeded from the historical project members.
 #
 # Cloudflare Builds source: GitHub main, root path /worker.
