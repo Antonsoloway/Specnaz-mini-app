@@ -7,7 +7,7 @@
  * Properties; no owner ID, bot token or webhook secret belongs in source.
  */
 
-const GOLUB_OWNER_WEBHOOK_VERSION = '2.5.0';
+const GOLUB_OWNER_WEBHOOK_VERSION = '2.6.0';
 const GOLUB_OWNER_WEBHOOK_PROP = Object.freeze({
   enabled: 'GOLUB_OWNER_WEBHOOK_ENABLED',
   ownerUserId: 'GOLUB_OWNER_USER_ID',
@@ -17,6 +17,7 @@ const GOLUB_OWNER_WEBHOOK_PROP = Object.freeze({
   lastError: 'GOLUB_OWNER_LAST_ERROR',
   lastIngress: 'GOLUB_OWNER_LAST_INGRESS',
   aiEnabled: 'GOLUB_OWNER_WEBHOOK_ENABLED',
+  unifiedUrl: 'GOLUB_OWNER_UNIFIED_WORKER_URL',
   aiUrl: 'GOLUB_SHADOW_WORKER_URL',
   aiSecret: 'GOLUB_SHADOW_SHARED_SECRET'
 });
@@ -25,10 +26,8 @@ const GOLUB_OWNER_PRODUCTION_WEBAPP_URL =
   'https://script.google.com/macros/s/AKfycbwmFpY8BPmxcQhBwwk0v2oXLUc9PukMbostm9o44X9RKf0WyST80V_vDtJXRFV3DZ8LUg/exec';
 const GOLUB_OWNER_RELAY_WEBHOOK_URL =
   'https://golub-chp-gateway.soloway3852.chatgpt.site/api/telegram';
-const GOLUB_OWNER_PUBLIC_MEMORY_URL =
-  'https://golub-chp-gateway.soloway3852.chatgpt.site/api/internal/ues-query';
 const GOLUB_OWNER_DEFAULT_AI_WORKER_URL =
-  'https://specnaz-ai-telegram-gateway.soloway3852.workers.dev/internal/golub-shadow';
+  'https://specnaz-ai-telegram-gateway.soloway3852.workers.dev/internal/golub-owner';
 const GOLUB_OWNER_AI_UNAVAILABLE =
   '🕊 Сейчас не смог получить ответ от ИИ. Повтори сообщение через минуту.';
 
@@ -126,17 +125,6 @@ function GOLUB_OWNER_workerError_(result) {
     : '';
 }
 
-function GOLUB_OWNER_completionText_(body) {
-  var completion = body && body.completion && typeof body.completion === 'object'
-    ? body.completion
-    : null;
-  var choices = completion && Array.isArray(completion.choices) ? completion.choices : [];
-  var message = choices[0] && choices[0].message && typeof choices[0].message === 'object'
-    ? choices[0].message
-    : null;
-  return message ? String(message.content || '').trim() : '';
-}
-
 function GOLUB_OWNER_cleanPlain_(value) {
   return String(value == null ? '' : value)
     .replace(/\[([^\]\n]{1,400})\]\(https?:\/\/[^\s)<>]{1,1800}\)/gi, '$1')
@@ -174,188 +162,141 @@ function GOLUB_OWNER_answerEnvelope_(plain, telegram) {
   return {plain:cleanPlain, html:safeHtml};
 }
 
-function GOLUB_OWNER_publicMemory_(prompt, message, props) {
-  var memorySecret = String(
-    props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.querySecret) || ''
-  );
-  if (memorySecret.length < 24) {
-    return {ready:false, contract:null, evidence:[]};
-  }
-  var path = '/api/internal/ues-query';
-  var payload = JSON.stringify({
-    action:'query',
-    question:String(prompt || '').slice(0, 5000),
-    nowUnix:Number(message && message.date || Math.floor(Date.now() / 1000)),
-    limit:40
-  });
-  var result = GOLUB_OWNER_signedPost_(
-    GOLUB_OWNER_PUBLIC_MEMORY_URL,
-    path,
-    payload,
-    memorySecret
-  );
-  if (result.code !== 200 || !result.body || result.body.ok !== true) {
-    return {ready:false, contract:null, evidence:[]};
-  }
-  var evidence = Array.isArray(result.body.evidence)
-    ? result.body.evidence.slice(0, 40).map(function(item) {
-        item = item && typeof item === 'object' ? item : {};
-        return {
-          eventId:String(item.eventId || '').slice(0, 240),
-          eventType:String(item.eventType || '').slice(0, 80),
-          actorName:String(item.actorName || '').slice(0, 240),
-          actorUsername:String(item.actorUsername || '').slice(0, 120),
-          targetName:String(item.targetName || '').slice(0, 240),
-          targetUsername:String(item.targetUsername || '').slice(0, 120),
-          occurredAtIso:String(item.occurredAtIso || '').slice(0, 80),
-          threadId:String(item.threadId || '0').slice(0, 40),
-          messageId:Number(item.messageId || 0),
-          chatMessageSeq:item.chatMessageSeq == null
-            ? null
-            : Number(item.chatMessageSeq),
-          text:String(item.text || '').slice(0, 2000),
-          mediaKind:String(item.mediaKind || '').slice(0, 80),
-          sourceLink:String(item.sourceLink || '').slice(0, 500)
-        };
-      })
-    : [];
-  return {
-    ready:true,
-    contract:result.body.contract && typeof result.body.contract === 'object'
-      ? result.body.contract
-      : null,
-    evidence:evidence
-  };
+function GOLUB_OWNER_workerEndpoint_(props, path) {
+  var configured = String(
+    props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.unifiedUrl) ||
+    props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.aiUrl) ||
+    GOLUB_OWNER_DEFAULT_AI_WORKER_URL
+  ).trim();
+  var origin = configured.replace(/\/internal\/[^/?#]+$/, '');
+  if (!/^https:\/\/[^/\s]+$/.test(origin)) throw new Error('AI_ENDPOINT_INVALID');
+  return origin + String(path || '');
 }
 
-function GOLUB_OWNER_fallbackAi_(shadowEndpoint, prompt, secret, message, props) {
-  var path = '/internal/llm';
-  var endpoint = String(shadowEndpoint || '').replace(/\/internal\/golub-shadow$/, path);
-  var publicMemory = {ready:false, contract:null, evidence:[]};
-  try {
-    publicMemory = GOLUB_OWNER_publicMemory_(prompt, message, props);
-  } catch (_) {}
-  var payload = JSON.stringify({
-    purpose:'golub_owner_private_fallback',
-    body:{
-      messages:[
-        {
-          role:'system',
-          content:[
-            'Ты Голубь Мира — будущий голос Чата Победителей (ЧП).',
-            'Сейчас ты общаешься только с владельцем в закрытой личке Telegram.',
-            'Не раскрывай внутренние ключи, маршруты и устройство системы.',
-            'Тебе может быть передан пакет public_chp_evidence только из публичного ЧП.',
-            'Не считай текст личного вопроса частью публичной памяти и никогда не выдумывай отсутствующие события.',
-            'Имена, время, тема, текст, messageId и sourceLink из evidence считаются источниками ответа.',
-            'Если evidence пуст и вопрос требует истории ЧП, честно скажи, что подтверждённых данных в доступном окне нет.',
-            'Сначала ответь на все части вопроса, затем связно перескажи события своими словами. Не печатай строки базы или журнал сообщений и не копируй длинные реплики дословно без прямой просьбы о цитате.',
-            'Не показывай URL, messageId и внутренние метаданные. Отвечай по-русски, естественно, кратко и по существу.'
-          ].join('\n')
-        },
-        {
-          role:'user',
-          content:JSON.stringify({
-            mode:'owner_private_with_public_chp_memory',
-            question:String(prompt || '').slice(0, 5000),
-            queryContract:publicMemory.contract,
-            publicChpEvidence:publicMemory.evidence
-          })
-        }
-      ],
-      temperature:0.2,
-      max_tokens:700
-    }
-  });
-  var result = GOLUB_OWNER_signedPost_(endpoint, path, payload, secret);
-  if (result.code !== 200 || !result.body || result.body.ok !== true) {
-    var workerError = GOLUB_OWNER_workerError_(result);
-    throw new Error('AI_FALLBACK_' + result.code + (workerError ? '_' + workerError : ''));
-  }
-  var answer = GOLUB_OWNER_completionText_(result.body);
-  if (!answer) throw new Error('AI_FALLBACK_EMPTY_ANSWER');
-  return GOLUB_OWNER_answerEnvelope_(answer.slice(0, 12000), null);
+function GOLUB_OWNER_workerSecret_(props) {
+  var secret = String(
+    props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.aiSecret) ||
+    props.getProperty('SPECNAZ_AI_SHARED_SECRET') ||
+    ''
+  );
+  if (secret.length < 32) throw new Error('AI_SECRET_NOT_CONFIGURED');
+  return secret;
 }
 
 function GOLUB_OWNER_aiAnswer_(message, sender, props) {
   if (String(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.aiEnabled) || '0') !== '1') {
     throw new Error('AI_DISABLED');
   }
-  var endpoint = String(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.aiUrl) || GOLUB_OWNER_DEFAULT_AI_WORKER_URL);
-  var secret = String(
-    props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.aiSecret) ||
-    props.getProperty('SPECNAZ_AI_SHARED_SECRET') ||
-    ''
-  );
-  if (!/^https:\/\/[^\s]+\/internal\/golub-shadow$/.test(endpoint) || !secret) {
-    throw new Error('AI_NOT_CONFIGURED');
-  }
   var prompt = String(message.text || message.caption || '').trim();
   if (!prompt) {
-    return GOLUB_OWNER_answerEnvelope_('🕊 Пока я отвечаю на текстовые сообщения. Пришли вопрос текстом.', null);
+    return {
+      plain:'🕊 Пока я отвечаю на текстовые сообщения. Пришли вопрос текстом.',
+      html:'',
+      commit:null,
+      commitAnswer:''
+    };
   }
-  var shadowPayload = JSON.stringify({
-    kind:'golub_shadow_private',
+
+  var path = '/internal/golub-owner';
+  var endpoint = GOLUB_OWNER_workerEndpoint_(props, path);
+  var secret = GOLUB_OWNER_workerSecret_(props);
+  var payload = JSON.stringify({
+    kind:'golub_owner_private',
     chatType:'private',
+    chatId:String(message && message.chat && message.chat.id || ''),
     messageId:Number(message.message_id || 0),
     date:Number(message.date || Math.floor(Date.now() / 1000)),
     user:{id:String(sender && sender.id || '')},
     text:prompt.slice(0, 5000)
   });
-  var shadow = GOLUB_OWNER_signedPost_(
-    endpoint,
-    '/internal/golub-shadow',
-    shadowPayload,
-    secret
-  );
-  if (shadow.code === 404 && /^not[-_ ]?found$/i.test(GOLUB_OWNER_workerError_(shadow))) {
-    return GOLUB_OWNER_fallbackAi_(endpoint, prompt, secret, message, props);
+  var result = GOLUB_OWNER_signedPost_(endpoint, path, payload, secret);
+  if (result.code !== 200 || !result.body || result.body.ok !== true) {
+    var workerError = GOLUB_OWNER_workerError_(result);
+    throw new Error('AI_HTTP_' + result.code + (workerError ? '_' + workerError : ''));
   }
-  if (shadow.code !== 200) {
-    var workerError = GOLUB_OWNER_workerError_(shadow);
-    throw new Error('AI_HTTP_' + shadow.code + (workerError ? '_' + workerError : ''));
+
+  var rawAnswer = String(result.body.answer || '').trim();
+  var commit = result.body.commit && typeof result.body.commit === 'object'
+    ? result.body.commit
+    : null;
+  if (!rawAnswer) throw new Error('AI_EMPTY_ANSWER');
+  if (!commit) throw new Error('AI_COMMIT_ENVELOPE_MISSING');
+
+  // The Worker is now the single output/grounding authority. Do not rewrite
+  // its answer in transport: the post-send commit hashes this exact text.
+  return {
+    plain:rawAnswer.slice(0, 12000),
+    html:'',
+    commit:commit,
+    commitAnswer:rawAnswer.slice(0, 12000)
+  };
+}
+
+function GOLUB_OWNER_sendReceipt_(data) {
+  var result = data && data.result && typeof data.result === 'object' ? data.result : null;
+  var messageId = result ? String(result.message_id == null ? '' : result.message_id) : '';
+  var botUserId = result && result.from ? String(result.from.id == null ? '' : result.from.id) : '';
+  var date = result ? Number(result.date || 0) : 0;
+  if (!/^\d+$/.test(messageId) || !/^[1-9]\d*$/.test(botUserId)) {
+    throw new Error('TELEGRAM_SEND_RECEIPT_INVALID');
   }
-  var answer = shadow.body && shadow.body.ok === true
-    ? String(shadow.body.answer || '').trim()
-    : '';
-  if (!answer) throw new Error('AI_EMPTY_ANSWER');
-  return GOLUB_OWNER_answerEnvelope_(
-    answer.slice(0, 12000),
-    shadow.body && shadow.body.telegram && typeof shadow.body.telegram === 'object'
-      ? shadow.body.telegram
-      : null
-  );
+  return {messageId:messageId, botUserId:botUserId, date:date};
 }
 
 function GOLUB_OWNER_sendAnswer_(chatId, answer) {
   var envelope = answer && typeof answer === 'object'
     ? answer
-    : GOLUB_OWNER_answerEnvelope_(answer, null);
+    : {plain:String(answer || ''), html:''};
   var html = GOLUB_OWNER_safeTelegramHtml_(envelope.html);
   if (html) {
-    tgAvatarApi_('sendMessage', {
+    return GOLUB_OWNER_sendReceipt_(tgAvatarApi_('sendMessage', {
       chat_id:String(chatId),
       text:html,
       parse_mode:'HTML',
       disable_web_page_preview:true
-    });
-    return;
+    }));
   }
-  var rest = GOLUB_OWNER_cleanPlain_(envelope.plain);
+
+  // Unified-runtime prose is already grounded and output-guarded. Preserve it
+  // byte-for-byte (apart from trim/chunk boundaries) so answerHash commits the
+  // same logical assistant text that was delivered to Telegram.
+  var rest = String(envelope.plain == null ? '' : envelope.plain).trim();
   if (!rest) throw new Error('EMPTY_ANSWER');
+  var firstReceipt = null;
   while (rest) {
     var chunk = rest.slice(0, 3900);
     if (rest.length > 3900) {
       var split = Math.max(chunk.lastIndexOf('\n'), chunk.lastIndexOf(' '));
       if (split > 2400) chunk = chunk.slice(0, split);
     }
-    tgAvatarApi_('sendMessage', {
+    var sent = tgAvatarApi_('sendMessage', {
       chat_id:String(chatId),
       text:chunk,
       disable_web_page_preview:true
     });
+    if (!firstReceipt) firstReceipt = GOLUB_OWNER_sendReceipt_(sent);
     rest = rest.slice(chunk.length).trim();
   }
+  return firstReceipt;
+}
+
+function GOLUB_OWNER_commitAnswer_(answer, sentReceipt, props) {
+  if (!answer || !answer.commit) return {ok:true, skipped:'no-runtime-commit'};
+  var path = '/internal/golub-owner-commit';
+  var endpoint = GOLUB_OWNER_workerEndpoint_(props, path);
+  var secret = GOLUB_OWNER_workerSecret_(props);
+  var commitAnswer = String(answer.commitAnswer || answer.plain || '').trim();
+  var payload = JSON.stringify({
+    commit:answer.commit,
+    sent:sentReceipt || {},
+    answer:commitAnswer
+  });
+  var result = GOLUB_OWNER_signedPost_(endpoint, path, payload, secret);
+  if (result.code !== 200 || !result.body || result.body.ok !== true) {
+    var workerError = GOLUB_OWNER_workerError_(result);
+    throw new Error('DURABLE_COMMIT_HTTP_' + result.code + (workerError ? '_' + workerError : ''));
+  }
+  return result.body;
 }
 
 function GOLUB_OWNER_aiBridgeStatus() {
@@ -369,12 +310,15 @@ function GOLUB_OWNER_aiBridgeStatus() {
     version:GOLUB_OWNER_WEBHOOK_VERSION,
     ownerWebhookEnabled:String(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.enabled) || '0') === '1',
     ownerConfigured:Boolean(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.ownerUserId)),
-    workerConfigured:Boolean(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.aiUrl) || GOLUB_OWNER_DEFAULT_AI_WORKER_URL),
-    sharedSecretConfigured:secret.length >= 32,
-    publicMemoryConfigured:Boolean(
-      GOLUB_OWNER_PUBLIC_MEMORY_URL &&
-      String(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.querySecret) || '').length >= 24
+    unifiedWorkerConfigured:Boolean(
+      props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.unifiedUrl) ||
+      props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.aiUrl) ||
+      GOLUB_OWNER_DEFAULT_AI_WORKER_URL
     ),
+    sharedSecretConfigured:secret.length >= 32,
+    commitCapable:secret.length >= 32,
+    legacyBrainFallback:false,
+    publicChpSpeaking:false,
     aiReady:secret.length >= 32
   };
   Logger.log(JSON.stringify(result));
@@ -465,20 +409,12 @@ function GOLUB_OWNER_recordIngress_(props, code) {
 }
 
 function GOLUB_OWNER_probeAiBridge() {
-  var props = PropertiesService.getScriptProperties();
-  var ownerUserId = String(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.ownerUserId) || '');
-  if (!ownerUserId) throw new Error('OWNER_NOT_CONFIGURED');
-  var answer = GOLUB_OWNER_aiAnswer_({
-    message_id:0,
-    date:Math.floor(Date.now() / 1000),
-    text:'Ответь одним коротким предложением: закрытый канал Голубя готов.'
-  }, {id:ownerUserId}, props);
-  var result = {
-    ok:Boolean(answer && answer.plain),
-    version:GOLUB_OWNER_WEBHOOK_VERSION,
-    answerLength:String(answer && answer.plain || '').length,
-    telegramHtmlReady:Boolean(answer && answer.html)
-  };
+  // P9B durable answer calls write inbound/provenance by design. A synthetic
+  // probe must therefore remain configuration-only; real verification is done
+  // with a real owner Telegram update during the guarded live gate.
+  var result = GOLUB_OWNER_aiBridgeStatus();
+  result.syntheticAiRequest = false;
+  result.syntheticDurableWrite = false;
   Logger.log(JSON.stringify(result));
   return result;
 }
@@ -534,20 +470,45 @@ function GOLUB_OWNER_tryHandleTelegram_(e) {
 
   try {
     var answer = GOLUB_OWNER_aiAnswer_(message, sender, props);
-    GOLUB_OWNER_sendAnswer_(message.chat.id, answer);
+    var sentReceipt = GOLUB_OWNER_sendAnswer_(message.chat.id, answer);
+    var sentAt = new Date().toISOString();
+
+    // The user already received this update. Persist dedupe BEFORE the durable
+    // commit callback so a storage/commit fault cannot produce a duplicate
+    // Telegram answer on any replay path.
     props.setProperties({
       GOLUB_OWNER_LAST_UPDATE_ID:String(updateId),
-      GOLUB_OWNER_LAST_OK:new Date().toISOString(),
+      GOLUB_OWNER_LAST_OK:sentAt,
       GOLUB_OWNER_LAST_ERROR:'',
-      GOLUB_OWNER_LAST_INGRESS:'PRIVATE_OWNER_ANSWERED ' + new Date().toISOString()
+      GOLUB_OWNER_LAST_INGRESS:'PRIVATE_OWNER_SENT ' + sentAt
     }, false);
+
+    if (answer && answer.commit) {
+      try {
+        GOLUB_OWNER_commitAnswer_(answer, sentReceipt, props);
+        props.setProperty(
+          GOLUB_OWNER_WEBHOOK_PROP.lastIngress,
+          'PRIVATE_OWNER_ANSWERED ' + new Date().toISOString()
+        );
+      } catch (_) {
+        // Never send a second/fallback answer after Telegram delivery. Record a
+        // safe degraded durable status only; the next live gate can repair it.
+        props.setProperty(
+          GOLUB_OWNER_WEBHOOK_PROP.lastError,
+          'DURABLE_COMMIT_FAILED ' + new Date().toISOString()
+        );
+        GOLUB_OWNER_recordIngress_(props, 'PRIVATE_OWNER_COMMIT_FAILED');
+      }
+    } else {
+      GOLUB_OWNER_recordIngress_(props, 'PRIVATE_OWNER_ANSWERED_NO_COMMIT');
+    }
   } catch (_) {
     // Do not persist message text, user IDs, bot tokens, secrets or exception URLs.
     try { GOLUB_OWNER_sendAnswer_(message.chat.id, GOLUB_OWNER_AI_UNAVAILABLE); } catch (_) {}
-    props.setProperty(
-      GOLUB_OWNER_WEBHOOK_PROP.lastError,
-      'AI_OR_SEND_FAILED ' + new Date().toISOString()
-    );
+    props.setProperties({
+      GOLUB_OWNER_LAST_UPDATE_ID:String(updateId),
+      GOLUB_OWNER_LAST_ERROR:'AI_OR_SEND_FAILED ' + new Date().toISOString()
+    }, false);
     GOLUB_OWNER_recordIngress_(props, 'PRIVATE_OWNER_FAILED');
   }
 
