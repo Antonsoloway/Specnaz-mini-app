@@ -1,0 +1,57 @@
+name: P9B Golub owner transport source gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/p9b-golub-owner-transport-source.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply transport-only P9B patch
+        run: python3 scripts/patch-p9b-golub-owner-transport-v1.py
+
+      - name: Syntax and source invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=apps-script-live/36_GOLUB_OWNER_WEBHOOK_INGRESS.js
+          node --check "$FILE"
+          grep -Fq "GOLUB_OWNER_WEBHOOK_VERSION = '2.6.0'" "$FILE"
+          grep -Fq "GOLUB_OWNER_UNIFIED_WORKER_URL" "$FILE"
+          grep -Fq "'/internal/golub-owner'" "$FILE"
+          grep -Fq "'/internal/golub-owner-commit'" "$FILE"
+          grep -Fq "DURABLE_COMMIT_FAILED" "$FILE"
+          grep -Fq "PRIVATE_OWNER_COMMIT_FAILED" "$FILE"
+          grep -Fq "GOLUB_OWNER_sendReceipt_" "$FILE"
+          grep -Fq "GOLUB_OWNER_commitAnswer_" "$FILE"
+          grep -Fq "legacyBrainFallback:false" "$FILE"
+          grep -Fq "publicChpSpeaking:false" "$FILE"
+          grep -Fq "syntheticDurableWrite = false" "$FILE"
+          ! grep -Fq "GOLUB_OWNER_fallbackAi_" "$FILE"
+          ! grep -Fq "GOLUB_OWNER_publicMemory_" "$FILE"
+          ! grep -Fq "/internal/llm" "$FILE"
+          ! grep -Fq "Ты Голубь Мира" "$FILE"
+          ! grep -Fq "publicChpEvidence" "$FILE"
+          ! grep -Fq "GOLUB_OWNER_PUBLIC_MEMORY_URL" "$FILE"
+          echo P9B_APPS_SCRIPT_TRANSPORT_SOURCE=PASS
+
+      - name: Commit source and remove one-shot helper
+        run: |
+          rm -f .github/workflows/p9b-golub-owner-transport-source.yml
+          rm -f scripts/patch-p9b-golub-owner-transport-v1.py
+          git config user.name 'specnaz-ai-ci'
+          git config user.email 'specnaz-ai-ci@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'feat: route Golub owner transport to unified runtime'
+          git push origin HEAD:main
