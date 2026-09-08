@@ -7,7 +7,7 @@
  * Properties; no owner ID, bot token or webhook secret belongs in source.
  */
 
-const GOLUB_OWNER_WEBHOOK_VERSION = '2.6.0';
+const GOLUB_OWNER_WEBHOOK_VERSION = '2.7.0';
 const GOLUB_OWNER_WEBHOOK_PROP = Object.freeze({
   enabled: 'GOLUB_OWNER_WEBHOOK_ENABLED',
   ownerUserId: 'GOLUB_OWNER_USER_ID',
@@ -263,6 +263,7 @@ function GOLUB_OWNER_sendAnswer_(chatId, answer) {
   var rest = String(envelope.plain == null ? '' : envelope.plain).trim();
   if (!rest) throw new Error('EMPTY_ANSWER');
   var firstReceipt = null;
+  var receipts = [];
   while (rest) {
     var chunk = rest.slice(0, 3900);
     if (rest.length > 3900) {
@@ -274,10 +275,13 @@ function GOLUB_OWNER_sendAnswer_(chatId, answer) {
       text:chunk,
       disable_web_page_preview:true
     });
-    if (!firstReceipt) firstReceipt = GOLUB_OWNER_sendReceipt_(sent);
+    var receipt = GOLUB_OWNER_sendReceipt_(sent);
+    receipts.push(receipt);
+    if (!firstReceipt) firstReceipt = receipt;
     rest = rest.slice(chunk.length).trim();
   }
-  return firstReceipt;
+  return {messageId:firstReceipt.messageId, botUserId:firstReceipt.botUserId,
+    date:firstReceipt.date, messages:receipts};
 }
 
 function GOLUB_OWNER_commitAnswer_(answer, sentReceipt, props) {
@@ -317,6 +321,7 @@ function GOLUB_OWNER_aiBridgeStatus() {
     ),
     sharedSecretConfigured:secret.length >= 32,
     commitCapable:secret.length >= 32,
+    commitRetry:'private_script_properties_outbox_v1',
     legacyBrainFallback:false,
     publicChpSpeaking:false,
     aiReady:secret.length >= 32
@@ -468,34 +473,40 @@ function GOLUB_OWNER_tryHandleTelegram_(e) {
 
   GOLUB_OWNER_recordIngress_(props, 'PRIVATE_OWNER_ACCEPTED');
 
+  var telegramAttempted = false;
   try {
+    // A dedicated minute timer is ensured before the next Telegram send.
+    GOLUB_OWNER_ensureCommitTimer_();
     var answer = GOLUB_OWNER_aiAnswer_(message, sender, props);
+    var commitJob = GOLUB_OWNER_prepareCommit_(answer, updateId, props);
+    if (commitJob && commitJob.duplicate) return GOLUB_OWNER_json_({ok:true});
+    telegramAttempted = true;
     var sentReceipt = GOLUB_OWNER_sendAnswer_(message.chat.id, answer);
     var sentAt = new Date().toISOString();
+    if (commitJob) GOLUB_OWNER_markCommitSent_(commitJob.key, sentReceipt, props);
 
     // The user already received this update. Persist dedupe BEFORE the durable
     // commit callback so a storage/commit fault cannot produce a duplicate
     // Telegram answer on any replay path.
-    props.setProperties({
-      GOLUB_OWNER_LAST_UPDATE_ID:String(updateId),
+    GOLUB_OWNER_recordHandledUpdate_(props, updateId, {
       GOLUB_OWNER_LAST_OK:sentAt,
       GOLUB_OWNER_LAST_ERROR:'',
       GOLUB_OWNER_LAST_INGRESS:'PRIVATE_OWNER_SENT ' + sentAt
-    }, false);
+    });
 
     if (answer && answer.commit) {
       try {
-        GOLUB_OWNER_commitAnswer_(answer, sentReceipt, props);
+        var committed = GOLUB_OWNER_attemptCommit_(commitJob.key, props);
+        if (!committed.committed) throw new Error('DURABLE_COMMIT_PENDING');
         props.setProperty(
           GOLUB_OWNER_WEBHOOK_PROP.lastIngress,
           'PRIVATE_OWNER_ANSWERED ' + new Date().toISOString()
         );
       } catch (_) {
-        // Never send a second/fallback answer after Telegram delivery. Record a
-        // safe degraded durable status only; the next live gate can repair it.
+        // Exact payload and receipts remain in the durable outbox for the timer.
         props.setProperty(
           GOLUB_OWNER_WEBHOOK_PROP.lastError,
-          'DURABLE_COMMIT_FAILED ' + new Date().toISOString()
+          'DURABLE_COMMIT_RETRY_PENDING ' + new Date().toISOString()
         );
         GOLUB_OWNER_recordIngress_(props, 'PRIVATE_OWNER_COMMIT_FAILED');
       }
@@ -504,11 +515,14 @@ function GOLUB_OWNER_tryHandleTelegram_(e) {
     }
   } catch (_) {
     // Do not persist message text, user IDs, bot tokens, secrets or exception URLs.
-    try { GOLUB_OWNER_sendAnswer_(message.chat.id, GOLUB_OWNER_AI_UNAVAILABLE); } catch (_) {}
-    props.setProperties({
-      GOLUB_OWNER_LAST_UPDATE_ID:String(updateId),
+    // A send response or later property write can fail after delivery. Never
+    // add a second/fallback Telegram message once a send has been attempted.
+    if (!telegramAttempted) {
+      try { GOLUB_OWNER_sendAnswer_(message.chat.id, GOLUB_OWNER_AI_UNAVAILABLE); } catch (_) {}
+    }
+    GOLUB_OWNER_recordHandledUpdate_(props, updateId, {
       GOLUB_OWNER_LAST_ERROR:'AI_OR_SEND_FAILED ' + new Date().toISOString()
-    }, false);
+    });
     GOLUB_OWNER_recordIngress_(props, 'PRIVATE_OWNER_FAILED');
   }
 

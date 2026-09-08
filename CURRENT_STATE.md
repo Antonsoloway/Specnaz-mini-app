@@ -1,6 +1,6 @@
 # Royal CRM / «Таблица ЧП» — CURRENT STATE
 
-> **Актуально на 05.09.2026.**
+> **Актуально на 08.09.2026.**
 > Новый чат обязан сначала прочитать `START_HERE.md`, затем этот файл и последние записи `WORK_HISTORY.md`.
 > Фактический runtime / живые Google Sheets / live Apps Script / текущий GitHub имеют приоритет над памятью чатов.
 
@@ -13,6 +13,15 @@
 5. GitHub commit не равен production/runtime-подтверждению.
 6. После принятой/проверенной работы обновлять `CURRENT_STATE.md` и `WORK_HISTORY.md`; `RELEASE_RULES.md` — при новом постоянном инварианте.
 7. Публичные handoff-файлы не должны содержать реальные Telegram ID, имена участников, requestId, dataHash, номера персональных строк или exact private endpoint; использовать обезличенные сценарии и агрегаты. Согласованные публичные credits сохраняются.
+
+### Golub owner commit outbox 2.7.0 — source ready, rollout pending — 08.09.2026
+
+- The private unified-runtime rollout already deployed the reviewed 2.6.0 owner transport. The older 2.5.0 note below is historical; this source update does not claim that 2.7.0 is live.
+- New `37_GOLUB_OWNER_COMMIT_OUTBOX.js` retains the exact answer and commit envelope in private Script Properties before delivery, then records Telegram receipts. A dedicated minute trigger retries only the signed history-commit callback after a failed acknowledgement; it never sends Telegram or generates another answer.
+- Retry processing uses bounded batches, leases and backoff. Records are removed only after the shared Worker acknowledges the durable assistant-history write. Stored assistant output remains ineligible for factual learning; shared-memory permissions are unchanged.
+- Prepared records without a saved delivery receipt are retained for diagnosis and are not automatically committed or resent. This handles commit failures after a recorded send; it does not claim a transaction spanning Telegram and Script Properties.
+- The trigger is installed idempotently on the next authenticated owner message, before sending its answer. Existing stable deployment is updated with live pull/backup and `clasp status`; functional acceptance belongs to the owner.
+- Combined Apps Script compilation and one offline failed-commit/retry check passed. Source publication is complete only after this commit; live release is tracked separately in the private runtime project.
 
 ### Golub narrative delivery 2.5.0 — source ready, rollout pending — 05.09.2026
 

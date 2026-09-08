@@ -6,6 +6,15 @@
 > номера строк и before/after payload хранятся только в приватном operational
 > handoff и admin journal.
 
+## 2026-09-08 — Golub post-send commit retry prepared
+
+- The private unified-runtime rollout already deployed the reviewed 2.6.0 owner transport. The older 2.5.0 note below is historical; this source update does not claim that 2.7.0 is live.
+- New `37_GOLUB_OWNER_COMMIT_OUTBOX.js` retains the exact answer and commit envelope in private Script Properties before delivery, then records Telegram receipts. A dedicated minute trigger retries only the signed history-commit callback after a failed acknowledgement; it never sends Telegram or generates another answer.
+- Retry processing uses bounded batches, leases and backoff. Records are removed only after the shared Worker acknowledges the durable assistant-history write. Stored assistant output remains ineligible for factual learning; shared-memory permissions are unchanged.
+- Prepared records without a saved delivery receipt are retained for diagnosis and are not automatically committed or resent. This handles commit failures after a recorded send; it does not claim a transaction spanning Telegram and Script Properties.
+- The trigger is installed idempotently on the next authenticated owner message, before sending its answer. Existing stable deployment is updated with live pull/backup and `clasp status`; functional acceptance belongs to the owner.
+- Combined Apps Script compilation and one offline failed-commit/retry check passed. Source publication is complete only after this commit; live release is tracked separately in the private runtime project.
+
 ## 2026-09-05 — Golub hidden Telegram citations prepared
 
 - Owner ingress source advanced from 2.4.0 to 2.5.0 for the pending shared narrative rollout.
