@@ -7,7 +7,7 @@
  * Properties; no owner ID, bot token or webhook secret belongs in source.
  */
 
-const GOLUB_OWNER_WEBHOOK_VERSION = '2.7.0';
+const GOLUB_OWNER_WEBHOOK_VERSION = '2.8.0';
 const GOLUB_OWNER_WEBHOOK_PROP = Object.freeze({
   enabled: 'GOLUB_OWNER_WEBHOOK_ENABLED',
   ownerUserId: 'GOLUB_OWNER_USER_ID',
@@ -183,7 +183,28 @@ function GOLUB_OWNER_workerSecret_(props) {
   return secret;
 }
 
-function GOLUB_OWNER_aiAnswer_(message, sender, props) {
+// Carry Telegram context, never arbitrary ingress memory or authorization flags.
+function GOLUB_OWNER_messageContext_(message, includeReply) {
+  var result = {};
+  ['message_id', 'date', 'edit_date', 'message_thread_id', 'media_group_id',
+   'text', 'caption', 'entities', 'caption_entities', 'quote', 'photo', 'video',
+   'video_note', 'voice', 'audio', 'document', 'animation', 'sticker',
+   'forum_topic_created', 'forum_topic_edited'].forEach(function(key) {
+    if (message[key] != null) result[key] = message[key];
+  });
+  var from = message.from || {};
+  result.from = {id:from.id, is_bot:Boolean(from.is_bot),
+    first_name:String(from.first_name || ''), last_name:String(from.last_name || ''),
+    username:String(from.username || '')};
+  var chat = message.chat || {};
+  result.chat = {id:chat.id, type:String(chat.type || ''), title:String(chat.title || '')};
+  if (includeReply && message.reply_to_message) {
+    result.reply_to_message = GOLUB_OWNER_messageContext_(message.reply_to_message, false);
+  }
+  return result;
+}
+
+function GOLUB_OWNER_aiAnswer_(message, sender, props, updateId) {
   if (String(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.aiEnabled) || '0') !== '1') {
     throw new Error('AI_DISABLED');
   }
@@ -206,8 +227,15 @@ function GOLUB_OWNER_aiAnswer_(message, sender, props) {
     chatId:String(message && message.chat && message.chat.id || ''),
     messageId:Number(message.message_id || 0),
     date:Number(message.date || Math.floor(Date.now() / 1000)),
-    user:{id:String(sender && sender.id || '')},
-    text:prompt.slice(0, 5000)
+    updateId:Number(updateId || message.message_id || 0),
+    contextVersion:'shared-answer-context-v1',
+    user:{id:String(sender && sender.id || ''), is_bot:Boolean(sender && sender.is_bot),
+      first_name:String(sender && sender.first_name || ''),
+      last_name:String(sender && sender.last_name || ''),
+      username:String(sender && sender.username || '')},
+    message:GOLUB_OWNER_messageContext_(message, true),
+    text:String(message.text || '').slice(0, 10000),
+    caption:String(message.caption || '').slice(0, 4096)
   });
   var result = GOLUB_OWNER_signedPost_(endpoint, path, payload, secret);
   if (result.code !== 200 || !result.body || result.body.ok !== true) {
@@ -477,7 +505,7 @@ function GOLUB_OWNER_tryHandleTelegram_(e) {
   try {
     // A dedicated minute timer is ensured before the next Telegram send.
     GOLUB_OWNER_ensureCommitTimer_();
-    var answer = GOLUB_OWNER_aiAnswer_(message, sender, props);
+    var answer = GOLUB_OWNER_aiAnswer_(message, sender, props, updateId);
     var commitJob = GOLUB_OWNER_prepareCommit_(answer, updateId, props);
     if (commitJob && commitJob.duplicate) return GOLUB_OWNER_json_({ok:true});
     telegramAttempted = true;
