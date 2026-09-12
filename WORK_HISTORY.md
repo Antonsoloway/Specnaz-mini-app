@@ -1,3 +1,13 @@
+## 2026-09-12 — Owner ingress resilience installed; behavioral acceptance pending
+
+Owner's completed recovery report confirms the existing Apps Script deployment uses ingress 2.9.0 and outbox 1.1.0; the deployment URL is preserved. Recovery found the release already active, so another deployment switch and version creation were unnecessary. Full live mirror synchronization succeeded.
+
+GitHub main at mirror commit 0f5bc050bfc4d9757262905f50694295c28236d2 contains ingress and outbox files exactly matching the reviewed source. Production installation evidence comes from the owner's verified deployment report; the mirror is a separate source confirmation.
+
+This supersedes the earlier source-prepared status. Telegram behavioral acceptance remains pending. The earlier immediate readback mismatch is no longer a deployment blocker; its precise cause has not been established. Do not repeat installation. Next verification is the owner's natural Telegram questions and, if needed, the protected ingress diagnostics.
+
+Only checkpoint documentation changes in this follow-up. No source, permissions, data, frontend release, model calls or outgoing messages were changed or generated here.
+
 ## 2026-09-12 — Owner ingress resilience 2.9.0, source prepared
 
 Source changes remove the redundant global lock when the commit timer is already installed. The error handler keeps fixed primary/secondary error codes and always contains secondary failures. Per-update delivery markers are independent of the shared cursor; confirmed Telegram receipts allow the commit timer to recover prepared payloads after a post-send metadata lock failure. Attempted or ambiguous sends are never automatically resent or treated as confirmed memory. Outbox 1.1.0 remains commit-only.
