@@ -1,8 +1,9 @@
 /** M3C: private durable outbox for post-send history commits; no Telegram send. */
-const GOLUB_COMMIT_OUTBOX_VERSION = '1.0.0';
+const GOLUB_COMMIT_OUTBOX_VERSION = '1.1.0';
 const GOLUB_COMMIT_PREFIX = 'GOLUB_OWNER_COMMIT_V1_';
 const GOLUB_COMMIT_HANDLER = 'GOLUB_OWNER_retryPendingCommits';
 const GOLUB_COMMIT_CHUNK_SIZE = 7000;
+const GOLUB_DELIVERY_PREFIX = 'GOLUB_OWNER_DELIVERY_V1_';
 
 function GOLUB_OWNER_commitLock_(operation) {
   var lock = LockService.getScriptLock();
@@ -11,12 +12,42 @@ function GOLUB_OWNER_commitLock_(operation) {
 }
 
 function GOLUB_OWNER_ensureCommitTimer_() {
+  // The installed timer is immutable on the request path. Reading it must not
+  // compete with long-running sheet transactions for the shared ScriptLock.
+  if (GOLUB_OWNER_hasCommitTimer_()) return;
   return GOLUB_OWNER_commitLock_(function() {
-    var found = ScriptApp.getProjectTriggers().some(function(trigger) {
-      return trigger.getHandlerFunction() === GOLUB_COMMIT_HANDLER;
-    });
-    if (!found) ScriptApp.newTrigger(GOLUB_COMMIT_HANDLER).timeBased().everyMinutes(1).create();
+    if (!GOLUB_OWNER_hasCommitTimer_()) {
+      ScriptApp.newTrigger(GOLUB_COMMIT_HANDLER).timeBased().everyMinutes(1).create();
+    }
   });
+}
+
+function GOLUB_OWNER_hasCommitTimer_() {
+  return ScriptApp.getProjectTriggers().some(function(trigger) {
+    return trigger.getHandlerFunction() === GOLUB_COMMIT_HANDLER;
+  });
+}
+
+function GOLUB_OWNER_deliveryKey_(updateId) {
+  if (!/^\d+$/.test(String(updateId))) throw new Error('COMMIT_UPDATE_ID_INVALID');
+  return GOLUB_DELIVERY_PREFIX + String(updateId);
+}
+
+function GOLUB_OWNER_deliveryRecord_(props, updateId) {
+  var raw = props.getProperty(GOLUB_OWNER_deliveryKey_(updateId));
+  if (!raw) return null;
+  // A malformed record must not authorize another Telegram send.
+  try { return JSON.parse(raw) || {state:'unknown'}; }
+  catch (_) { return {state:'unknown'}; }
+}
+
+function GOLUB_OWNER_recordDelivery_(props, updateId, receipt, kind) {
+  // Per-update record, never a shared read/modify/write cursor. Save a real
+  // receipt independently of ScriptLock before touching the legacy outbox META.
+  var record = {version:'1.0.0', at:Date.now(), kind:kind,
+    state:receipt ? 'confirmed' : 'attempted', receipt:receipt || null};
+  props.setProperty(GOLUB_OWNER_deliveryKey_(updateId), JSON.stringify(record));
+  return record;
 }
 
 function GOLUB_OWNER_commitDigest_(value) {
@@ -39,7 +70,8 @@ function GOLUB_OWNER_prepareCommit_(answer, updateId, props) {
   if (!/^\d+$/.test(String(updateId))) throw new Error('COMMIT_UPDATE_ID_INVALID');
   var key = GOLUB_COMMIT_PREFIX + String(updateId);
   return GOLUB_OWNER_commitLock_(function() {
-    if (Number(updateId) <= Number(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.lastUpdateId) || -1)) {
+    if (GOLUB_OWNER_deliveryRecord_(props, updateId) ||
+      Number(updateId) <= Number(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.lastUpdateId) || -1)) {
       return {key:key, duplicate:true};
     }
     if (props.getProperty(key + '_META')) return {key:key, duplicate:true};
@@ -67,7 +99,16 @@ function GOLUB_OWNER_prepareCommit_(answer, updateId, props) {
 function GOLUB_OWNER_markCommitSent_(key, receipt, props) {
   return GOLUB_OWNER_commitLock_(function() {
     var meta = JSON.parse(props.getProperty(key + '_META') || 'null');
-    if (!meta || meta.state !== 'prepared' || !receipt || !receipt.messageId || !receipt.botUserId) {
+    if (!meta && receipt &&
+      Number(key.slice(GOLUB_COMMIT_PREFIX.length)) <=
+      Number(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.lastUpdateId) || -1)) return;
+    if (!meta || !receipt || !receipt.messageId || !receipt.botUserId) {
+      throw new Error('COMMIT_SENT_STATE_INVALID');
+    }
+    // The timer may already have recovered the independently saved receipt.
+    if (meta.state !== 'prepared') {
+      if (meta.sent && String(meta.sent.messageId) === String(receipt.messageId) &&
+        String(meta.sent.botUserId) === String(receipt.botUserId)) return;
       throw new Error('COMMIT_SENT_STATE_INVALID');
     }
     meta.sent = receipt;
@@ -88,6 +129,16 @@ function GOLUB_OWNER_attemptCommit_(key, props) {
   var claim = GOLUB_OWNER_commitLock_(function() {
     var meta = JSON.parse(props.getProperty(key + '_META') || 'null');
     if (!meta) return null;
+    if (meta.state === 'prepared') {
+      var delivery = GOLUB_OWNER_deliveryRecord_(props, meta.updateId);
+      if (delivery && delivery.kind === 'answer' && delivery.state === 'confirmed' &&
+        delivery.receipt && delivery.receipt.messageId && delivery.receipt.botUserId) {
+        meta.sent = delivery.receipt;
+        meta.state = 'sent';
+        meta.nextAttemptAt = 0;
+        props.setProperty(key + '_META', JSON.stringify(meta));
+      }
+    }
     if (meta.state === 'committed') {
       GOLUB_OWNER_cleanCommitted_(key, meta, props);
       return null;
@@ -148,7 +199,11 @@ function GOLUB_OWNER_retryPendingCommits() {
   }).map(function(key) {
     try { return {key:key.slice(0, -5), meta:JSON.parse(all[key])}; } catch (_) { return null; }
   }).filter(function(job) {
-    return job && job.meta.state !== 'prepared' && Number(job.meta.nextAttemptAt || 0) <= Date.now()
+    if (!job) return false;
+    var delivery = null;
+    try { delivery = JSON.parse(all[GOLUB_DELIVERY_PREFIX + job.meta.updateId] || 'null'); } catch (_) {}
+    var recoverable = delivery && delivery.kind === 'answer' && delivery.state === 'confirmed';
+    return (job.meta.state !== 'prepared' || recoverable) && Number(job.meta.nextAttemptAt || 0) <= Date.now()
       && !(job.meta.state === 'processing' && Number(job.meta.leaseUntil || 0) > Date.now());
   }).sort(function(a,b) { return a.meta.createdAt - b.meta.createdAt; });
   var summary = {version:GOLUB_COMMIT_OUTBOX_VERSION, attempted:0, committed:0, pending:0};
@@ -161,5 +216,38 @@ function GOLUB_OWNER_retryPendingCommits() {
       else if (result.pending) summary.pending += 1;
     } catch (_) { summary.pending += 1; }
   }
+  // Bounded cleanup only after the legacy cursor covers the record, and never
+  // while its answer/commit payload is pending. No answer is sent by this timer.
+  try {
+    GOLUB_OWNER_commitLock_(function() {
+      var latest = Number(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.lastUpdateId) || -1);
+      Object.keys(all).filter(function(key) { return key.indexOf(GOLUB_DELIVERY_PREFIX) === 0; })
+        .forEach(function(key) {
+          var record;
+          try { record = JSON.parse(all[key]); } catch (_) { return; }
+          if (record && record.version === '1.0.0' &&
+            ['attempted','confirmed'].indexOf(record.state) >= 0) {
+            latest = Math.max(latest, Number(key.slice(GOLUB_DELIVERY_PREFIX.length)));
+          }
+        });
+      if (isFinite(latest) && latest >= 0) {
+        props.setProperty(GOLUB_OWNER_WEBHOOK_PROP.lastUpdateId, String(latest));
+      }
+    });
+    var cursor = Number(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.lastUpdateId) || -1);
+    var removed = 0;
+    Object.keys(all).filter(function(key) { return key.indexOf(GOLUB_DELIVERY_PREFIX) === 0; })
+      .forEach(function(key) {
+        if (removed >= 20) return;
+        var id = key.slice(GOLUB_DELIVERY_PREFIX.length);
+        var record;
+        try { record = JSON.parse(all[key]); } catch (_) { return; }
+        if (Number(id) <= cursor && Number(record.at) < Date.now() - 7 * 86400000 &&
+          !props.getProperty(GOLUB_COMMIT_PREFIX + id + '_META')) {
+          props.deleteProperty(key);
+          removed += 1;
+        }
+      });
+  } catch (_) {}
   return summary;
 }

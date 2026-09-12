@@ -181,3 +181,11 @@ Admin-preview `v0.6.0` дополнительно использует:
 - Admin write transport retries must reuse the exact same requestId/body. Transient network and 408/425/429/502/503/504 failures may be retried; permanent auth/validation/conflict responses must not be replayed as new mutations.
 
 - Active-team decoration must run after asynchronous admin team detail rendering; the active-team indicator must not depend on a later tap/input event.
+
+
+### Owner-private Telegram error and receipt persistence
+
+- An installed commit timer is checked without the global sheet lock; timer creation remains serialized with a second check.
+- The ingress error handler must contain its own storage/lock failures and preserve sanitized primary and secondary codes separately.
+- Per-update delivery receipts precede shared cursor/outbox finalization. A confirmed answer receipt may recover an existing prepared commit payload; fallback or ambiguous sends must never be committed as an AI answer.
+- The minute retry remains commit-only. Do not automatically resend an ambiguous Telegram operation or discard its prepared payload. Apps Script and Telegram do not share an atomic transaction; offline replay tests are not proof of universal exactly-once delivery.

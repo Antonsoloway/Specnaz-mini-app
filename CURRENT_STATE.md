@@ -1,3 +1,11 @@
+## 2026-09-12 — Owner ingress resilience 2.9.0, source prepared
+
+Source changes remove the redundant global lock when the commit timer is already installed. The error handler keeps fixed primary/secondary error codes and always contains secondary failures. Per-update delivery markers are independent of the shared cursor; confirmed Telegram receipts allow the commit timer to recover prepared payloads after a post-send metadata lock failure. Attempted or ambiguous sends are never automatically resent or treated as confirmed memory. Outbox 1.1.0 remains commit-only.
+
+Eleven offline tests passed: lock contention, secondary error containment, replay during send, exact-answer commit recovery, ambiguous send, secret omission, property outage and owner/group isolation. These tests do not establish end-to-end bot acceptance. The primary cause of the earlier live AI failures remains unconfirmed.
+
+Publication is source only until the deployment checkpoint is recorded. Existing stable Apps Script deployment must be updated in place; no new webhook, model probe or permission expansion. Frontend, Sheet schema and shared Worker unchanged. Detailed operational evidence remains in the private runtime repository.
+
 # Royal CRM / «Таблица ЧП» — CURRENT STATE
 
 ## 2026-09-08 — M3D complete owner request transport, source ready
