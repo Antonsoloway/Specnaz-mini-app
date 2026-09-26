@@ -550,3 +550,17 @@ searchKeys и searchIndexVersion.
 
 - Replaced only private `track-06.mp3`; no playlist routing or user music preference behavior changed.
 - Source MP3 was normalized to the existing set and exported without embedded tags/artwork.
+
+### 26.09.2026 — fixed lost chat membership status for raw Telegram service-events
+
+Live evidence:
+- Marina join update `377511441` contained `new_chat_member/new_chat_members` for Telegram ID `7734222503`.
+- The old route logged the update as `WRONG_SECRET` / `stat`, so `case 'join'` in the CRM core never executed and AF remained blank.
+- Control event for Roman Lazutkin had arrived through the canonical ChatKeeper contract as `event=join` and produced `PLAYER_JOINED`, confirming the CRM join logic itself was healthy.
+
+Code change:
+- `36_GOLUB_OWNER_WEBHOOK_INGRESS.js` v2.9.1 now prepares a narrow authenticated membership bridge for Telegram group join/leave service-events.
+- `05_RELIABLE_WEBHOOK_QUEUE.js` consumes only the bridge result and passes the normalized payload into the pre-existing reliable queue.
+- No direct writes to participant state were added in code.
+- Existing ChatKeeper payloads were regression-tested byte-for-byte unchanged; ordinary supergroup messages are not reclassified; wrong relay secrets are consumed before CRM.
+- Live admin sheet row for Marina was repaired to `В чате` after confirming the original join event.
