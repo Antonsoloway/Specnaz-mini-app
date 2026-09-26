@@ -7,7 +7,7 @@
  * Properties; no owner ID, bot token or webhook secret belongs in source.
  */
 
-const GOLUB_OWNER_WEBHOOK_VERSION = '2.9.0';
+const GOLUB_OWNER_WEBHOOK_VERSION = '2.9.1';
 const GOLUB_OWNER_WEBHOOK_PROP = Object.freeze({
   enabled: 'GOLUB_OWNER_WEBHOOK_ENABLED',
   ownerUserId: 'GOLUB_OWNER_USER_ID',
@@ -81,6 +81,128 @@ function GOLUB_OWNER_isDirectTelegramEvent_(e) {
   return GOLUB_OWNER_isDirectTelegramUpdate_(
     GOLUB_OWNER_safeJson_(GOLUB_OWNER_raw_(e))
   );
+}
+
+/**
+ * Convert only authenticated Telegram group membership service-events into the
+ * existing Royal CRM join/leave contract. Normal messages remain untouched and
+ * continue through their current routes.
+ *
+ * Returns:
+ *   null                — not a membership service-event;
+ *   {event: <fake e>}   — verified event normalized for the reliable CRM queue;
+ *   {response: <200>}   — membership event rejected/ignored before CRM.
+ */
+function GOLUB_OWNER_prepareGroupMembershipEvent_(e) {
+  var data = GOLUB_OWNER_safeJson_(GOLUB_OWNER_raw_(e));
+  if (!GOLUB_OWNER_isDirectTelegramUpdate_(data)) return null;
+
+  var message = data.message || {};
+  var chat = message.chat || {};
+  var chatType = String(chat.type || '');
+  if (chatType !== 'group' && chatType !== 'supergroup') return null;
+
+  var event = '';
+  var member = null;
+
+  if (
+    message.left_chat_member &&
+    typeof message.left_chat_member === 'object'
+  ) {
+    event = 'leave';
+    member = message.left_chat_member;
+  } else if (
+    message.new_chat_member &&
+    typeof message.new_chat_member === 'object'
+  ) {
+    event = 'join';
+    member = message.new_chat_member;
+  } else if (
+    Array.isArray(message.new_chat_members) &&
+    message.new_chat_members.length === 1 &&
+    message.new_chat_members[0] &&
+    typeof message.new_chat_members[0] === 'object'
+  ) {
+    event = 'join';
+    member = message.new_chat_members[0];
+  } else {
+    return null;
+  }
+
+  var props = PropertiesService.getScriptProperties();
+  var expectedSecret = String(
+    props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.querySecret) || ''
+  );
+  var suppliedSecret = e && e.parameter
+    ? String(e.parameter[GOLUB_OWNER_WEBHOOK_QUERY_PARAM] || '')
+    : '';
+
+  if (!GOLUB_OWNER_safeEqual_(suppliedSecret, expectedSecret)) {
+    GOLUB_OWNER_recordIngress_(props, 'GROUP_MEMBERSHIP_BAD_QUERY_SECRET');
+    return {response:GOLUB_OWNER_json_({ok:true})};
+  }
+
+  var memberId = String(member && member.id == null ? '' : member.id).trim();
+  if (!/^[1-9]\d*$/.test(memberId)) {
+    GOLUB_OWNER_recordIngress_(props, 'GROUP_MEMBERSHIP_INVALID_ID');
+    return {response:GOLUB_OWNER_json_({ok:true})};
+  }
+
+  if (member.is_bot === true) {
+    GOLUB_OWNER_recordIngress_(props, 'GROUP_MEMBERSHIP_BOT_IGNORED');
+    return {response:GOLUB_OWNER_json_({ok:true})};
+  }
+
+  var crmSecret = String(
+    props.getProperty('ROYAL_CRM_WEBHOOK_SECRET_CURRENT') || ''
+  ).trim();
+  if (!crmSecret) {
+    GOLUB_OWNER_recordIngress_(props, 'GROUP_MEMBERSHIP_CRM_SECRET_MISSING');
+    return {response:GOLUB_OWNER_json_({ok:false,error:'CRM_SECRET_MISSING'})};
+  }
+
+  var firstName = String(member.first_name || '').trim();
+  var lastName = String(member.last_name || '').trim();
+  var displayName = (firstName + ' ' + lastName).replace(/\s+/g, ' ').trim();
+  var username = String(member.username || '').replace(/^@+/, '').trim();
+  var messageDate = Number(message.date || 0);
+  var eventDate = messageDate > 0
+    ? new Date(messageDate * 1000).toISOString()
+    : '';
+
+  var payload = {
+    secret:crmSecret,
+    event:event,
+    tg_name:displayName || username || memberId,
+    tg_link:username ? '@' + username : '',
+    tg_id:memberId,
+    reputation:0,
+    real_rating:0,
+    datetime:eventDate,
+    chat_id:String(chat.id == null ? '' : chat.id),
+    chat_title:String(chat.title || ''),
+    telegram_update_id:String(data.update_id),
+    telegram_message_id:String(message.message_id == null ? '' : message.message_id),
+    source:'telegram_group_membership_bridge'
+  };
+  var normalizedRaw = JSON.stringify(payload);
+
+  GOLUB_OWNER_recordIngress_(
+    props,
+    event === 'join' ? 'GROUP_MEMBERSHIP_JOIN_BRIDGED' : 'GROUP_MEMBERSHIP_LEAVE_BRIDGED'
+  );
+
+  return {
+    event:{
+      parameter:e && e.parameter ? e.parameter : {},
+      parameters:e && e.parameters ? e.parameters : {},
+      postData:{
+        contents:normalizedRaw,
+        length:normalizedRaw.length,
+        type:'application/json'
+      }
+    }
+  };
 }
 
 function GOLUB_OWNER_hmacHex_(secret, value) {
