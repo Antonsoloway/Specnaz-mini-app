@@ -607,3 +607,15 @@ Repo config на 23.08.2026:
 - Private track 06 replaced by the user-supplied original MP3 after metadata/artwork removal and loudness normalization to the existing background set.
 - Random 6-track playlist behavior and asset identity remain unchanged.
 
+## 26.09.2026 — Telegram membership service-event bridge
+
+- Root cause confirmed from live webhook log for Marina (Telegram ID 7734222503): the raw Telegram `new_chat_member/new_chat_members` update reached the Apps Script endpoint but fell through into the ChatKeeper/Royal CRM route and was rejected as `WRONG_SECRET`.
+- Fix prepared in `apps-script-live`:
+  - authenticated group `new_chat_member/new_chat_members` -> existing Royal CRM `event=join`;
+  - authenticated group `left_chat_member` -> existing Royal CRM `event=leave`;
+  - normal group messages, owner-private Golub traffic, Mini App and existing ChatKeeper payloads keep their previous routes unchanged;
+  - bridge requires the existing Golub relay query secret before constructing a CRM event;
+  - normalized membership events continue through the existing reliable webhook queue, event-key dedupe, core join/leave handler, sorting and logs.
+- Regression coverage added in `tests/golub-ingress-resilience.test.mjs`.
+- Live data repair performed separately in the admin sheet: Marina row 191, column AF `Состояние чата` set to `В чате` based on the confirmed join service-event.
+- Deployment rule: update the EXISTING Apps Script web deployment only; do not change webhook URLs and do not run setup/upgrade functions.
