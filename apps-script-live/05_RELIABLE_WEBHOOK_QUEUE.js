@@ -92,6 +92,20 @@ function doPost(e) {
       : null;
   if (golubOwnerTelegram) return golubOwnerTelegram;
 
+  // Telegram group membership service-events arrive through the same trusted
+  // relay as Golub owner traffic. Normalize only join/leave events; everything
+  // else keeps the exact pre-existing route.
+  const golubMembership =
+    typeof GOLUB_OWNER_prepareGroupMembershipEvent_ === 'function'
+      ? GOLUB_OWNER_prepareGroupMembershipEvent_(e)
+      : null;
+  if (golubMembership && golubMembership.response) {
+    return golubMembership.response;
+  }
+  if (golubMembership && golubMembership.event) {
+    e = golubMembership.event;
+  }
+
   const miniAppStartWelcome = MINIAPP_handleStartWelcome_(e);
   if (miniAppStartWelcome) return miniAppStartWelcome;
   // Telegram Mini App API: отдельный маршрут, НЕ попадает в очередь ChatKeeper.
