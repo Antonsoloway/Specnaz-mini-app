@@ -16,7 +16,7 @@ export function validateAgentAction(body) {
   return body;
 }
 export function queryVariants(query) {
-  const visual = {'а':'a','в':'b','е':'e','к':'k','м':'m','н':'h','о':'o','р':'p','с':'c','т':'t','у':'y','х':'x'};
+  const visual = {'а':'a','в':'b','е':'e','к':'k','м':'m','н':'h','о':'o','р':'p','с':'c','т':'t','у':'y','х':'x','и':'u'};
   const latin = {'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'e','ж':'zh','з':'z','и':'i','й':'y','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f','х':'kh','ц':'ts','ч':'ch','ш':'sh','щ':'shch','ъ':'','ы':'y','ь':'','э':'e','ю':'yu','я':'ya'};
   const q = query.trim();
   const replace = map => q.replace(/[а-яё]/gi, c => { const v = map[c.toLowerCase()]; return v === undefined ? c : c === c.toUpperCase() ? v.toUpperCase() : v; });
