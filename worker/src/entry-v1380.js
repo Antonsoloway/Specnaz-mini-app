@@ -227,7 +227,7 @@ async function handleFastAdminWrite(request, env, ctx) {
   }, status, corsHeaders(request, env));
 }
 
-async function authorizeAdmin(request, env) {
+export async function authorizeAdmin(request, env) {
   const sessionSecret = String(env.SESSION_SECRET || '').trim();
   if (!sessionSecret) throw appError(500, 'SESSION_SECRET_MISSING', 'Серверная сессия не настроена.');
   const token = bearerToken(request);
@@ -593,3 +593,4 @@ function appError(status, code, publicMessage='') {
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
+

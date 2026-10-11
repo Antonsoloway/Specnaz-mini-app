@@ -1,0 +1,17 @@
+name: Sosiska module
+on:
+  push:
+    branches: [main, 'sosiska-*']
+  pull_request:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/sosiska-*.test.mjs
+      - run: node --test tests/admin-write-timeout-v0600.test.js tests/admin-data-client-v0600.test.js
+      - run: node --check sosiska-v061.js && node --check transport-v0514.js
+      - run: npx --yes esbuild@0.25.12 worker/src/entry-v1420.js --bundle --format=esm --platform=browser --outfile=/tmp/sosiska-worker.js

@@ -1,3 +1,8 @@
+
+## 11.10.2026 — Агент «Сосиска»: модуль ЧП, development stage1
+
+Реализация в отдельной ветке `sosiska-miniapp-stage1-20261011`; production/main не изменены. Админский экран, серверная проверка доступа, гибридный поиск, карточки и состав, история/дельты, ручные снимки и управление интервалом, GPT-анализ последних двух снимков реализованы. 21 новый тест и 22 существующих admin/transport теста PASS; bundle ~290 KB. Живое подключение не выполнено: текущий Cloudflare OAuth видит только аккаунт облачного агента, а Worker ЧП отсутствует среди доступных Workers. Для rollout нужны доступ к существующему `royal-crm-miniapp-api`, приватный RM_AGENT_API_KEY и SOSISKA_GROQ_KEY. Мониторинг автоматически не включался; уровень/прогресс и боты не менялись. Передача: `docs/sosiska/RESUME_20261011.md`. Ограничения: картинки эмблем ещё не сопоставлены, выбор произвольного периода анализа не реализован; полный исторический набор тестов содержит устаревшие fixtures, не объявлен зелёным.
+
 ## 2026-09-12 — Owner ingress resilience installed; behavioral acceptance pending
 
 Owner's completed recovery report confirms the existing Apps Script deployment uses ingress 2.9.0 and outbox 1.1.0; the deployment URL is preserved. Recovery found the release already active, so another deployment switch and version creation were unnecessary. Full live mirror synchronization succeeded.
@@ -619,3 +624,4 @@ Repo config на 23.08.2026:
 - Regression coverage added in `tests/golub-ingress-resilience.test.mjs`.
 - Live data repair performed separately in the admin sheet: Marina row 191, column AF `Состояние чата` set to `В чате` based on the confirmed join service-event.
 - Deployment rule: update the EXISTING Apps Script web deployment only; do not change webhook URLs and do not run setup/upgrade functions.
+

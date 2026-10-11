@@ -564,3 +564,9 @@ Code change:
 - No direct writes to participant state were added in code.
 - Existing ChatKeeper payloads were regression-tested byte-for-byte unchanged; ordinary supergroup messages are not reclassified; wrong relay secrets are consumed before CRM.
 - Live admin sheet row for Marina was repaired to `В чате` after confirming the original join event.
+
+
+## 11.10.2026 — Агент «Сосиска»: модуль ЧП, development stage1
+
+Реализация в отдельной ветке `sosiska-miniapp-stage1-20261011`; production/main не изменены. Админский экран, серверная проверка доступа, гибридный поиск, карточки и состав, история/дельты, ручные снимки и управление интервалом, GPT-анализ последних двух снимков реализованы. 21 новый тест и 22 существующих admin/transport теста PASS; bundle ~290 KB. Живое подключение не выполнено: текущий Cloudflare OAuth видит только аккаунт облачного агента, а Worker ЧП отсутствует среди доступных Workers. Для rollout нужны доступ к существующему `royal-crm-miniapp-api`, приватный RM_AGENT_API_KEY и SOSISKA_GROQ_KEY. Мониторинг автоматически не включался; уровень/прогресс и боты не менялись. Передача: `docs/sosiska/RESUME_20261011.md`. Ограничения: картинки эмблем ещё не сопоставлены, выбор произвольного периода анализа не реализован; полный исторический набор тестов содержит устаревшие fixtures, не объявлен зелёным.
+
