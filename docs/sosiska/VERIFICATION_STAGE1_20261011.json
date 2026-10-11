@@ -1,0 +1,26 @@
+{
+  "verifiedSourceCommit": "20b6c3f73740f68cd993f9cf224ddd4a0ae8d8f3",
+  "local": {
+    "moduleTests": 22,
+    "existingAdminTransportTests": 22,
+    "passed": 44,
+    "bundle": "pass"
+  },
+  "githubCI": [
+    {
+      "runId": 38173924335,
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/Antonsoloway/Specnaz-mini-app/actions/runs/38173924335"
+    },
+    {
+      "runId": 38173921986,
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/Antonsoloway/Specnaz-mini-app/actions/runs/38173921986"
+    }
+  ],
+  "productionDeployed": false,
+  "liveMiniAppAcceptance": false,
+  "cloudflareMiniAppAccess": false
+}
