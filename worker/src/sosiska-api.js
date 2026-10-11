@@ -1,4 +1,3 @@
-import {analyzeSosiskaHistory} from './sosiska-analysis.js';
 // Browser receives game data only. Agent credentials never leave this facade.
 const AGENT_ORIGIN = 'https://specnaz-royal-match-agent-stage1.soloway3852.workers.dev';
 const id = value => typeof value === 'string' && /^[1-9]\d{0,18}$/.test(value) && BigInt(value) <= 9223372036854775807n;
@@ -6,9 +5,10 @@ const object = value => value !== null && typeof value === 'object' && !Array.is
 const invalid = () => { throw Object.assign(new Error('INVALID_REQUEST'), {status:400}); };
 export function validateAgentAction(body) {
   if (!object(body)) invalid();
-  const keys = {health:[],search:['query'],team:['teamId'],list:[],watch:['teamId','intervalMinutes'],unwatch:['teamId'],capture:['teamId'],history:['teamId','limit','before'],analysis:['teamId']}[body.operation];
+  const keys = {health:[],search:['query'],team:['teamId'],list:[],watch:['teamId','intervalMinutes'],unwatch:['teamId'],capture:['teamId'],history:['teamId','limit','before'],analysis:['teamId'],analysisStatus:['jobId'],analysisTimeline:['jobId','teamId','limit','before']}[body.operation];
   if (!Array.isArray(keys) || Object.keys(body).some(k => !['operation',...keys].includes(k))) invalid();
-  if (keys.includes('teamId') && !id(body.teamId)) invalid();
+  if (keys.includes('teamId') && !(body.operation==='analysis' && body.teamId===undefined) && !id(body.teamId)) invalid();
+  if (keys.includes('jobId') && !(body.operation==='analysisStatus'&&body.jobId===undefined) && (typeof body.jobId!=='string'||!/^[a-f0-9-]{36}$/.test(body.jobId))) invalid();
   if (body.operation === 'search' && (typeof body.query !== 'string' || !body.query.trim() || body.query.length > 160)) invalid();
   if (body.operation === 'watch' && (!Number.isInteger(body.intervalMinutes) || body.intervalMinutes < 60 || body.intervalMinutes > 10080)) invalid();
   if (body.limit !== undefined && (!Number.isInteger(body.limit) || body.limit < 1 || body.limit > 20)) invalid();
@@ -46,7 +46,7 @@ export function createSosiskaApi({authorizeAdmin,fetchAgent=fetch,fetchAI=fetch}
       async function call(path,message) {
         const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),25000);
         try {
-          const response=await fetchAgent(AGENT_ORIGIN+path,{method:'POST',headers:{Authorization:`Bearer ${env.RM_AGENT_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify(message),signal:controller.signal,redirect:'error'});
+          const response=await fetchAgent(AGENT_ORIGIN+path,{method:'POST',headers:{Authorization:`Bearer ${env.RM_AGENT_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify(message),signal:controller.signal,redirect:'manual'});
           const result=await response.json();
           if(!response.ok||result.ok!==true)throw Object.assign(new Error('AGENT_UNAVAILABLE'),{status:response.status===429?429:502});
           // The cloud agent's contract exposes decoded read-only data only.
@@ -80,9 +80,14 @@ export function createSosiskaApi({authorizeAdmin,fetchAgent=fetch,fetchAI=fetch}
         if(data?.Status!==0||data.TeamId!==body.teamId||!Array.isArray(data.Members))throw new Error('AGENT_TEAM_INVALID');
         return json({ok:true,data});
       }
-      if(body.operation==='analysis'){
-        const history=await call('/v1/monitor',{operation:'history',teamId:body.teamId,limit:2});
-        return json({ok:true,data:await analyzeSosiskaHistory({records:history.records,teamId:body.teamId,env,fetchAI})});
+      if(['analysis','analysisStatus','analysisTimeline'].includes(body.operation)){
+        if(!env.SOSISKA_ANALYSIS)return json({ok:false,error:'ANALYSIS_NOT_CONFIGURED',message:'ИИ-анализ ещё не подключён.'},503);
+        const {operation,...params}=body;
+        const stub=env.SOSISKA_ANALYSIS.get(env.SOSISKA_ANALYSIS.idFromName('full-history-v1'));
+        const response=await stub.fetch('https://analysis.internal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({operation:{analysis:'start',analysisStatus:'status',analysisTimeline:'timeline'}[operation],...params})});
+        const result=await response.json();
+        if(!response.ok||!result.ok)return json({ok:false,error:result.error||'ANALYSIS_UNAVAILABLE',message:result.error==='ANALYSIS_NOT_CONFIGURED'?'ИИ-анализ ещё не подключён.':'Анализ временно недоступен. Повторите попытку.'},503);
+        return json(result);
       }
       return json({ok:true,data:await call('/v1/monitor',body)});
     } catch(error) {

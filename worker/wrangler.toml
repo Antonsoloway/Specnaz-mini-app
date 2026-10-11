@@ -2,6 +2,14 @@ name = "royal-crm-miniapp-api"
 main = "src/entry-v1420.js"
 compatibility_date = "2026-08-15"
 
+[[durable_objects.bindings]]
+name = "SOSISKA_ANALYSIS"
+class_name = "SosiskaAnalysisJobs"
+
+[[migrations]]
+tag = "sosiska-analysis-v1"
+new_sqlite_classes = ["SosiskaAnalysisJobs"]
+
 [vars]
 FRONTEND_ORIGIN = "https://antonsoloway.github.io"
 DATA_REPO = "Antonsoloway/royal-crm-data"

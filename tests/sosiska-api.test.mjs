@@ -28,3 +28,11 @@ test('real shared authorization rejects forged and expired signed sessions',asyn
 });
 
 test('team status failure or wrong identity never becomes a usable card',async()=>{for(const data of [{Status:1,TeamId:'1',Members:[]},{Status:0,TeamId:'2',Members:[]}]){const handle=createSosiskaApi({authorizeAdmin:async()=>{},fetchAgent:async()=>response(data)});assert.equal((await handle(req({operation:'team',teamId:'1'}),env)).status,502);}});
+test('all-team analysis and status use protected job binding, never two-snapshot history',async()=>{
+  const calls=[];const binding={idFromName:n=>n,get:()=>({fetch:async(url,init)=>{calls.push(JSON.parse(init.body));return Response.json({ok:true,data:{state:'running',jobId:'00000000-0000-4000-8000-000000000001'}});}})};
+  const handle=createSosiskaApi({authorizeAdmin:async()=>{},fetchAgent:()=>{throw new Error('No game calls allowed');}});
+  assert.equal((await handle(req({operation:'analysis'}),{...env,SOSISKA_ANALYSIS:binding})).status,200);
+  assert.equal((await handle(req({operation:'analysisStatus'}),{...env,SOSISKA_ANALYSIS:binding})).status,200);
+  assert.deepEqual(calls,[{operation:'start'},{operation:'status'}]);
+  assert.throws(()=>validateAgentAction({operation:'analysis',records:[{forged:true}]}));
+});

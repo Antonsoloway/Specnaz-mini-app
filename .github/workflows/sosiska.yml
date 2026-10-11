@@ -15,3 +15,5 @@ jobs:
       - run: node --test tests/admin-write-timeout-v0600.test.js tests/admin-data-client-v0600.test.js
       - run: node --check sosiska-v061.js && node --check transport-v0514.js
       - run: npx --yes esbuild@0.25.12 worker/src/entry-v1420.js --bundle --format=esm --platform=browser --outfile=/tmp/sosiska-worker.js
+      - run: npm install --prefix /tmp/sosiska-runtime --no-audit --no-fund miniflare@5.20261006.1-alpha
+      - run: node tests/verify-sosiska-workerd.mjs /tmp/sosiska-runtime/package.json /tmp/sosiska-worker.js
