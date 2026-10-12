@@ -624,3 +624,8 @@ Backend rollout и приватные server credentials подтвержден�
 ИИ-анализ НЕ подключён: SOSISKA_GROQ_KEY отсутствует. Для завершения нужен Secret SOSISKA_GROQ_KEY в существующем royal-crm-miniapp-api, проверка провайдера и анализ настоящей уже сохранённой истории. Не создавать watches/captures автоматически ради теста. Owner Telegram smoke: закрыть/повторно открыть ЧП через Голубя Мира, проверить админскую кнопку, поиск/состав/историю, остальные страницы/навигацию; обычный пользователь не должен иметь доступ.
 
 Исторические handoff-утверждения «production не изменён» и «модуль не опубликован» относятся к этапам до rollout; актуально это состояние. Боты и Apps Script не менялись, приложение не переносилось.
+
+
+## 2026-10-12 — Sosiska combined search filters
+
+See docs/sosiska/SEARCH_FILTERS_20261012.md. Inclusive minimum team points, leader substring, member/entry level/crown ranges and open/closed filters; hydrates all candidates, explicitly reports unchecked data, supports stop/reset and filtered pagination. 63 tests and CI38278637377 PASS. Frontend-only update; autonomous level updater remains deferred.
