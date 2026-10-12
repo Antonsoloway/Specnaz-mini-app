@@ -590,3 +590,8 @@ Code change:
 ### Изоляция — remote CI подтверждён
 
 Source cd58e56b100034129eaa70bca615317aeca9e1bf: обе Sosiska module workflows38206103451(push) и38206107288(PR) завершеныsuccess. В CI включены54Nodetests,5SQLite/cold-startchecks и новая32-case проверка сохранения существующих маршрутов. Продолжаем после ручного входа Google/Cloudflare; ни deployment, ни secret update не выполнены.
+
+
+## Передача другому чату — 12.10.2026
+
+Актуальная полная передача: docs/sosiska/HANDOFF_20261012.md. Работать через актуальное Cloud Shell соединение Commander; не повторять неудачные BrowserSSO/device-login попытки. Интеграция не развёрнута, production не изменён.
