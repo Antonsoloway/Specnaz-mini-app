@@ -1,6 +1,16 @@
 name = "royal-crm-miniapp-api"
-main = "src/entry-v1410.js"
+account_id = "0dd3beb421783a043d0327ac771a3f1a"
+keep_vars = true
+main = "src/entry-v1420.js"
 compatibility_date = "2026-08-15"
+
+[[durable_objects.bindings]]
+name = "SOSISKA_ANALYSIS"
+class_name = "SosiskaAnalysisJobs"
+
+[[migrations]]
+tag = "sosiska-analysis-v1"
+new_sqlite_classes = ["SosiskaAnalysisJobs"]
 
 [vars]
 FRONTEND_ORIGIN = "https://antonsoloway.github.io"
@@ -22,6 +32,8 @@ invocation_logs = true
 # BOT_TOKEN
 # GITHUB_TOKEN
 # SESSION_SECRET
+# RM_AGENT_API_KEY — private cloud-agent key, used only by /admin-agent.
+# SOSISKA_GROQ_KEY — separate analysis credential; no bot settings are changed.
 # BOT_TOKEN is also used server-side as the HMAC key for Worker -> Apps Script
 # admin-write requests and short-lived Google Sheets CellImage source URLs.
 # It is never exposed to the browser or GitHub.
@@ -62,3 +74,4 @@ invocation_logs = true
 # MAYAK and the registry remains seeded from the historical project members.
 #
 # Cloudflare Builds source: GitHub main, root path /worker.
+

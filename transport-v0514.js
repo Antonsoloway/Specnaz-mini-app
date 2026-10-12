@@ -200,7 +200,7 @@
     let pathname = '';
     try { pathname = new URL(urlString).pathname; } catch (_) {}
     if (gasMode) {
-      if (pathname === '/admin-data' || pathname === '/admin-write' || pathname === '/admin-team-photo') {
+      if (pathname === '/admin-agent' || pathname === '/admin-data' || pathname === '/admin-write' || pathname === '/admin-team-photo') {
         throw workerRequiredError();
       }
       return fallbackFor(urlString, init);
@@ -211,7 +211,7 @@
     const isAdminWrite = pathname === '/admin-write';
     const isProtectedMedia = pathname === '/project-mayak-media';
     const attempts = isAuth ? 2 : 1;
-    const timeoutMs = isAuth
+    const timeoutMs = pathname === '/admin-agent' ? 120000 : isAuth
       ? AUTH_TIMEOUT_MS
       : isAdminData
         ? ADMIN_DATA_TIMEOUT_MS
@@ -237,7 +237,7 @@
       }
     }
 
-    if (isAdminData || isAdminWrite || pathname === '/admin-team-photo') {
+    if (pathname === '/admin-agent' || isAdminData || isAdminWrite || pathname === '/admin-team-photo') {
       throw lastError || workerRequiredError();
     }
     if (!GAS_URL) throw lastError || timeoutError(timeoutCode);
@@ -247,3 +247,4 @@
 
   window.__ROYAL_TRANSPORT_VERSION__ = '0.5.14.4';
 })();
+

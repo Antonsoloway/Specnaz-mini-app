@@ -564,3 +564,52 @@ Code change:
 - No direct writes to participant state were added in code.
 - Existing ChatKeeper payloads were regression-tested byte-for-byte unchanged; ordinary supergroup messages are not reclassified; wrong relay secrets are consumed before CRM.
 - Live admin sheet row for Marina was repaired to `В чате` after confirming the original join event.
+
+
+## 11.10.2026 — Агент «Сосиска»: модуль ЧП, development stage1
+
+Реализация в отдельной ветке `sosiska-miniapp-stage1-20261011`; production/main не изменены. Админский экран, серверная проверка доступа, гибридный поиск, карточки и состав, история/дельты, ручные снимки и управление интервалом, GPT-анализ последних двух снимков реализованы. 22 новых теста и 22 существующих admin/transport теста PASS; bundle ~290 KB. Живое подключение не выполнено: текущий Cloudflare OAuth видит только аккаунт облачного агента, а Worker ЧП отсутствует среди доступных Workers. Для rollout нужны доступ к существующему `royal-crm-miniapp-api`, приватный RM_AGENT_API_KEY и SOSISKA_GROQ_KEY. Мониторинг автоматически не включался; уровень/прогресс и боты не менялись. Передача: `docs/sosiska/RESUME_20261011.md`. Ограничения: картинки эмблем ещё не сопоставлены, выбор произвольного периода анализа не реализован; полный исторический набор тестов содержит устаревшие fixtures, не объявлен зелёным.
+
+
+## 12.10.2026 МСК — Сосиска: вся история всех отслеживаемых команд
+
+Уточнение владельца заменило анализ последних двух снимков на полную историю всех отслеживаемых команд и динамику изменений. Реализованы persistent SQLite DO jobs + alarms, чтение всех страниц до baseline, проверка полного охвата, многоэтапный GPT-анализ, итог каждой команды/сравнение всех команд и точная числовая динамика по всем снимкам. 54 Node tests и 5 workerd/SQLite/cold-start checks PASS, bundle ~307.5 KB. Исправлен несовместимый Workers redirect:error на manual. Код в PR #40, production не менялся. Commander/Cloud Shell проверен: OAuth обновлён, HTTP 200; единственный доступный Cloudflare account содержит только bot gateway и cloud Royal Match agent, существующего Worker ЧП нет. Rollout всё ещё требует доступа к его аккаунту и серверных credentials. Актуальная передача: docs/sosiska/RESUME_20261012.md.
+
+
+
+## 12.10.2026 — изоляция Сосиски от действующего ЧП
+
+Требование владельца: Сосиска — отдельный админский модуль, сохранять действующие функции приложения. Добавлен tests/verify-sosiska-isolation-workerd.mjs и шаги в Sosiska module CI: собираются entry-v1410 (текущий API) и entry-v1420 (обёртка модуля), в настоящем workerd сравниваются статусы/все заголовки/байт-в-байт тела30запросов GET/POST/OPTIONS по10существующим маршрутам. Дополнительно успешные GET/snapshot и GET/admin-data с подписанной тестовой сессией и фиктивными CRM/Telegram/GitHub responses сравниваются без различий. Всего32checksPASS,8fixtureCalls,liveNetworkCalls0. Проверка не покрывает все успешные write/media-сценарии и не заменяет Telegram acceptance. Production код этой сессией не изменялся.
+
+Повторно54NodetestsPASS и5workerd checks SQLite alarms/cold-start/full historyPASS; исходный код неизменён. Существующий live ЧП healthHTTP200/version1.41.0 подтверждён ранее, frontend пока без Сосиски. OAuth доступ к management API остаётся недоступным. Cloud Browser предложил защищённый вход; выбран Google, но вход отклонён с видимым «Неправильный пароль». Секреты не прочитаны/не записаны, новые credentials не создавались. Требуется ручное завершение входа в Cloudflare Dashboard; не запускать новые device codes вслепую.
+
+Все изменения только tests/CI/checkpoints в рабочей ветке, main/frontend/Workers/secrets/Apps Script/watches/history не менялись. RemoteCI проверить на кодовом коммите этой записи.
+
+
+
+### Изоляция — remote CI подтверждён
+
+Source cd58e56b100034129eaa70bca615317aeca9e1bf: обе Sosiska module workflows38206103451(push) и38206107288(PR) завершеныsuccess. В CI включены54Nodetests,5SQLite/cold-startchecks и новая32-case проверка сохранения существующих маршрутов. Продолжаем после ручного входа Google/Cloudflare; ни deployment, ни secret update не выполнены.
+
+
+## Передача другому чату — 12.10.2026
+
+Актуальная полная передача: docs/sosiska/HANDOFF_20261012.md. Работать через актуальное Cloud Shell соединение Commander; не повторять неудачные BrowserSSO/device-login попытки. Интеграция не развёрнута, production не изменён.
+
+
+## 12.10.2026 — доступ восстановлен, исходная интеграция
+
+OAuth согласован на два пространства того же логина, включая Tropical Spoon. Settings/deployments royal-crm-miniapp-api доступны. Productionдоrollout versioned267420-350c-4c10-9d5a-7c9d21e368b4; vars/secrets/settings/deploymentbackup приватно сохранены вCloudShell. В конфигурацию добавлен явный account_id существующегоWorker иkeep_vars=true. Причина pendingmigration upload установлена по Wrangler source: versions upload не применяет DurableObjectmigration; нуженdeploy. Builds logs API отдельно не разрешён текущими OAuth scopes.
+
+Приложение не переносится. План прежний: отдельный/admin-agent внутри существующегоMiniAppWorker, adminэкран в существующемЧП. Для интеграции подготовлен дополнительный server-onlykey в изолированном игровомагенте с сохранением прежнего ключа. SourceSpecnaz-ai b42c719abb953e58541c58eb1b948e713ea84beb, isolatedCI38209491964success. Рабочая веткаsosiska-isolated-runtime-20261012 содержит только эту credentialправку,3tests иCItrigger. Сессию/уровень/историю/боты она не меняет. Пока запись не подтверждаетdeploy. Groqkey дляанализа ещё не установлен; не объявлятьИИготовым без его проверки.
+
+
+## 12.10.2026 — backend rollout подтверждён; frontend готовится
+
+Доступ восстановлен выбором Tropical Spoon при device OAuth. Existing MiniApp source a4a6cadf89933c9d3b94d878246e378eabca5f16 имеет оба CI success (38209716035/38209719296). В существующем royal-crm-miniapp-api выполнен deploy и первая SQLite migration sosiska-analysis-v1. Version после deploy 6390a57f-81d0-44b5-870f-793301a36aa2; последующий secret update мог создать новую version, смотреть deployments. Резервные settings/deployments до изменения сохранены приватно в Cloud Shell; rollback version ed267420-350c-4c10-9d5a-7c9d21e368b4. Добавлен серверный RM_AGENT_API_KEY; старые BOT_TOKEN/GITHUB_TOKEN/SESSION_SECRET и vars сохранены.
+
+Live проверки: прежний /health HTTP200/version1.41.0; /admin-agent неверная session401, чужой Origin403, OPTIONS204. Это не живой admin acceptance. Изолированный агент source b42c719abb953e58541c58eb1b948e713ea84beb/CI38209491964success,122Node testsPASS: поддержка дополнительного RM_MINIAPP_API_KEY с сохранением прежнего ключа. Version после deploy cd3f7263-a5c1-4db5-a39e-16e60b8be25d, затем secret update. Новый ключ и ключ фасада переданы приватно, не опубликованы. Live health sessionConfigured=true, automatic-verified-service; Mamonovo2candidates, list0watches. Уровень, identity, league, бот Worker и Apps Script не менялись; captures не создавались.
+
+Frontend: отдельный модуль в существующем app-v0600, marker20261012-v061-sosiska1, история изменений дополнена; version0.6.1 сохранена по существующей схеме добавлений. Новые tests проверяют query/hash на двух Telegram redirect этапах и сохранение истории. Публиковать после нового CI. Commander перестал отвечать после backend rollout; commit/push через него не подтверждён. Доставка frontend продолжается GitHub connector с optimistic branch lease; не повторять неизвестный shell push вслепую.
+
+SOSISKA_GROQ_KEY отсутствует. Анализ не объявлять подключённым; требуется ключ провайдера, затем private provider probe и реальная история выбранных владельцем команд. Картинки эмблем и Telegram device smoke остаются ограничениями. Этот раздел заменяет старые формулировки о недоступном Worker и отсутствии backend deployment.

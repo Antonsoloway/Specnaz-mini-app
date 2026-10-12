@@ -3,8 +3,10 @@
   'use strict';
 
   const VERSION = '0.6.1';
-  const PATCH_VERSION = '0.6.1-changelog-latest.1';
+  const PATCH_VERSION = '0.6.1-changelog-latest.2';
   const CHANGE = 'В админском Журнале исправлен порядок записей: все события теперь принудительно сортируются по фактическому времени от новых к старым, независимо от источника записи и порядка, в котором данные пришли с сервера.';
+
+  const AGENT_CHANGE = 'Добавлен отдельный админский модуль «Сосиска»: поиск команд Royal Match, выбор по описанию и лидеру, состав игроков, снимки, история изменений и управление отслеживанием.';
 
   const releases = Array.isArray(window.RoyalChangelog?.releases)
     ? window.RoyalChangelog.releases
@@ -20,6 +22,8 @@
   }
   if (!Array.isArray(section.changes)) section.changes = [];
   if (!section.changes.includes(CHANGE)) section.changes.unshift(CHANGE);
+
+  if (!section.changes.includes(AGENT_CHANGE)) section.changes.unshift(AGENT_CHANGE);
 
   current.changes = current.sections.flatMap(item => Array.isArray(item?.changes) ? item.changes : []);
   window.RoyalChangelog0601 = current;

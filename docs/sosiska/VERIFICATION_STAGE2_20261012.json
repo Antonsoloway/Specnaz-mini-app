@@ -1,0 +1,142 @@
+{
+  "verifiedSourceCommit": "67891b0f6e6e6b5bd72aba64635f332a359ebd50",
+  "local": {
+    "nodeTests": 54,
+    "moduleTests": 32,
+    "existingTests": 22,
+    "workerdChecks": 5,
+    "liveFixtureNetworkCalls": 0,
+    "fullHistoryFixture": {
+      "team1": 127,
+      "team2": 12,
+      "team3": 0
+    },
+    "bundle": "pass"
+  },
+  "githubCI": [
+    {
+      "runId": 38176090560,
+      "jobId": 114578674827,
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run node --test tests/sosiska-*.test.mjs",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run node --test tests/admin-write-timeout-v0600.test.js tests/admin-data-client-v0600.test.js",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run node --check sosiska-v061.js && node --check transport-v0514.js",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run npx --yes esbuild@0.25.12 worker/src/entry-v1420.js --bundle --format=esm --platform=browser --outfile=/tmp/sosiska-worker.js",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run npm install --prefix /tmp/sosiska-runtime --no-audit --no-fund miniflare@5.20261006.1-alpha",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run node tests/verify-sosiska-workerd.mjs /tmp/sosiska-runtime/package.json /tmp/sosiska-worker.js",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "runId": 38176087434,
+      "jobId": 114578665586,
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run node --test tests/sosiska-*.test.mjs",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run node --test tests/admin-write-timeout-v0600.test.js tests/admin-data-client-v0600.test.js",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run node --check sosiska-v061.js && node --check transport-v0514.js",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run npx --yes esbuild@0.25.12 worker/src/entry-v1420.js --bundle --format=esm --platform=browser --outfile=/tmp/sosiska-worker.js",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run npm install --prefix /tmp/sosiska-runtime --no-audit --no-fund miniflare@5.20261006.1-alpha",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run node tests/verify-sosiska-workerd.mjs /tmp/sosiska-runtime/package.json /tmp/sosiska-worker.js",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ],
+  "commander": {
+    "cloudShellDevice": "cs-465796544509-default",
+    "oauthRefreshed": true,
+    "accountsHttp": 200,
+    "accountCount": 1,
+    "accountId": "62c513d37c8b15db448b263dfb7d2dee",
+    "accessibleWorkers": [
+      "specnaz-ai-telegram-gateway",
+      "specnaz-royal-match-agent-stage1"
+    ],
+    "miniAppWorkerAccessible": false
+  },
+  "productionDeployed": false,
+  "liveMiniAppAcceptance": false
+}
