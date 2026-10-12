@@ -13,3 +13,8 @@
 Проверки: 63 Node tests PASS, включая порог 30000, сочетание всех полей, недопустимые диапазоны, подходящую команду на второй странице, сброс, повтор ошибки без лишних запросов, остановку и навигацию. CI38278637377 SUCCESS на c4041bd56dd5eb00facec06dbcf69915ab2287ec, включая workerd alarm/cold start/isolation checks.
 
 Frontend releaseBuild 20261012-v061-sosiska-filters1. JS/CSS cache keys 20261012-filters1; RoyalSosiska.version0.3.0. Runtime API и игровой Worker не изменены, игровые записи не выполнялись. Автоповышение уровня остаётся отложенным по просьбе владельца.
+
+
+## Подтверждённая публикация — 12 октября 2026
+
+PR42 merged: a56c38ebd441660c1ef57445816081df2ba49414. Финальная правка9156d5ad218a7d985df26409bdbffccb84388422 останавливает загрузку при HTTP401/403/429; 64 Node tests PASS. PR CI38279011528 SUCCESS, main CI38279307207 SUCCESS, Pages deployment38279306652 SUCCESS. Независимый HTTP GET действующих app.html, sosiska-v061.js и sosiska-v061.css подтвердил точное совпадение Git blob SHA каждого файла с merge commit. Админский Telegram smoke владельца ещё не выполнялся. Shell перестал отвечать после push финальной правки; merge и проверка CI выполнены через подключённый GitHub. Не повторять старый push из checkout без fetch.
