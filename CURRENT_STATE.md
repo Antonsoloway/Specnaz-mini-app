@@ -666,3 +666,14 @@ Live проверки: прежний /health HTTP200/version1.41.0; /admin-agen
 Frontend: отдельный модуль в существующем app-v0600, marker20261012-v061-sosiska1, история изменений дополнена; version0.6.1 сохранена по существующей схеме добавлений. Новые tests проверяют query/hash на двух Telegram redirect этапах и сохранение истории. Публиковать после нового CI. Commander перестал отвечать после backend rollout; commit/push через него не подтверждён. Доставка frontend продолжается GitHub connector с optimistic branch lease; не повторять неизвестный shell push вслепую.
 
 SOSISKA_GROQ_KEY отсутствует. Анализ не объявлять подключённым; требуется ключ провайдера, затем private provider probe и реальная история выбранных владельцем команд. Картинки эмблем и Telegram device smoke остаются ограничениями. Этот раздел заменяет старые формулировки о недоступном Worker и отсутствии backend deployment.
+
+
+## 12.10.2026 — модуль опубликован в действующем ЧП
+
+PR #40 слит в main, merge 266098191b29140f3bca1ed99d24839f62bd3b87. Source 9eb296ce4edc76b9971c6df6eb7323d8af2560a2: Sosiska CI 38210642939 success; Cloudflare preview Build 4b66bd3f-4601-49ff-9c61-75c773a075c8 success. Публичный app.html фактически открывает app-v0600.html?releaseBuild=20261012-v061-sosiska1; DOM содержит sosiska-v061.css/js. В обычном браузере без Telegram initData показан штатный отказ авторизации; админскую кнопку без настоящей Telegram session не проверяли.
+
+Backend rollout и приватные server credentials подтверждены в предыдущем разделе. Commander после rollout перестал отвечать; два запроса read_process_output/start_process завершились timeout. Frontend commit/push через Shell не подтверждён; GitHub connector доставил source через expected-head lease, затем зелёный CI и merge. Не выполнять force push из оставшегося Cloud Shell checkout: он может содержать незакоммиченные аналогичные правки и старый branch head.
+
+ИИ-анализ НЕ подключён: SOSISKA_GROQ_KEY отсутствует. Для завершения нужен Secret SOSISKA_GROQ_KEY в существующем royal-crm-miniapp-api, проверка провайдера и анализ настоящей уже сохранённой истории. Не создавать watches/captures автоматически ради теста. Owner Telegram smoke: закрыть/повторно открыть ЧП через Голубя Мира, проверить админскую кнопку, поиск/состав/историю, остальные страницы/навигацию; обычный пользователь не должен иметь доступ.
+
+Исторические handoff-утверждения «production не изменён» и «модуль не опубликован» относятся к этапам до rollout; актуально это состояние. Боты и Apps Script не менялись, приложение не переносилось.
