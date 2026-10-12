@@ -1,4 +1,6 @@
 name = "royal-crm-miniapp-api"
+account_id = "0dd3beb421783a043d0327ac771a3f1a"
+keep_vars = true
 main = "src/entry-v1420.js"
 compatibility_date = "2026-08-15"
 
