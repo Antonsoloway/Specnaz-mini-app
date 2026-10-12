@@ -638,3 +638,8 @@ Repo config на 23.08.2026:
 - Live data repair performed separately in the admin sheet: Marina row 191, column AF `Состояние чата` set to `В чате` based on the confirmed join service-event.
 - Deployment rule: update the EXISTING Apps Script web deployment only; do not change webhook URLs and do not run setup/upgrade functions.
 
+
+
+### Изоляция — remote CI подтверждён
+
+Source cd58e56b100034129eaa70bca615317aeca9e1bf: обе Sosiska module workflows38206103451(push) и38206107288(PR) завершеныsuccess. В CI включены54Nodetests,5SQLite/cold-startchecks и новая32-case проверка сохранения существующих маршрутов. Продолжаем после ручного входа Google/Cloudflare; ни deployment, ни secret update не выполнены.
