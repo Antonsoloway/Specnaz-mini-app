@@ -7,11 +7,12 @@ const settle=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate);};
 function setup({admin=true,responder}={}){
   const listeners={},docListeners={},tiles=[],calls=[],panel={innerHTML:'',hidden:false},grid={querySelector:()=>tiles.find(x=>!x.removed)||null,appendChild:b=>tiles.push(b)};
   const document={querySelector:s=>s==='.grid'?grid:s==='[data-sosiska-interval]'?{value:'120'}:null,getElementById:()=>panel,createElement:()=>({dataset:{},remove(){this.removed=true;}}),addEventListener:(type,fn)=>{docListeners[type]=fn;}};
-  const context={document,authState:{role:{isChatAdmin:admin}},sessionToken:'session-a',activePage:'home',setActiveNav(){},renderPage(page){panel.innerHTML=page;},FormData:class{constructor(form){this.form=form;}get(){return this.form.query;}},Response,AbortController,setTimeout,clearTimeout,console,fetch:async(url,init)=>{const b=JSON.parse(init.body);calls.push(b);return Response.json({ok:true,data:await (responder?responder(b):{watches:[]})});}};
+  const context={document,authState:{role:{isChatAdmin:admin}},sessionToken:'session-a',activePage:'home',setActiveNav(){},renderPage(page){panel.innerHTML=page;},FormData:class{constructor(form){this.form=form;}get(name){return this.form.filters?this.form.filters[name]??'':this.form.query;}},Response,AbortController,setTimeout,clearTimeout,console,fetch:async(url,init)=>{const b=JSON.parse(init.body);calls.push(b);return Response.json({ok:true,data:await (responder?responder(b):{watches:[]})});}};
   context.window={addEventListener:(type,fn)=>{listeners[type]=fn;},RoyalNav:{pushCurrent(){}},RoyalAdminDataV0600:{subscribe(fn){listeners.adminClear=fn;}}};vm.createContext(context);vm.runInContext(source,context);
   const action=(name,id)=>listeners.click({target:{closest:s=>s==='[data-sosiska-action]'?{dataset:{sosiskaAction:name,teamId:id}}:null},preventDefault(){},stopImmediatePropagation(){}});
-  const search=query=>docListeners.submit({target:{query,matches:()=>true,querySelector:()=>({blur(){}})},preventDefault(){},stopImmediatePropagation(){}});
-  return {context,tiles,calls,panel,action,search,listeners};
+  const search=query=>docListeners.submit({target:{query,matches:selector=>selector==='[data-sosiska-search]',querySelector:()=>({blur(){}})},preventDefault(){},stopImmediatePropagation(){}});
+  const filter=values=>docListeners.submit({target:{filters:values,matches:selector=>selector==='[data-sosiska-filters]'},preventDefault(){},stopImmediatePropagation(){}});
+  return {context,tiles,calls,panel,action,search,filter,listeners};
 }
 test('tile only appears for admins and opening lists watches without enabling any',async()=>{
   const denied=setup({admin:false});assert.equal(denied.tiles.length,0);await denied.context.window.RoyalSosiska.open();assert.equal(denied.calls.length,0);
@@ -36,4 +37,65 @@ test('analysis is escaped and tied to server dates, never generated automaticall
 test('global analysis includes all tracked teams without requiring an open card',async()=>{
   const s=setup({responder:b=>b.operation==='list'?{watches:[{teamId:'1',intervalMinutes:60},{teamId:'2',intervalMinutes:120}]}:b.operation==='analysis'?{available:true,state:'done',processedSnapshots:130,summary:{text:'All teams'},teams:[{teamId:'1',teamName:'First',count:127,text:'Early and late',from:'2026-10-01',to:'2026-10-11'},{teamId:'2',teamName:'Second',count:3,text:'Other history',from:'2026-10-09',to:'2026-10-11'}]}:{available:false}});
   await s.context.window.RoyalSosiska.open();s.action('analysis-all');await settle();assert.deepEqual(s.calls.find(b=>b.operation==='analysis'),{operation:'analysis'});assert.match(s.panel.innerHTML,/130/);assert.match(s.panel.innerHTML,/Early and late/);assert.match(s.panel.innerHTML,/Other history/);assert.equal(s.calls.filter(b=>['watch','capture'].includes(b.operation)).length,0);
+});
+
+const filterTeam=(id,level=10000,crown=0,leader='Лидер')=>({TeamId:String(id),TeamName:'Team '+id,Description:'Details '+id,Leader:'99',CoLeaders:[],MinLevel:100,MinCrown:0,Type:true,Members:[{UserId:'99',Name:leader,Level:level,Crown:crown,HelpCount:0},{UserId:'98',Name:'Member',Level:10000,Crown:0,HelpCount:0}]});
+test('filters combine inclusive score, leader substring, member and entry ranges and team type',()=>{
+ const api=setup().context.window.RoyalSosiska.filters;
+ const f=api.parse(new Map(Object.entries({scoreMin:'30000',leader:'АЛ',membersMin:'2',membersMax:'2',entryLevelMin:'100',entryLevelMax:'100',entryCrownMax:'0',type:'open'})));
+ const t=filterTeam('1',19000,1000,'Наталья');
+ assert.equal(api.fields(t).score,30000);assert.equal(api.matches(t,f),true);
+ assert.equal(api.matches({...t,Members:t.Members.map(m=>({...m,Crown:0}))},f),false);
+ assert.equal(api.matches({...t,Type:false},f),false);
+ assert.equal(api.matches(undefined,f),false);
+ assert.equal(api.matches({...t,Members:[{UserId:'99',Name:'Наталья',Level:30000}]},{scoreMin:1}),false);
+ assert.equal(api.matches({...t,Score:999999,Members:t.Members.map(m=>({...m,Level:0,Crown:0}))},{scoreMin:30000}),false);
+});
+test('invalid numeric ranges do not silently coerce negative, fractional or malformed filters',()=>{
+ const api=setup().context.window.RoyalSosiska.filters;
+ for(const values of [{scoreMin:'-1'},{scoreMin:'30.5'},{scoreMin:'30000x'},{membersMax:'51'},{membersMin:'30',membersMax:'20'},{type:'unknown'}]){
+   assert.throws(()=>api.parse(new Map(Object.entries(values))));
+ }
+ assert.equal(api.parse(new Map([['scoreMin','0']])).scoreMin,0);
+});
+test('filtering checks candidates after first page and clearing keeps all original results',async()=>{
+ const candidates=Array.from({length:6},(_,i)=>({teamId:String(i+1),name:'Team '+(i+1)}));
+ const s=setup({responder:b=>b.operation==='search'?{candidates,warnings:[]}:b.operation==='team'?filterTeam(b.teamId,b.teamId==='6'?20000:10000,0,b.teamId==='6'?'Needle':'Other'):{watches:[]}});
+ await s.context.window.RoyalSosiska.open();s.search('Team');await settle();
+ assert.equal(s.calls.filter(b=>b.operation==='team').length,4);
+ s.filter({scoreMin:'30000',leader:'needle'});await settle();
+ assert.match(s.panel.innerHTML,/Показано: 1 из 6/);assert.match(s.panel.innerHTML,/Team 6/);assert.match(s.panel.innerHTML,/Командные очки: 30000/);
+ assert.equal(s.calls.filter(b=>b.operation==='team').length,6);
+ s.action('clear-filters');await settle();assert.match(s.panel.innerHTML,/Показано: 6 из 6/);
+ assert.equal(s.calls.filter(b=>['watch','capture'].includes(b.operation)).length,0);
+});
+test('failed detail remains explicitly unchecked and is retried without repeating cached reads',async()=>{
+ let fail=true;
+ const candidates=Array.from({length:5},(_,i)=>({teamId:String(i+1),name:'Team '+(i+1)}));
+ const s=setup({responder:b=>{
+  if(b.operation==='search')return {candidates,warnings:['Рейтинги временно недоступны.']};
+  if(b.operation==='team'){if(b.teamId==='5'&&fail)throw new Error('network');return filterTeam(b.teamId,20000);}
+  return {watches:[]};
+ }});
+ await s.context.window.RoyalSosiska.open();s.search('Team');await settle();
+ s.filter({scoreMin:'30000'});await settle();assert.match(s.panel.innerHTML,/Не проверено команд: 1/);assert.match(s.panel.innerHTML,/Рейтинги временно недоступны/);
+ fail=false;s.filter({scoreMin:'30000'});await settle();assert.match(s.panel.innerHTML,/Показано: 5 из 5/);
+ assert.equal(s.calls.filter(b=>b.operation==='team'&&b.teamId==='1').length,1);
+ assert.equal(s.calls.filter(b=>b.operation==='team'&&b.teamId==='5').length,2);
+});
+test('navigation during full filtering stops further reads and ignores late detail',async()=>{
+ let release;
+ const candidates=Array.from({length:6},(_,i)=>({teamId:String(i+1),name:'Team '+(i+1)}));
+ const s=setup({responder:b=>b.operation==='search'?{candidates,warnings:[]}:b.operation==='team'?(b.teamId==='5'?new Promise(r=>{release=r;}):filterTeam(b.teamId,20000)):{watches:[]}});
+ await s.context.window.RoyalSosiska.open();s.search('Team');await settle();
+ s.filter({scoreMin:'30000'});await settle();s.context.renderPage('players');release(filterTeam('5',20000));await settle();
+ assert.equal(s.panel.innerHTML,'players');assert.equal(s.calls.some(b=>b.operation==='team'&&b.teamId==='6'),false);
+});
+test('stop full filtering leaves unverified count and does not read next candidate',async()=>{
+ let release;
+ const candidates=Array.from({length:6},(_,i)=>({teamId:String(i+1),name:'Team '+(i+1)}));
+ const s=setup({responder:b=>b.operation==='search'?{candidates,warnings:[]}:b.operation==='team'?(b.teamId==='5'?new Promise(r=>{release=r;}):filterTeam(b.teamId,20000)):{watches:[]}});
+ await s.context.window.RoyalSosiska.open();s.search('Team');await settle();
+ s.filter({scoreMin:'30000'});await settle();s.action('stop-filters');release(filterTeam('5',20000));await settle();
+ assert.equal(s.calls.some(b=>b.operation==='team'&&b.teamId==='6'),false);assert.match(s.panel.innerHTML,/Не проверено команд: 1/);
 });
