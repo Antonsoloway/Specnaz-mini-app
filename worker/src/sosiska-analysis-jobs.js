@@ -1,5 +1,5 @@
 import {timelineRows,packAnalysisParts,requestSosiskaAnalysis} from './sosiska-analysis.js';
-const ORIGIN='https://specnaz-royal-match-agent-stage1.soloway3852.workers.dev';
+const ORIGIN='https://specnaz-royal-match-agent-stage1.specnaz-sosiska.workers.dev';
 const json=(value,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store'}});
 const safeError=e=>/^ANALYSIS_[A-Z_]+$/.test(e?.message??'')?e.message:'ANALYSIS_UNAVAILABLE';
 export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=requestSosiskaAnalysis,now=()=>Date.now(),uuid=()=>crypto.randomUUID()}) {

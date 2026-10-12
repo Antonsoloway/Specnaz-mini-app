@@ -20,7 +20,7 @@ const options={rootPath:dirname(scriptPath),name:'sosiska-fixture',modules:true,
   if(u.hostname==='api.telegram.org')return Response.json({ok:true,result:{status:'administrator'}});
   const b=await request.json();
   if(u.hostname==='api.groq.com')return Response.json({choices:[{finish_reason:'stop',message:{content:'Fixture whole-history analysis'}}]});
-  if(u.hostname==='specnaz-royal-match-agent-stage1.soloway3852.workers.dev') {
+  if(u.hostname==='specnaz-royal-match-agent-stage1.specnaz-sosiska.workers.dev') {
     assert.ok(['list','history'].includes(b.operation));
     if(b.operation==='list')return Response.json({ok:true,data:{watches:[{teamId:'1',enabled:true}]}});
     const records=[record(3),record(2),record(1)].filter(r=>r.sequence<(b.before??Infinity)).slice(0,b.limit);

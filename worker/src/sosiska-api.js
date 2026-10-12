@@ -1,5 +1,5 @@
 // Browser receives game data only. Agent credentials never leave this facade.
-const AGENT_ORIGIN = 'https://specnaz-royal-match-agent-stage1.soloway3852.workers.dev';
+const AGENT_ORIGIN = 'https://specnaz-royal-match-agent-stage1.specnaz-sosiska.workers.dev';
 const id = value => typeof value === 'string' && /^[1-9]\d{0,18}$/.test(value) && BigInt(value) <= 9223372036854775807n;
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const invalid = () => { throw Object.assign(new Error('INVALID_REQUEST'), {status:400}); };
