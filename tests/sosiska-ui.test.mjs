@@ -99,3 +99,14 @@ test('stop full filtering leaves unverified count and does not read next candida
  s.filter({scoreMin:'30000'});await settle();s.action('stop-filters');release(filterTeam('5',20000));await settle();
  assert.equal(s.calls.some(b=>b.operation==='team'&&b.teamId==='6'),false);assert.match(s.panel.innerHTML,/Не проверено команд: 1/);
 });
+
+test('full candidate hydration stops on revoked admin session or rate limiting',async()=>{
+ for(const status of [401,403,429]){
+  const candidates=Array.from({length:6},(_,i)=>({teamId:String(i+1),name:'Team '+(i+1)}));
+  const s=setup({responder:b=>b.operation==='search'?{candidates,warnings:[]}:b.operation==='team'?filterTeam(b.teamId,20000):{watches:[]}});
+  const original=s.context.fetch;s.context.fetch=async(url,init)=>{const b=JSON.parse(init.body);if(b.operation==='team'&&b.teamId==='5'){s.calls.push(b);return Response.json({ok:false,message:'Access or rate limit'}, {status});}return original(url,init);};
+  await s.context.window.RoyalSosiska.open();s.search('Team');await settle();s.filter({scoreMin:'30000'});await settle();
+  assert.equal(s.calls.some(b=>b.operation==='team'&&b.teamId==='6'),false);
+  if(status===401||status===403)assert.ok(!s.panel.innerHTML.includes('Team 1'));
+ }
+});
