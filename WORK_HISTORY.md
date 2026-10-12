@@ -575,3 +575,13 @@ Code change:
 
 Уточнение владельца заменило анализ последних двух снимков на полную историю всех отслеживаемых команд и динамику изменений. Реализованы persistent SQLite DO jobs + alarms, чтение всех страниц до baseline, проверка полного охвата, многоэтапный GPT-анализ, итог каждой команды/сравнение всех команд и точная числовая динамика по всем снимкам. 54 Node tests и 5 workerd/SQLite/cold-start checks PASS, bundle ~307.5 KB. Исправлен несовместимый Workers redirect:error на manual. Код в PR #40, production не менялся. Commander/Cloud Shell проверен: OAuth обновлён, HTTP 200; единственный доступный Cloudflare account содержит только bot gateway и cloud Royal Match agent, существующего Worker ЧП нет. Rollout всё ещё требует доступа к его аккаунту и серверных credentials. Актуальная передача: docs/sosiska/RESUME_20261012.md.
 
+
+
+## 12.10.2026 — изоляция Сосиски от действующего ЧП
+
+Требование владельца: Сосиска — отдельный админский модуль, сохранять действующие функции приложения. Добавлен tests/verify-sosiska-isolation-workerd.mjs и шаги в Sosiska module CI: собираются entry-v1410 (текущий API) и entry-v1420 (обёртка модуля), в настоящем workerd сравниваются статусы/все заголовки/байт-в-байт тела30запросов GET/POST/OPTIONS по10существующим маршрутам. Дополнительно успешные GET/snapshot и GET/admin-data с подписанной тестовой сессией и фиктивными CRM/Telegram/GitHub responses сравниваются без различий. Всего32checksPASS,8fixtureCalls,liveNetworkCalls0. Проверка не покрывает все успешные write/media-сценарии и не заменяет Telegram acceptance. Production код этой сессией не изменялся.
+
+Повторно54NodetestsPASS и5workerd checks SQLite alarms/cold-start/full historyPASS; исходный код неизменён. Существующий live ЧП healthHTTP200/version1.41.0 подтверждён ранее, frontend пока без Сосиски. OAuth доступ к management API остаётся недоступным. Cloud Browser предложил защищённый вход; выбран Google, но вход отклонён с видимым «Неправильный пароль». Секреты не прочитаны/не записаны, новые credentials не создавались. Требуется ручное завершение входа в Cloudflare Dashboard; не запускать новые device codes вслепую.
+
+Все изменения только tests/CI/checkpoints в рабочей ветке, main/frontend/Workers/secrets/Apps Script/watches/history не менялись. RemoteCI проверить на кодовом коммите этой записи.
+

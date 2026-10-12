@@ -17,3 +17,5 @@ jobs:
       - run: npx --yes esbuild@0.25.12 worker/src/entry-v1420.js --bundle --format=esm --platform=browser --outfile=/tmp/sosiska-worker.js
       - run: npm install --prefix /tmp/sosiska-runtime --no-audit --no-fund miniflare@5.20261006.1-alpha
       - run: node tests/verify-sosiska-workerd.mjs /tmp/sosiska-runtime/package.json /tmp/sosiska-worker.js
+      - run: npx --yes esbuild@0.25.12 worker/src/entry-v1410.js --bundle --format=esm --platform=browser --outfile=/tmp/sosiska-legacy-worker.js
+      - run: node tests/verify-sosiska-isolation-workerd.mjs /tmp/sosiska-runtime/package.json /tmp/sosiska-legacy-worker.js /tmp/sosiska-worker.js
