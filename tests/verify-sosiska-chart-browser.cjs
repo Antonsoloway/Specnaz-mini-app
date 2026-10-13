@@ -1,0 +1,39 @@
+const {chromium}=require('playwright');
+const path=require('path'),assert=require('assert/strict');
+const root=path.resolve(__dirname,'..');
+(async()=>{
+ const browser=await chromium.launch({...(process.env.CHROMIUM_EXECUTABLE?{executablePath:process.env.CHROMIUM_EXECUTABLE}:{}),headless:true,args:['--no-sandbox']});
+ const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.setContent('<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{background:#152330;color:white;font-family:Arial;margin:10px}button{background:#253c50;color:white;border:1px solid #60829b;border-radius:8px} .grid{display:none}</style><div class="grid"></div><main id="panel"></main>');
+ await page.addStyleTag({path:path.join(root,'sosiska-v061.css')});
+ await page.evaluate(()=>{
+  window.authState={role:{isChatAdmin:true}};window.sessionToken='fixture';window.setActiveNav=()=>{};window.renderPage=()=>{};
+  const members=n=>[{UserId:'p',Name:'Eddi',Level:n*10,Crown:n,HelpCount:0},{UserId:'q',Name:'Second',Level:n*5,Crown:n*2,HelpCount:0}];
+  window.fetch=async(_,init)=>{const b=JSON.parse(init.body);let data;
+   if(b.operation==='list')data={watches:[{teamId:'1',teamName:'Team 1',intervalMinutes:60},{teamId:'2',teamName:'Team 2',intervalMinutes:60}]};
+   if(b.operation==='team')data={TeamId:b.teamId,TeamName:'Team '+b.teamId,Members:members(801)};
+   if(b.operation==='analysisStatus')data={available:false};
+   if(b.operation==='history'){const end=Math.min(801,(b.before??802)-1),records=[];for(let n=end;n>0&&records.length<b.limit;n--)records.push({sequence:n,snapshot:{teamId:b.teamId,capturedAt:new Date(Date.UTC(2026,8,1)+n*3600000).toISOString(),raw:{TeamName:'Team '+b.teamId,Members:members(n)}},changes:{baseline:n===1}});data={records,nextBefore:records.at(-1)?.sequence>1?records.at(-1).sequence:null};}
+   return Response.json({ok:true,data});
+  };
+ });
+ await page.addScriptTag({path:path.join(root,'sosiska-period-v061.js')});await page.addScriptTag({path:path.join(root,'sosiska-v061.js')});
+ await page.evaluate(()=>RoyalSosiska.open());await page.locator('[data-sosiska-action="team"][data-team-id="1"]').click();await page.waitForFunction(()=>document.querySelector('.sosiska-screen')?.getAttribute('aria-busy')==='false');
+ const chart=page.locator('.sosiska-chart').first(),range=chart.locator('[data-chart-range]'),read=()=>range.textContent();
+ const initial=await read();assert.match(initial,/×1$/);await chart.locator('[data-chart-action="in"]').click();assert.match(await read(),/×2$/);
+ const zoomed=await read();await chart.locator('[data-chart-action="left"]').click();assert.notEqual(await read(),zoomed);
+ await chart.locator('[data-chart-scroll]').fill('0');assert.match(await read(),/01\.09\.2026/);assert.match(await chart.locator('svg').textContent(),/01\.09/);
+ const viewport=chart.locator('[data-chart-viewport]');await viewport.scrollIntoViewIfNeeded();const box=await viewport.boundingBox();await page.mouse.move(box.x+box.width*.6,box.y+box.height*.5);await page.mouse.down();await page.mouse.move(box.x+box.width*.35,box.y+box.height*.5,{steps:5});await page.mouse.up();assert.notEqual(await read(),zoomed);
+ await chart.locator('[data-chart-action="reset"]').click();assert.equal(await read(),initial);assert.equal(await chart.locator('[data-chart-scroll]').isDisabled(),true);
+ await viewport.focus();await page.keyboard.press('+');assert.match(await read(),/×2$/);await page.keyboard.press('Home');assert.equal(await read(),initial);
+ await viewport.scrollIntoViewIfNeeded();const b=await viewport.boundingBox(),cdp=await page.context().newCDPSession(page),cy=b.y+b.height*.5;
+ await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:b.x+b.width*.4,y:cy},{x:b.x+b.width*.6,y:cy}]});
+ await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:b.x+b.width*.25,y:cy},{x:b.x+b.width*.75,y:cy}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});assert.notEqual(await read(),initial);
+ await chart.locator('[data-chart-action="reset"]').click();
+ await page.locator('[data-sosiska-action="player"][data-player-id="p"]').click();const player=page.locator('.sosiska-player-detail .sosiska-chart');assert.equal(await player.count(),1);await player.locator('[data-chart-action="in"]').click();assert.match(await player.locator('[data-chart-range]').textContent(),/×2$/);
+ await page.locator('[data-sosiska-action="player"][data-player-id="q"]').click();assert.equal(await page.locator('.sosiska-player-detail').count(),1);assert.match(await page.locator('.sosiska-player-detail [data-chart-range]').textContent(),/×1$/);
+ await page.locator('.sosiska-player-detail .sosiska-chart').screenshot({path:'/tmp/sosiska-zoom-mobile.png'});
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),390);
+ assert.deepEqual(errors,[]);
+ console.log(JSON.stringify({mobileWidth:390,historySnapshots:801,zoom:'pass',buttonsPan:'pass',sliderEarliest:'pass',pointerDrag:'pass',keyboard:'pass',pinch:'pass',playerIsolation:'pass',pageErrors:0}));await browser.close();
+})().catch(e=>{console.error(e);process.exit(1)});

@@ -10,7 +10,7 @@
   const role=(t,id)=>t.Leader===id?'Лидер':t.CoLeaders?.includes(id)?'Помощник':'Участник';
   const admin=()=>typeof authState!=='undefined'&&!!(authState?.role?.isChatAdmin||authState?.role?.code==='admin'||authState?.permissions?.canManageAll);
   const session=()=>typeof sessionToken==='undefined'?'':sessionToken;
-  function reset(){analysisMode=null;analysisEpoch++;selected.clear();comparison=null;playerId=null;clearTimeout(pollTimer);timelines.clear();epoch++;opened=false;busy=false;candidates=[];details.clear();team=null;records=[];watches=[];nextBefore=null;notice='';analysis=null;filters={};filterLoading=false;stopFilterLoading=true;searchWarnings=[];period=null;periodLoading=false;stopPeriod=true;}
+  function reset(){chartModels.clear();chartRanges.clear();analysisMode=null;analysisEpoch++;selected.clear();comparison=null;playerId=null;clearTimeout(pollTimer);timelines.clear();epoch++;opened=false;busy=false;candidates=[];details.clear();team=null;records=[];watches=[];nextBefore=null;notice='';analysis=null;filters={};filterLoading=false;stopFilterLoading=true;searchWarnings=[];period=null;periodLoading=false;stopPeriod=true;}
   function decorate(){const grid=document.querySelector('.grid');if(!grid)return;let b=grid.querySelector('[data-sosiska-open]');if(!admin()){b?.remove();return;}if(b)return;b=document.createElement('button');b.type='button';b.className='tile';b.dataset.sosiskaOpen='1';b.innerHTML='<span>🌭</span><b>Агент «Сосиска»</b><small>Команды Royal Match и прогресс</small>';grid.appendChild(b);}
   async function api(operation,params={},e=epoch){
     const token=session();if(!token||!admin())throw new Error('Откройте приложение заново.');
@@ -34,29 +34,98 @@
   const clock=v=>new Date(v).toLocaleTimeString('ru-RU',{timeZone:'Europe/Moscow',hour:'2-digit',minute:'2-digit'});
   const day=v=>new Date(v).toLocaleDateString('ru-RU',{timeZone:'Europe/Moscow',day:'2-digit',month:'2-digit'});
   let chartNumber=0;
+  const chartModels=new Map(),chartRanges=new Map();
   function chart(lines,title){
     const valid=p=>p.hours>0&&Number.isFinite(p[metric]);
     const all=lines.flatMap(l=>l.points).filter(valid);if(!all.length)return '<p>Нет наблюдаемых интервалов для графика.</p>';
-    const start=Math.min(...all.map(p=>Date.parse(p.from))),end=Math.max(...all.map(p=>Date.parse(p.to))),peak=Math.max(...all.map(p=>p[metric]/p.hours));
-    const scale=peak>0?10**Math.floor(Math.log10(peak)):1,max=Math.max(1,Math.ceil(peak/scale)*scale);
-    const x=t=>48+296*(Date.parse(t)-start)/Math.max(1,end-start),y=v=>230-194*v/max,number=++chartNumber;
+    const min=all.reduce((n,p)=>Math.min(n,Date.parse(p.from)),Infinity),maxTime=all.reduce((n,p)=>Math.max(n,Date.parse(p.to)),-Infinity),peak=all.reduce((n,p)=>Math.max(n,p[metric]/p.hours),0),number=++chartNumber;
+    const key=JSON.stringify([analysisMode,team?.TeamId,playerId,[...selected.keys()].sort(),title,metric,min,maxTime]);
+    const view=chartRanges.get(key)||{min,max:maxTime,start:min,end:maxTime,minSpan:Math.max(1,all.reduce((n,p)=>Math.min(n,Date.parse(p.to)-Date.parse(p.from)),Infinity))};
+    chartRanges.set(key,view);if(chartRanges.size>100)chartRanges.delete(chartRanges.keys().next().value);
+    const chartMetric=metric,chartUnit=unit(),singleColor=metricColor();
+    function svg(){
+    const start=view.start,end=view.end;
+    const visible=all.filter(p=>Date.parse(p.to)>start&&Date.parse(p.from)<end),visiblePeak=visible.reduce((v,p)=>Math.max(v,p[chartMetric]/p.hours),0);
+    const scale=visiblePeak>0?10**Math.floor(Math.log10(visiblePeak)):1,max=Math.max(1,Math.ceil(visiblePeak/scale)*scale);
+    const x=t=>48+296*((typeof t==='number'?t:Date.parse(t))-start)/Math.max(1,end-start),y=v=>230-194*v/max;
     const grid=Array.from({length:5},(_,i)=>{const v=max*i/4;return '<path d="M48 '+y(v)+'H344" stroke="#365064" stroke-dasharray="3 5"/><text x="40" y="'+(y(v)+5)+'" text-anchor="end" fill="#cbd5e1" font-size="15">'+esc(rate(v))+'</text>';}).join('');
     const axes=[0,.5,1].map(f=>{const t=new Date(start+(end-start)*f).toISOString(),px=48+296*f;return '<text x="'+px+'" y="257" text-anchor="'+(f===0?'start':f===1?'end':'middle')+'" fill="#f1f5f9" font-size="16">'+esc(clock(t))+'</text><text x="'+px+'" y="278" text-anchor="'+(f===0?'start':f===1?'end':'middle')+'" fill="#94a3b8" font-size="13">'+esc(day(t))+'</text>';}).join('');
     const paths=lines.map((l,i)=>{
-      const color=lines.length===1?metricColor():colors[i%colors.length],points=l.points.filter(valid),groups=[];let group=[];
+      const color=lines.length===1?singleColor:colors[i%colors.length],points=l.points.filter(valid).filter(p=>Date.parse(p.to)>start&&Date.parse(p.from)<end),groups=[];let group=[];
       for(const p of points){if(group.length&&group.at(-1).to!==p.from){groups.push(group);group=[];}group.push(p);}if(group.length)groups.push(group);
       if(!points.length)return '';
       const gradient='sosiska-fill-'+number+'-'+i;
       return '<defs><linearGradient id="'+gradient+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+color+'" stop-opacity=".35"/><stop offset="100%" stop-color="'+color+'" stop-opacity=".02"/></linearGradient></defs>'+groups.map(g=>{
-       let path='M'+x(g[0].from).toFixed(2)+' '+y(g[0][metric]/g[0].hours).toFixed(2);
-       for(let j=0;j<g.length;j++){const p=g[j];if(j)path+='V'+y(p[metric]/p.hours).toFixed(2);path+='H'+x(p.to).toFixed(2);}
-       const area=path+'V230H'+x(g[0].from).toFixed(2)+'Z';
+       let path='M'+x(Math.max(start,Date.parse(g[0].from))).toFixed(2)+' '+y(g[0][chartMetric]/g[0].hours).toFixed(2);
+       for(let j=0;j<g.length;j++){const p=g[j];if(j)path+='V'+y(p[chartMetric]/p.hours).toFixed(2);path+='H'+x(Math.min(end,Date.parse(p.to))).toFixed(2);}
+       const area=path+'V230H'+x(Math.max(start,Date.parse(g[0].from))).toFixed(2)+'Z';
        return '<path d="'+area+'" fill="url(#'+gradient+')"/><path d="'+path+'" stroke="'+color+'" stroke-width="3.5" stroke-linejoin="round" fill="none"><title>'+esc(l.name)+'</title></path>';
-      }).join('')+'<circle cx="'+x(points.at(-1).to).toFixed(2)+'" cy="'+y(points.at(-1)[metric]/points.at(-1).hours).toFixed(2)+'" r="4" fill="'+color+'"/>';
+      }).join('')+'<circle cx="'+x(Math.min(end,Date.parse(points.at(-1).to))).toFixed(2)+'" cy="'+y(points.at(-1)[chartMetric]/points.at(-1).hours).toFixed(2)+'" r="4" fill="'+color+'"/>';
     }).join('');
+    return '<svg viewBox="0 0 360 295" role="img" aria-label="'+esc(title+' '+chartUnit)+'">'+grid+paths+axes+'</svg>';
+    }
+    chartModels.set(String(number),{view,svg});
     const one=lines.length===1,latest=all.at(-1),hours=all.reduce((n,p)=>n+p.hours,0),average=all.reduce((n,p)=>n+p[metric],0)/hours;
-    return '<figure class="sosiska-chart"><figcaption>'+esc(title)+'<small>'+esc(unit())+' · время МСК</small></figcaption>'+(one?'<div class="sosiska-chart-stats"><div><small>Последний интервал</small><b>'+rate(latest[metric]/latest.hours)+'</b></div><div><small>В среднем</small><b>'+rate(average)+'</b></div><div><small>Пик</small><b>'+rate(peak)+'</b></div></div>':'')+'<svg viewBox="0 0 360 295" role="img" aria-label="'+esc(title+' '+unit())+'">'+grid+paths+axes+'</svg><div class="sosiska-chart-key">'+lines.map((l,i)=>'<span class="sosiska-legend" style="color:'+(one?metricColor():colors[i%colors.length])+'">● '+esc(l.name)+'</span>').join('')+'</div><details class="sosiska-chart-values"><summary>Значения по интервалам</summary>'+lines.map(l=>'<h4>'+esc(l.name)+'</h4><div class="sosiska-interval-values">'+l.points.filter(valid).map(p=>'<div><span>'+esc(day(p.from)+' '+clock(p.from)+' — '+day(p.to)+' '+clock(p.to))+'</span><b>'+rate(p[metric]/p.hours)+' '+esc(unit())+'</b></div>').join('')+'</div>').join('')+'</details></figure>';
+    return '<figure class="sosiska-chart" data-chart-id="'+number+'"><figcaption>'+esc(title)+'<small>'+esc(unit())+' · время МСК</small></figcaption>'+(one?'<div class="sosiska-chart-stats"><div><small>Последний интервал</small><b>'+rate(latest[metric]/latest.hours)+'</b></div><div><small>В среднем</small><b>'+rate(average)+'</b></div><div><small>Пик</small><b>'+rate(peak)+'</b></div></div>':'')+'<div class="sosiska-chart-controls">'+[['in','+','Увеличить'],['out','−','Уменьшить'],['left','←','Ранее'],['right','→','Позже'],['reset','Вся история','Показать всю историю']].map(([action,label,hint])=>'<button type="button" data-chart-action="'+action+'" aria-label="'+hint+'" title="'+hint+'">'+label+'</button>').join('')+'</div><div class="sosiska-chart-viewport" data-chart-viewport tabindex="0" role="group" aria-label="Масштаб и перемещение графика: плюс, минус, стрелки, Home">'+svg()+'</div><p class="sosiska-chart-range" data-chart-range>'+chartRangeLabel(view)+'</p><label class="sosiska-chart-scroll">Положение во всей истории<input type="range" data-chart-scroll min="0" max="1000" value="'+(view.max-view.min>view.end-view.start?Math.round(1000*(view.start-view.min)/(view.max-view.min-view.end+view.start)):0)+'" '+(view.end-view.start>=view.max-view.min?'disabled':'')+'></label><p class="sosiska-chart-hint">Два пальца — масштаб · один — перемещение. Кнопки + / − и стрелки делают то же.</p><div class="sosiska-chart-key">'+lines.map((l,i)=>'<span class="sosiska-legend" style="color:'+(one?metricColor():colors[i%colors.length])+'">● '+esc(l.name)+'</span>').join('')+'</div><details class="sosiska-chart-values"><summary>Значения по интервалам</summary>'+lines.map(l=>'<h4>'+esc(l.name)+'</h4><div class="sosiska-interval-values">'+l.points.filter(valid).map(p=>'<div><span>'+esc(day(p.from)+' '+clock(p.from)+' — '+day(p.to)+' '+clock(p.to))+'</span><b>'+rate(p[chartMetric]/p.hours)+' '+esc(unit())+'</b></div>').join('')+'</div>').join('')+'</details></figure>';
   }
+  function chartRangeLabel(v){return esc(when(new Date(v.start).toISOString())+' — '+when(new Date(v.end).toISOString()))+' МСК · ×'+rate((v.max-v.min)/(v.end-v.start));}
+  function setChartWindow(v,start,span){
+    span=Math.max(Math.min(v.minSpan,v.max-v.min),Math.min(v.max-v.min,span));
+    v.start=Math.max(v.min,Math.min(v.max-span,start));v.end=v.start+span;
+  }
+  function zoomChart(v,factor,anchor=.5){
+    anchor=Math.max(0,Math.min(1,anchor));const span=v.end-v.start,next=Math.max(Math.min(v.minSpan,v.max-v.min),Math.min(v.max-v.min,span/factor));
+    setChartWindow(v,v.start+span*anchor-next*anchor,next);
+  }
+  function paintChart(figure,model){
+    const {view}=model;figure.querySelector('[data-chart-viewport]').innerHTML=model.svg();
+    figure.querySelector('[data-chart-range]').innerHTML=chartRangeLabel(view);
+    const slider=figure.querySelector('[data-chart-scroll]'),room=view.max-view.min-(view.end-view.start);
+    slider.disabled=room<=0;slider.value=room>0?Math.round(1000*(view.start-view.min)/room):0;
+  }
+  function chartTarget(target){const figure=target.closest?.('[data-chart-id]'),model=chartModels.get(figure?.dataset.chartId);return model?{figure,model}:null;}
+  function chartAction(figure,model,action){
+    const v=model.view,span=v.end-v.start;
+    if(action==='in'||action==='out')zoomChart(v,action==='in'?2:.5);
+    if(action==='left'||action==='right')setChartWindow(v,v.start+span*(action==='left'?-.4:.4),span);
+    if(action==='reset')setChartWindow(v,v.min,v.max-v.min);
+    paintChart(figure,model);
+  }
+  window.addEventListener('click',event=>{
+    const control=event.target.closest?.('[data-chart-action]'),target=control&&chartTarget(control);if(!target)return;
+    event.preventDefault();event.stopImmediatePropagation();chartAction(target.figure,target.model,control.dataset.chartAction);
+  },true);
+  document.addEventListener('input',event=>{
+    if(!event.target.matches?.('[data-chart-scroll]'))return;const target=chartTarget(event.target);if(!target)return;
+    const v=target.model.view,span=v.end-v.start;setChartWindow(v,v.min+Number(event.target.value)/1000*(v.max-v.min-span),span);paintChart(target.figure,target.model);
+  });
+  document.addEventListener('keydown',event=>{
+    if(!event.target.matches?.('[data-chart-viewport]'))return;
+    const action={'+':'in','=':'in','-':'out',ArrowLeft:'left',ArrowRight:'right',Home:'reset'}[event.key],target=chartTarget(event.target);if(!action||!target)return;
+    event.preventDefault();chartAction(target.figure,target.model,action);
+  });
+  let chartGesture=null;
+  const gesturePoints=g=>[...g.pointers.values()];
+  const gestureDistance=g=>{const p=gesturePoints(g);return Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y);};
+  document.addEventListener('pointerdown',event=>{
+    const viewport=event.target.closest?.('[data-chart-viewport]'),target=viewport&&chartTarget(viewport);if(!target||event.button>0)return;
+    if(!chartGesture||chartGesture.viewport!==viewport)chartGesture={...target,viewport,pointers:new Map()};
+    const g=chartGesture;g.pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});g.viewport.setPointerCapture?.(event.pointerId);event.preventDefault();
+  });
+  document.addEventListener('pointermove',event=>{
+    const g=chartGesture;if(!g||!g.pointers.has(event.pointerId)||!g.viewport.isConnected)return;
+    const prev=g.pointers.get(event.pointerId),before=g.pointers.size===2?gestureDistance(g):0,p=gesturePoints(g),oldMid=p.reduce((n,p)=>n+p.x,0)/p.length;
+    g.pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});const rect=g.viewport.getBoundingClientRect(),width=rect.width*296/360,v=g.model.view;
+    if(g.pointers.size===2&&before>0){const now=gesturePoints(g),mid=now.reduce((n,p)=>n+p.x,0)/now.length;zoomChart(v,gestureDistance(g)/before,(oldMid-rect.left-rect.width*48/360)/width);setChartWindow(v,v.start-(mid-oldMid)/width*(v.end-v.start),v.end-v.start);}
+    else if(g.pointers.size===1)setChartWindow(v,v.start-(event.clientX-prev.x)/width*(v.end-v.start),v.end-v.start);
+    event.preventDefault();paintChart(g.figure,g.model);
+  });
+  for(const type of ['pointerup','pointercancel','lostpointercapture'])document.addEventListener(type,event=>{if(!chartGesture)return;chartGesture.pointers.delete(event.pointerId);if(!chartGesture.pointers.size)chartGesture=null;});
+  document.addEventListener('wheel',event=>{
+    const viewport=event.target.closest?.('[data-chart-viewport]'),target=viewport&&chartTarget(viewport);if(!target)return;
+    // Ctrl+wheel or trackpad pinch zooms; ordinary wheel retains page scrolling.
+    if(!event.ctrlKey)return;event.preventDefault();const rect=viewport.getBoundingClientRect();zoomChart(target.model.view,Math.exp(-event.deltaY*.01),(event.clientX-rect.left-rect.width*48/360)/(rect.width*296/360));paintChart(target.figure,target.model);
+  },{passive:false});
   function hourlyChart(bins){
    const max=Math.max(1,...bins.map(h=>h.rate??0));
    return '<div class="sosiska-hour-grid">'+bins.map(h=>{
@@ -64,7 +133,7 @@
     return '<div class="sosiska-hour-cell" style="background:'+background+'"><b>'+String(h.hour).padStart(2,'0')+':00</b><span>'+(h.rate===null?'—':rate(h.rate))+'</span><small>'+(h.rate===null?'нет данных':esc(unit()))+'</small></div>';
    }).join('')+'</div><p class="sosiska-hour-key">Зелёный — самый высокий темп · синий — ниже · — нет наблюдений</p>';
   }
-  function charts(points,name){return '<h3>Темп активности команды</h3>'+metricButtons()+chart([{name,points}], 'Активность во времени')+'<p class="muted">Прирост за интервал между снимками / длительность интервала. Сбросы счётчиков и вступление игроков не считаются прогрессом. Старые интервалы длинной истории объединяются.</p>';}
+  function charts(points,name){return '<h3>Темп активности команды</h3>'+metricButtons()+chart([{name,points}], 'Активность во времени')+'<p class="muted">Прирост за интервал между снимками / длительность интервала. Сбросы счётчиков и вступление игроков не считаются прогрессом. График охватывает всю загруженную историю. Масштабируйте, чтобы рассмотреть отдельные интервалы.</p>';}
   function playerView(){
    const p=period?.players.find(p=>p.userId===playerId);if(!p)return '';
    const hoursKey={levels:'levelHours',crowns:'crownHours',help:'helpHours'}[metric];
@@ -166,7 +235,7 @@
     return button('results','← К результатам')+'<article><h3>'+esc(team.TeamName)+'</h3><p>'+esc(team.Description)+'</p><p>Командные очки: '+esc(value(v.score))+' · участников: '+members.length+'</p><p>Лидер: '+esc(v.leader??'—')+'</p><p>Вход: уровень '+esc(team.MinLevel)+', короны '+esc(team.MinCrown)+' · '+(team.Type?'Открытая':'Закрытая')+'</p>'+button('roster-view','Состав')+button('period','Весь период')+button('history','Журнал снимков')+button('analysis','ИИ-анализ всей истории команды')+'<details><summary>Управление отслеживанием</summary>'+button('capture','Сохранить снимок сейчас')+'<label>Интервал, минуты<input data-sosiska-interval type="number" min="60" max="10080" step="1" value="'+esc(w?.intervalMinutes??60)+'" '+(busy?'disabled':'')+'></label>'+button('watch',w?'Изменить интервал':'Включить отслеживание')+(w?button('unwatch','Остановить отслеживание'):'')+'<p class="muted">Остановка сохраняет историю снимков.</p></details></article>'+
       (teamView==='roster'?'<article><h3>Состав · по уровням и коронам</h3><ol class="sosiska-roster">'+members.map(memberCard).join('')+'</ol></article>':teamView==='history'?history():button('period-refresh','Обновить весь период')+periodView());
   }
-  function render(){if(!opened)return;const panel=document.getElementById('panel');if(!panel)return;panel.hidden=false;panel.innerHTML=`<section class="sosiska-screen" aria-busy="${busy}">${button('back','← На главную')}<h2>🌭 Агент «Сосиска»</h2><p class="muted">Royal Match · доступ администраторам</p><form data-sosiska-search><label>Название команды<input name="query" maxlength="160" value="${esc(query)}" placeholder="Например, Mamonovo" required ${busy?'disabled':''}></label><button ${busy?'disabled':''}>Найти</button></form><p role="status" aria-live="polite">${esc(busy?((filterLoading||periodLoading)?notice:'Получаем данные…'):notice)}</p>${filterLoading?'<button type="button" data-sosiska-action="stop-filters">Остановить загрузку</button>':''}${periodLoading?'<button type="button" data-sosiska-action="stop-period">Остановить загрузку истории</button>':''}${team&&analysisMode!=='selected'?roster():results()}${comparisonView()}<div id="sosiskaAnalysis">${analysisView()}</div><h3>Отслеживаемые команды</h3>${button('list','Обновить список')}${watches.length?watches.map(w=>`<article><b>${esc(w.teamName||details.get(w.teamId)?.TeamName||'Команда без названия')}</b><p>Каждые ${esc(w.intervalMinutes)} мин. · последний снимок: ${esc(when(w.lastSuccessAt))}</p>${w.lastError?`<p>Последняя попытка не удалась: ${esc(w.lastError)}</p>`:''}${button('select-team',selected.has(w.teamId)?'✓ Выбрана для сравнения':'Выбрать для сравнения',`data-team-id="${esc(w.teamId)}"`)}${button('team','Открыть',`data-team-id="${esc(w.teamId)}"`)}</article>`).join(''):'<p>Отслеживание не включено.</p>'}</section>`;}
+  function render(){if(!opened)return;chartModels.clear();chartGesture=null;const panel=document.getElementById('panel');if(!panel)return;panel.hidden=false;panel.innerHTML=`<section class="sosiska-screen" aria-busy="${busy}">${button('back','← На главную')}<h2>🌭 Агент «Сосиска»</h2><p class="muted">Royal Match · доступ администраторам</p><form data-sosiska-search><label>Название команды<input name="query" maxlength="160" value="${esc(query)}" placeholder="Например, Mamonovo" required ${busy?'disabled':''}></label><button ${busy?'disabled':''}>Найти</button></form><p role="status" aria-live="polite">${esc(busy?((filterLoading||periodLoading)?notice:'Получаем данные…'):notice)}</p>${filterLoading?'<button type="button" data-sosiska-action="stop-filters">Остановить загрузку</button>':''}${periodLoading?'<button type="button" data-sosiska-action="stop-period">Остановить загрузку истории</button>':''}${team&&analysisMode!=='selected'?roster():results()}${comparisonView()}<div id="sosiskaAnalysis">${analysisView()}</div><h3>Отслеживаемые команды</h3>${button('list','Обновить список')}${watches.length?watches.map(w=>`<article><b>${esc(w.teamName||details.get(w.teamId)?.TeamName||'Команда без названия')}</b><p>Каждые ${esc(w.intervalMinutes)} мин. · последний снимок: ${esc(when(w.lastSuccessAt))}</p>${w.lastError?`<p>Последняя попытка не удалась: ${esc(w.lastError)}</p>`:''}${button('select-team',selected.has(w.teamId)?'✓ Выбрана для сравнения':'Выбрать для сравнения',`data-team-id="${esc(w.teamId)}"`)}${button('team','Открыть',`data-team-id="${esc(w.teamId)}"`)}</article>`).join(''):'<p>Отслеживание не включено.</p>'}</section>`;}
 
   function analysisView(){
     if(!analysisParams())return '';
@@ -214,7 +283,7 @@
   }
   async function loadPeriod(e){
     if(typeof SosiskaPeriod==='undefined')throw new Error('Обновите приложение для загрузки динамики.');
-    const acc=SosiskaPeriod.createPeriodAccumulator(team.TeamId);let before;
+    const acc=SosiskaPeriod.createPeriodAccumulator(team.TeamId,{retainIntervals:true});let before;
     periodLoading=true;stopPeriod=false;notice='Загружаем весь период…';render();
     try{
       for(;;){
@@ -271,7 +340,7 @@
       if(action==='clear-selection'){selected.clear();comparison=null;await switchAnalysis(team?'team':null,e);return;}
       if(action==='analysis-selected'){if(analysisMode!=='selected')return;if(selected.size<2)throw Error('Выберите от двух до пяти команд.');const params=analysisParams(),data=await api('analysis',params,e);if(!matchesAnalysis(data,params))throw Error('Ответ ИИ не соответствует выбранным командам.');analysis=data;schedulePoll();return;}
       if(action==='compare'){if(selected.size<2)throw Error('Выберите от двух до пяти команд.');const periods=[];comparison=null;
-       for(const id of selected.keys()){notice='Загружаем историю: '+selected.get(id);render();const acc=SosiskaPeriod.createPeriodAccumulator(id);let before;
+       for(const id of selected.keys()){notice='Загружаем историю: '+selected.get(id);render();const acc=SosiskaPeriod.createPeriodAccumulator(id,{retainIntervals:true});let before;
         for(;;){const page=await api('history',{teamId:id,limit:20,...(before?{before}:{})},e);if(!page.records.length)break;for(const r of page.records)acc.add(r);if(!page.nextBefore)break;if(before&&page.nextBefore>=before)throw Error('Ошибка порядка истории.');before=page.nextBefore;}
         periods.push(acc.result());}
        try{comparison=SosiskaPeriod.comparePeriods(periods);}catch(error){throw Error(error.message==='COMPARISON_NO_OVERLAP'?'У команд нет общего периода наблюдения.':'Для сравнения каждой команде нужны хотя бы два снимка и полная история.');}return;}
@@ -294,5 +363,6 @@
   window.addEventListener('royal:auth-ready',()=>{reset();decorate();});
   for(const name of ['royal:access-denied','royal:fatal'])window.addEventListener(name,()=>{reset();decorate();});
   window.RoyalAdminDataV0600?.subscribe?.(event=>{if(event.type==='clear'&&['unauthorized','forbidden','session-changed'].includes(event.reason)){const visible=opened;reset();if(visible){const panel=document.getElementById('panel');if(panel)panel.textContent='Админская сессия завершена. Откройте приложение заново.';}}});
-  decorate();window.RoyalSosiska={version:'0.5.2',open,filters:{parse:parseFilters,matches:matchesFilters,fields:teamFilterFields}};
+  decorate();window.RoyalSosiska={version:'0.5.3',open,filters:{parse:parseFilters,matches:matchesFilters,fields:teamFilterFields}};
 })();
+

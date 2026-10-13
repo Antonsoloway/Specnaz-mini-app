@@ -26,7 +26,7 @@ var SosiskaPeriod = (() => {
     sortedMembers: () => sortedMembers
   });
   var sortedMembers = (members) => [...members ?? []].sort((a, b) => Number(b.Level ?? 0) + Number(b.Crown ?? 0) - (Number(a.Level ?? 0) + Number(a.Crown ?? 0)) || Number(b.Level ?? 0) - Number(a.Level ?? 0) || String(a.UserId).localeCompare(String(b.UserId)));
-  function createPeriodAccumulator(teamId) {
+  function createPeriodAccumulator(teamId, { retainIntervals = false } = {}) {
     let newer = null, expected = null, head = null, count = 0, from = null, to = null, teamName = "", complete = false;
     const players = /* @__PURE__ */ new Map(), series = [];
     const ensure = (m) => {
@@ -80,10 +80,10 @@ var SosiskaPeriod = (() => {
           interval.observed++;
           if (point.levels > 0 || point.crowns > 0 || point.help > 0) interval.active++;
           for (const metric of ["levels", "crowns", "help"]) interval[metric] += point[metric] ?? 0;
-          appendPoint(p.series, point);
+          appendPoint(p.series, point, retainIntervals);
           addHourly(p.hourly, point);
         }
-        appendPoint(series, interval);
+        appendPoint(series, interval, retainIntervals);
         for (const [id, m] of next) if (!old.has(id)) ensure(m).joined++;
       }
       newer = s;
@@ -122,9 +122,9 @@ var SosiskaPeriod = (() => {
     return { add, result };
   }
   var activityOrder = (a, b) => Number(b.levelGain > 0 || b.crownGain > 0 || b.helpGain > 0) - Number(a.levelGain > 0 || a.crownGain > 0 || a.helpGain > 0) || b.levelGain - a.levelGain || b.crownGain - a.crownGain || b.helpGain - a.helpGain || String(a.userId).localeCompare(String(b.userId));
-  function appendPoint(list, point) {
+  function appendPoint(list, point, retainIntervals) {
     list.push(point);
-    if (list.length > 512) {
+    if (!retainIntervals && list.length > 512) {
       const b = list.pop(), a = list.pop(), merged = { from: b.from, to: a.to, hours: a.hours + b.hours, aggregated: true };
       for (const k of ["levels", "crowns", "help", "active", "observed"]) if (k in a) merged[k] = a[k] === null || b[k] === null ? null : a[k] + b[k];
       list.push(merged);
@@ -154,3 +154,4 @@ var SosiskaPeriod = (() => {
   }
   return __toCommonJS(sosiska_period_exports);
 })();
+

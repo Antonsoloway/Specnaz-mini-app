@@ -2,7 +2,7 @@
 export const sortedMembers=members=>[...(members??[])].sort((a,b)=>
  (Number(b.Level??0)+Number(b.Crown??0))-(Number(a.Level??0)+Number(a.Crown??0))||
  Number(b.Level??0)-Number(a.Level??0)||String(a.UserId).localeCompare(String(b.UserId)));
-export function createPeriodAccumulator(teamId){
+export function createPeriodAccumulator(teamId,{retainIntervals=false}={}){
  let newer=null,expected=null,head=null,count=0,from=null,to=null,teamName='',complete=false;
  const players=new Map(),series=[];
  const ensure=m=>{
@@ -38,9 +38,9 @@ export function createPeriodAccumulator(teamId){
     }
     interval.observed++;if(point.levels>0||point.crowns>0||point.help>0)interval.active++;
     for(const metric of ['levels','crowns','help'])interval[metric]+=point[metric]??0;
-    appendPoint(p.series,point);addHourly(p.hourly,point);
+    appendPoint(p.series,point,retainIntervals);addHourly(p.hourly,point);
    }
-   appendPoint(series,interval);
+   appendPoint(series,interval,retainIntervals);
    for(const [id,m] of next)if(!old.has(id))ensure(m).joined++;
   }
   newer=s;from=s.capturedAt;count++;expected--;
@@ -61,9 +61,9 @@ export function createPeriodAccumulator(teamId){
 // Rank activity by observed counter growth; crowns remain a separate unit.
 export const activityOrder=(a,b)=>Number(b.levelGain>0||b.crownGain>0||b.helpGain>0)-Number(a.levelGain>0||a.crownGain>0||a.helpGain>0)||b.levelGain-a.levelGain||b.crownGain-a.crownGain||b.helpGain-a.helpGain||String(a.userId).localeCompare(String(b.userId));
 // Keep long histories bounded. Merge adjacent old intervals without discarding totals.
-function appendPoint(list,point){
+function appendPoint(list,point,retainIntervals){
  list.push(point);
- if(list.length>512){const b=list.pop(),a=list.pop(),merged={from:b.from,to:a.to,hours:a.hours+b.hours,aggregated:true};
+ if(!retainIntervals&&list.length>512){const b=list.pop(),a=list.pop(),merged={from:b.from,to:a.to,hours:a.hours+b.hours,aggregated:true};
   for(const k of ['levels','crowns','help','active','observed'])if(k in a)merged[k]=a[k]===null||b[k]===null?null:a[k]+b[k];
   list.push(merged);
  }
@@ -85,3 +85,4 @@ export function comparePeriods(periods){
   return {teamId:p.teamId,teamName:p.teamName,from:points[0]?.from,to:points.at(-1)?.to,hours,levels,crowns,help,levelsPerHour:hours?levels/hours:null,crownsPerHour:hours?crowns/hours:null,series:points};
  })};
 }
+
