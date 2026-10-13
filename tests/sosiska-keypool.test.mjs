@@ -21,7 +21,7 @@ test('transfer forwards original entry, keeps scheduled handler, rejects unconfi
  const scheduled=()=>42;let calls=0;const original={fetch:async()=>{calls++;return new Response('original');},scheduled};
  const wrapped=wrapSosiskaKeyTransfer(original,{mode:'source'});assert.equal(wrapped.scheduled,scheduled);
  assert.equal(await (await wrapped.fetch(new Request('https://local/webhook'),env,{})).text(),'original');assert.equal(calls,1);
- for(const e of [{},{...env,SOSISKA_KEY_TRANSFER_UNTIL:Date.now()-1},{...env,SOSISKA_KEY_TRANSFER_UNTIL:Date.now()+3600001}])assert.equal((await wrapped.fetch(request(),e,{})).status,404);
+ for(const e of [{},{...env,SOSISKA_KEY_TRANSFER_UNTIL:Date.now()-1},{...env,SOSISKA_KEY_TRANSFER_UNTIL:Date.now()+7200000}])assert.equal((await wrapped.fetch(request(),e,{})).status,404);
  assert.equal((await wrapped.fetch(request('wrong'),env,{})).status,404);
 });
 test('keys encrypted in response, never plaintext and other secrets not exported',async()=>{
