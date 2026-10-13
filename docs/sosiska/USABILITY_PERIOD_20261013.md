@@ -29,3 +29,8 @@ Read-only live проверка существующих watches: FORTUNA4298767
 Chromium проверка с реальным сохранённым набором FORTUNA и mocked API: viewport390px/document390px, 48карточек, raw UserId в тексте отсутствует. PNG визуально проверены: ники/числа целые; separate period view. Fixture не использует живую Telegram session; Telegram acceptance остаётся за владельцем.
 
 Автоповышение уровня остаётся отложенным, игровой прогресс/боты/расписание наблюдений не изменены.
+
+
+## Live rollout confirmed
+
+PR43 merged:7a208d7b4fa3e2f5706b0a97267df69a4097bf10. Final source3f2da65b3da61aff06e443829a57a4b4bf32572d passed CI38444611060/38444618123; main CI38444769659 and Pages deployment38444767737 SUCCESS. Live HTTP200 verified new app.html releaseBuild, app-v0600 period-script reference, UI version0.4.0, period library and roster CSS. Existing royal-crm-miniapp-api Worker bundle updated after green CI; full bindings compared equal before/after. SOSISKA_GROQ_KEY still absent; actual AI run not accepted. Existing two game watches were read-only checked and not modified. Native reward coefficients/x2/x3 remain unresolved; original native assets or corresponding evidence needed. Autolevel remains paused.
