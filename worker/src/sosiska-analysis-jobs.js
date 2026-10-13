@@ -67,7 +67,7 @@ export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=request
   }
   async function analyzeChunk(j,t) {
     const part=await storage.get(key(j,`input:${t.teamId}:${t.chunkIndex}`));
-    const result=await analyze({input:{teamId:t.teamId,teamName:t.name,...part},task:'Это часть полного временного ряда в формате JSON lines, возможно фрагмент длинной записи. Проанализируй все содержащиеся интервалы, сохрани даты, UserId, имена, числа и существенные изменения для последующего объединения. Не называй часть всей историей.',env});
+    const result=await analyze({input:{teamId:t.teamId,teamName:t.name,...part},task:'Ответ до 250 слов: выбери существенные изменения, а не переписывай весь вход. Это часть полного временного ряда в формате JSON lines, возможно фрагмент длинной записи. Проанализируй все содержащиеся интервалы, сохрани даты, UserId, имена, числа и существенные изменения для последующего объединения. Не называй часть всей историей.',env});
     await storage.put(key(j,`summary:${t.teamId}:0:${t.summaries}`),result);t.summaries++;t.chunkIndex++;
     if(t.chunkIndex>=t.chunkCount)j.phase=t.complete?'reduce':'fetch';
   }
@@ -85,19 +85,19 @@ export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=request
     if(t.summaries===1) {
       const report=await storage.get(key(j,`summary:${t.teamId}:${t.level}:0`));
       const period=await periodStats(j,t);
-      const final=await analyze({input:{period,teamId:t.teamId,teamName:t.name,from:t.from,to:t.to,snapshotCount:t.count,complete:t.complete,analysis:report},task:'Составь итоговый анализ ВСЕЙ истории этой команды. Охват задан явно. Опиши динамику по времени, игроков, изменения состава и неопределённости. Один снимок не даёт динамики; прямо сообщи это.',env});
+      const final=await analyze({input:{period,teamId:t.teamId,teamName:t.name,from:t.from,to:t.to,snapshotCount:t.count,complete:t.complete,analysis:report},task:'Ответ до 450 слов, с выводами и ведущими игроками; не повторяй полный список счётчиков. Составь итоговый анализ ВСЕЙ истории этой команды. Охват задан явно. Опиши динамику по времени, игроков, изменения состава и неопределённости. Один снимок не даёт динамики; прямо сообщи это.',env});
       await storage.put(key(j,`report:${t.teamId}`),{...final,period});await nextTeam(j);return;
     }
     const batch=[];let chars=0;
     while(t.reduceIndex<t.summaries){const r=await storage.get(key(j,`summary:${t.teamId}:${t.level}:${t.reduceIndex}`));if(batch.length>=2&&chars+JSON.stringify(r).length>6000)break;batch.push(r);chars+=JSON.stringify(r).length;t.reduceIndex++;}
-    const result=await analyze({input:{teamId:t.teamId,parts:batch},task:'Объедини ВСЕ эти промежуточные анализы: сохрани хронологию, игроков/UserId и числа, ранние и поздние периоды. Это промежуточное сжатие, не весь итог.',env});
+    const result=await analyze({input:{teamId:t.teamId,parts:batch},task:'Ответ до 300 слов. Объедини ВСЕ эти промежуточные анализы: сохрани хронологию, игроков/UserId и числа, ранние и поздние периоды. Это промежуточное сжатие, не весь итог.',env});
     const n=t.nextSummaries??0;await storage.put(key(j,`summary:${t.teamId}:${t.level+1}:${n}`),result);t.nextSummaries=n+1;
     if(t.reduceIndex===t.summaries){t.level++;t.summaries=t.nextSummaries;t.nextSummaries=0;t.reduceIndex=0;}
   }
   async function nextTeam(j){j.teamIndex++;j.phase=j.teamIndex<j.teams.length?'fetch':'overall';}
   async function overall(j) {
     const teams=[];for(const t of j.teams)teams.push({teamId:t.teamId,teamName:t.name,count:t.count,from:t.from,to:t.to,report:(await storage.get(key(j,`report:${t.teamId}`)))?.text});
-    const report=await analyze({input:{scope:j.scope,teams},task:'Сделай сравнительный итог по ВСЕМ командам и их полной истории: динамика, темп, вклад игроков, состав, отличия периодов и ограничения сравнения. Не сравнивай разную длительность как равную. Не пропускай команды без снимков, отметь нехватку данных.',env});
+    const report=await analyze({input:{scope:j.scope,teams},task:'Ответ до 400 слов. Сделай сравнительный итог по ВСЕМ командам и их полной истории: динамика, темп, вклад игроков, состав, отличия периодов и ограничения сравнения. Не сравнивай разную длительность как равную. Не пропускай команды без снимков, отметь нехватку данных.',env});
     await storage.put(key(j,'overall'),report);j.state='done';j.completedAt=new Date(now()).toISOString();
   }
   async function step() {

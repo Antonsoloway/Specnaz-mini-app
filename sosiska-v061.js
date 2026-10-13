@@ -29,18 +29,46 @@
   const colors=['#38bdf8','#fb923c','#a78bfa','#4ade80','#f472b6'];
   const unit=()=>({levels:'уровней/ч',crowns:'корон/ч',help:'помощи/ч'}[metric]);
   function metricButtons(){return ['levels','crowns','help'].map(k=>button('metric',(metric===k?'✓ ':'')+({levels:'Уровни',crowns:'Короны',help:'Помощь'}[k]),'data-metric="'+k+'"')).join('');}
+  const metricColor=()=>({levels:'#38bdf8',crowns:'#fbbf24',help:'#34d399'}[metric]);
+  const clock=v=>new Date(v).toLocaleTimeString('ru-RU',{timeZone:'Europe/Moscow',hour:'2-digit',minute:'2-digit'});
+  const day=v=>new Date(v).toLocaleDateString('ru-RU',{timeZone:'Europe/Moscow',day:'2-digit',month:'2-digit'});
+  let chartNumber=0;
   function chart(lines,title){
-    const all=lines.flatMap(l=>l.points).filter(p=>p.hours>0&&Number.isFinite(p[metric]));if(!all.length)return '<p>Нет наблюдаемых интервалов для графика.</p>';
-    const start=Math.min(...all.map(p=>Date.parse(p.from))),end=Math.max(...all.map(p=>Date.parse(p.to))),max=Math.max(1,...all.map(p=>p[metric]/p.hours));
-    const x=t=>40+540*(Date.parse(t)-start)/Math.max(1,end-start),y=v=>170-145*v/max;
-    return '<figure class="sosiska-chart"><figcaption>'+esc(title)+' · '+esc(unit())+'</figcaption><svg viewBox="0 0 600 205" role="img" aria-label="'+esc(title+' '+unit())+'"><path d="M40 20V170H580" fill="none" stroke="#64748b"/><text x="2" y="25" fill="currentColor" font-size="12">'+esc(rate(max))+'</text><text x="20" y="175" fill="currentColor" font-size="12">0</text>'+lines.map((l,i)=>l.points.filter(p=>p.hours>0&&Number.isFinite(p[metric])).map(p=>'<path d="M'+x(p.from).toFixed(2)+' '+y(p[metric]/p.hours).toFixed(2)+'H'+x(p.to).toFixed(2)+'" stroke="'+colors[i%colors.length]+'" stroke-width="3" fill="none"><title>'+esc(l.name+': '+when(p.from)+' — '+when(p.to)+', '+rate(p[metric]/p.hours)+' '+unit())+'</title></path>').join('')).join('')+'</svg><p class="muted">'+esc(when(new Date(start).toISOString()))+' — '+esc(when(new Date(end).toISOString()))+' МСК</p>'+lines.map((l,i)=>'<span class="sosiska-legend" style="color:'+colors[i%colors.length]+'">● '+esc(l.name)+'</span>').join('')+'</figure>';
+    const valid=p=>p.hours>0&&Number.isFinite(p[metric]);
+    const all=lines.flatMap(l=>l.points).filter(valid);if(!all.length)return '<p>Нет наблюдаемых интервалов для графика.</p>';
+    const start=Math.min(...all.map(p=>Date.parse(p.from))),end=Math.max(...all.map(p=>Date.parse(p.to))),peak=Math.max(...all.map(p=>p[metric]/p.hours));
+    const scale=peak>0?10**Math.floor(Math.log10(peak)):1,max=Math.max(1,Math.ceil(peak/scale)*scale);
+    const x=t=>48+296*(Date.parse(t)-start)/Math.max(1,end-start),y=v=>230-194*v/max,number=++chartNumber;
+    const grid=Array.from({length:5},(_,i)=>{const v=max*i/4;return '<path d="M48 '+y(v)+'H344" stroke="#365064" stroke-dasharray="3 5"/><text x="40" y="'+(y(v)+5)+'" text-anchor="end" fill="#cbd5e1" font-size="15">'+esc(rate(v))+'</text>';}).join('');
+    const axes=[0,.5,1].map(f=>{const t=new Date(start+(end-start)*f).toISOString(),px=48+296*f;return '<text x="'+px+'" y="257" text-anchor="'+(f===0?'start':f===1?'end':'middle')+'" fill="#f1f5f9" font-size="16">'+esc(clock(t))+'</text><text x="'+px+'" y="278" text-anchor="'+(f===0?'start':f===1?'end':'middle')+'" fill="#94a3b8" font-size="13">'+esc(day(t))+'</text>';}).join('');
+    const paths=lines.map((l,i)=>{
+      const color=lines.length===1?metricColor():colors[i%colors.length],points=l.points.filter(valid),groups=[];let group=[];
+      for(const p of points){if(group.length&&group.at(-1).to!==p.from){groups.push(group);group=[];}group.push(p);}if(group.length)groups.push(group);
+      if(!points.length)return '';
+      const gradient='sosiska-fill-'+number+'-'+i;
+      return '<defs><linearGradient id="'+gradient+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+color+'" stop-opacity=".35"/><stop offset="100%" stop-color="'+color+'" stop-opacity=".02"/></linearGradient></defs>'+groups.map(g=>{
+       let path='M'+x(g[0].from).toFixed(2)+' '+y(g[0][metric]/g[0].hours).toFixed(2);
+       for(let j=0;j<g.length;j++){const p=g[j];if(j)path+='V'+y(p[metric]/p.hours).toFixed(2);path+='H'+x(p.to).toFixed(2);}
+       const area=path+'V230H'+x(g[0].from).toFixed(2)+'Z';
+       return '<path d="'+area+'" fill="url(#'+gradient+')"/><path d="'+path+'" stroke="'+color+'" stroke-width="3.5" stroke-linejoin="round" fill="none"><title>'+esc(l.name)+'</title></path>';
+      }).join('')+'<circle cx="'+x(points.at(-1).to).toFixed(2)+'" cy="'+y(points.at(-1)[metric]/points.at(-1).hours).toFixed(2)+'" r="4" fill="'+color+'"/>';
+    }).join('');
+    const one=lines.length===1,latest=all.at(-1),hours=all.reduce((n,p)=>n+p.hours,0),average=all.reduce((n,p)=>n+p[metric],0)/hours;
+    return '<figure class="sosiska-chart"><figcaption>'+esc(title)+'<small>'+esc(unit())+' · время МСК</small></figcaption>'+(one?'<div class="sosiska-chart-stats"><div><small>Последний интервал</small><b>'+rate(latest[metric]/latest.hours)+'</b></div><div><small>В среднем</small><b>'+rate(average)+'</b></div><div><small>Пик</small><b>'+rate(peak)+'</b></div></div>':'')+'<svg viewBox="0 0 360 295" role="img" aria-label="'+esc(title+' '+unit())+'">'+grid+paths+axes+'</svg><div class="sosiska-chart-key">'+lines.map((l,i)=>'<span class="sosiska-legend" style="color:'+(one?metricColor():colors[i%colors.length])+'">● '+esc(l.name)+'</span>').join('')+'</div><details class="sosiska-chart-values"><summary>Значения по интервалам</summary>'+lines.map(l=>'<h4>'+esc(l.name)+'</h4><div class="sosiska-interval-values">'+l.points.filter(valid).map(p=>'<div><span>'+esc(day(p.from)+' '+clock(p.from)+' — '+day(p.to)+' '+clock(p.to))+'</span><b>'+rate(p[metric]/p.hours)+' '+esc(unit())+'</b></div>').join('')+'</div>').join('')+'</details></figure>';
+  }
+  function hourlyChart(bins){
+   const max=Math.max(1,...bins.map(h=>h.rate??0));
+   return '<div class="sosiska-hour-grid">'+bins.map(h=>{
+    const strength=h.rate===null?0:Math.min(1,h.rate/max),background=h.rate===null?'#23313e':strength>.75?'#168d78':strength>.4?'#2168a3':strength>0?'#284d70':'#24374b';
+    return '<div class="sosiska-hour-cell" style="background:'+background+'"><b>'+String(h.hour).padStart(2,'0')+':00</b><span>'+(h.rate===null?'—':rate(h.rate))+'</span><small>'+(h.rate===null?'нет данных':esc(unit()))+'</small></div>';
+   }).join('')+'</div><p class="sosiska-hour-key">Зелёный — самый высокий темп · синий — ниже · — нет наблюдений</p>';
   }
   function charts(points,name){return '<h3>Темп активности команды</h3>'+metricButtons()+chart([{name,points}], 'Активность во времени')+'<p class="muted">Прирост за интервал между снимками / длительность интервала. Сбросы счётчиков и вступление игроков не считаются прогрессом. Старые интервалы длинной истории объединяются.</p>';}
   function playerView(){
    const p=period?.players.find(p=>p.userId===playerId);if(!p)return '';
    const hoursKey={levels:'levelHours',crowns:'crownHours',help:'helpHours'}[metric];
-   const bins=p.hourly.map(h=>({hour:h.hour,value:h[hoursKey]??h.hours,rate:(h[hoursKey]??h.hours)>0?h[metric]/(h[hoursKey]??h.hours):null})),max=Math.max(1,...bins.map(h=>h.rate??0)),peak=bins.filter(h=>h.rate!==null).sort((a,b)=>b.rate-a.rate)[0];
-   return '<article class="sosiska-player-detail"><h3>'+esc(p.name)+' · активность</h3>'+button('player-close','Закрыть графики игрока')+metricButtons()+chart([{name:p.name,points:p.series}], 'Темп игрока')+'<h4>В какое время активнее · МСК</h4><svg class="sosiska-hours" viewBox="0 0 600 195" role="img" aria-label="Средний темп по часам суток">'+bins.map((h,i)=>'<rect x="'+(i*24+10)+'" y="'+(150-130*(h.rate??0)/max)+'" width="18" height="'+(130*(h.rate??0)/max)+'" fill="'+(h.rate===null?'#64748b':'#38bdf8')+'"><title>'+h.hour+':00 · '+(h.rate===null?'нет наблюдений':esc(rate(h.rate)+' '+unit()+', охват '+rate(h.value)+' ч'))+'</title></rect>'+(i%3===0?'<text x="'+(i*24+10)+'" y="175" fill="currentColor" font-size="14">'+h.hour+'</text>':'')).join('')+'</svg><p>'+(!peak||peak.rate===0?'Положительный прирост не наблюдался.':'Наибольший наблюдаемый темп: '+peak.hour+':00–'+((peak.hour+1)%24)+':00 · '+rate(peak.rate)+' '+unit())+'</p><p class="muted">Это оценка по снимкам: прирост равномерно распределён по охваченному интервалу. Точное время игры неизвестно. При редких снимках профиль менее точный. Короны не переводятся в пройденные уровни.</p></article>';
+   const bins=p.hourly.map(h=>({hour:h.hour,value:h[hoursKey]??h.hours,rate:(h[hoursKey]??h.hours)>0?h[metric]/(h[hoursKey]??h.hours):null})),peak=bins.filter(h=>h.rate!==null).sort((a,b)=>b.rate-a.rate)[0];
+   return '<article class="sosiska-player-detail"><h3>'+esc(p.name)+' · активность</h3>'+button('player-close','Закрыть графики игрока')+metricButtons()+chart([{name:p.name,points:p.series}], 'Темп игрока')+'<h4>В какое время активнее · МСК</h4>'+hourlyChart(bins)+'<p>'+(!peak||peak.rate===0?'Положительный прирост не наблюдался.':'Наибольший наблюдаемый темп: '+peak.hour+':00–'+((peak.hour+1)%24)+':00 · '+rate(peak.rate)+' '+unit())+'</p><p class="muted">Это оценка по снимкам: прирост равномерно распределён по охваченному интервалу. Точное время игры неизвестно. При редких снимках профиль менее точный. Короны не переводятся в пройденные уровни.</p></article>';
   }
   function comparisonView(){
    if(!selected.size)return '';
@@ -52,9 +80,9 @@
       (!period.complete?'<p>История загружена не полностью. Это промежуточные показатели; повторите загрузку.</p>':'')+
       (period.snapshotCount<2?'<p>Для расчёта скорости нужен хотя бы второй снимок.</p>':'')+
       '<p class="muted">Уровни/час — прирост обычного уровня за наблюдаемые интервалы. Короны/час — отдельный счётчик, не число пройденных раундов лиги. Отсутствие роста уровня в лиге не означает, что игрок не играет.</p>'+
-      '<h3>Игроки · сначала активные</h3><p class="muted">Порядок по выбранному показателю графика: уровни, короны или помощь. Показатели не складываются.</p>'+charts(period.series,period.teamName)+playerView()+[...period.players].sort((a,b)=>(b[{levels:'levelGain',crowns:'crownGain',help:'helpGain'}[metric]]??0)-(a[{levels:'levelGain',crowns:'crownGain',help:'helpGain'}[metric]]??0)||SosiskaPeriod.activityOrder(a,b)).map(m=>'<div class="sosiska-player"><h4>'+esc(m.name)+(m.current?'':' · вышел / исключён')+'</h4>'+
+      '<h3>Игроки · сначала активные</h3><p class="muted">Порядок по выбранному показателю графика: уровни, короны или помощь. Показатели не складываются.</p>'+charts(period.series,period.teamName)+[...period.players].sort((a,b)=>(b[{levels:'levelGain',crowns:'crownGain',help:'helpGain'}[metric]]??0)-(a[{levels:'levelGain',crowns:'crownGain',help:'helpGain'}[metric]]??0)||SosiskaPeriod.activityOrder(a,b)).map(m=>'<div class="sosiska-player"><h4>'+esc(m.name)+(m.current?'':' · вышел / исключён')+'</h4>'+
        button('player','Графики активности', 'data-player-id="'+esc(m.userId)+'"')+'<p>Уровни: +'+esc(m.levelGain)+' · '+rate(m.levelsPerHour)+' / час<br>Короны: +'+esc(m.crownGain)+' · '+rate(m.crownsPerHour)+' / час<br>Помощь: +'+esc(m.helpGain)+'</p>'+
-       '<p class="muted">Наблюдался в составе: '+rate(m.observedHours)+' ч · вступлений: '+m.joined+' · выходов: '+m.left+(m.crownResets?' · сбросов корон: '+m.crownResets:'')+(m.levelResets?' · уменьшений уровня: '+m.levelResets:'')+'</p></div>').join('')+'</article>';
+       '<p class="muted">Наблюдался в составе: '+rate(m.observedHours)+' ч · вступлений: '+m.joined+' · выходов: '+m.left+(m.crownResets?' · сбросов корон: '+m.crownResets:'')+(m.levelResets?' · уменьшений уровня: '+m.levelResets:'')+'</p>'+(m.userId===playerId?playerView():'')+'</div>').join('')+'</article>';
   }
 
 
@@ -127,8 +155,8 @@
     if(!records.length)return '';
     return '<h3>Журнал снимков · сначала активные</h3>'+records.map(r=>'<article><h4>№'+r.sequence+' · '+esc(when(r.snapshot.capturedAt))+' МСК</h4>'+
       (r.changes.baseline?'<p>Начало наблюдения.</p>':'<p>Изменения с предыдущей проверки:</p><p>Вступили: '+esc(r.changes.joined.map(m=>m.Name).join(', ')||'—')+'<br>Вышли: '+esc(r.changes.left.map(m=>m.Name).join(', ')||'—')+'</p>'+
-       [...r.changes.members].sort((a,b)=>changeActivity(b,'Level')-changeActivity(a,'Level')||changeActivity(b,'Crown')-changeActivity(a,'Crown')||changeActivity(b,'HelpCount')-changeActivity(a,'HelpCount')).map(m=>'<div class="sosiska-player"><b>'+esc(m.name)+'</b>'+m.changes.filter(c=>labels[c.field]).map(c=>'<p>'+esc(labels[c.field])+': '+esc(value(c.before))+' → '+esc(value(c.after))+(c.delta!==undefined?' ('+(c.delta>0?'+':'')+esc(c.delta)+')':'')+'</p>').join('')+'</div>').join('')+
-       (!r.changes.members.length?'<p>Счётчики участников не изменились.</p>':'')+r.snapshot.raw.Members.filter(m=>!r.changes.members.some(c=>c.userId===m.UserId)).map(m=>'<div class="sosiska-player muted"><b>'+esc(m.Name)+'</b><p>Без наблюдаемого прироста счётчиков.</p></div>').join(''))+'</article>').join('')+
+       [...r.changes.members].filter(m=>['Level','Crown','HelpCount'].some(f=>changeActivity(m,f)>0)).sort((a,b)=>changeActivity(b,'Level')-changeActivity(a,'Level')||changeActivity(b,'Crown')-changeActivity(a,'Crown')||changeActivity(b,'HelpCount')-changeActivity(a,'HelpCount')).map(m=>'<div class="sosiska-player"><b>'+esc(m.name)+'</b>'+m.changes.filter(c=>labels[c.field]).map(c=>'<p>'+esc(labels[c.field])+': '+esc(value(c.before))+' → '+esc(value(c.after))+(c.delta!==undefined?' ('+(c.delta>0?'+':'')+esc(c.delta)+')':'')+'</p>').join('')+'</div>').join('')+
+       (!r.changes.members.some(m=>['Level','Crown','HelpCount'].some(f=>changeActivity(m,f)>0))?'<p>Прирост активности не наблюдался.</p>':''))+'</article>').join('')+
        (nextBefore?button('older','Более ранние снимки'):'');
   }
   function memberCard(m){return '<li class="sosiska-member" data-player-id="'+esc(m.UserId)+'"><div><strong>'+esc(m.Name)+'</strong><small>'+esc(role(team,m.UserId))+'</small></div><div class="sosiska-metrics"><span>Уровень<b>'+esc(value(m.Level))+'</b></span><span>Короны<b>'+esc(value(m.Crown))+'</b></span><span>Помощь<b>'+esc(value(m.HelpCount))+'</b></span></div></li>';}
@@ -142,7 +170,7 @@
   function analysisView(){
     if(!analysis?.available)return '<p class="muted">'+esc(analysis?.reason||'ИИ-анализ ещё не запускался. Динамика за весь период доступна без ИИ.')+'</p>';
     const a=analysis;
-    if(a.state==='running')return `<article><h3>Анализ всей истории выполняется</h3><p>Команд: ${a.teams.length} · обработано снимков: ${esc(a.processedSnapshots)}</p><p>Задача продолжится после закрытия приложения.</p>${a.error?'<p>'+esc(analysisError(a.error))+'</p><p>Повтор: '+esc(when(a.nextAttemptAt))+' · попыток: '+esc(a.retries)+'</p>':''}</article>`;
+    if(a.state==='running')return `<article><h3>Анализ всей истории выполняется</h3><p>Команд: ${a.teams.length} · загружено снимков: ${esc(a.processedSnapshots)}</p><p>${esc(({fetch:'Читаем сохранённую историю',chunk:'ИИ анализирует изменения',reduce:'ИИ объединяет части анализа',overall:'ИИ сравнивает команды'}[a.phase]||'Анализируем историю'))}</p><p>Задача продолжится после закрытия приложения.</p>${a.error?'<p>'+esc(analysisError(a.error))+'</p><p>Повтор: '+esc(when(a.nextAttemptAt))+' · попыток: '+esc(a.retries)+'</p>':''}</article>`;
     if(a.state==='failed')return `<article><h3>Анализ не завершён</h3><p>Обработано снимков: ${esc(a.processedSnapshots)}. ${esc(analysisError(a.error))}</p><p>Можно повторить запуск; история сохранена.</p></article>`;
     return `<article><h3>${a.scope==='team'?'Анализ команды за весь период':'Общий анализ отслеживаемых команд'}</h3><p>Команд: ${a.teams.length} · снимков: ${esc(a.processedSnapshots)}</p><div class="sosiska-analysis">${esc(a.summary?.text)}</div></article>${a.teams.map(t=>`<article><h3>${esc(t.teamName||t.teamId)}</h3><p>Вся история: ${esc(t.count)} снимков · ${esc(when(t.from))} — ${esc(when(t.to))} МСК</p><div class="sosiska-analysis">${esc(t.text)}</div>${button('timeline','Динамика по снимкам',`data-team-id="${esc(t.teamId)}"`)}${timelineView(t.teamId)}</article>`).join('')}`;
   }
@@ -228,7 +256,7 @@
     run(async e=>{
       if(action==='metric'){metric=target.dataset.metric;return;}
       if(action==='player-close'){playerId=null;return;}
-      if(action==='player'){playerId=target.dataset.playerId;teamView='period';if(!period?.complete)await loadPeriod(e);return;}
+      if(action==='player'){playerId=target.dataset.playerId;teamView='period';if(!period?.complete)await loadPeriod(e);render();setTimeout(()=>{if(e===epoch)document.querySelector('.sosiska-player-detail')?.scrollIntoView?.({behavior:'smooth',block:'start'});},0);return;}
       if(action==='select-team'){const id=target.dataset.teamId;if(selected.has(id))selected.delete(id);else{if(selected.size>=5)throw Error('Выберите не более пяти команд.');selected.set(id,details.get(id)?.TeamName||watches.find(w=>w.teamId===id)?.teamName||candidates.find(c=>c.teamId===id)?.name||id);}comparison=null;return;}
       if(action==='clear-selection'){selected.clear();comparison=null;return;}
       if(action==='analysis-selected'){if(selected.size<2)throw Error('Выберите от двух до пяти команд.');analysis=await api('analysis',{teamIds:[...selected.keys()]},e);schedulePoll();return;}
@@ -257,5 +285,5 @@
   window.addEventListener('royal:auth-ready',()=>{reset();decorate();});
   for(const name of ['royal:access-denied','royal:fatal'])window.addEventListener(name,()=>{reset();decorate();});
   window.RoyalAdminDataV0600?.subscribe?.(event=>{if(event.type==='clear'&&['unauthorized','forbidden','session-changed'].includes(event.reason)){const visible=opened;reset();if(visible){const panel=document.getElementById('panel');if(panel)panel.textContent='Админская сессия завершена. Откройте приложение заново.';}}});
-  decorate();window.RoyalSosiska={version:'0.5.0',open,filters:{parse:parseFilters,matches:matchesFilters,fields:teamFilterFields}};
+  decorate();window.RoyalSosiska={version:'0.5.1',open,filters:{parse:parseFilters,matches:matchesFilters,fields:teamFilterFields}};
 })();
