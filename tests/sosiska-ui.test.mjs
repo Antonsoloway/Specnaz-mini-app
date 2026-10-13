@@ -134,3 +134,15 @@ test('activity charts open on player click and comparison only reads selected te
 test('AI failure renders actionable text rather than raw internal error code',async()=>{
  const s=setup({responder:b=>b.operation==='analysisStatus'?{available:true,state:'failed',teams:[],processedSnapshots:5,error:'ANALYSIS_KEYS_REJECTED'}:{watches:[]}});await s.context.window.RoyalSosiska.open();assert.match(s.panel.innerHTML,/отклонил подключённые ключи/);assert.ok(!s.panel.innerHTML.includes('ANALYSIS_KEYS_REJECTED'));
 });
+test('snapshot view omits unchanged and zero-growth members, retains growth and membership events',async()=>{
+ const raw={TeamId:'1',TeamName:'Team',Members:[{UserId:'1',Name:'Idle',Level:100,Crown:0,HelpCount:0}]};
+ const record={sequence:2,snapshot:{teamId:'1',capturedAt:'2026-10-13T10:00:00Z',raw},changes:{baseline:false,joined:[{Name:'New member'}],left:[{Name:'Left member'}],members:[{userId:'1',name:'Renamed but idle',changes:[{field:'Name',before:'Old',after:'New'}]},{userId:'2',name:'Active member',changes:[{field:'Level',before:10,after:20,delta:10}]},{userId:'3',name:'Reset member',changes:[{field:'Crown',before:10,after:0,delta:-10}]}]}};
+ const s=setup({responder:b=>b.operation==='team'?raw:b.operation==='history'?{records:[record],nextBefore:null}:{watches:[]}});await s.context.window.RoyalSosiska.open();s.action('team','1');await settle();s.action('history');await settle();
+ assert.match(s.panel.innerHTML,/Active member/);assert.match(s.panel.innerHTML,/New member/);assert.match(s.panel.innerHTML,/Left member/);for(const name of ['Renamed but idle','Reset member','Без наблюдаемого прироста'])assert.ok(!s.panel.innerHTML.includes(name));
+});
+test('opening another player replaces the single inline chart and keeps labels readable',async()=>{
+ const raw={TeamId:'1',TeamName:'Team',Members:[{UserId:'1',Name:'First',Level:10,Crown:0,HelpCount:0},{UserId:'2',Name:'Second',Level:20,Crown:0,HelpCount:0}]};
+ const records=[2,1].map(n=>({sequence:n,snapshot:{teamId:'1',capturedAt:new Date(Date.UTC(2026,9,13,n)).toISOString(),raw:{...raw,Members:raw.Members.map(m=>({...m,Level:m.Level+n}))}},changes:{baseline:n===1}}));
+ const s=setup({responder:b=>b.operation==='team'?raw:b.operation==='history'?{records,nextBefore:null}:{watches:[]}});await s.context.window.RoyalSosiska.open();s.action('team','1');await settle();s.action('player',undefined,{playerId:'1'});await settle();assert.match(s.panel.innerHTML,/First · активность/);
+ s.action('player',undefined,{playerId:'2'});await settle();assert.equal((s.panel.innerHTML.match(/class="sosiska-player-detail"/g)||[]).length,1);assert.ok(!s.panel.innerHTML.includes('First · активность'));assert.match(s.panel.innerHTML,/Second · активность/);assert.match(s.panel.innerHTML,/В среднем/);assert.match(s.panel.innerHTML,/Значения по интервалам/);assert.equal((s.panel.innerHTML.match(/class="sosiska-hour-cell"/g)||[]).length,24);assert.match(s.panel.innerHTML,/viewBox="0 0 360 295"/);
+});
