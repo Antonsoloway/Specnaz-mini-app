@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 const source=await readFile(new URL('../sosiska-v061.js',import.meta.url),'utf8');
+const periodSource=await readFile(new URL('../sosiska-period-v061.js',import.meta.url),'utf8');
 const settle=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate);};
 function setup({admin=true,responder}={}){
   const listeners={},docListeners={},tiles=[],calls=[],panel={innerHTML:'',hidden:false},grid={querySelector:()=>tiles.find(x=>!x.removed)||null,appendChild:b=>tiles.push(b)};
   const document={querySelector:s=>s==='.grid'?grid:s==='[data-sosiska-interval]'?{value:'120'}:null,getElementById:()=>panel,createElement:()=>({dataset:{},remove(){this.removed=true;}}),addEventListener:(type,fn)=>{docListeners[type]=fn;}};
   const context={document,authState:{role:{isChatAdmin:admin}},sessionToken:'session-a',activePage:'home',setActiveNav(){},renderPage(page){panel.innerHTML=page;},FormData:class{constructor(form){this.form=form;}get(name){return this.form.filters?this.form.filters[name]??'':this.form.query;}},Response,AbortController,setTimeout,clearTimeout,console,fetch:async(url,init)=>{const b=JSON.parse(init.body);calls.push(b);return Response.json({ok:true,data:await (responder?responder(b):{watches:[]})});}};
-  context.window={addEventListener:(type,fn)=>{listeners[type]=fn;},RoyalNav:{pushCurrent(){}},RoyalAdminDataV0600:{subscribe(fn){listeners.adminClear=fn;}}};vm.createContext(context);vm.runInContext(source,context);
+  context.window={addEventListener:(type,fn)=>{listeners[type]=fn;},RoyalNav:{pushCurrent(){}},RoyalAdminDataV0600:{subscribe(fn){listeners.adminClear=fn;}}};vm.createContext(context);vm.runInContext(periodSource,context);vm.runInContext(source,context);
   const action=(name,id)=>listeners.click({target:{closest:s=>s==='[data-sosiska-action]'?{dataset:{sosiskaAction:name,teamId:id}}:null},preventDefault(){},stopImmediatePropagation(){}});
   const search=query=>docListeners.submit({target:{query,matches:selector=>selector==='[data-sosiska-search]',querySelector:()=>({blur(){}})},preventDefault(){},stopImmediatePropagation(){}});
   const filter=values=>docListeners.submit({target:{filters:values,matches:selector=>selector==='[data-sosiska-filters]'},preventDefault(){},stopImmediatePropagation(){}});
@@ -109,4 +110,15 @@ test('full candidate hydration stops on revoked admin session or rate limiting',
   assert.equal(s.calls.some(b=>b.operation==='team'&&b.teamId==='6'),false);
   if(status===401||status===403)assert.ok(!s.panel.innerHTML.includes('Team 1'));
  }
+});
+
+test('roster is sorted and full period automatically covers more than one history page without AI',async()=>{
+ const members=[{UserId:'2',Name:'Low',Level:100,Crown:0,HelpCount:0},{UserId:'3',Name:'High',Level:200,Crown:50,HelpCount:0}];
+ const histories=Array.from({length:27},(_,i)=>({sequence:27-i,snapshot:{teamId:'1',capturedAt:new Date(Date.UTC(2026,9,13)+(27-i)*3600000).toISOString(),raw:{TeamName:'Team',Members:members.map(m=>({...m,Level:m.Level+27-i}))}},changes:{baseline:27-i===1}}));
+ const s=setup({responder:b=>b.operation==='team'?{TeamId:'1',TeamName:'Team',Leader:'3',Members:members}:b.operation==='history'?(()=>{const records=histories.filter(r=>r.sequence<(b.before??Infinity)).slice(0,b.limit);return {records,nextBefore:records.at(-1)?.sequence>1?records.at(-1).sequence:null};})():b.operation==='analysisStatus'?{available:false,reason:'Key missing'}:{watches:[]}});
+ await s.context.window.RoyalSosiska.open();s.action('team','1');await settle();
+ assert.ok(s.panel.innerHTML.indexOf('data-player-id="3"')<s.panel.innerHTML.indexOf('data-player-id="2"'));
+ assert.match(s.panel.innerHTML,/Весь период наблюдения/);assert.match(s.panel.innerHTML,/снимков: 27/);assert.match(s.panel.innerHTML,/Уровни: \+26/);
+ assert.equal(s.calls.filter(b=>b.operation==='history').length,2);assert.ok(!s.panel.innerHTML.includes('JSON'));assert.ok(!s.panel.innerHTML.includes('UserId'));
+ assert.equal(s.calls.some(b=>['analysis','watch','capture'].includes(b.operation)),false);
 });

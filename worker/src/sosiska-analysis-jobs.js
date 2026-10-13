@@ -1,3 +1,4 @@
+import {createPeriodAccumulator} from './sosiska-period.js';
 import {timelineRows,packAnalysisParts,requestSosiskaAnalysis} from './sosiska-analysis.js';
 const ORIGIN='https://specnaz-royal-match-agent-stage1.specnaz-sosiska.workers.dev';
 const json=(value,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store'}});
@@ -26,7 +27,7 @@ export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=request
   }
   async function status(jobId) {
     jobId=jobId??await storage.get('analysis:active');
-    if(!jobId)return {available:false,reason:'Анализ ещё не запускался.'};
+    if(!jobId)return {available:false,reason:env.SOSISKA_GROQ_KEY?'Анализ ещё не запускался.':'ИИ-анализ не подключён: отсутствует ключ провайдера. Динамика за весь период доступна без ИИ.'};
     const j=await storage.get(`analysis:${jobId}:state`);if(!j)throw new Error('ANALYSIS_JOB_NOT_FOUND');
     const result={available:true,jobId:j.jobId,state:j.state,scope:j.scope,processedSnapshots:j.processedSnapshots,createdAt:j.createdAt,updatedAt:j.updatedAt,error:j.error??null,teams:j.teams.map(t=>({teamId:t.teamId,teamName:t.name,count:t.count,headSequence:t.headSequence,from:t.from,to:t.to,complete:!!t.complete}))};
     if(j.state==='done') {
@@ -70,12 +71,22 @@ export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=request
     await storage.put(key(j,`summary:${t.teamId}:0:${t.summaries}`),result);t.summaries++;t.chunkIndex++;
     if(t.chunkIndex>=t.chunkCount)j.phase=t.complete?'reduce':'fetch';
   }
+  async function periodStats(j,t){
+    const acc=createPeriodAccumulator(t.teamId);
+    for(let n=t.headSequence;n>0;n--){
+      const p=await storage.get(key(j,`point:${t.teamId}:${n}`));
+      if(!p)throw Object.assign(new Error('ANALYSIS_HISTORY_INCOMPLETE'),{permanent:true});
+      acc.add({sequence:n,snapshot:{teamId:t.teamId,capturedAt:p.capturedAt,raw:{TeamName:t.name,Members:p.members.map(m=>({UserId:m.userId,Name:m.name,Level:m.level,Crown:m.crown,HelpCount:m.help}))}},changes:{baseline:n===1}});
+    }
+    return acc.result();
+  }
   async function reduceTeam(j,t) {
     if(t.summaries===0){await storage.put(key(j,`report:${t.teamId}`),{text:'Сохранённых снимков пока нет.',model:null});await nextTeam(j);return;}
     if(t.summaries===1) {
       const report=await storage.get(key(j,`summary:${t.teamId}:${t.level}:0`));
-      const final=await analyze({input:{teamId:t.teamId,teamName:t.name,from:t.from,to:t.to,snapshotCount:t.count,complete:t.complete,analysis:report},task:'Составь итоговый анализ ВСЕЙ истории этой команды. Охват задан явно. Опиши динамику по времени, игроков, изменения состава и неопределённости. Один снимок не даёт динамики; прямо сообщи это.',env});
-      await storage.put(key(j,`report:${t.teamId}`),final);await nextTeam(j);return;
+      const period=await periodStats(j,t);
+      const final=await analyze({input:{period,teamId:t.teamId,teamName:t.name,from:t.from,to:t.to,snapshotCount:t.count,complete:t.complete,analysis:report},task:'Составь итоговый анализ ВСЕЙ истории этой команды. Охват задан явно. Опиши динамику по времени, игроков, изменения состава и неопределённости. Один снимок не даёт динамики; прямо сообщи это.',env});
+      await storage.put(key(j,`report:${t.teamId}`),{...final,period});await nextTeam(j);return;
     }
     const batch=[];let chars=0;
     while(t.reduceIndex<t.summaries){const r=await storage.get(key(j,`summary:${t.teamId}:${t.level}:${t.reduceIndex}`));if(batch.length>=2&&chars+JSON.stringify(r).length>24000)break;batch.push(r);chars+=JSON.stringify(r).length;t.reduceIndex++;}
