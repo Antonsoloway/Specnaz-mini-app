@@ -15,17 +15,20 @@ export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=request
     }finally{clearTimeout(timer);}
   }
   async function save(j){j.updatedAt=new Date(now()).toISOString();await storage.put(key(j,'state'),j);}
+  const scopeKey=(teamId,ids)=>teamId?'team:'+teamId:'selected:'+JSON.stringify([...ids].sort());
   async function start(teamId,selectedIds) {
+    if((!teamId&&!selectedIds)||(teamId&&selectedIds))throw new Error('ANALYSIS_INVALID');
     if(!analysisKeys(env).length)throw Object.assign(new Error('ANALYSIS_NOT_CONFIGURED'),{permanent:true});
     const active=await storage.get('analysis:active');
-    if(active){const j=await storage.get(`analysis:${active}:state`);if(j&&!['done','failed'].includes(j.state)){if((!teamId&&!selectedIds&&j.scope==='all-watched')||(teamId&&j.scope==='team'&&j.teams[0].teamId===teamId)||(selectedIds&&j.scope==='selected'&&JSON.stringify([...selectedIds].sort())===JSON.stringify(j.teams.map(t=>t.teamId).sort())))return status(active);throw new Error('ANALYSIS_BUSY');}}
-    const watches=selectedIds?selectedIds.map(teamId=>({teamId})):teamId?[{teamId}]:(await agent({operation:'list'})).watches.filter(w=>w.enabled);
+    if(active){const j=await storage.get(`analysis:${active}:state`);if(j&&!['done','failed'].includes(j.state)){if((teamId&&j.scope==='team'&&j.teams[0].teamId===teamId)||(selectedIds&&j.scope==='selected'&&JSON.stringify([...selectedIds].sort())===JSON.stringify(j.teams.map(t=>t.teamId).sort())))return status(active);throw new Error('ANALYSIS_BUSY');}}
+    const watches=selectedIds?selectedIds.map(teamId=>({teamId})):[{teamId}];
     const teamIds=[...new Set(watches.map(w=>w.teamId))];
     if(!teamIds.length)return {available:false,reason:'Нет отслеживаемых команд.'};
-    const j={jobId:uuid(),state:'running',phase:'fetch',scope:selectedIds?'selected':teamId?'team':'all-watched',createdAt:new Date(now()).toISOString(),teams:teamIds.map(id=>({teamId:id,count:0,headSequence:null,expected:null,before:null,summaries:0,chunkIndex:0,chunkCount:0,level:0,reduceIndex:0})),teamIndex:0,processedSnapshots:0,retries:0};
-    await save(j);await storage.put('analysis:active',j.jobId);await storage.setAlarm(now()+1000);return status(j.jobId);
+    const j={jobId:uuid(),state:'running',phase:'fetch',scope:selectedIds?'selected':'team',createdAt:new Date(now()).toISOString(),teams:teamIds.map(id=>({teamId:id,count:0,headSequence:null,expected:null,before:null,summaries:0,chunkIndex:0,chunkCount:0,level:0,reduceIndex:0})),teamIndex:0,processedSnapshots:0,retries:0};
+    await save(j);await storage.put('analysis:active',j.jobId);await storage.put('analysis:scope:'+scopeKey(teamId,selectedIds),j.jobId);await storage.setAlarm(now()+1000);return status(j.jobId);
   }
-  async function status(jobId) {
+  async function status(jobId,teamId,selectedIds) {
+    if(!jobId&&(teamId||selectedIds)){jobId=await storage.get('analysis:scope:'+scopeKey(teamId,selectedIds));if(!jobId)return {available:false,reason:'ИИ-анализ для выбранных команд ещё не запускался.'};}
     jobId=jobId??await storage.get('analysis:active');
     if(!jobId)return {available:false,reason:analysisKeys(env).length?'Анализ ещё не запускался.':'ИИ-анализ не подключён: отсутствует ключ провайдера. Динамика за весь период доступна без ИИ.'};
     const j=await storage.get(`analysis:${jobId}:state`);if(!j)throw new Error('ANALYSIS_JOB_NOT_FOUND');
@@ -97,7 +100,7 @@ export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=request
   async function nextTeam(j){j.teamIndex++;j.phase=j.teamIndex<j.teams.length?'fetch':'overall';}
   async function overall(j) {
     const teams=[];for(const t of j.teams)teams.push({teamId:t.teamId,teamName:t.name,count:t.count,from:t.from,to:t.to,report:(await storage.get(key(j,`report:${t.teamId}`)))?.text});
-    const report=await analyze({input:{scope:j.scope,teams},task:'Ответ до 400 слов. Сделай сравнительный итог по ВСЕМ командам и их полной истории: динамика, темп, вклад игроков, состав, отличия периодов и ограничения сравнения. Не сравнивай разную длительность как равную. Не пропускай команды без снимков, отметь нехватку данных.',env});
+    const report=await analyze({input:{scope:j.scope,teams},task:j.scope==='team'?'Ответ до 400 слов. Подведи итог полной истории только этой команды: динамика, темп, вклад игроков, состав и ограничения наблюдений.': 'Ответ до 400 слов. Сделай сравнительный итог по ВСЕМ командам и их полной истории: динамика, темп, вклад игроков, состав, отличия периодов и ограничения сравнения. Не сравнивай разную длительность как равную. Не пропускай команды без снимков, отметь нехватку данных.',env});
     await storage.put(key(j,'overall'),report);j.state='done';j.completedAt=new Date(now()).toISOString();
   }
   async function step() {
@@ -123,6 +126,6 @@ export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=request
 }
 export class SosiskaAnalysisJobs {
   constructor(ctx,env){this.jobs=createAnalysisJobs({storage:ctx.storage,env});}
-  async fetch(request){try{const b=await request.json();const data=b.operation==='start'?await this.jobs.start(b.teamId,b.teamIds):b.operation==='status'?await this.jobs.status(b.jobId):b.operation==='timeline'?await this.jobs.timeline(b.jobId,b.teamId,b.before,b.limit):null;if(!data)return json({ok:false,error:'ANALYSIS_INVALID'},400);return json({ok:true,data});}catch(e){return json({ok:false,error:safeError(e)},503);}}
+  async fetch(request){try{const b=await request.json();const data=b.operation==='start'?await this.jobs.start(b.teamId,b.teamIds):b.operation==='status'?await this.jobs.status(b.jobId,b.teamId,b.teamIds):b.operation==='timeline'?await this.jobs.timeline(b.jobId,b.teamId,b.before,b.limit):null;if(!data)return json({ok:false,error:'ANALYSIS_INVALID'},400);return json({ok:true,data});}catch(e){return json({ok:false,error:safeError(e)},503);}}
   async alarm(){await this.jobs.step();}
 }

@@ -28,12 +28,12 @@ test('real shared authorization rejects forged and expired signed sessions',asyn
 });
 
 test('team status failure or wrong identity never becomes a usable card',async()=>{for(const data of [{Status:1,TeamId:'1',Members:[]},{Status:0,TeamId:'2',Members:[]}]){const handle=createSosiskaApi({authorizeAdmin:async()=>{},fetchAgent:async()=>response(data)});assert.equal((await handle(req({operation:'team',teamId:'1'}),env)).status,502);}});
-test('all-team analysis and status use protected job binding, never two-snapshot history',async()=>{
+test('single-team analysis and status use protected job binding, never two-snapshot history',async()=>{
   const calls=[];const binding={idFromName:n=>n,get:()=>({fetch:async(url,init)=>{calls.push(JSON.parse(init.body));return Response.json({ok:true,data:{state:'running',jobId:'00000000-0000-4000-8000-000000000001'}});}})};
   const handle=createSosiskaApi({authorizeAdmin:async()=>{},fetchAgent:()=>{throw new Error('No game calls allowed');}});
-  assert.equal((await handle(req({operation:'analysis'}),{...env,SOSISKA_ANALYSIS:binding})).status,200);
+  assert.equal((await handle(req({operation:'analysis',teamId:'1'}),{...env,SOSISKA_ANALYSIS:binding})).status,200);
   assert.equal((await handle(req({operation:'analysisStatus'}),{...env,SOSISKA_ANALYSIS:binding})).status,200);
-  assert.deepEqual(calls,[{operation:'start'},{operation:'status'}]);
+  assert.deepEqual(calls,[{operation:'start',teamId:'1'},{operation:'status'}]);
   assert.throws(()=>validateAgentAction({operation:'analysis',records:[{forged:true}]}));
 });
 test('selected analysis IDs are bounded, unique and mutually exclusive with single team',()=>{
@@ -41,3 +41,5 @@ test('selected analysis IDs are bounded, unique and mutually exclusive with sing
  for(const teamIds of [[],['1'],['1','1'],['1','x'],['1','2','3','4','5','6']])assert.throws(()=>validateAgentAction({operation:'analysis',teamIds}));
  assert.throws(()=>validateAgentAction({operation:'analysis',teamId:'1',teamIds:['1','2']}));
 });
+
+test('unscoped analysis is rejected, scoped status forwards exact selection',()=>{assert.throws(()=>validateAgentAction({operation:'analysis'}));assert.doesNotThrow(()=>validateAgentAction({operation:'analysisStatus',teamId:'1'}));assert.doesNotThrow(()=>validateAgentAction({operation:'analysisStatus',teamIds:['1','2']}));});

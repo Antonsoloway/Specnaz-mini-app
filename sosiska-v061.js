@@ -2,6 +2,7 @@
 (() => {
   const endpoint='https://royal-crm-miniapp-api.tropical-spoon.workers.dev/admin-agent';
   let epoch=0,opened=false,busy=false,query='',candidates=[],offset=0,team=null,watches=[],records=[],nextBefore=null,notice='',analysis=null;
+  let analysisMode=null,analysisEpoch=0;
   const details=new Map(),timelines=new Map(),size=4;let pollTimer=null,filters={},filterLoading=false,stopFilterLoading=false,searchWarnings=[],period=null,periodLoading=false,stopPeriod=false,teamView='period',selected=new Map(),comparison=null,playerId=null,metric='levels';
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const value=v=>v==null?'—':typeof v==='object'?'—':String(v);
@@ -9,7 +10,7 @@
   const role=(t,id)=>t.Leader===id?'Лидер':t.CoLeaders?.includes(id)?'Помощник':'Участник';
   const admin=()=>typeof authState!=='undefined'&&!!(authState?.role?.isChatAdmin||authState?.role?.code==='admin'||authState?.permissions?.canManageAll);
   const session=()=>typeof sessionToken==='undefined'?'':sessionToken;
-  function reset(){selected.clear();comparison=null;playerId=null;clearTimeout(pollTimer);timelines.clear();epoch++;opened=false;busy=false;candidates=[];details.clear();team=null;records=[];watches=[];nextBefore=null;notice='';analysis=null;filters={};filterLoading=false;stopFilterLoading=true;searchWarnings=[];period=null;periodLoading=false;stopPeriod=true;}
+  function reset(){analysisMode=null;analysisEpoch++;selected.clear();comparison=null;playerId=null;clearTimeout(pollTimer);timelines.clear();epoch++;opened=false;busy=false;candidates=[];details.clear();team=null;records=[];watches=[];nextBefore=null;notice='';analysis=null;filters={};filterLoading=false;stopFilterLoading=true;searchWarnings=[];period=null;periodLoading=false;stopPeriod=true;}
   function decorate(){const grid=document.querySelector('.grid');if(!grid)return;let b=grid.querySelector('[data-sosiska-open]');if(!admin()){b?.remove();return;}if(b)return;b=document.createElement('button');b.type='button';b.className='tile';b.dataset.sosiskaOpen='1';b.innerHTML='<span>🌭</span><b>Агент «Сосиска»</b><small>Команды Royal Match и прогресс</small>';grid.appendChild(b);}
   async function api(operation,params={},e=epoch){
     const token=session();if(!token||!admin())throw new Error('Откройте приложение заново.');
@@ -25,7 +26,7 @@
   const sorted=members=>[...(members??[])].sort((a,b)=>(Number(b.Level??0)+Number(b.Crown??0))-(Number(a.Level??0)+Number(a.Crown??0))||Number(b.Level??0)-Number(a.Level??0)||String(a.UserId).localeCompare(String(b.UserId)));
   const rate=v=>v==null?'—':Number(v).toLocaleString('ru-RU',{maximumFractionDigits:2});
   const changeActivity=(m,field)=>Math.max(0,m.changes.find(c=>c.field===field)?.delta??0);
-  const analysisError=code=>({ANALYSIS_KEYS_REJECTED:'Провайдер отклонил подключённые ключи. Требуется проверка ключей на сервере.',ANALYSIS_INPUT_TOO_LARGE:'Провайдер отклонил слишком большой запрос. Повторите запуск после обновления.',ANALYSIS_REQUEST_REJECTED:'Провайдер отклонил параметры запроса. Требуется проверка ответа на сервере.',ANALYSIS_PROVIDER_UNAVAILABLE:'Провайдер ИИ временно недоступен или исчерпан лимит запросов.',ANALYSIS_INCOMPLETE:'ИИ не закончил ответ. Запуск можно повторить.',ANALYSIS_HISTORY_INCOMPLETE:'В истории обнаружен пропуск. Анализ остановлен.',ANALYSIS_NOT_CONFIGURED:'Ключи ИИ не подключены.'}[code]||'Не удалось завершить анализ. История сохранена.');
+  const analysisError=code=>({ANALYSIS_BUSY:'Сейчас завершается предыдущий анализ. Его задача продолжится в фоне; повторите запуск после завершения.',ANALYSIS_KEYS_REJECTED:'Провайдер отклонил подключённые ключи. Требуется проверка ключей на сервере.',ANALYSIS_INPUT_TOO_LARGE:'Провайдер отклонил слишком большой запрос. Повторите запуск после обновления.',ANALYSIS_REQUEST_REJECTED:'Провайдер отклонил параметры запроса. Требуется проверка ответа на сервере.',ANALYSIS_PROVIDER_UNAVAILABLE:'Провайдер ИИ временно недоступен или исчерпан лимит запросов.',ANALYSIS_INCOMPLETE:'ИИ не закончил ответ. Запуск можно повторить.',ANALYSIS_HISTORY_INCOMPLETE:'В истории обнаружен пропуск. Анализ остановлен.',ANALYSIS_NOT_CONFIGURED:'Ключи ИИ не подключены.'}[code]||'Не удалось завершить анализ. История сохранена.');
   const colors=['#38bdf8','#fb923c','#a78bfa','#4ade80','#f472b6'];
   const unit=()=>({levels:'уровней/ч',crowns:'корон/ч',help:'помощи/ч'}[metric]);
   function metricButtons(){return ['levels','crowns','help'].map(k=>button('metric',(metric===k?'✓ ':'')+({levels:'Уровни',crowns:'Короны',help:'Помощь'}[k]),'data-metric="'+k+'"')).join('');}
@@ -71,7 +72,7 @@
    return '<article class="sosiska-player-detail"><h3>'+esc(p.name)+' · активность</h3>'+button('player-close','Закрыть графики игрока')+metricButtons()+chart([{name:p.name,points:p.series}], 'Темп игрока')+'<h4>В какое время активнее · МСК</h4>'+hourlyChart(bins)+'<p>'+(!peak||peak.rate===0?'Положительный прирост не наблюдался.':'Наибольший наблюдаемый темп: '+peak.hour+':00–'+((peak.hour+1)%24)+':00 · '+rate(peak.rate)+' '+unit())+'</p><p class="muted">Это оценка по снимкам: прирост равномерно распределён по охваченному интервалу. Точное время игры неизвестно. При редких снимках профиль менее точный. Короны не переводятся в пройденные уровни.</p></article>';
   }
   function comparisonView(){
-   if(!selected.size)return '';
+   if(analysisMode!=='selected'||!selected.size)return '';
    return '<article><h3>Сравнение выбранных команд · '+selected.size+'/5</h3><p>'+[...selected.values()].map(esc).join(', ')+'</p>'+button('compare','Построить сравнение')+button('analysis-selected','ИИ-анализ выбранных команд')+button('clear-selection','Сбросить выбор')+(comparison?'<p>Общий период: '+esc(when(comparison.from))+' — '+esc(when(comparison.to))+' МСК</p>'+metricButtons()+chart(comparison.teams.map(t=>({name:t.teamName,points:t.series})), 'Темп команд')+comparison.teams.map(t=>'<div class="sosiska-player"><b>'+esc(t.teamName)+'</b><p>Уровни: '+(t.hours?'+'+t.levels:'—')+' · '+rate(t.levelsPerHour)+'/ч<br>Короны: '+(t.hours?'+'+t.crowns:'—')+' · '+rate(t.crownsPerHour)+'/ч<br>Помощь: '+(t.hours?'+'+t.help:'—')+'</p><p>Охват: '+rate(t.hours)+' ч · '+esc(when(t.from))+' — '+esc(when(t.to))+'</p></div>').join('')+'<p class="muted">Сравниваются только целые интервалы внутри общего периода; суммы и темп показаны раздельно. Границы снимков могут различаться. Нет интервалов — нет оценки. Интервалы, пересекающие границу общего периода, исключены; фактический охват указан у каждой команды.</p>':'')+'</article>';
   }
   function periodView(){
@@ -165,14 +166,15 @@
     return button('results','← К результатам')+'<article><h3>'+esc(team.TeamName)+'</h3><p>'+esc(team.Description)+'</p><p>Командные очки: '+esc(value(v.score))+' · участников: '+members.length+'</p><p>Лидер: '+esc(v.leader??'—')+'</p><p>Вход: уровень '+esc(team.MinLevel)+', короны '+esc(team.MinCrown)+' · '+(team.Type?'Открытая':'Закрытая')+'</p>'+button('roster-view','Состав')+button('period','Весь период')+button('history','Журнал снимков')+button('analysis','ИИ-анализ всей истории команды')+'<details><summary>Управление отслеживанием</summary>'+button('capture','Сохранить снимок сейчас')+'<label>Интервал, минуты<input data-sosiska-interval type="number" min="60" max="10080" step="1" value="'+esc(w?.intervalMinutes??60)+'" '+(busy?'disabled':'')+'></label>'+button('watch',w?'Изменить интервал':'Включить отслеживание')+(w?button('unwatch','Остановить отслеживание'):'')+'<p class="muted">Остановка сохраняет историю снимков.</p></details></article>'+
       (teamView==='roster'?'<article><h3>Состав · по уровням и коронам</h3><ol class="sosiska-roster">'+members.map(memberCard).join('')+'</ol></article>':teamView==='history'?history():button('period-refresh','Обновить весь период')+periodView());
   }
-  function render(){if(!opened)return;const panel=document.getElementById('panel');if(!panel)return;panel.hidden=false;panel.innerHTML=`<section class="sosiska-screen" aria-busy="${busy}">${button('back','← На главную')}<h2>🌭 Агент «Сосиска»</h2><p class="muted">Royal Match · доступ администраторам</p><form data-sosiska-search><label>Название команды<input name="query" maxlength="160" value="${esc(query)}" placeholder="Например, Mamonovo" required ${busy?'disabled':''}></label><button ${busy?'disabled':''}>Найти</button></form><p role="status" aria-live="polite">${esc(busy?((filterLoading||periodLoading)?notice:'Получаем данные…'):notice)}</p>${filterLoading?'<button type="button" data-sosiska-action="stop-filters">Остановить загрузку</button>':''}${periodLoading?'<button type="button" data-sosiska-action="stop-period">Остановить загрузку истории</button>':''}${team?roster():results()}${comparisonView()}<div id="sosiskaAnalysis">${analysisView()}</div><h3>Отслеживаемые команды</h3>${button('analysis-all','Анализ всей истории всех отслеживаемых команд')}${button('analysis-status','Обновить состояние анализа')}${button('list','Обновить список')}${watches.length?watches.map(w=>`<article><b>${esc(w.teamName||details.get(w.teamId)?.TeamName||'Команда без названия')}</b><p>Каждые ${esc(w.intervalMinutes)} мин. · последний снимок: ${esc(when(w.lastSuccessAt))}</p>${w.lastError?`<p>Последняя попытка не удалась: ${esc(w.lastError)}</p>`:''}${button('select-team',selected.has(w.teamId)?'✓ Выбрана для сравнения':'Выбрать для сравнения',`data-team-id="${esc(w.teamId)}"`)}${button('team','Открыть',`data-team-id="${esc(w.teamId)}"`)}</article>`).join(''):'<p>Отслеживание не включено.</p>'}</section>`;}
+  function render(){if(!opened)return;const panel=document.getElementById('panel');if(!panel)return;panel.hidden=false;panel.innerHTML=`<section class="sosiska-screen" aria-busy="${busy}">${button('back','← На главную')}<h2>🌭 Агент «Сосиска»</h2><p class="muted">Royal Match · доступ администраторам</p><form data-sosiska-search><label>Название команды<input name="query" maxlength="160" value="${esc(query)}" placeholder="Например, Mamonovo" required ${busy?'disabled':''}></label><button ${busy?'disabled':''}>Найти</button></form><p role="status" aria-live="polite">${esc(busy?((filterLoading||periodLoading)?notice:'Получаем данные…'):notice)}</p>${filterLoading?'<button type="button" data-sosiska-action="stop-filters">Остановить загрузку</button>':''}${periodLoading?'<button type="button" data-sosiska-action="stop-period">Остановить загрузку истории</button>':''}${team&&analysisMode!=='selected'?roster():results()}${comparisonView()}<div id="sosiskaAnalysis">${analysisView()}</div><h3>Отслеживаемые команды</h3>${button('list','Обновить список')}${watches.length?watches.map(w=>`<article><b>${esc(w.teamName||details.get(w.teamId)?.TeamName||'Команда без названия')}</b><p>Каждые ${esc(w.intervalMinutes)} мин. · последний снимок: ${esc(when(w.lastSuccessAt))}</p>${w.lastError?`<p>Последняя попытка не удалась: ${esc(w.lastError)}</p>`:''}${button('select-team',selected.has(w.teamId)?'✓ Выбрана для сравнения':'Выбрать для сравнения',`data-team-id="${esc(w.teamId)}"`)}${button('team','Открыть',`data-team-id="${esc(w.teamId)}"`)}</article>`).join(''):'<p>Отслеживание не включено.</p>'}</section>`;}
 
   function analysisView(){
+    if(!analysisParams())return '';
     if(!analysis?.available)return '<p class="muted">'+esc(analysis?.reason||'ИИ-анализ ещё не запускался. Динамика за весь период доступна без ИИ.')+'</p>';
     const a=analysis;
     if(a.state==='running')return `<article><h3>Анализ всей истории выполняется</h3><p>Команд: ${a.teams.length} · загружено снимков: ${esc(a.processedSnapshots)}</p><p>${esc(({fetch:'Читаем сохранённую историю',chunk:'ИИ анализирует изменения',reduce:'ИИ объединяет части анализа',overall:'ИИ сравнивает команды'}[a.phase]||'Анализируем историю'))}</p><p>Задача продолжится после закрытия приложения.</p>${a.error?'<p>'+esc(analysisError(a.error))+'</p><p>Повтор: '+esc(when(a.nextAttemptAt))+' · попыток: '+esc(a.retries)+'</p>':''}</article>`;
     if(a.state==='failed')return `<article><h3>Анализ не завершён</h3><p>Обработано снимков: ${esc(a.processedSnapshots)}. ${esc(analysisError(a.error))}</p><p>Можно повторить запуск; история сохранена.</p></article>`;
-    return `<article><h3>${a.scope==='team'?'Анализ команды за весь период':'Общий анализ отслеживаемых команд'}</h3><p>Команд: ${a.teams.length} · снимков: ${esc(a.processedSnapshots)}</p><div class="sosiska-analysis">${esc(a.summary?.text)}</div></article>${a.teams.map(t=>`<article><h3>${esc(t.teamName||t.teamId)}</h3><p>Вся история: ${esc(t.count)} снимков · ${esc(when(t.from))} — ${esc(when(t.to))} МСК</p><div class="sosiska-analysis">${esc(t.text)}</div>${button('timeline','Динамика по снимкам',`data-team-id="${esc(t.teamId)}"`)}${timelineView(t.teamId)}</article>`).join('')}`;
+    return `<article><h3>${a.scope==='team'?'Анализ команды за весь период':'Сравнение выбранных команд за весь период'}</h3><p>Команд: ${a.teams.length} · снимков: ${esc(a.processedSnapshots)}</p><div class="sosiska-analysis">${esc(a.summary?.text)}</div></article>${a.teams.map(t=>`<article><h3>${esc(t.teamName||t.teamId)}</h3><p>Вся история: ${esc(t.count)} снимков · ${esc(when(t.from))} — ${esc(when(t.to))} МСК</p><div class="sosiska-analysis">${esc(t.text)}</div>${button('timeline','Динамика по снимкам',`data-team-id="${esc(t.teamId)}"`)}${timelineView(t.teamId)}</article>`).join('')}`;
   }
   function timelineView(id){
     const data=timelines.get(id);if(!data)return '';
@@ -183,11 +185,19 @@
     const delta=(id,field)=>{const c=point.changes.members?.find(m=>m.userId===id)?.changes.find(c=>c.field===field);return c?.delta===undefined?'—':c.delta>0?'+'+c.delta:String(c.delta);};
     return `<div class="sosiska-table"><table><thead><tr><th>Игрок</th><th>Уровень / Δ</th><th>Короны / Δ</th><th>Помощь / Δ</th></tr></thead><tbody>${sorted(point.members.map(m=>({...m,UserId:m.userId,Level:m.level,Crown:m.crown}))).map(m=>`<tr><td>${esc(m.name)}</td><td>${esc(value(m.level))} / ${esc(delta(m.userId,'Level'))}</td><td>${esc(value(m.crown))} / ${esc(delta(m.userId,'Crown'))}</td><td>${esc(value(m.help))} / ${esc(delta(m.userId,'HelpCount'))}</td></tr>`).join('')}</tbody></table></div><p>Вступили: ${esc(point.changes.joined?.map(m=>m.Name).join(', ')||'—')}<br>Вышли: ${esc(point.changes.left?.map(m=>m.Name).join(', ')||'—')}</p>`;
   }
+  function analysisParams(){return analysisMode==='team'&&team?{teamId:team.TeamId}:analysisMode==='selected'&&selected.size>=2?{teamIds:[...selected.keys()]}:null;}
+  function matchesAnalysis(a,params){return !a?.available||(a.scope===(params.teamId?'team':'selected')&&JSON.stringify((a.teams??[]).map(t=>t.teamId).sort())===JSON.stringify((params.teamId?[params.teamId]:params.teamIds).slice().sort()));}
+  async function switchAnalysis(mode,e){
+    analysisMode=mode;analysis=null;analysisEpoch++;clearTimeout(pollTimer);timelines.clear();
+    const params=analysisParams(),version=analysisEpoch;if(!params)return;
+    const current=await api('analysisStatus',params,e);
+    if(version===analysisEpoch&&matchesAnalysis(current,params)){analysis=current;schedulePoll();}
+  }
   function schedulePoll(){
     clearTimeout(pollTimer);if(!opened||analysis?.state!=='running')return;
-    const e=epoch;pollTimer=setTimeout(async()=>{
-      if(e!==epoch||!opened)return;if(busy){schedulePoll();return;}
-      try{const current=await api('analysisStatus',{jobId:analysis.jobId},e);analysis=current;const node=document.getElementById('sosiskaAnalysis');if(node)node.innerHTML=analysisView();}catch(error){if(error.stale)return;notice='Не удалось обновить состояние анализа: '+error.message;render();}
+    const e=epoch,version=analysisEpoch,jobId=analysis.jobId,params=analysisParams();pollTimer=setTimeout(async()=>{
+      if(e!==epoch||version!==analysisEpoch||!opened)return;if(busy){schedulePoll();return;}
+      try{const current=await api('analysisStatus',{jobId},e);if(version!==analysisEpoch||!matchesAnalysis(current,params))return;analysis=current;const node=document.getElementById('sosiskaAnalysis');if(node)node.innerHTML=analysisView();}catch(error){if(error.stale||version!==analysisEpoch)return;notice='Не удалось обновить состояние анализа: '+error.message;render();}
       schedulePoll();
     },5000);
   }
@@ -227,12 +237,12 @@
     watches=(await api('list',{},e)).watches;
     for(const w of watches){if(e!==epoch||!opened)return;try{const d=await api('history',{teamId:w.teamId,limit:1},e);w.teamName=d.records?.[0]?.snapshot?.raw?.TeamName;}catch(error){if(error.stale||error.denied)throw error;if(error.limited)break;}}
   }
-  async function open(){reset();if(!admin())return;opened=true;try{window.RoyalNav?.pushCurrent?.();setActiveNav('sosiska');activePage='sosiska';}catch{}render();await run(async e=>{await loadWatches(e);notice='Введите название команды для поиска.';try{analysis=await api('analysisStatus',{},e);schedulePoll();}catch(error){if(error.stale)throw error;}});}
+  async function open(){reset();if(!admin())return;opened=true;try{window.RoyalNav?.pushCurrent?.();setActiveNav('sosiska');activePage='sosiska';}catch{}render();await run(async e=>{await loadWatches(e);notice='Введите название команды для поиска.';});}
   document.addEventListener('submit',event=>{
     if(event.target.matches('[data-sosiska-search]')){
       event.preventDefault();event.stopImmediatePropagation();if(busy)return;
       query=String(new FormData(event.target).get('query')||'').trim();event.target.querySelector('input')?.blur();
-      run(async e=>{team=null;records=[];candidates=[];details.clear();filters={};const d=await api('search',{query},e);candidates=d.candidates;searchWarnings=d.warnings;offset=0;notice=d.warnings.join(' ')||(!candidates.length?'Команды не найдены.':'');await hydrate(e);});return;
+      run(async e=>{team=null;await switchAnalysis(null,e);records=[];candidates=[];details.clear();filters={};const d=await api('search',{query},e);candidates=d.candidates;searchWarnings=d.warnings;offset=0;notice=d.warnings.join(' ')||(!candidates.length?'Команды не найдены.':'');await hydrate(e);});return;
     }
     if(!event.target.matches('[data-sosiska-filters]'))return;
     event.preventDefault();event.stopImmediatePropagation();if(busy)return;
@@ -257,22 +267,21 @@
       if(action==='metric'){metric=target.dataset.metric;return;}
       if(action==='player-close'){playerId=null;return;}
       if(action==='player'){playerId=target.dataset.playerId;teamView='period';if(!period?.complete)await loadPeriod(e);render();setTimeout(()=>{if(e===epoch)document.querySelector('.sosiska-player-detail')?.scrollIntoView?.({behavior:'smooth',block:'start'});},0);return;}
-      if(action==='select-team'){const id=target.dataset.teamId;if(selected.has(id))selected.delete(id);else{if(selected.size>=5)throw Error('Выберите не более пяти команд.');selected.set(id,details.get(id)?.TeamName||watches.find(w=>w.teamId===id)?.teamName||candidates.find(c=>c.teamId===id)?.name||id);}comparison=null;return;}
-      if(action==='clear-selection'){selected.clear();comparison=null;return;}
-      if(action==='analysis-selected'){if(selected.size<2)throw Error('Выберите от двух до пяти команд.');analysis=await api('analysis',{teamIds:[...selected.keys()]},e);schedulePoll();return;}
+      if(action==='select-team'){const id=target.dataset.teamId;if(selected.has(id))selected.delete(id);else{if(selected.size>=5)throw Error('Выберите не более пяти команд.');selected.set(id,details.get(id)?.TeamName||watches.find(w=>w.teamId===id)?.teamName||candidates.find(c=>c.teamId===id)?.name||id);}comparison=null;await switchAnalysis('selected',e);return;}
+      if(action==='clear-selection'){selected.clear();comparison=null;await switchAnalysis(team?'team':null,e);return;}
+      if(action==='analysis-selected'){if(analysisMode!=='selected')return;if(selected.size<2)throw Error('Выберите от двух до пяти команд.');const params=analysisParams(),data=await api('analysis',params,e);if(!matchesAnalysis(data,params))throw Error('Ответ ИИ не соответствует выбранным командам.');analysis=data;schedulePoll();return;}
       if(action==='compare'){if(selected.size<2)throw Error('Выберите от двух до пяти команд.');const periods=[];comparison=null;
        for(const id of selected.keys()){notice='Загружаем историю: '+selected.get(id);render();const acc=SosiskaPeriod.createPeriodAccumulator(id);let before;
         for(;;){const page=await api('history',{teamId:id,limit:20,...(before?{before}:{})},e);if(!page.records.length)break;for(const r of page.records)acc.add(r);if(!page.nextBefore)break;if(before&&page.nextBefore>=before)throw Error('Ошибка порядка истории.');before=page.nextBefore;}
         periods.push(acc.result());}
        try{comparison=SosiskaPeriod.comparePeriods(periods);}catch(error){throw Error(error.message==='COMPARISON_NO_OVERLAP'?'У команд нет общего периода наблюдения.':'Для сравнения каждой команде нужны хотя бы два снимка и полная история.');}return;}
-      if(action==='results'){team=null;records=[];return;}
+      if(action==='results'){team=null;records=[];await switchAnalysis(null,e);return;}
       if(action==='clear-filters'){filters={};offset=0;notice='Фильтры сброшены.';await hydrate(e);return;}
       if(action==='next'||action==='prev'){offset+=action==='next'?size:-size;await hydrate(e);return;}
-      if(action==='team'){const id=target.dataset.teamId;team=await api('team',{teamId:id},e);details.set(id,team);records=[];period=null;playerId=null;teamView='period';nextBefore=null;await loadPeriod(e);return;}
+      if(action==='team'){const id=target.dataset.teamId;team=await api('team',{teamId:id},e);details.set(id,team);await switchAnalysis('team',e);records=[];period=null;playerId=null;teamView='period';nextBefore=null;await loadPeriod(e);return;}
       if(action==='list'){await loadWatches(e);return;}
-      if(action==='analysis-all'||action==='analysis-status'){analysis=await api(action==='analysis-all'?'analysis':'analysisStatus',{},e);timelines.clear();if(!analysis.available)notice=analysis.reason;schedulePoll();return;}
       if(action==='timeline'||action==='timeline-older'){const id=target.dataset.teamId,old=timelines.get(id);const data=await api('analysisTimeline',{jobId:analysis.jobId,teamId:id,limit:10,...(action==='timeline-older'?{before:old.nextBefore}:{})},e);timelines.set(id,{...data,points:action==='timeline-older'?[...old.points,...data.points]:data.points});return;}if(!team)return;
-      if(action==='analysis'){const data=await api('analysis',{teamId:team.TeamId},e);analysis=data;timelines.clear();if(!data.available)notice=data.reason;schedulePoll();return;}
+      if(action==='analysis'){if(analysisMode!=='team')return;const data=await api('analysis',{teamId:team.TeamId},e);if(!matchesAnalysis(data,analysisParams()))throw Error('Ответ ИИ не соответствует выбранной команде.');analysis=data;timelines.clear();if(!data.available)notice=data.reason;schedulePoll();return;}
       if(action==='roster-view'){teamView='roster';return;}
       if(action==='period'||action==='period-refresh'){teamView='period';if(action==='period-refresh'||!period?.complete)await loadPeriod(e);return;}
       if(action==='capture'){await api('capture',{teamId:team.TeamId},e);if(teamView==='period')await loadPeriod(e);else await loadHistory(e);notice='Снимок сохранён.';return;}
@@ -285,5 +294,5 @@
   window.addEventListener('royal:auth-ready',()=>{reset();decorate();});
   for(const name of ['royal:access-denied','royal:fatal'])window.addEventListener(name,()=>{reset();decorate();});
   window.RoyalAdminDataV0600?.subscribe?.(event=>{if(event.type==='clear'&&['unauthorized','forbidden','session-changed'].includes(event.reason)){const visible=opened;reset();if(visible){const panel=document.getElementById('panel');if(panel)panel.textContent='Админская сессия завершена. Откройте приложение заново.';}}});
-  decorate();window.RoyalSosiska={version:'0.5.1',open,filters:{parse:parseFilters,matches:matchesFilters,fields:teamFilterFields}};
+  decorate();window.RoyalSosiska={version:'0.5.2',open,filters:{parse:parseFilters,matches:matchesFilters,fields:teamFilterFields}};
 })();
