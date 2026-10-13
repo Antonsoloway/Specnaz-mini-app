@@ -24,3 +24,20 @@ test('one snapshot has no speed; gaps and reversed time do not become complete p
  const b=createPeriodAccumulator('1');b.add(record(3,[m('A',100)]));assert.throws(()=>b.add(record(1,[m('A',99)])),/INCOMPLETE/);assert.equal(b.result().complete,false);
  const c=createPeriodAccumulator('1');c.add(record(2,[m('A',100)]));const old=record(1,[m('A',99)]);old.snapshot.capturedAt=record(3,[]).snapshot.capturedAt;assert.throws(()=>c.add(old),/TIME/);
 });
+test('activity rank, time series and hourly profile preserve observed progress',()=>{
+ const a=createPeriodAccumulator('1');a.add(record(3,[m('Idle',1000),m('Active',120,20)]));a.add(record(2,[m('Idle',1000),m('Active',110,10)]));a.add(record(1,[m('Idle',1000),m('Active',100,0)]));
+ const r=a.result();assert.equal(r.players[0].userId,'Active');assert.equal(r.series.reduce((n,p)=>n+p.levels,0),20);assert.equal(r.players[0].hourly.reduce((n,h)=>n+h.levels,0),20);assert.equal(r.players[0].series[0].from,record(1,[]).snapshot.capturedAt);assert.equal(r.players[0].hourly.find(h=>h.hour===4).levelsPerHour,10);
+});
+test('invalid/reset metrics do not create zero-tempo observations in hourly bins',()=>{
+ const a=createPeriodAccumulator('1');a.add(record(2,[m('A',100,0)]));a.add(record(1,[m('A',100,20)]));const p=a.result().players[0];assert.equal(p.series[0].crowns,null);assert.equal(p.hourly.find(h=>h.hour===4).crownsPerHour,null);
+});
+test('comparison uses overlap and excludes boundary intervals, not lifetime totals',async()=>{
+ const {comparePeriods}=await import('../worker/src/sosiska-period.js');const a=createPeriodAccumulator('1'),b=createPeriodAccumulator('2');
+ for(const n of [4,3,2,1])a.add(record(n,[m('A',n*10)]));
+ for(const n of [3,2,1]){const r=record(n,[m('B',n*5)]);r.snapshot.teamId='2';r.snapshot.capturedAt=new Date(Date.parse(r.snapshot.capturedAt)+3600000).toISOString();b.add(r);}
+ const c=comparePeriods([a.result(),b.result()]);assert.equal(c.teams[0].hours,2);assert.equal(c.teams[0].levels,20);assert.equal(c.teams[1].levelsPerHour,5);
+ assert.throws(()=>comparePeriods([{...a.result(),complete:false},b.result()]),/NEEDS_HISTORY/);
+});
+test('large histories remain bounded without losing all-period totals',()=>{
+ const a=createPeriodAccumulator('1');for(let n=1100;n>0;n--)a.add(record(n,[m('A',n)]));const r=a.result();assert.ok(r.series.length<=512);assert.equal(r.series.reduce((n,p)=>n+p.levels,0),1099);assert.equal(r.players[0].hourly.reduce((n,h)=>n+h.levels,0),1099);
+});

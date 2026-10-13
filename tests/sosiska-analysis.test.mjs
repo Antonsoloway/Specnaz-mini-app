@@ -36,3 +36,9 @@ test('provider failure and truncated output are not completed analysis',async()=
 
 test('AI final report includes deterministic full-period rates and distinguishes league rounds',async()=>{const s=setup({'1':23});const job=await s.make().start('1');const result=await finish(s,job.jobId);assert.equal(result.teams[0].period.snapshotCount,23);assert.equal(result.teams[0].period.complete,true);assert.equal(result.teams[0].period.players[0].levelGain,22);assert.equal(result.teams[0].period.leagueRoundsAvailable,false);assert.ok(s.inputs.some(i=>i.period?.snapshotCount===23));});
 test('missing analysis key is visible even before first start',async()=>{const storage={get:async()=>null};const j=createAnalysisJobs({storage,env:{}});const result=await j.status();assert.equal(result.available,false);assert.match(result.reason,/отсутствует ключ/);});
+test('exhausted provider retries stop after five attempts and preserve history cursor',async()=>{
+ const s=setup({'1':6},{aiFail:()=>true});const j=await s.make().start('1');const done=await finish(s,j.jobId);assert.equal(done.state,'failed');assert.equal(done.retries,5);assert.equal(done.processedSnapshots,5);assert.equal(s.alarm,null);
+});
+test('selected teams analysis includes only chosen IDs and preserves duplicate scope',async()=>{
+ const s=setup({'1':2,'2':2,'3':2});const j=await s.make().start(undefined,['1','3']);assert.equal((await s.make().start(undefined,['3','1'])).jobId,j.jobId);const done=await finish(s,j.jobId);assert.equal(done.scope,'selected');assert.deepEqual(done.teams.map(t=>t.teamId),['1','3']);assert.equal(s.calls.some(b=>b.operation==='list'),false);
+});

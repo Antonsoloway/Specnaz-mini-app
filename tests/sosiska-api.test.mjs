@@ -36,3 +36,8 @@ test('all-team analysis and status use protected job binding, never two-snapshot
   assert.deepEqual(calls,[{operation:'start'},{operation:'status'}]);
   assert.throws(()=>validateAgentAction({operation:'analysis',records:[{forged:true}]}));
 });
+test('selected analysis IDs are bounded, unique and mutually exclusive with single team',()=>{
+ assert.deepEqual(validateAgentAction({operation:'analysis',teamIds:['1','2']}).teamIds,['1','2']);
+ for(const teamIds of [[],['1'],['1','1'],['1','x'],['1','2','3','4','5','6']])assert.throws(()=>validateAgentAction({operation:'analysis',teamIds}));
+ assert.throws(()=>validateAgentAction({operation:'analysis',teamId:'1',teamIds:['1','2']}));
+});
