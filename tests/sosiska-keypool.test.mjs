@@ -43,3 +43,10 @@ test('provider failures carry safe status counts and actionable classifications'
   await assert.rejects(()=>requestSosiskaAnalysis({env:{SOSISKA_GROQ_KEY:'private'},input:{},task:'',fetchAI:async()=>Response.json({error:{message:'private provider details'}},{status})}),e=>{assert.equal(e.message,code);assert.equal(e.permanent,true);assert.equal(e.diagnostics.statuses[status],1);assert.ok(!JSON.stringify(e).includes('private'));return true;});
  }
 });
+test('unfinished response reports finish reason without burning the whole key pool',async()=>{
+ let calls=0;await assert.rejects(()=>requestSosiskaAnalysis({env:{SOSISKA_GROQ_KEYS:'["a","b","c"]'},input:{},task:'',fetchAI:async(_,init)=>{calls++;const body=JSON.parse(init.body);assert.equal(body.max_completion_tokens,4096);assert.equal(body.reasoning_effort,'low');return Response.json({choices:[{finish_reason:'length',message:{content:'partial'}}]});}}),e=>e.message==='ANALYSIS_INCOMPLETE'&&e.diagnostics.finishes.length===1);assert.equal(calls,1);
+});
+test('compact final table preserves all deterministic player values',async()=>{
+ const {analysisInput}=await import('../worker/src/sosiska-analysis.js');const players=Array.from({length:50},(_,i)=>({userId:String(i),name:'Player'+i,current:true,levelGain:i,crownGain:i*2,helpGain:0,observedHours:23,levelsPerHour:i/23,joined:0,left:0,crownResets:0}));const input={period:{complete:true,snapshotCount:27,players},analysis:{text:'summary'}};const compact=analysisInput(input);
+ assert.ok(JSON.stringify(compact).length<JSON.stringify(input).length*.6);assert.deepEqual(compact.period.players.map(row=>Object.fromEntries(compact.period.playerColumns.map((k,i)=>[k,row[i]]))),players);assert.deepEqual(input.period.players,players);
+});
