@@ -10,6 +10,8 @@
 
   const FILTER_CHANGE = 'В поиске Сосиски добавлены совместные фильтры: командные очки от указанного значения, ник лидера, число участников, уровень и короны для входа, открытая или закрытая команда. Подробности проверяются по всем найденным командам, включая следующие страницы.';
 
+  const PERIOD_CHANGE = 'Сосиска: состав отсортирован по уровням и коронам, технический JSON убран. При открытии команды загружается вся история, рассчитываются изменения игроков и скорости уровней/корон в час, отдельно отмечены выходы и сбросы. Причина недоступности ИИ показывается явно.';
+
   const releases = Array.isArray(window.RoyalChangelog?.releases)
     ? window.RoyalChangelog.releases
     : [];
@@ -28,6 +30,8 @@
   if (!section.changes.includes(AGENT_CHANGE)) section.changes.unshift(AGENT_CHANGE);
 
   if (!section.changes.includes(FILTER_CHANGE)) section.changes.unshift(FILTER_CHANGE);
+
+  if (!section.changes.includes(PERIOD_CHANGE)) section.changes.unshift(PERIOD_CHANGE);
 
   current.changes = current.sections.flatMap(item => Array.isArray(item?.changes) ? item.changes : []);
   window.RoyalChangelog0601 = current;
