@@ -33,7 +33,7 @@ const invoke=async body=>{const r=await mf.dispatchFetch('https://miniapp.test/a
 try {
   mf=new Miniflare(convertV4MiniflareOptions?{...convertV4MiniflareOptions(options),resourcePersistencePath:persist}:options);
   const denied=await mf.dispatchFetch('https://miniapp.test/admin-agent',{method:'POST',headers:{Authorization:'Bearer forged','Content-Type':'application/json'},body:'{"operation":"analysis"}'});assert.equal(denied.status,401);
-  const job=await invoke({operation:'analysis'});assert.equal(job.state,'running');
+  const job=await invoke({operation:'analysis',teamId:'1'});assert.equal(job.state,'running');
   await mf.dispose();mf=new Miniflare(convertV4MiniflareOptions?{...convertV4MiniflareOptions(options),resourcePersistencePath:persist}:options);
   assert.equal((await invoke({operation:'analysisStatus',jobId:job.jobId})).jobId,job.jobId);
   let result;

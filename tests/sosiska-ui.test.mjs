@@ -17,7 +17,7 @@ function setup({admin=true,responder}={}){
 }
 test('tile only appears for admins and opening lists watches without enabling any',async()=>{
   const denied=setup({admin:false});assert.equal(denied.tiles.length,0);await denied.context.window.RoyalSosiska.open();assert.equal(denied.calls.length,0);
-  const s=setup();assert.equal(s.tiles.length,1);await s.context.window.RoyalSosiska.open();assert.deepEqual(s.calls,[{operation:'list'},{operation:'analysisStatus'}]);assert.match(s.panel.innerHTML,/Отслеживание не включено/);
+  const s=setup();assert.equal(s.tiles.length,1);await s.context.window.RoyalSosiska.open();assert.deepEqual(s.calls,[{operation:'list'}]);assert.match(s.panel.innerHTML,/Отслеживание не включено/);
 });
 test('same-name results show description and leader, with HTML escaped',async()=>{
   const s=setup({responder:b=>b.operation==='list'?{watches:[]}:b.operation==='search'?{candidates:[{teamId:'1',name:'<img src=x onerror=evil()>',memberCount:1,sources:['search']}],warnings:[]}:{TeamId:'1',TeamName:'Team',Description:'<script>evil()</script>',Leader:'2',CoLeaders:[],Members:[{UserId:'2',Name:'Leader & Co',Level:1,Crown:0,HelpCount:0}]}});
@@ -33,11 +33,12 @@ test('explicit watch uses user interval; history renders changes and joins',asyn
   await s.context.window.RoyalSosiska.open();s.action('team','1');await settle();assert.match(s.panel.innerHTML,/Лидер/);s.action('watch');await settle();assert.deepEqual(s.calls.find(b=>b.operation==='watch'),{operation:'watch',teamId:'1',intervalMinutes:120});s.action('history');await settle();assert.match(s.panel.innerHTML,/\+10/);assert.match(s.panel.innerHTML,/Вступили: New/);
 });
 test('analysis is escaped and tied to server dates, never generated automatically',async()=>{
-  const s=setup({responder:b=>b.operation==='team'?{TeamId:'1',TeamName:'Team',Members:[]}:b.operation==='analysis'?{available:true,state:'done',processedSnapshots:30,summary:{text:'<b>Untrusted</b>'},teams:[{teamId:'1',teamName:'Team',count:30,text:'Report',from:'2026-10-11T19:00:00Z',to:'2026-10-11T20:00:00Z'}]}:{watches:[]}});await s.context.window.RoyalSosiska.open();s.action('team','1');await settle();assert.equal(s.calls.filter(x=>x.operation==='analysis').length,0);s.action('analysis');await settle();assert.match(s.panel.innerHTML,/&lt;b&gt;Untrusted/);
+  const s=setup({responder:b=>b.operation==='team'?{TeamId:'1',TeamName:'Team',Members:[]}:b.operation==='analysis'?{available:true,scope:'team',state:'done',processedSnapshots:30,summary:{text:'<b>Untrusted</b>'},teams:[{teamId:'1',teamName:'Team',count:30,text:'Report',from:'2026-10-11T19:00:00Z',to:'2026-10-11T20:00:00Z'}]}:{watches:[]}});await s.context.window.RoyalSosiska.open();s.action('team','1');await settle();assert.equal(s.calls.filter(x=>x.operation==='analysis').length,0);s.action('analysis');await settle();assert.match(s.panel.innerHTML,/&lt;b&gt;Untrusted/);
 });
-test('global analysis includes all tracked teams without requiring an open card',async()=>{
-  const s=setup({responder:b=>b.operation==='list'?{watches:[{teamId:'1',intervalMinutes:60},{teamId:'2',intervalMinutes:120}]}:b.operation==='analysis'?{available:true,state:'done',processedSnapshots:130,summary:{text:'All teams'},teams:[{teamId:'1',teamName:'First',count:127,text:'Early and late',from:'2026-10-01',to:'2026-10-11'},{teamId:'2',teamName:'Second',count:3,text:'Other history',from:'2026-10-09',to:'2026-10-11'}]}:{available:false}});
-  await s.context.window.RoyalSosiska.open();s.action('analysis-all');await settle();assert.deepEqual(s.calls.find(b=>b.operation==='analysis'),{operation:'analysis'});assert.match(s.panel.innerHTML,/130/);assert.match(s.panel.innerHTML,/Early and late/);assert.match(s.panel.innerHTML,/Other history/);assert.equal(s.calls.filter(b=>['watch','capture'].includes(b.operation)).length,0);
+test('no global analysis control or unscoped request is available',async()=>{
+ const s=setup();await s.context.window.RoyalSosiska.open();s.action('analysis-all');await settle();
+ assert.equal(s.calls.some(b=>b.operation==='analysis'||b.operation==='analysisStatus'),false);
+ assert.ok(!s.panel.innerHTML.includes('data-sosiska-action="analysis-all"'));
 });
 
 const filterTeam=(id,level=10000,crown=0,leader='Лидер')=>({TeamId:String(id),TeamName:'Team '+id,Description:'Details '+id,Leader:'99',CoLeaders:[],MinLevel:100,MinCrown:0,Type:true,Members:[{UserId:'99',Name:leader,Level:level,Crown:crown,HelpCount:0},{UserId:'98',Name:'Member',Level:10000,Crown:0,HelpCount:0}]});
@@ -132,7 +133,7 @@ test('activity charts open on player click and comparison only reads selected te
  s.context.renderPage('home');await s.context.window.RoyalSosiska.open();assert.ok(!s.panel.innerHTML.includes('Сравнение выбранных'));
 });
 test('AI failure renders actionable text rather than raw internal error code',async()=>{
- const s=setup({responder:b=>b.operation==='analysisStatus'?{available:true,state:'failed',teams:[],processedSnapshots:5,error:'ANALYSIS_KEYS_REJECTED'}:{watches:[]}});await s.context.window.RoyalSosiska.open();assert.match(s.panel.innerHTML,/отклонил подключённые ключи/);assert.ok(!s.panel.innerHTML.includes('ANALYSIS_KEYS_REJECTED'));
+ const s=setup({responder:b=>b.operation==='team'?{TeamId:'1',TeamName:'Team',Members:[]}:b.operation==='analysisStatus'?{available:true,scope:'team',state:'failed',teams:[{teamId:'1'}],processedSnapshots:5,error:'ANALYSIS_KEYS_REJECTED'}:{watches:[]}});await s.context.window.RoyalSosiska.open();s.action('team','1');await settle();assert.match(s.panel.innerHTML,/отклонил подключённые ключи/);assert.ok(!s.panel.innerHTML.includes('ANALYSIS_KEYS_REJECTED'));
 });
 test('snapshot view omits unchanged and zero-growth members, retains growth and membership events',async()=>{
  const raw={TeamId:'1',TeamName:'Team',Members:[{UserId:'1',Name:'Idle',Level:100,Crown:0,HelpCount:0}]};
@@ -145,4 +146,28 @@ test('opening another player replaces the single inline chart and keeps labels r
  const records=[2,1].map(n=>({sequence:n,snapshot:{teamId:'1',capturedAt:new Date(Date.UTC(2026,9,13,n)).toISOString(),raw:{...raw,Members:raw.Members.map(m=>({...m,Level:m.Level+n}))}},changes:{baseline:n===1}}));
  const s=setup({responder:b=>b.operation==='team'?raw:b.operation==='history'?{records,nextBefore:null}:{watches:[]}});await s.context.window.RoyalSosiska.open();s.action('team','1');await settle();s.action('player',undefined,{playerId:'1'});await settle();assert.match(s.panel.innerHTML,/First · активность/);
  s.action('player',undefined,{playerId:'2'});await settle();assert.equal((s.panel.innerHTML.match(/class="sosiska-player-detail"/g)||[]).length,1);assert.ok(!s.panel.innerHTML.includes('First · активность'));assert.match(s.panel.innerHTML,/Second · активность/);assert.match(s.panel.innerHTML,/В среднем/);assert.match(s.panel.innerHTML,/Значения по интервалам/);assert.equal((s.panel.innerHTML.match(/class="sosiska-hour-cell"/g)||[]).length,24);assert.match(s.panel.innerHTML,/viewBox="0 0 360 295"/);
+});
+
+test('team and comparison reports belong to their exact screen and restore by scoped status',async()=>{
+ const report=(ids,scope)=>({available:true,scope,state:'done',processedSnapshots:ids.length,summary:{text:'Report '+ids.join(',')},teams:ids.map(teamId=>({teamId,text:'Only '+teamId}))});
+ const s=setup({responder:b=>b.operation==='team'?{TeamId:b.teamId,TeamName:'Team '+b.teamId,Members:[]}:b.operation==='list'?{watches:['1','2','3'].map(teamId=>({teamId}))}:b.operation==='analysis'||b.operation==='analysisStatus'?report(b.teamId?[b.teamId]:b.teamIds,b.teamId?'team':'selected'):{records:[],nextBefore:null}});
+ await s.context.window.RoyalSosiska.open();assert.ok(!s.panel.innerHTML.includes('Report'));
+ s.action('team','1');await settle();assert.match(s.panel.innerHTML,/Report 1/);s.action('analysis');await settle();assert.deepEqual(s.calls.find(b=>b.operation==='analysis'),{operation:'analysis',teamId:'1'});
+ s.action('team','2');await settle();assert.match(s.panel.innerHTML,/Report 2/);assert.ok(!s.panel.innerHTML.includes('Only 1'));
+ s.action('select-team','1');await settle();assert.ok(!s.panel.innerHTML.includes('Report 2'));
+ s.action('select-team','3');await settle();assert.match(s.panel.innerHTML,/Report 1,3/);assert.ok(!s.panel.innerHTML.includes('Only 2'));assert.ok(!s.panel.innerHTML.includes('data-sosiska-action="analysis"'));
+ s.action('analysis-selected');await settle();assert.deepEqual(s.calls.filter(b=>b.operation==='analysis').at(-1),{operation:'analysis',teamIds:['1','3']});
+ s.action('team','2');await settle();assert.match(s.panel.innerHTML,/Report 2/);assert.ok(!s.panel.innerHTML.includes('Report 1,3'));assert.ok(!s.panel.innerHTML.includes('data-sosiska-action="analysis-selected"'));
+ s.action('results');await settle();assert.ok(!s.panel.innerHTML.includes('Report'));
+ assert.equal(s.calls.some(b=>['analysis','analysisStatus'].includes(b.operation)&&!b.teamId&&!b.teamIds),false);
+});
+
+test('late polling response from previous team cannot overwrite the newly opened report',async()=>{
+ let poll,release;
+ const report=(id,state='done')=>({available:true,jobId:'00000000-0000-4000-8000-000000000001',scope:'team',state,processedSnapshots:1,summary:{text:'Summary '+id},teams:[{teamId:id,text:'Only '+id}]});
+ const s=setup({responder:b=>b.operation==='team'?{TeamId:b.teamId,TeamName:'Team '+b.teamId,Members:[]}:b.operation==='analysisStatus'?(b.jobId?new Promise(r=>{release=r;}):report(b.teamId,b.teamId==='1'?'running':'done')):b.operation==='history'?{records:[],nextBefore:null}:{watches:[]}});
+ s.context.setTimeout=(fn,ms)=>{if(ms===5000)poll=fn;return 1;};s.context.clearTimeout=()=>{};
+ await s.context.window.RoyalSosiska.open();s.action('team','1');await settle();const pending=poll();await settle();
+ s.action('team','2');await settle();assert.match(s.panel.innerHTML,/Summary 2/);
+ release(report('1'));await pending;assert.match(s.panel.innerHTML,/Summary 2/);assert.ok(!s.panel.innerHTML.includes('Only 1'));
 });
