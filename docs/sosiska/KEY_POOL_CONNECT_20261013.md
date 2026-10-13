@@ -19,3 +19,8 @@ Source90f4f6f78dc192f0eed3c93c5993b456e06bdb93; 76 Node tests PASS; CI3844607091
 После переподключения прочитать ~/sosiska-auth-private/key-connect-20261013/progress.log и acceptance-status.json (последний содержит закрытый отчёт/игровые данные, не публиковать целиком). Подтвердить done с обоими отчётами, summary и полной историей; если failed/running — изучить сохранённый error/состояние, не запускать перенос заново. Проверить, что target main entry обычный, временные route/vars/secret удалены; закончить безопасную очистку, если finally не выполнился. СОХРАНИТЬ SOSISKA_GROQ_KEYS и все остальные bindings/секреты/namespace. Если main Build заменил временный target wrapper, status collector может закончиться ошибкой маршрута, а cloud job продолжиться — это не доказательство ошибки GPT.
 
 Приватные OAuth/backup/transfer-session не читать в вывод и не коммитить. Source original code восстановлен до Shell failure; source bots не требуют повторного переноса/rollout. Игровой Worker/сессия/две watches/captures/автоповышение не менялись. Последнее по-прежнему отложено.
+
+
+## Production build confirmed through GitHub
+
+Main merge f73103f6559645b1fdd1784a80e74ec7ca12be85: Sosiska CI38447874104 SUCCESS, Pages38447872786 SUCCESS, Workers Builds royal-crm-miniapp-api production build f09a2998-907b-44e2-af8d-bc77b07d2cd1 SUCCESS. The normal entry-v1420 build does not import the temporary key-transfer helper, so this production deployment removes that private wrapper route. Removal of the leftover temporary target secret and final live AI job state still require Shell verification; never label the report completed based only on CI/build.
