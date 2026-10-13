@@ -171,3 +171,19 @@ test('late polling response from previous team cannot overwrite the newly opened
  s.action('team','2');await settle();assert.match(s.panel.innerHTML,/Summary 2/);
  release(report('1'));await pending;assert.match(s.panel.innerHTML,/Summary 2/);assert.ok(!s.panel.innerHTML.includes('Only 1'));
 });
+
+
+test('clicking a roster member opens detailed native profile and close returns to roster',async()=>{
+ const members=[{UserId:'777',Name:'First',Level:100,Crown:5,HelpCount:3},{UserId:'778',Name:'Second',Level:80,Crown:2,HelpCount:0}];
+ const s=setup({responder:b=>b.operation==='team'?{TeamId:'1',TeamName:'Team',Members:members}:b.operation==='profile'?{userId:b.userId,name:b.userId==='777'?'First':'Second',level:100,crown:5,joinedAt:'1685577600',teamName:'Team',stats:{totalCrown:'32155',highestCrown:'14244',leagueWins:'10',firstTryWins:'15257',helpsMade:'1046',helpsReceived:'0',areasCompleted:'160',collectionsCompleted:'12',setsCompleted:'199'},fetchedAt:'2026-10-13T20:00:00Z'}:b.operation==='history'?{records:[],nextBefore:null}:{watches:[]}});
+ await s.context.window.RoyalSosiska.open();s.action('team','1');await settle();s.action('roster-view');await settle();assert.match(s.panel.innerHTML,/Открыть профиль First/);
+ s.action('profile',undefined,{profileId:'777'});await settle();assert.deepEqual(s.calls.find(b=>b.operation==='profile'),{operation:'profile',userId:'777'});
+ for(const label of ['Статистика лиги','Всего корон','Больше всего корон','Победы в лигах','Побед с первой попытки','Оказанная помощь','Полученная помощь','Пройдено территорий','Собрано коллекций','Завершено наборов','06.2023'])assert.ok(s.panel.innerHTML.includes(label));assert.match(s.panel.innerHTML,/32\s155/);
+ s.action('profile-close');await settle();assert.ok(!s.panel.innerHTML.includes('data-player-profile'));assert.match(s.panel.innerHTML,/Открыть профиль Second/);
+ s.action('profile',undefined,{profileId:'778'});await settle();assert.match(s.panel.innerHTML,/<h4>Second<\/h4>/);
+ assert.equal(s.calls.some(b=>['watch','capture','analysis'].includes(b.operation)),false);
+});
+test('failed or mismatched profile never supplies fabricated lifetime statistics',async()=>{
+ const s=setup({responder:b=>b.operation==='team'?{TeamId:'1',TeamName:'Team',Members:[{UserId:'777',Name:'Player',Level:100,Crown:4}]}:b.operation==='profile'?{userId:'778',name:'Wrong person',stats:{totalCrown:'999'}}:b.operation==='history'?{records:[],nextBefore:null}:{watches:[]}});
+ await s.context.window.RoyalSosiska.open();s.action('team','1');await settle();s.action('profile',undefined,{profileId:'777'});await settle();assert.match(s.panel.innerHTML,/Профиль не соответствует/);assert.ok(!s.panel.innerHTML.includes('Wrong person'));assert.ok(!s.panel.innerHTML.includes('>999<'));assert.match(s.panel.innerHTML,/Повторить загрузку/);
+});

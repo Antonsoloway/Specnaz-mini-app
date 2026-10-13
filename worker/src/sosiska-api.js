@@ -5,8 +5,9 @@ const object = value => value !== null && typeof value === 'object' && !Array.is
 const invalid = () => { throw Object.assign(new Error('INVALID_REQUEST'), {status:400}); };
 export function validateAgentAction(body) {
   if (!object(body)) invalid();
-  const keys = {health:[],search:['query'],team:['teamId'],list:[],watch:['teamId','intervalMinutes'],unwatch:['teamId'],capture:['teamId'],history:['teamId','limit','before'],analysis:['teamId','teamIds'],analysisStatus:['jobId','teamId','teamIds'],analysisTimeline:['jobId','teamId','limit','before']}[body.operation];
+  const keys = {profile:['userId'],health:[],search:['query'],team:['teamId'],list:[],watch:['teamId','intervalMinutes'],unwatch:['teamId'],capture:['teamId'],history:['teamId','limit','before'],analysis:['teamId','teamIds'],analysisStatus:['jobId','teamId','teamIds'],analysisTimeline:['jobId','teamId','limit','before']}[body.operation];
   if (!Array.isArray(keys) || Object.keys(body).some(k => !['operation',...keys].includes(k))) invalid();
+  if(keys.includes('userId')&&!id(body.userId))invalid();
   if (keys.includes('teamId') && !(['analysis','analysisStatus'].includes(body.operation) && body.teamId===undefined) && !id(body.teamId)) invalid();
   if(body.teamIds!==undefined&&(!Array.isArray(body.teamIds)||body.teamIds.length<2||body.teamIds.length>5||body.teamIds.some(v=>!id(v))||new Set(body.teamIds).size!==body.teamIds.length||body.teamId!==undefined))invalid();
   if(body.operation==='analysis'&&body.teamId===undefined&&body.teamIds===undefined)invalid();
@@ -77,6 +78,11 @@ export function createSosiskaApi({authorizeAdmin,fetchAgent=fetch,fetchAI=fetch}
         return json({ok:true,data:{query:body.query,variants,candidates:[...candidates.values()],warnings:[...new Set(warnings)]}});
       }
       if(body.operation==='health')return json({ok:true,data:await invoke('health')});
+      if(body.operation==='profile'){
+        const data=await invoke('getProfile',{userId:body.userId});
+        if(data.RequestedUserId!==body.userId||!data.Profile||!Array.isArray(data.Stats))throw new Error('AGENT_PROFILE_INVALID');
+        return json({ok:true,data:normalizePlayerProfile(body.userId,data)});
+      }
       if(body.operation==='team'){
         const data=await invoke('getTeamInfo',{teamId:body.teamId,includeMembers:true});
         if(data?.Status!==0||data.TeamId!==body.teamId||!Array.isArray(data.Members))throw new Error('AGENT_TEAM_INVALID');
@@ -98,4 +104,15 @@ export function createSosiskaApi({authorizeAdmin,fetchAgent=fetch,fetchAI=fetch}
       return json({ok:false,error:code,message:error.publicMessage|| (status===401?'Откройте приложение заново.':status===403?'Раздел доступен только администраторам.':status===400?'Проверьте параметры запроса.':'Агент временно недоступен. Повторите попытку.')},status);
     }
   };
+}
+
+
+// StatType from the supplied Royal Match build 38911 metadata. Values stay int64 strings.
+export function normalizePlayerProfile(userId,data){
+ const mapping={2:'firstTryWins',3:'helpsMade',4:'helpsReceived',5:'areasCompleted',8:'highestCrown',9:'totalCrown',10:'leagueWins',30:'setsCompleted',31:'collectionsCompleted'};
+ const stats={};
+ for(const row of data.Stats){const name=mapping[row.Id];if(!name)continue;if(name in stats||typeof row.Value!=='string'||!/^\d+$/.test(row.Value)||BigInt(row.Value)>9223372036854775807n)throw Error('AGENT_PROFILE_INVALID');stats[name]=row.Value;}
+ const p=data.Profile;
+ if(typeof p.Name!=='string'||!Number.isSafeInteger(p.Level)||p.Level<0||!Number.isSafeInteger(p.Crown)||p.Crown<0||typeof p.JoinDate!=='string'||!/^\d+$/.test(p.JoinDate)||typeof p.TeamId!=='string'||!/^\d+$/.test(p.TeamId))throw Error('AGENT_PROFILE_INVALID');
+ return {userId,name:p.Name,level:p.Level,crown:p.Crown,teamId:p.TeamId,teamName:p.TeamName,joinedAt:p.JoinDate,profileSetting:p.ProfileSetting,stats,fetchedAt:new Date().toISOString()};
 }
