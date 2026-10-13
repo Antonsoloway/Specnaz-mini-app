@@ -117,8 +117,8 @@ test('roster is sorted and full period automatically covers more than one histor
  const histories=Array.from({length:27},(_,i)=>({sequence:27-i,snapshot:{teamId:'1',capturedAt:new Date(Date.UTC(2026,9,13)+(27-i)*3600000).toISOString(),raw:{TeamName:'Team',Members:members.map(m=>({...m,Level:m.Level+27-i}))}},changes:{baseline:27-i===1}}));
  const s=setup({responder:b=>b.operation==='team'?{TeamId:'1',TeamName:'Team',Leader:'3',Members:members}:b.operation==='history'?(()=>{const records=histories.filter(r=>r.sequence<(b.before??Infinity)).slice(0,b.limit);return {records,nextBefore:records.at(-1)?.sequence>1?records.at(-1).sequence:null};})():b.operation==='analysisStatus'?{available:false,reason:'Key missing'}:{watches:[]}});
  await s.context.window.RoyalSosiska.open();s.action('team','1');await settle();
- assert.ok(s.panel.innerHTML.indexOf('data-player-id="3"')<s.panel.innerHTML.indexOf('data-player-id="2"'));
- assert.match(s.panel.innerHTML,/Весь период наблюдения/);assert.match(s.panel.innerHTML,/снимков: 27/);assert.match(s.panel.innerHTML,/Уровни: \+26/);
+ s.action('roster-view');await settle();assert.ok(s.panel.innerHTML.indexOf('data-player-id="3"')<s.panel.innerHTML.indexOf('data-player-id="2"'));
+ s.action('period');await settle();assert.match(s.panel.innerHTML,/Весь период наблюдения/);assert.match(s.panel.innerHTML,/снимков: 27/);assert.match(s.panel.innerHTML,/Уровни: \+26/);
  assert.equal(s.calls.filter(b=>b.operation==='history').length,2);assert.ok(!s.panel.innerHTML.includes('JSON'));assert.ok(!s.panel.innerHTML.includes('UserId'));
  assert.equal(s.calls.some(b=>['analysis','watch','capture'].includes(b.operation)),false);
 });
