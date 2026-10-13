@@ -629,3 +629,8 @@ Backend rollout и приватные server credentials подтвержден�
 ## 2026-10-12 — Sosiska combined search filters
 
 See docs/sosiska/SEARCH_FILTERS_20261012.md. Inclusive minimum team points, leader substring, member/entry level/crown ranges and open/closed filters; hydrates all candidates, explicitly reports unchecked data, supports stop/reset and filtered pagination. 63 tests and CI38278637377 PASS. Frontend-only update; autonomous level updater remains deferred.
+
+
+## 2026-10-13 — Sosiska roster/period usability
+
+See docs/sosiska/USABILITY_PERIOD_20261013.md. Sorted mobile cards, no raw JSON, distinct full-period/roster/journal views, streaming full-history rates per player with reset/join/leave handling. Missing SOSISKA_GROQ_KEY confirmed; AI is not live configured. Crown-to-round conversion remains unproven, no invented formula. 71 tests and real two-team history check passed. Level updater still deferred.
