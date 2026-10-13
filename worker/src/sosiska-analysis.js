@@ -26,16 +26,30 @@ export function packAnalysisParts(rows,maxCharacters=16000) {
   }
   flush();return parts;
 }
+export function analysisKeys(env){
+ const keys=[];
+ if(typeof env.SOSISKA_GROQ_KEY==='string'&&env.SOSISKA_GROQ_KEY.trim())keys.push(env.SOSISKA_GROQ_KEY.trim());
+ if(env.SOSISKA_GROQ_KEYS){let pool;try{pool=JSON.parse(env.SOSISKA_GROQ_KEYS);}catch{throw Object.assign(new Error('ANALYSIS_KEYS_INVALID'),{permanent:true});}if(!Array.isArray(pool)||pool.length>64||pool.some(k=>typeof k!=='string'||!k.trim()))throw Object.assign(new Error('ANALYSIS_KEYS_INVALID'),{permanent:true});keys.push(...pool.map(k=>k.trim()));}
+ return [...new Set(keys)];
+}
+let nextKey=0;
 export async function requestSosiskaAnalysis({input,task,env,fetchAI=fetch}) {
-  if(!env.SOSISKA_GROQ_KEY)throw Object.assign(new Error('ANALYSIS_NOT_CONFIGURED'),{permanent:true});
-  const model=env.SOSISKA_GROQ_MODEL||'openai/gpt-oss-120b';
-  if(!/^openai\/gpt-oss-(120b|20b)$/.test(model))throw Object.assign(new Error('ANALYSIS_MODEL_INVALID'),{permanent:true});
-  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),60000);
-  try {
-    const r=await fetchAI('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${env.SOSISKA_GROQ_KEY}`,'Content-Type':'application/json'},signal:controller.signal,redirect:'manual',body:JSON.stringify({model,messages:[{role:'system',content:ANALYSIS_SYSTEM+'\n'+task},{role:'user',content:JSON.stringify(input)}],max_completion_tokens:4096})});
-    if(!r.ok)throw Object.assign(new Error('ANALYSIS_PROVIDER_UNAVAILABLE'),{permanent:![408,429,500,502,503,504].includes(r.status)});
-    const data=await r.json(),choice=data.choices?.[0];
-    if(choice?.finish_reason!=='stop'||typeof choice?.message?.content!=='string'||!choice.message.content.trim())throw new Error('ANALYSIS_INCOMPLETE');
-    return {text:choice.message.content,model};
-  }finally{clearTimeout(timer);}
+ const keys=analysisKeys(env);if(!keys.length)throw Object.assign(new Error('ANALYSIS_NOT_CONFIGURED'),{permanent:true});
+ const model=env.SOSISKA_GROQ_MODEL||'openai/gpt-oss-120b';
+ if(!/^openai\/gpt-oss-(120b|20b)$/.test(model))throw Object.assign(new Error('ANALYSIS_MODEL_INVALID'),{permanent:true});
+ const start=nextKey%keys.length,deadline=Date.now()+65000;let temporary=false,incomplete=false;
+ for(let i=0;i<keys.length;i++){
+  if(Date.now()>=deadline){temporary=true;break;}
+  nextKey=(start+i+1)%keys.length;
+  const key=keys[(start+i)%keys.length],controller=new AbortController(),timer=setTimeout(()=>controller.abort(),Math.min(20000,deadline-Date.now()));
+  try{
+   const r=await fetchAI('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},signal:controller.signal,redirect:'manual',body:JSON.stringify({model,messages:[{role:'system',content:ANALYSIS_SYSTEM+'\n'+task},{role:'user',content:JSON.stringify(input)}],max_completion_tokens:4096})});
+   if(!r.ok){if([408,429,500,502,503,504].includes(r.status)){temporary=true;continue;}if([401,403].includes(r.status))continue;throw Object.assign(new Error('ANALYSIS_PROVIDER_UNAVAILABLE'),{permanent:true});}
+   const d=await r.json(),choice=d.choices?.[0];
+   if(choice?.finish_reason!=='stop'||typeof choice?.message?.content!=='string'||!choice.message.content.trim()){incomplete=true;continue;}
+   nextKey=(start+i+1)%keys.length;return {text:choice.message.content,model};
+  }catch(error){if(error.permanent)throw error;temporary=true;}finally{clearTimeout(timer);}
+ }
+ if(incomplete)throw new Error('ANALYSIS_INCOMPLETE');
+ throw Object.assign(new Error('ANALYSIS_PROVIDER_UNAVAILABLE'),{permanent:!temporary});
 }
