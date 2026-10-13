@@ -1,5 +1,5 @@
 import {createPeriodAccumulator} from './sosiska-period.js';
-import {timelineRows,packAnalysisParts,requestSosiskaAnalysis} from './sosiska-analysis.js';
+import {timelineRows,packAnalysisParts,requestSosiskaAnalysis,analysisKeys} from './sosiska-analysis.js';
 const ORIGIN='https://specnaz-royal-match-agent-stage1.specnaz-sosiska.workers.dev';
 const json=(value,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store'}});
 const safeError=e=>/^ANALYSIS_[A-Z_]+$/.test(e?.message??'')?e.message:'ANALYSIS_UNAVAILABLE';
@@ -16,7 +16,7 @@ export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=request
   }
   async function save(j){j.updatedAt=new Date(now()).toISOString();await storage.put(key(j,'state'),j);}
   async function start(teamId) {
-    if(!env.SOSISKA_GROQ_KEY)throw Object.assign(new Error('ANALYSIS_NOT_CONFIGURED'),{permanent:true});
+    if(!analysisKeys(env).length)throw Object.assign(new Error('ANALYSIS_NOT_CONFIGURED'),{permanent:true});
     const active=await storage.get('analysis:active');
     if(active){const j=await storage.get(`analysis:${active}:state`);if(j&&!['done','failed'].includes(j.state)){if((!teamId&&j.scope==='all-watched')||(teamId&&j.scope==='team'&&j.teams[0].teamId===teamId))return status(active);throw new Error('ANALYSIS_BUSY');}}
     const watches=teamId?[{teamId}]:(await agent({operation:'list'})).watches.filter(w=>w.enabled);
@@ -27,7 +27,7 @@ export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=request
   }
   async function status(jobId) {
     jobId=jobId??await storage.get('analysis:active');
-    if(!jobId)return {available:false,reason:env.SOSISKA_GROQ_KEY?'Анализ ещё не запускался.':'ИИ-анализ не подключён: отсутствует ключ провайдера. Динамика за весь период доступна без ИИ.'};
+    if(!jobId)return {available:false,reason:analysisKeys(env).length?'Анализ ещё не запускался.':'ИИ-анализ не подключён: отсутствует ключ провайдера. Динамика за весь период доступна без ИИ.'};
     const j=await storage.get(`analysis:${jobId}:state`);if(!j)throw new Error('ANALYSIS_JOB_NOT_FOUND');
     const result={available:true,jobId:j.jobId,state:j.state,scope:j.scope,processedSnapshots:j.processedSnapshots,createdAt:j.createdAt,updatedAt:j.updatedAt,error:j.error??null,teams:j.teams.map(t=>({teamId:t.teamId,teamName:t.name,count:t.count,headSequence:t.headSequence,from:t.from,to:t.to,complete:!!t.complete}))};
     if(j.state==='done') {
@@ -115,7 +115,7 @@ export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=request
       if(j.state==='done')await storage.deleteAlarm();else await storage.setAlarm(now()+1000);
     }catch(error) {
       const saved=await storage.get(key(j,'state'));saved.retries++;saved.error=safeError(error);
-      if(error.permanent||saved.retries>=5)saved.state='failed';
+      if(error.permanent||saved.retries>=5&&saved.error!=='ANALYSIS_PROVIDER_UNAVAILABLE')saved.state='failed';
       await save(saved);if(saved.state==='failed')await storage.deleteAlarm();else await storage.setAlarm(now()+Math.min(600000,60000*saved.retries));
     }
   }
