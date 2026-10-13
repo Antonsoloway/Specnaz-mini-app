@@ -154,4 +154,3 @@ var SosiskaPeriod = (() => {
   }
   return __toCommonJS(sosiska_period_exports);
 })();
-
