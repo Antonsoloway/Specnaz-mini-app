@@ -10,7 +10,7 @@ function setup({admin=true,responder}={}){
   const document={querySelector:s=>s==='.grid'?grid:s==='[data-sosiska-interval]'?{value:'120'}:null,getElementById:()=>panel,createElement:()=>({dataset:{},remove(){this.removed=true;}}),addEventListener:(type,fn)=>{docListeners[type]=fn;}};
   const context={document,authState:{role:{isChatAdmin:admin}},sessionToken:'session-a',activePage:'home',setActiveNav(){},renderPage(page){panel.innerHTML=page;},FormData:class{constructor(form){this.form=form;}get(name){return this.form.filters?this.form.filters[name]??'':this.form.query;}},Response,AbortController,setTimeout,clearTimeout,console,fetch:async(url,init)=>{const b=JSON.parse(init.body);calls.push(b);return Response.json({ok:true,data:await (responder?responder(b):{watches:[]})});}};
   context.window={addEventListener:(type,fn)=>{listeners[type]=fn;},RoyalNav:{pushCurrent(){}},RoyalAdminDataV0600:{subscribe(fn){listeners.adminClear=fn;}}};vm.createContext(context);vm.runInContext(periodSource,context);vm.runInContext(source,context);
-  const action=(name,id)=>listeners.click({target:{closest:s=>s==='[data-sosiska-action]'?{dataset:{sosiskaAction:name,teamId:id}}:null},preventDefault(){},stopImmediatePropagation(){}});
+  const action=(name,id,extra={})=>listeners.click({target:{closest:s=>s==='[data-sosiska-action]'?{dataset:{sosiskaAction:name,teamId:id,...extra}}:null},preventDefault(){},stopImmediatePropagation(){}});
   const search=query=>docListeners.submit({target:{query,matches:selector=>selector==='[data-sosiska-search]',querySelector:()=>({blur(){}})},preventDefault(){},stopImmediatePropagation(){}});
   const filter=values=>docListeners.submit({target:{filters:values,matches:selector=>selector==='[data-sosiska-filters]'},preventDefault(){},stopImmediatePropagation(){}});
   return {context,tiles,calls,panel,action,search,filter,listeners};
@@ -121,4 +121,16 @@ test('roster is sorted and full period automatically covers more than one histor
  s.action('period');await settle();assert.match(s.panel.innerHTML,/Весь период наблюдения/);assert.match(s.panel.innerHTML,/снимков: 27/);assert.match(s.panel.innerHTML,/Уровни: \+26/);
  assert.equal(s.calls.filter(b=>b.operation==='history').length,2);assert.ok(!s.panel.innerHTML.includes('JSON'));assert.ok(!s.panel.innerHTML.includes('UserId'));
  assert.equal(s.calls.some(b=>['analysis','watch','capture'].includes(b.operation)),false);
+});
+test('activity charts open on player click and comparison only reads selected teams',async()=>{
+ const history=id=>[2,1].map(n=>({sequence:n,snapshot:{teamId:id,capturedAt:new Date(Date.UTC(2026,9,13,n)).toISOString(),raw:{TeamName:'Team '+id,Members:[{UserId:'1',Name:'Idle',Level:1000,Crown:0,HelpCount:0},{UserId:'2',Name:'<Active>',Level:n*10,Crown:n*5,HelpCount:0}]}},changes:{baseline:n===1,joined:[],left:[],members:[]}}));
+ const s=setup({responder:b=>b.operation==='list'?{watches:['1','2','3'].map(teamId=>({teamId,intervalMinutes:60}))}:b.operation==='history'?{records:history(b.teamId).slice(0,b.limit),nextBefore:null}:b.operation==='team'?{TeamId:b.teamId,TeamName:'Team '+b.teamId,Members:history(b.teamId)[0].snapshot.raw.Members}:b.operation==='analysis'?{available:false}:{available:false}});
+ await s.context.window.RoyalSosiska.open();s.action('team','1');await settle();assert.match(s.panel.innerHTML,/Темп активности команды/);assert.ok(s.panel.innerHTML.indexOf('&lt;Active&gt;')<s.panel.innerHTML.indexOf('<h4>Idle'));
+ s.action('player',undefined,{playerId:'2'});await settle();assert.match(s.panel.innerHTML,/В какое время активнее/);assert.match(s.panel.innerHTML,/Точное время игры неизвестно/);assert.ok(!s.panel.innerHTML.includes('<Active>'));
+ for(const id of ['1','2']){s.action('select-team',id);await settle();}const before=s.calls.length;s.action('compare');await settle();assert.match(s.panel.innerHTML,/Общий период/);assert.match(s.panel.innerHTML,/Темп команд/);assert.deepEqual([...new Set(s.calls.slice(before).map(x=>x.teamId))],['1','2']);
+ s.action('analysis-selected');await settle();assert.deepEqual(s.calls.find(b=>b.operation==='analysis').teamIds,['1','2']);assert.equal(s.calls.some(b=>['capture','watch'].includes(b.operation)),false);
+ s.context.renderPage('home');await s.context.window.RoyalSosiska.open();assert.ok(!s.panel.innerHTML.includes('Сравнение выбранных'));
+});
+test('AI failure renders actionable text rather than raw internal error code',async()=>{
+ const s=setup({responder:b=>b.operation==='analysisStatus'?{available:true,state:'failed',teams:[],processedSnapshots:5,error:'ANALYSIS_KEYS_REJECTED'}:{watches:[]}});await s.context.window.RoyalSosiska.open();assert.match(s.panel.innerHTML,/отклонил подключённые ключи/);assert.ok(!s.panel.innerHTML.includes('ANALYSIS_KEYS_REJECTED'));
 });

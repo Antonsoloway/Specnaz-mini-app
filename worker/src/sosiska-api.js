@@ -5,9 +5,10 @@ const object = value => value !== null && typeof value === 'object' && !Array.is
 const invalid = () => { throw Object.assign(new Error('INVALID_REQUEST'), {status:400}); };
 export function validateAgentAction(body) {
   if (!object(body)) invalid();
-  const keys = {health:[],search:['query'],team:['teamId'],list:[],watch:['teamId','intervalMinutes'],unwatch:['teamId'],capture:['teamId'],history:['teamId','limit','before'],analysis:['teamId'],analysisStatus:['jobId'],analysisTimeline:['jobId','teamId','limit','before']}[body.operation];
+  const keys = {health:[],search:['query'],team:['teamId'],list:[],watch:['teamId','intervalMinutes'],unwatch:['teamId'],capture:['teamId'],history:['teamId','limit','before'],analysis:['teamId','teamIds'],analysisStatus:['jobId'],analysisTimeline:['jobId','teamId','limit','before']}[body.operation];
   if (!Array.isArray(keys) || Object.keys(body).some(k => !['operation',...keys].includes(k))) invalid();
   if (keys.includes('teamId') && !(body.operation==='analysis' && body.teamId===undefined) && !id(body.teamId)) invalid();
+  if(body.teamIds!==undefined&&(!Array.isArray(body.teamIds)||body.teamIds.length<2||body.teamIds.length>5||body.teamIds.some(v=>!id(v))||new Set(body.teamIds).size!==body.teamIds.length||body.teamId!==undefined))invalid();
   if (keys.includes('jobId') && !(body.operation==='analysisStatus'&&body.jobId===undefined) && (typeof body.jobId!=='string'||!/^[a-f0-9-]{36}$/.test(body.jobId))) invalid();
   if (body.operation === 'search' && (typeof body.query !== 'string' || !body.query.trim() || body.query.length > 160)) invalid();
   if (body.operation === 'watch' && (!Number.isInteger(body.intervalMinutes) || body.intervalMinutes < 60 || body.intervalMinutes > 10080)) invalid();

@@ -38,3 +38,8 @@ test('target transfer path dispatches only start/status to existing named job ob
  for(const operation of ['capture','watch','getSecrets']){const r=await wrapped.fetch(new Request('https://local/__sosiska_keys_v1',{method:'POST',headers:{Authorization:'Bearer '+secret},body:JSON.stringify({operation})}),e,{});assert.equal(r.status,400);}
  const r=await wrapped.fetch(new Request('https://local/__sosiska_keys_v1',{method:'POST',headers:{Authorization:'Bearer '+secret},body:'{"operation":"status"}'}),e,{});assert.equal(r.status,200);assert.equal(calls,1);
 });
+test('provider failures carry safe status counts and actionable classifications',async()=>{
+ for(const [status,code] of [[401,'ANALYSIS_KEYS_REJECTED'],[403,'ANALYSIS_KEYS_REJECTED'],[413,'ANALYSIS_INPUT_TOO_LARGE'],[400,'ANALYSIS_REQUEST_REJECTED']]){
+  await assert.rejects(()=>requestSosiskaAnalysis({env:{SOSISKA_GROQ_KEY:'private'},input:{},task:'',fetchAI:async()=>Response.json({error:{message:'private provider details'}},{status})}),e=>{assert.equal(e.message,code);assert.equal(e.permanent,true);assert.equal(e.diagnostics.statuses[status],1);assert.ok(!JSON.stringify(e).includes('private'));return true;});
+ }
+});

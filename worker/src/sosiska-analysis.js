@@ -37,19 +37,21 @@ export async function requestSosiskaAnalysis({input,task,env,fetchAI=fetch}) {
  const keys=analysisKeys(env);if(!keys.length)throw Object.assign(new Error('ANALYSIS_NOT_CONFIGURED'),{permanent:true});
  const model=env.SOSISKA_GROQ_MODEL||'openai/gpt-oss-120b';
  if(!/^openai\/gpt-oss-(120b|20b)$/.test(model))throw Object.assign(new Error('ANALYSIS_MODEL_INVALID'),{permanent:true});
- const start=nextKey%keys.length,deadline=Date.now()+65000;let temporary=false,incomplete=false;
+ const start=nextKey%keys.length,deadline=Date.now()+65000;let temporary=false,incomplete=false;const statuses={},fail=(code,permanent=false)=>Object.assign(new Error(code),{permanent,diagnostics:{statuses,attempts:Object.values(statuses).reduce((a,b)=>a+b,0)}});
  for(let i=0;i<keys.length;i++){
   if(Date.now()>=deadline){temporary=true;break;}
   nextKey=(start+i+1)%keys.length;
   const key=keys[(start+i)%keys.length],controller=new AbortController(),timer=setTimeout(()=>controller.abort(),Math.min(20000,deadline-Date.now()));
   try{
-   const r=await fetchAI('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},signal:controller.signal,redirect:'manual',body:JSON.stringify({model,messages:[{role:'system',content:ANALYSIS_SYSTEM+'\n'+task},{role:'user',content:JSON.stringify(input)}],max_completion_tokens:4096})});
-   if(!r.ok){if([408,429,500,502,503,504].includes(r.status)){temporary=true;continue;}if([401,403].includes(r.status))continue;throw Object.assign(new Error('ANALYSIS_PROVIDER_UNAVAILABLE'),{permanent:true});}
+   const r=await fetchAI('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},signal:controller.signal,redirect:'manual',body:JSON.stringify({model,messages:[{role:'system',content:ANALYSIS_SYSTEM+'\n'+task},{role:'user',content:JSON.stringify(input)}],max_completion_tokens:2048,reasoning_effort:'low'})});
+   statuses[r.status]=(statuses[r.status]??0)+1;
+   if(!r.ok){if([408,429,500,502,503,504].includes(r.status)){temporary=true;continue;}if([401,403].includes(r.status))continue;throw fail(r.status===413?'ANALYSIS_INPUT_TOO_LARGE':r.status===400?'ANALYSIS_REQUEST_REJECTED':'ANALYSIS_PROVIDER_UNAVAILABLE',true);} 
    const d=await r.json(),choice=d.choices?.[0];
    if(choice?.finish_reason!=='stop'||typeof choice?.message?.content!=='string'||!choice.message.content.trim()){incomplete=true;continue;}
    nextKey=(start+i+1)%keys.length;return {text:choice.message.content,model};
   }catch(error){if(error.permanent)throw error;temporary=true;}finally{clearTimeout(timer);}
  }
- if(incomplete)throw new Error('ANALYSIS_INCOMPLETE');
- throw Object.assign(new Error('ANALYSIS_PROVIDER_UNAVAILABLE'),{permanent:!temporary});
+ if(incomplete)throw fail('ANALYSIS_INCOMPLETE');
+ if(!temporary&&Object.keys(statuses).every(s=>['401','403'].includes(s)))throw fail('ANALYSIS_KEYS_REJECTED',true);
+ throw fail('ANALYSIS_PROVIDER_UNAVAILABLE',!temporary);
 }
