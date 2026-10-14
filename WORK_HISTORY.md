@@ -689,3 +689,17 @@ Two redirects preserve Telegram hash and set releaseBuild20261014-v061-team-live
 Full live mirror synced through the project's normal script as
 125e655841d741a38024e1fef96f7cd981454578; both mainCI runs success.
 Earlier publication/rollout-pending notes are historical and superseded.
+
+
+## 2026-10-14 — picker overlay regression fix (source ready)
+
+Owner reported the Find and Bind button appeared dead inside the CRM editor.
+Exact cause: the admin modal uses z-index99999; picker backdrop used20000 and
+opened underneath it. Earlier browser fixture directly invoked pickTeam without
+the real editor backdrop, so it missed the bug. Fix: picker uses100010, blurs the
+old active control, and the link button uses the existing admin button styling.
+Release marker20261014-v061-team-picker2; no backend, table, bot or agent changes.
+118Node testsPASS. Regression browser now uses real editor CSS, modal markup,
+window capture routers and Android/iPhone touch handlers; taps the actual button,
+checks elementFromPoint owns the visible search, cancels/reopens, filters and binds
+while preserving the draft/photo. Publication/runtime evidence follows below.
