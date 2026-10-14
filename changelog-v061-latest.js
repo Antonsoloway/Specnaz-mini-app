@@ -3,7 +3,7 @@
   'use strict';
 
   const VERSION = '0.6.1';
-  const PATCH_VERSION = '0.6.1-changelog-latest.4';
+  const PATCH_VERSION = '0.6.1-changelog-latest.5';
   const CHANGE = 'В админском Журнале исправлен порядок записей: все события теперь принудительно сортируются по фактическому времени от новых к старым, независимо от источника записи и порядка, в котором данные пришли с сервера.';
 
   const AGENT_CHANGE = 'Добавлен отдельный админский модуль «Сосиска»: поиск команд Royal Match, выбор по описанию и лидеру, состав игроков, снимки, история изменений и управление отслеживанием.';
@@ -27,6 +27,8 @@
     current.sections.unshift(section);
   }
   if (!Array.isArray(section.changes)) section.changes = [];
+  const EMBLEM_CHANGE='Добавлены 176 игровых эмблем Royal Match: перед названиями привязанных команд, в поиске, карточках, профилях игроков и сравнении Сосиски. Эмблема выбирается по номеру сервера; редактирование названия не меняет эмблему.';
+  if (!section.changes.includes(EMBLEM_CHANGE)) section.changes.unshift(EMBLEM_CHANGE);
   if (!section.changes.includes(TEAM_CHANGE)) section.changes.unshift(TEAM_CHANGE);
   if (!section.changes.includes(CHANGE)) section.changes.unshift(CHANGE);
 

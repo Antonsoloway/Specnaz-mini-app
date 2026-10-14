@@ -714,3 +714,16 @@ elementFromPoint assertion and passes after the fix with Android/iPhone UA
 touch handlers, cancellation/reopen, filtering and binding. No page errors.
 This closes the earlier fixture coverage gap. Real Telegram recheck belongs to owner.
 Frontend release marker20261014-v061-team-picker2. Backend, Sheets and agent unchanged.
+
+
+## 2026-10-14 — 176 Royal Match emblems (source ready)
+
+Owner supplied the full catalogue in screenshots 2893/2895–2902; IDs0–175 mapped
+left-to-right/top-to-bottom. Original transparent WebP artwork, shared emblem
+module, Sosiska names/legends/profiles and linked public/admin CRM names added.
+Team-live exposes validated logo; profile exposes teamLogo. Zero preserved,
+unknown IDs and RK excluded. Bounded viewport loading (two requests), shared
+pending reads; auth/session clearing and unlink/rebind guard. No Sheet, watch,
+agent progress, bot or secret changes. See docs/team-emblems/IMPLEMENTATION_20261014.md.
+122 Node tests and37 real-workerd checks PASS; mobile320/390/768 and actual
+Android/iPhone picker fixtures PASS. Publication/runtime evidence pending.
