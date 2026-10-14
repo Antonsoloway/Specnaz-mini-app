@@ -23,6 +23,8 @@ var SosiskaPeriod = (() => {
     activityOrder: () => activityOrder,
     comparePeriods: () => comparePeriods,
     createPeriodAccumulator: () => createPeriodAccumulator,
+    hourlyDays: () => hourlyDays,
+    mskDateRange: () => mskDateRange,
     sortedMembers: () => sortedMembers
   });
   var sortedMembers = (members) => [...members ?? []].sort((a, b) => Number(b.Level ?? 0) + Number(b.Crown ?? 0) - (Number(a.Level ?? 0) + Number(a.Crown ?? 0)) || Number(b.Level ?? 0) - Number(a.Level ?? 0) || String(a.UserId).localeCompare(String(b.UserId)));
@@ -151,6 +153,37 @@ var SosiskaPeriod = (() => {
       const hours = points.reduce((n, x) => n + x.hours, 0), levels = points.reduce((n, x) => n + x.levels, 0), crowns = points.reduce((n, x) => n + x.crowns, 0), help = points.reduce((n, x) => n + x.help, 0);
       return { teamId: p.teamId, teamName: p.teamName, from: points[0]?.from, to: points.at(-1)?.to, hours, levels, crowns, help, levelsPerHour: hours ? levels / hours : null, crownsPerHour: hours ? crowns / hours : null, series: points };
     }) };
+  }
+  function hourlyDays(series, hour, metric, from, to) {
+    if (!Number.isInteger(hour) || hour < 0 || hour > 23 || !["levels", "crowns", "help"].includes(metric)) throw Error("INVALID_HOUR");
+    const start = Date.parse(from), end = Date.parse(to), rows = /* @__PURE__ */ new Map();
+    if (!(end > start)) return [];
+    const offset = 3 * 36e5, dayMs = 864e5;
+    for (let day = Math.floor((start + offset) / dayMs) * dayMs - offset; day < end; day += dayMs) {
+      const a = day + hour * 36e5, b = a + 36e5;
+      if (b <= start || a >= end) continue;
+      const date = new Date(day + offset).toISOString().slice(0, 10);
+      rows.set(date, { date, hours: 0, gain: 0, intervals: 0 });
+    }
+    for (const point of series) {
+      const a = Date.parse(point.from), b = Date.parse(point.to);
+      if (!(b > a) || !Number.isFinite(point[metric]) || point[metric] < 0) continue;
+      for (let day = Math.floor((Math.max(a, start) + offset) / dayMs) * dayMs - offset; day < Math.min(b, end); day += dayMs) {
+        const left = Math.max(a, start, day + hour * 36e5), right = Math.min(b, end, day + (hour + 1) * 36e5);
+        if (right <= left) continue;
+        const row = rows.get(new Date(day + offset).toISOString().slice(0, 10));
+        if (!row) continue;
+        row.hours += (right - left) / 36e5;
+        row.gain += point[metric] * (right - left) / (b - a);
+        row.intervals++;
+      }
+    }
+    return [...rows.values()].reverse().map((row) => ({ ...row, rate: row.hours ? row.gain / row.hours : null }));
+  }
+  function mskDateRange(from, to) {
+    const valid = (s) => typeof s === "string" && /^\d{4}-\d\d-\d\d$/.test(s) && Number.isFinite(Date.parse(s + "T00:00:00Z")) && (/* @__PURE__ */ new Date(s + "T00:00:00Z")).toISOString().slice(0, 10) === s;
+    if (!valid(from) || !valid(to) || from > to) throw Error("INVALID_DATE_RANGE");
+    return { from: new Date(Date.parse(from + "T00:00:00Z") - 108e5).toISOString(), to: new Date(Date.parse(to + "T00:00:00Z") + 864e5 - 108e5).toISOString() };
   }
   return __toCommonJS(sosiska_period_exports);
 })();

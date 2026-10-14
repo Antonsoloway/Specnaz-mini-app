@@ -120,7 +120,7 @@ test('roster is sorted and full period automatically covers more than one histor
  await s.context.window.RoyalSosiska.open();s.action('team','1');await settle();
  s.action('roster-view');await settle();assert.ok(s.panel.innerHTML.indexOf('data-player-id="3"')<s.panel.innerHTML.indexOf('data-player-id="2"'));
  s.action('period');await settle();assert.match(s.panel.innerHTML,/Весь период наблюдения/);assert.match(s.panel.innerHTML,/снимков: 27/);assert.match(s.panel.innerHTML,/Уровни: \+26/);
- assert.equal(s.calls.filter(b=>b.operation==='history').length,2);assert.ok(!s.panel.innerHTML.includes('JSON'));assert.ok(!s.panel.innerHTML.includes('UserId'));
+ assert.equal(s.calls.filter(b=>b.operation==='history').length,2);assert.ok(!s.panel.innerHTML.includes('&quot;Members&quot;'));assert.ok(!s.panel.innerHTML.includes('UserId'));
  assert.equal(s.calls.some(b=>['analysis','watch','capture'].includes(b.operation)),false);
 });
 test('activity charts open on player click and comparison only reads selected teams',async()=>{

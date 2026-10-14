@@ -1,3 +1,4 @@
+import {prepareHistoryExport} from './sosiska-export.js';
 // Browser receives game data only. Agent credentials never leave this facade.
 const AGENT_ORIGIN = 'https://specnaz-royal-match-agent-stage1.specnaz-sosiska.workers.dev';
 const id = value => typeof value === 'string' && /^[1-9]\d{0,18}$/.test(value) && BigInt(value) <= 9223372036854775807n;
@@ -5,7 +6,7 @@ const object = value => value !== null && typeof value === 'object' && !Array.is
 const invalid = () => { throw Object.assign(new Error('INVALID_REQUEST'), {status:400}); };
 export function validateAgentAction(body) {
   if (!object(body)) invalid();
-  const keys = {profile:['userId'],health:[],search:['query'],team:['teamId'],list:[],watch:['teamId','intervalMinutes'],unwatch:['teamId'],capture:['teamId'],history:['teamId','limit','before'],analysis:['teamId','teamIds'],analysisStatus:['jobId','teamId','teamIds'],analysisTimeline:['jobId','teamId','limit','before']}[body.operation];
+  const keys = {prepareExport:['teamId','from','to'],profile:['userId'],health:[],search:['query'],team:['teamId'],list:[],watch:['teamId','intervalMinutes'],unwatch:['teamId'],capture:['teamId'],history:['teamId','limit','before'],analysis:['teamId','teamIds'],analysisStatus:['jobId','teamId','teamIds'],analysisTimeline:['jobId','teamId','limit','before']}[body.operation];
   if (!Array.isArray(keys) || Object.keys(body).some(k => !['operation',...keys].includes(k))) invalid();
   if(keys.includes('userId')&&!id(body.userId))invalid();
   if (keys.includes('teamId') && !(['analysis','analysisStatus'].includes(body.operation) && body.teamId===undefined) && !id(body.teamId)) invalid();
@@ -13,9 +14,10 @@ export function validateAgentAction(body) {
   if(body.operation==='analysis'&&body.teamId===undefined&&body.teamIds===undefined)invalid();
   if (keys.includes('jobId') && !(body.operation==='analysisStatus'&&body.jobId===undefined) && (typeof body.jobId!=='string'||!/^[a-f0-9-]{36}$/.test(body.jobId))) invalid();
   if (body.operation === 'search' && (typeof body.query !== 'string' || !body.query.trim() || body.query.length > 160)) invalid();
-  if (body.operation === 'watch' && (!Number.isInteger(body.intervalMinutes) || body.intervalMinutes < 60 || body.intervalMinutes > 10080)) invalid();
+  if (body.operation === 'watch' && (!Number.isInteger(body.intervalMinutes) || body.intervalMinutes < 5 || body.intervalMinutes > 10080)) invalid();
   if (body.limit !== undefined && (!Number.isInteger(body.limit) || body.limit < 1 || body.limit > 20)) invalid();
   if (body.before !== undefined && (!Number.isSafeInteger(body.before) || body.before < 1)) invalid();
+  if(body.operation==='prepareExport'&&(![body.from,body.to].every(x=>typeof x==='string'&&/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(x)&&Number.isFinite(Date.parse(x)))||body.from>=body.to))invalid();
   return body;
 }
 export function queryVariants(query) {
@@ -56,6 +58,7 @@ export function createSosiskaApi({authorizeAdmin,fetchAgent=fetch,fetchAI=fetch}
           return result.data;
         } finally {clearTimeout(timer);}
       }
+      if(body.operation==='prepareExport')return json({ok:true,data:await prepareHistoryExport(request,env,body)});
       const invoke = (operation,payload={}) => call('/v1/invoke',{protocolVersion:1,operation,payload});
       if(body.operation==='search') {
         const variants=queryVariants(body.query),candidates=new Map(),warnings=[];
