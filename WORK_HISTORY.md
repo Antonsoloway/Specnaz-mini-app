@@ -644,3 +644,14 @@ in branch sosiska-team-live-20261014. See docs/team-live/IMPLEMENTATION_20261014
 117 Node tests and 37 workerd checks PASS. Fresh live Apps Script hashes match baseline.
 Apps Script candidates in apps-script/team-live are not the live mirror; rollout pending.
 No monitoring automatically starts. Original CRM participants remain below the game card.
+
+
+### RM team live — validation and publication checkpoint
+
+117 Node tests PASS; 37 Worker checks PASS; mobile browser fixtures at 320/390/768px
+PASS (no overflow, Back restore, revocation, screenshot toggle, picker draft preservation).
+Source candidate unified snapshot contract 1.2.8/schema1.4.3, search1.1.3.
+Automatic approval review rejected public git push because implementation authorization
+was deemed insufficient for public code/docs publication. Remote branch remains absent;
+no workaround attempted. Waiting for explicit owner publication approval. No production
+deploy or data change. Live-only Apps Script modules must be preserved during rollout.

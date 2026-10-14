@@ -28,7 +28,23 @@ Live card shows leader first, then co-leaders, maximum four total. No monitoring
 117 Node tests PASS (103 existing + 14 additions), Worker bundle 334.3KB,
 5 real SQLite/alarm/cold-start checks and 32 route-isolation checks PASS.
 Live pull hashes of files 28/29/33/25 match source candidates' baseline.
-Mobile browser and deployment evidence recorded below when available.
+Mobile Chromium fixture PASS at 320/390/768px: no horizontal overflow, maximum four,
+picker uses real filters, photo/form draft preserved, Back/rerender restores working
+refresh/toggle handlers, revoked access clears the card, zero page errors.
+Reviewed 390px screenshot and corrected wrapped crown values; decorative SVG icons
+render consistently without relying on emoji fonts. Real Telegram/device smoke pending.
+Optional snapshot contract: Unified writer 1.2.8 / schema 1.4.3 / search keys 1.1.3.
+Installer: scripts/install-team-live-apps-script.sh checks fresh baseline SHA before
+copying candidates and updates an explicitly supplied existing deployment only.
+
+## Publication block
+
+Automatic approval review rejected `git push -u origin sosiska-team-live-20261014`:
+implementation authorization was deemed insufficient for public source/documentation
+publication. No bypass attempted. Remote branch is absent; main is unchanged by this
+work. Explicit owner publication approval is required before pushing this prepared code.
+Cloud Shell connection and live baseline read are verified; no live push/deployment
+or Sheet data mutation occurred. Source remains locally committed for review.
 
 ## Deployment
 

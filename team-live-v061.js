@@ -3,10 +3,12 @@
   const API=typeof API_URL==='undefined'?'https://royal-crm-miniapp-api.tropical-spoon.workers.dev':API_URL;
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const num=v=>v==null?'—':Number(v).toLocaleString('ru-RU');
+  const playerNum=v=>v==null?'—':String(v);
+  const icon=kind=>'<svg viewBox="0 0 32 32" aria-hidden="true">'+(kind==='shield'?'<path d="M5 4h22v13c0 6-6 10-11 13C11 27 5 23 5 17z" fill="#b92347" stroke="#ffd95b" stroke-width="3"/><path d="M11 12h10M16 7v10" stroke="#fff0a5" stroke-width="3"/>':kind==='star'?'<path d="M16 2l4 9 10 1-7 7 2 10-9-5-9 5 2-10-7-7 10-1z" fill="#ffcf42" stroke="#956724" stroke-width="1.5"/>':'<path d="M3 9l7 6 6-11 6 11 7-6-4 18H7z" fill="#ffd552" stroke="#96662a" stroke-width="2"/><path d="M7 23h18" stroke="#f69e29" stroke-width="3"/>')+'</svg>';
   const token=()=>typeof sessionToken==='undefined'?'':sessionToken;
-  const states=new WeakMap();
+  const states=new WeakMap();let permitted=true;
   function card(data) {
-    return '<header class="team-live-banner"><h3>О команде</h3></header><div class="team-live-summary"><div class="team-live-title"><span class="team-live-emblem" aria-hidden="true">🛡️</span><div><h3>'+esc(data.name)+'</h3><p>'+esc(data.description)+'</p></div><div class="team-live-places"><small>Места</small><b>'+num(data.memberCount)+'/'+num(data.capacity)+'</b></div></div><div class="team-live-facts"><div><span>Очки команды</span><b>'+num(data.score)+'</b></div><div><span>Уровень входа</span><b>'+num(data.minLevel)+'</b></div><div><span>Короны входа</span><b>'+num(data.minCrowns)+'</b></div><div><span>Тип команды</span><b>'+esc(data.type||'—')+'</b></div></div></div><div class="team-live-leadership">'+data.leadership.slice(0,4).map(m=>'<article class="team-live-player"><span class="team-live-player-icon" aria-hidden="true">'+(m.role==='Лидер'?'👑':'⭐')+'</span><div class="team-live-player-name"><b>'+esc(m.name)+'</b><small>'+esc(m.role)+'</small></div><div class="team-live-crowns"><small>👑</small><b>'+num(m.crowns)+'</b></div><div><small>Помощь</small><b>'+num(m.help)+'</b></div><div><small>Уровень</small><b>'+num(m.level)+'</b></div></article>').join('')+'</div>';
+    return '<header class="team-live-banner"><h3>О команде</h3></header><div class="team-live-summary"><div class="team-live-title"><span class="team-live-emblem" aria-hidden="true">'+icon('shield')+'</span><div><h3>'+esc(data.name)+'</h3><p>'+esc(data.description)+'</p></div><div class="team-live-places"><small>Места</small><b>'+num(data.memberCount)+'/'+num(data.capacity)+'</b></div></div><div class="team-live-facts"><div><span>Очки команды</span><b>'+num(data.score)+'</b></div><div><span>Уровень входа</span><b>'+num(data.minLevel)+'</b></div><div><span>Короны входа</span><b>'+num(data.minCrowns)+'</b></div><div><span>Тип команды</span><b>'+esc(data.type||'—')+'</b></div></div></div><div class="team-live-leadership">'+data.leadership.slice(0,4).map(m=>'<article class="team-live-player"><span class="team-live-player-icon" aria-hidden="true">'+icon(m.role==='Лидер'?'crown':'star')+'</span><div class="team-live-player-name"><b>'+esc(m.name)+'</b><small>'+esc(m.role)+'</small></div><div class="team-live-crowns"><small>'+icon('crown')+'</small><b>'+playerNum(m.crowns)+'</b></div><div><small>Помощь</small><b>'+playerNum(m.help)+'</b></div><div><small>Уровень</small><b>'+playerNum(m.level)+'</b></div></article>').join('')+'</div>';
   }
   async function load(host,refresh=false) {
     const state=states.get(host);if(!state||state.loading)return;
@@ -27,14 +29,19 @@
     finally{clearTimeout(timer);state.loading=false;if(button)button.disabled=false;}
   }
   function decorate() {
+    if(!permitted||!token())return;
     const panel=document.getElementById('panel'),photo=panel?.querySelector('.team-photo-box');
-    if(!photo||photo.dataset.teamLiveMounted)return;
+    if(!photo)return;
     const adminShell=panel.querySelector('[data-admin-team="1"]'),admin=!!adminShell;
     const name=adminShell?.dataset.adminTeamName||panel.querySelector('.team-detail-head h2')?.textContent;
     const game=adminShell?.dataset.adminTeamFullGame||panel.querySelector('.team-detail-head .muted')?.textContent;
     if(game!=='Royal Match')return;
     const teams=admin?window.RoyalAdminDataV0600?.current?.adminData?.teams:(typeof snapshotState==='undefined'?[]:snapshotState?.teams);
     const record=teams?.find(t=>t.name===name&&t.game==='Royal Match');if(!record?.gameTeamId)return;
+    const existing=photo.previousElementSibling;
+    if(photo.dataset.teamLiveMounted&&existing?.matches('.team-live-card')){
+      if(!states.has(existing)){states.set(existing,{name,admin,id:record.gameTeamId,photo,loading:false});load(existing);}return;
+    }
     photo.dataset.teamLiveMounted='1';photo.classList.add('team-live-original');
     const host=document.createElement('section');host.className='team-live-card';
     host.innerHTML='<div data-team-live-content><p>Получаем сведения о команде…</p></div><footer><p data-team-live-status role="status"></p><button type="button" data-team-live-refresh>Обновить</button><button type="button" data-team-live-photo>Показать сохранённый скриншот</button></footer>';
@@ -55,7 +62,10 @@
     for(const input of form.querySelectorAll('[data-write-field="gameTeamId"],[data-team-live-pick]'))input.disabled=!rm;
     if(!rm){const input=form.querySelector('[data-write-field="gameTeamId"]');if(input)input.value='';}
   });
-  for(const name of ['royal:access-denied','royal:fatal','royal:auth-ready'])window.addEventListener(name,()=>document.querySelectorAll('.team-live-card').forEach(n=>n.remove()));
+  function clear(){document.querySelectorAll('.team-live-card').forEach(n=>n.remove());document.querySelectorAll('[data-team-live-mounted]').forEach(n=>{delete n.dataset.teamLiveMounted;n.classList.remove('team-live-original','team-live-photo-shown');});}
+  for(const name of ['royal:access-denied','royal:fatal'])window.addEventListener(name,()=>{permitted=false;clear();});
+  window.addEventListener('royal:auth-ready',()=>{clear();permitted=true;decorate();});
+  window.RoyalAdminDataV0600?.subscribe?.(event=>{if(event.type==='clear'&&['unauthorized','forbidden','session-changed'].includes(event.reason)){permitted=false;clear();}});
   new MutationObserver(decorate).observe(document.body,{childList:true,subtree:true});decorate();
   window.RoyalTeamLive={version:'1.0.0',card,decorate};
 })();

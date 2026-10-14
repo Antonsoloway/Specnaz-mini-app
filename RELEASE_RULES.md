@@ -189,3 +189,13 @@ Admin-preview `v0.6.0` дополнительно использует:
 - The ingress error handler must contain its own storage/lock failures and preserve sanitized primary and secondary codes separately.
 - Per-update delivery receipts precede shared cursor/outbox finalization. A confirmed answer receipt may recover an existing prepared commit payload; fallback or ambiguous sends must never be committed as an AI answer.
 - The minute retry remains commit-only. Do not automatically resend an ambiguous Telegram operation or discard its prepared payload. Apps Script and Telegram do not share an atomic transaction; offline replay tests are not proof of universal exactly-once delivery.
+
+
+## RM game team link (source prepared 14.10.2026)
+
+Optional gameTeamId applies only to Royal Match. Sosiska picker must reuse existing
+search/filters and preserve the CRM editor/photo draft. Binding never starts monitoring.
+The live card shows leader first, then co-leaders, at most four game players in total.
+Existing CRM membership list is independent. Store ID as text in owned Команды!M,
+refuse occupied columns, preserve photo C/formula E:L and include linked ID in revision.
+Every game-card cache hit must still validate current CRM access and current binding.
