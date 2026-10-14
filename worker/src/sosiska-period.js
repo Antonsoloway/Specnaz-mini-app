@@ -86,3 +86,31 @@ export function comparePeriods(periods){
  })};
 }
 
+
+// Same uniform interval allocation as the 24-hour grid, split into MSK calendar days.
+export function hourlyDays(series,hour,metric,from,to){
+ if(!Number.isInteger(hour)||hour<0||hour>23||!['levels','crowns','help'].includes(metric))throw Error('INVALID_HOUR');
+ const start=Date.parse(from),end=Date.parse(to),rows=new Map();
+ if(!(end>start))return [];
+ const offset=3*3600000,dayMs=86400000;
+ for(let day=Math.floor((start+offset)/dayMs)*dayMs-offset;day<end;day+=dayMs){
+  const a=day+hour*3600000,b=a+3600000;if(b<=start||a>=end)continue;
+  const date=new Date(day+offset).toISOString().slice(0,10);rows.set(date,{date,hours:0,gain:0,intervals:0});
+ }
+ for(const point of series){
+  const a=Date.parse(point.from),b=Date.parse(point.to);
+  if(!(b>a)||!Number.isFinite(point[metric])||point[metric]<0)continue;
+  for(let day=Math.floor((Math.max(a,start)+offset)/dayMs)*dayMs-offset;day<Math.min(b,end);day+=dayMs){
+   const left=Math.max(a,start,day+hour*3600000),right=Math.min(b,end,day+(hour+1)*3600000);
+   if(right<=left)continue;
+   const row=rows.get(new Date(day+offset).toISOString().slice(0,10));if(!row)continue;
+   row.hours+=(right-left)/3600000;row.gain+=point[metric]*(right-left)/(b-a);row.intervals++;
+  }
+ }
+ return [...rows.values()].reverse().map(row=>({...row,rate:row.hours?row.gain/row.hours:null}));
+}
+export function mskDateRange(from,to){
+ const valid=s=>typeof s==='string'&&/^\d{4}-\d\d-\d\d$/.test(s)&&Number.isFinite(Date.parse(s+'T00:00:00Z'))&&new Date(s+'T00:00:00Z').toISOString().slice(0,10)===s;
+ if(!valid(from)||!valid(to)||from>to)throw Error('INVALID_DATE_RANGE');
+ return {from:new Date(Date.parse(from+'T00:00:00Z')-10800000).toISOString(),to:new Date(Date.parse(to+'T00:00:00Z')+86400000-10800000).toISOString()};
+}

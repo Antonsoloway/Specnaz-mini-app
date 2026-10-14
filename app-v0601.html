@@ -9,7 +9,7 @@
   <script>
   (() => {
     const params = new URLSearchParams(window.location.search || '');
-    params.set('releaseBuild', '20261013-v061-sosiska-profile1');
+    params.set('releaseBuild', '20261014-v061-sosiska-history1');
     const search = params.toString() ? `?${params.toString()}` : '';
     const next = 'app-v0600.html' + search + (window.location.hash || '');
     window.location.replace(next);
