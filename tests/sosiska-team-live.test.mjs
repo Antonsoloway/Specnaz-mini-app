@@ -81,3 +81,16 @@ test('real Sheet create writes text ID and rejects RK ID before changing cells',
  const s=await writesFixture(),c=s.context;const bad=c.MINIAPP_adminWriteFinalCreateTeam_(s.ctx('createTeam',{game:'Royal Kingdom',name:'New',gameTeamId:'22'}));assert.equal(bad.ok,false);assert.equal(s.rows[2][1],'');
  const result=c.MINIAPP_adminWriteFinalCreateTeam_(s.ctx('createTeam',{game:'Royal Match',name:'New',gameTeamId:'22'}));assert.equal(result.ok,true);assert.equal(result.record.gameTeamId,'22');assert.equal(s.rows[2][12],'22');assert.equal(typeof s.rows[2][12],'string');
 });
+
+
+test('standalone snapshot attaches IDs using the explicit CRM spreadsheet',()=>{
+ const s=sheetSetup('ID команды RM');
+ s.context.SPREADSHEET_ID='fixture-CRM';
+ s.context.SHEET_TEAMS='Команды';
+ s.context.SpreadsheetApp={openById:id=>{assert.equal(id,'fixture-CRM');return {getSheetByName:name=>{assert.equal(name,'Команды');return {getLastRow:()=>2,getRange:(r)=>r===1?{getDisplayValue:()=> 'ID команды RM'}:{getDisplayValues:()=>[['Royal Match','CRM','','','','','','','','','','','12']]}}}};}};
+ s.context.MINIAPP_adminWriteCanonicalGame_=v=>v;
+ s.context.MINIAPP_snapshotStripGameSuffix_=v=>v;
+ s.context.MINIAPP_snapshotTeamKey_=(name,game)=>name+'|'+game;
+ const snapshot={teams:[{name:'CRM',game:'Royal Match'},{name:'CRM',game:'Royal Kingdom'}]};
+ s.context.MINIAPP_teamLiveAttach_(snapshot);assert.equal(snapshot.teams[0].gameTeamId,'12');assert.equal(snapshot.teams[1].gameTeamId,undefined);
+});

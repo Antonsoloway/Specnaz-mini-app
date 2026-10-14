@@ -29,7 +29,7 @@ function MINIAPP_teamLivePrepare_(sheet, game, input, previous) {
   return {ok:true, id:id, changed:id !== String(previous || '')};
 }
 function MINIAPP_teamLiveAttach_(snapshot) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet(), sheet = ss.getSheetByName(SHEET_TEAMS);
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID), sheet = ss.getSheetByName(SHEET_TEAMS);
   if (!sheet || sheet.getLastRow()<2 || sheet.getRange(1,13).getDisplayValue() !== MINIAPP_TEAM_LIVE_HEADER) return;
   var map = {};
   sheet.getRange(2,1,sheet.getLastRow()-1,13).getDisplayValues().forEach(function(row){
