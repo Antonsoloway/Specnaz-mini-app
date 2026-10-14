@@ -7,13 +7,13 @@ const periodSource=await readFile(new URL('../sosiska-period-v061.js',import.met
 const settle=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate);};
 function setup({admin=true,responder}={}){
   const listeners={},docListeners={},tiles=[],calls=[],panel={innerHTML:'',hidden:false},grid={querySelector:()=>tiles.find(x=>!x.removed)||null,appendChild:b=>tiles.push(b)};
-  const document={querySelector:s=>s==='.grid'?grid:s==='[data-sosiska-interval]'?{value:'120'}:null,getElementById:()=>panel,createElement:()=>({dataset:{},remove(){this.removed=true;}}),addEventListener:(type,fn)=>{docListeners[type]=fn;}};
+  const hosts=[];const document={body:{appendChild:n=>hosts.push(n)},activeElement:{focus(){}},querySelector:s=>s==='.grid'?grid:s==='[data-sosiska-interval]'?{value:'120'}:null,getElementById:()=>panel,createElement:()=>({dataset:{},querySelector:()=>null,remove(){this.removed=true;}}),addEventListener:(type,fn)=>{docListeners[type]=fn;}};
   const context={document,authState:{role:{isChatAdmin:admin}},sessionToken:'session-a',activePage:'home',setActiveNav(){},renderPage(page){panel.innerHTML=page;},FormData:class{constructor(form){this.form=form;}get(name){return this.form.filters?this.form.filters[name]??'':this.form.query;}},Response,AbortController,setTimeout,clearTimeout,console,fetch:async(url,init)=>{const b=JSON.parse(init.body);calls.push(b);return Response.json({ok:true,data:await (responder?responder(b):{watches:[]})});}};
   context.window={addEventListener:(type,fn)=>{listeners[type]=fn;},RoyalNav:{pushCurrent(){}},RoyalAdminDataV0600:{subscribe(fn){listeners.adminClear=fn;}}};vm.createContext(context);vm.runInContext(periodSource,context);vm.runInContext(source,context);
   const action=(name,id,extra={})=>listeners.click({target:{closest:s=>s==='[data-sosiska-action]'?{dataset:{sosiskaAction:name,teamId:id,...extra}}:null},preventDefault(){},stopImmediatePropagation(){}});
   const search=query=>docListeners.submit({target:{query,matches:selector=>selector==='[data-sosiska-search]',querySelector:()=>({blur(){}})},preventDefault(){},stopImmediatePropagation(){}});
   const filter=values=>docListeners.submit({target:{filters:values,matches:selector=>selector==='[data-sosiska-filters]'},preventDefault(){},stopImmediatePropagation(){}});
-  return {context,tiles,calls,panel,action,search,filter,listeners};
+  return {context,tiles,calls,panel,action,search,filter,listeners,hosts};
 }
 test('tile only appears for admins and opening lists watches without enabling any',async()=>{
   const denied=setup({admin:false});assert.equal(denied.tiles.length,0);await denied.context.window.RoyalSosiska.open();assert.equal(denied.calls.length,0);
@@ -186,4 +186,21 @@ test('clicking a roster member opens detailed native profile and close returns t
 test('failed or mismatched profile never supplies fabricated lifetime statistics',async()=>{
  const s=setup({responder:b=>b.operation==='team'?{TeamId:'1',TeamName:'Team',Members:[{UserId:'777',Name:'Player',Level:100,Crown:4}]}:b.operation==='profile'?{userId:'778',name:'Wrong person',stats:{totalCrown:'999'}}:b.operation==='history'?{records:[],nextBefore:null}:{watches:[]}});
  await s.context.window.RoyalSosiska.open();s.action('team','1');await settle();s.action('profile',undefined,{profileId:'777'});await settle();assert.match(s.panel.innerHTML,/Профиль не соответствует/);assert.ok(!s.panel.innerHTML.includes('Wrong person'));assert.ok(!s.panel.innerHTML.includes('>999<'));assert.match(s.panel.innerHTML,/Повторить загрузку/);
+});
+
+
+test('CRM picker reuses filters, binds decoded ID without list/history/monitor calls and preserves editor',async()=>{
+ const t={TeamId:'12',TeamName:'Picked',Leader:'2',CoLeaders:[],Members:[{UserId:'2',Name:'Leader',Level:20,Crown:2}],Type:true,MinLevel:10,MinCrown:0};
+ const s=setup({responder:b=>b.operation==='search'?{candidates:[{teamId:'12',name:'Picked'}],warnings:[]}:t});
+ s.panel.innerHTML='existing editor';let chosen;
+ s.context.window.RoyalSosiska.pickTeam(data=>chosen=data);s.search('Picked');await settle();
+ assert.match(s.hosts[0].innerHTML,/Привязать эту команду/);assert.match(s.hosts[0].innerHTML,/Ник лидера содержит/);assert.ok(!s.hosts[0].innerHTML.includes('Выбрать для сравнения'));
+ s.filter({scoreMin:'10',leader:'Leader',type:'open'});await settle();s.action('bind','12');await settle();
+ assert.equal(chosen.TeamId,'12');assert.equal(s.panel.innerHTML,'existing editor');assert.equal(s.hosts[0].removed,true);
+ assert.ok(s.calls.every(c=>['search','team'].includes(c.operation)));
+});
+test('picker cancellation discards late search results and does not navigate editor',async()=>{
+ let release;const pending=new Promise(resolve=>release=resolve),s=setup({responder:()=>pending});s.panel.innerHTML='editor';let selected=false;
+ s.context.window.RoyalSosiska.pickTeam(()=>selected=true);s.search('Delayed');await settle();s.action('back');release({candidates:[],warnings:[]});await settle();
+ assert.equal(selected,false);assert.equal(s.panel.innerHTML,'editor');assert.equal(s.hosts[0].removed,true);
 });

@@ -634,3 +634,24 @@ See docs/sosiska/SEARCH_FILTERS_20261012.md. Inclusive minimum team points, lead
 ## 2026-10-13 — Sosiska roster/period usability
 
 See docs/sosiska/USABILITY_PERIOD_20261013.md. Sorted mobile cards, no raw JSON, distinct full-period/roster/journal views, streaming full-history rates per player with reset/join/leave handling. Missing SOSISKA_GROQ_KEY confirmed; AI is not live configured. Crown-to-round conversion remains unproven, no invented formula. 71 tests and real two-team history check passed. Level updater still deferred.
+
+
+## 2026-10-14 — RM ID / live team card, source prepared
+
+Owner requested RM-only ID binding through Sosiska search/filters, editable autofilled name,
+existing screenshot preservation, and only leader/co-leaders (maximum four). Implemented
+in branch sosiska-team-live-20261014. See docs/team-live/IMPLEMENTATION_20261014.md.
+117 Node tests and 37 workerd checks PASS. Fresh live Apps Script hashes match baseline.
+Apps Script candidates in apps-script/team-live are not the live mirror; rollout pending.
+No monitoring automatically starts. Original CRM participants remain below the game card.
+
+
+### RM team live — validation and publication checkpoint
+
+117 Node tests PASS; 37 Worker checks PASS; mobile browser fixtures at 320/390/768px
+PASS (no overflow, Back restore, revocation, screenshot toggle, picker draft preservation).
+Source candidate unified snapshot contract 1.2.8/schema1.4.3, search1.1.3.
+Automatic approval review rejected public git push because implementation authorization
+was deemed insufficient for public code/docs publication. Remote branch remains absent;
+no workaround attempted. Waiting for explicit owner publication approval. No production
+deploy or data change. Live-only Apps Script modules must be preserved during rollout.
