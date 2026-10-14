@@ -14,7 +14,8 @@ export function projectTeam(team, fetchedAt) {
   if(team.Status!==0 || !Array.isArray(team.Members)) throw Error('INVALID_TEAM');
   const valid=team.Members.every(m=>Number.isSafeInteger(m.Level)&&m.Level>=0&&Number.isSafeInteger(m.Crown)&&m.Crown>=0);
   const score=valid?team.Members.reduce((n,m)=>n+m.Level+m.Crown,0):null;
-  return {teamId:team.TeamId, name:String(team.TeamName||''), description:String(team.Description||''),
+  const logo=team.TeamLogo??team.Logo;
+  return {teamId:team.TeamId, name:String(team.TeamName||''), logo:Number.isInteger(logo)&&logo>=0&&logo<176?logo:null, description:String(team.Description||''),
     memberCount:team.Members.length, capacity:50, score:Number.isSafeInteger(score)?score:null,
     minLevel:Number.isSafeInteger(team.MinLevel)?team.MinLevel:null, minCrowns:Number.isSafeInteger(team.MinCrown)?team.MinCrown:null,
     type:typeof team.Type==='boolean'?(team.Type?'Открытая':'Закрытая'):null,

@@ -8,7 +8,7 @@
   const token=()=>typeof sessionToken==='undefined'?'':sessionToken;
   const states=new WeakMap();let permitted=true;
   function card(data) {
-    return '<header class="team-live-banner"><h3>О команде</h3></header><div class="team-live-summary"><div class="team-live-title"><span class="team-live-emblem" aria-hidden="true">'+icon('shield')+'</span><div><h3>'+esc(data.name)+'</h3><p>'+esc(data.description)+'</p></div><div class="team-live-places"><small>Места</small><b>'+num(data.memberCount)+'/'+num(data.capacity)+'</b></div></div><div class="team-live-facts"><div><span>Очки команды</span><b>'+num(data.score)+'</b></div><div><span>Уровень входа</span><b>'+num(data.minLevel)+'</b></div><div><span>Короны входа</span><b>'+num(data.minCrowns)+'</b></div><div><span>Тип команды</span><b>'+esc(data.type||'—')+'</b></div></div></div><div class="team-live-leadership">'+data.leadership.slice(0,4).map(m=>'<article class="team-live-player"><span class="team-live-player-icon" aria-hidden="true">'+icon(m.role==='Лидер'?'crown':'star')+'</span><div class="team-live-player-name"><b>'+esc(m.name)+'</b><small>'+esc(m.role)+'</small></div><div class="team-live-crowns"><small>'+icon('crown')+'</small><b>'+playerNum(m.crowns)+'</b></div><div><small>Помощь</small><b>'+playerNum(m.help)+'</b></div><div><small>Уровень</small><b>'+playerNum(m.level)+'</b></div></article>').join('')+'</div>';
+    return '<header class="team-live-banner"><h3>О команде</h3></header><div class="team-live-summary"><div class="team-live-title"><span class="team-live-emblem" aria-hidden="true">'+(window.RoyalTeamEmblems?.image(data.logo)||'')+'</span><div><h3>'+esc(data.name)+'</h3><p>'+esc(data.description)+'</p></div><div class="team-live-places"><small>Места</small><b>'+num(data.memberCount)+'/'+num(data.capacity)+'</b></div></div><div class="team-live-facts"><div><span>Очки команды</span><b>'+num(data.score)+'</b></div><div><span>Уровень входа</span><b>'+num(data.minLevel)+'</b></div><div><span>Короны входа</span><b>'+num(data.minCrowns)+'</b></div><div><span>Тип команды</span><b>'+esc(data.type||'—')+'</b></div></div></div><div class="team-live-leadership">'+data.leadership.slice(0,4).map(m=>'<article class="team-live-player"><span class="team-live-player-icon" aria-hidden="true">'+icon(m.role==='Лидер'?'crown':'star')+'</span><div class="team-live-player-name"><b>'+esc(m.name)+'</b><small>'+esc(m.role)+'</small></div><div class="team-live-crowns"><small>'+icon('crown')+'</small><b>'+playerNum(m.crowns)+'</b></div><div><small>Помощь</small><b>'+playerNum(m.help)+'</b></div><div><small>Уровень</small><b>'+playerNum(m.level)+'</b></div></article>').join('')+'</div>';
   }
   async function load(host,refresh=false) {
     const state=states.get(host);if(!state||state.loading)return;
@@ -18,8 +18,9 @@
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),35000);
     try {
       const params=new URLSearchParams({team:state.name,game:'Royal Match',...(refresh?{refresh:'1'}:{})});
-      const r=await fetch(API+(state.admin?'/admin-team-live?':'/team-live?')+params,{headers:{Authorization:'Bearer '+session},signal:controller.signal});
-      const payload=await r.json();if(!host.isConnected||session!==token())return;
+      let payload,r;
+      if(window.RoyalTeamEmblems){payload=await window.RoyalTeamEmblems.fetchLive({name:state.name,gameTeamId:state.id},state.admin,refresh);r={ok:true,status:200};}
+      else {r=await fetch(API+(state.admin?'/admin-team-live?':'/team-live?')+params,{headers:{Authorization:'Bearer '+session},signal:controller.signal});payload=await r.json();}if(!host.isConnected||session!==token())return;
       if(r.status===401||r.status===403){host.querySelector('[data-team-live-content]').textContent='';throw Error('Откройте приложение заново.');}
       if(!r.ok||!payload.ok)throw Error(payload.message||'Данные игры не загрузились.');
       if(payload.data.teamId!==state.id||!Array.isArray(payload.data.leadership))throw Error('Привязка команды изменилась. Обновите карточку.');

@@ -117,5 +117,5 @@ export function normalizePlayerProfile(userId,data){
  for(const row of data.Stats){const name=mapping[row.Id];if(!name)continue;if(name in stats||typeof row.Value!=='string'||!/^\d+$/.test(row.Value)||BigInt(row.Value)>9223372036854775807n)throw Error('AGENT_PROFILE_INVALID');stats[name]=row.Value;}
  const p=data.Profile;
  if(typeof p.Name!=='string'||!Number.isSafeInteger(p.Level)||p.Level<0||!Number.isSafeInteger(p.Crown)||p.Crown<0||typeof p.JoinDate!=='string'||!/^\d+$/.test(p.JoinDate)||typeof p.TeamId!=='string'||!/^\d+$/.test(p.TeamId))throw Error('AGENT_PROFILE_INVALID');
- return {userId,name:p.Name,level:p.Level,crown:p.Crown,teamId:p.TeamId,teamName:p.TeamName,joinedAt:p.JoinDate,profileSetting:p.ProfileSetting,stats,fetchedAt:new Date().toISOString()};
+ return {userId,name:p.Name,level:p.Level,crown:p.Crown,teamId:p.TeamId,teamName:p.TeamName,teamLogo:Number.isInteger(p.TeamLogo)&&p.TeamLogo>=0&&p.TeamLogo<176?p.TeamLogo:null,joinedAt:p.JoinDate,profileSetting:p.ProfileSetting,stats,fetchedAt:new Date().toISOString()};
 }
