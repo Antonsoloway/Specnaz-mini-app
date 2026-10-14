@@ -199,3 +199,13 @@ The live card shows leader first, then co-leaders, at most four game players in 
 Existing CRM membership list is independent. Store ID as text in owned Команды!M,
 refuse occupied columns, preserve photo C/formula E:L and include linked ID in revision.
 Every game-card cache hit must still validate current CRM access and current binding.
+
+
+### RM emblem identity
+
+Emblem is the validated numeric Logo/TeamLogo from a linked Royal Match team,
+never guessed from CRM name. Zero is valid; unknown/out-of-catalogue IDs render
+no substitute. Static owner-supplied catalogue0–175. Image alt must be empty and
+aria-hidden so existing name-based CRM text/routing is unchanged. RK cannot
+inherit RM art. Preserve screenshots and existing private media loaders; bounded
+viewport reads and session/revocation/unlink clearing, no directory network prewarm.
