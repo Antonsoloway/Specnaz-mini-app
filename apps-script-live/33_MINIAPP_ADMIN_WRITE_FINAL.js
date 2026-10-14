@@ -57,6 +57,8 @@ function MINIAPP_adminWriteFinalUpdateTeam_(ctx) {
   var nextName = Object.prototype.hasOwnProperty.call(changes, 'name')
     ? MINIAPP_adminWriteHardenedTeamName_(changes.name)
     : originalName;
+  var link = MINIAPP_teamLivePrepare_(sheet, game, changes, before.gameTeamId);
+  if (!link.ok) return link;
   var nextLeader = Object.prototype.hasOwnProperty.call(changes, 'leader')
     ? MINIAPP_adminWriteText_(changes.leader, 180)
     : before.leader;
@@ -98,6 +100,8 @@ function MINIAPP_adminWriteFinalUpdateTeam_(ctx) {
     MINIAPP_adminWriteHardenedSetTeamLeader_(sheet, row, nextLeader);
   }
 
+  if (link.changed) MINIAPP_teamLiveWriteId_(sheet, row, link.id);
+
   if (typeof finalRoleRepairDecoratedTeamMemberships_ === 'function') {
     finalRoleRepairDecoratedTeamMemberships_(ctx.ss, {
       skipMark: true,
@@ -129,6 +133,7 @@ function MINIAPP_adminWriteFinalUpdateTeam_(ctx) {
   if (photoPrepared.changed && photoPrepared.sourceUrl) after.photoUrl = photoPrepared.sourceUrl;
   var key = game + ' :: ' + nextName;
   var journalChanges = {
+    gameTeamId: link.id,
     name: nextName,
     leader: nextLeader
   };
@@ -181,6 +186,8 @@ function MINIAPP_adminWriteFinalCreateTeam_(ctx) {
     return MINIAPP_adminWriteError_('TEAM_EXISTS', 'Такая команда уже существует в этой игре.');
   }
 
+  var link = MINIAPP_teamLivePrepare_(sheet, game, ctx.payload, '');
+  if (!link.ok) return link;
   var row = MINIAPP_adminWriteFindEmptyTeamRow_(sheet);
   if (!row) return MINIAPP_adminWriteError_('TEAMS_FULL', 'На листе команд нет свободной подготовленной строки.');
   var before = { row: row, empty: true };
@@ -198,17 +205,20 @@ function MINIAPP_adminWriteFinalCreateTeam_(ctx) {
     sheet.getRange(row, 1).setValue(game);
     sheet.getRange(row, 2).setValue(name);
     if (leader) MINIAPP_adminWriteHardenedSetTeamLeader_(sheet, row, leader);
+    MINIAPP_teamLiveWriteId_(sheet, row, link.id);
 
     if (photoPrepared.changed) {
       var photoCellResult = MINIAPP_adminTeamPhotoApplyCell_(sheet, row, photoPrepared);
       if (!photoCellResult || photoCellResult.ok === false) {
         sheet.getRange(row, 1, 1, 4).clearContent();
+        MINIAPP_teamLiveClearId_(sheet, row);
         SpreadsheetApp.flush();
         return photoCellResult;
       }
     }
   } catch (error) {
-    try { sheet.getRange(row, 1, 1, 4).clearContent(); } catch (_) {}
+    try { sheet.getRange(row, 1, 1, 4).clearContent();
+        MINIAPP_teamLiveClearId_(sheet, row); } catch (_) {}
     SpreadsheetApp.flush();
     console.error('Create team source row failed', error && error.stack ? error.stack : error);
     return MINIAPP_adminWriteError_('TEAM_CREATE_SHEET_FAILED', 'Не удалось записать новую команду. Строка очищена.');
@@ -229,6 +239,7 @@ function MINIAPP_adminWriteFinalCreateTeam_(ctx) {
   if (photoPrepared.changed && photoPrepared.sourceUrl) after.photoUrl = photoPrepared.sourceUrl;
   var key = game + ' :: ' + name;
   var journalChanges = {
+    gameTeamId: link.id,
     game: game,
     name: name,
     leader: leader
@@ -435,6 +446,7 @@ function MINIAPP_adminWriteFinalDeleteTeam_(ctx) {
   try {
     // A:D are the only team source fields. E:L are formula arrays.
     sheet.getRange(row, 1, 1, 4).clearContent();
+        MINIAPP_teamLiveClearId_(sheet, row);
     SpreadsheetApp.flush();
   } catch (error) {
     console.error('Delete team source row failed', error && error.stack ? error.stack : error);
@@ -497,12 +509,13 @@ function MINIAPP_adminWriteFinalDeleteTeam_(ctx) {
 }
 
 function MINIAPP_adminWriteFinalTeamState_(sheet, row) {
-  var values = sheet.getRange(row, 1, 1, 12).getDisplayValues()[0];
+  var values = sheet.getRange(row, 1, 1, 13).getDisplayValues()[0];
   return {
     row: row,
     game: MINIAPP_adminWriteCanonicalGame_(values[0]),
     name: MINIAPP_adminWriteValue_(values[1]),
     leader: MINIAPP_adminWriteValue_(values[3]),
+    gameTeamId: MINIAPP_teamLiveReadId_(sheet, values[12], MINIAPP_adminWriteCanonicalGame_(values[0])),
     players: MINIAPP_adminWriteNumberOrText_(values[4]),
     specnazTrips: MINIAPP_adminWriteNumberOrText_(values[5]),
     sort: MINIAPP_adminWriteNumberOrText_(values[6]),
@@ -593,8 +606,9 @@ function MINIAPP_adminWriteFinalMeta_() {
     mode: 'single-range-validation-safe',
     rollback: 'source-values-and-role-rules'
   };
-  meta.writableTeamFields = ['name', 'leader', 'photo'];
-  meta.createTeamFields = ['game', 'name', 'leader', 'photo'];
+  meta.gameTeamLink = {enabled: true, game: 'Royal Match', version: '1.0.0'};
+  meta.writableTeamFields = ['name', 'leader', 'photo', 'gameTeamId'];
+  meta.createTeamFields = ['game', 'name', 'leader', 'photo', 'gameTeamId'];
   var unifiedQueueReady = typeof MINIAPP_queueUnifiedSnapshotRefresh_ === 'function';
   meta.snapshotRefresh = {
     mode: unifiedQueueReady

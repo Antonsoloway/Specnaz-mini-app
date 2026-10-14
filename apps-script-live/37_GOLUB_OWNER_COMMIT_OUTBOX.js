@@ -3,6 +3,12 @@ const GOLUB_COMMIT_OUTBOX_VERSION = '1.1.0';
 const GOLUB_COMMIT_PREFIX = 'GOLUB_OWNER_COMMIT_V1_';
 const GOLUB_COMMIT_HANDLER = 'GOLUB_OWNER_retryPendingCommits';
 const GOLUB_COMMIT_CHUNK_SIZE = 7000;
+const GOLUB_AI_RETRY_VERSION = '1.0.0';
+const GOLUB_AI_RETRY_PREFIX = 'GOLUB_OWNER_AI_RETRY_V1_';
+const GOLUB_AI_RETRY_MAX_ATTEMPTS = 30;
+const GOLUB_AI_RETRY_STALE_MS = 15 * 60000;
+const GOLUB_COMMIT_TIMER_HEARTBEAT_PROP = 'GOLUB_OWNER_COMMIT_TIMER_HEARTBEAT_V1';
+const GOLUB_COMMIT_TIMER_STALE_MS = 3 * 60000;
 const GOLUB_DELIVERY_PREFIX = 'GOLUB_OWNER_DELIVERY_V1_';
 
 function GOLUB_OWNER_commitLock_(operation) {
@@ -11,21 +17,43 @@ function GOLUB_OWNER_commitLock_(operation) {
   try { return operation(); } finally { lock.releaseLock(); }
 }
 
+function GOLUB_OWNER_commitTimerTriggers_() {
+  return ScriptApp.getProjectTriggers().filter(function(trigger) {
+    return trigger.getHandlerFunction() === GOLUB_COMMIT_HANDLER;
+  });
+}
+
+function GOLUB_OWNER_commitTimerHealthy_(props, triggers, now) {
+  if (!triggers.length) return false;
+  var heartbeat = Number(props.getProperty(GOLUB_COMMIT_TIMER_HEARTBEAT_PROP) || 0);
+  return heartbeat > 0 && Math.max(0, now - heartbeat) <= GOLUB_COMMIT_TIMER_STALE_MS;
+}
+
 function GOLUB_OWNER_ensureCommitTimer_() {
-  // The installed timer is immutable on the request path. Reading it must not
-  // compete with long-running sheet transactions for the shared ScriptLock.
-  if (GOLUB_OWNER_hasCommitTimer_()) return;
+  // A trigger can remain listed after its executions stop succeeding. Treat the
+  // heartbeat, not mere trigger existence, as liveness. Owner-private traffic
+  // self-heals a stale/missing timer without exposing an admin endpoint.
+  var props = PropertiesService.getScriptProperties();
+  var now = Date.now();
+  var existing = GOLUB_OWNER_commitTimerTriggers_();
+  if (GOLUB_OWNER_commitTimerHealthy_(props, existing, now)) return;
   return GOLUB_OWNER_commitLock_(function() {
-    if (!GOLUB_OWNER_hasCommitTimer_()) {
-      ScriptApp.newTrigger(GOLUB_COMMIT_HANDLER).timeBased().everyMinutes(1).create();
-    }
+    now = Date.now();
+    existing = GOLUB_OWNER_commitTimerTriggers_();
+    if (GOLUB_OWNER_commitTimerHealthy_(props, existing, now)) return;
+    existing.forEach(function(trigger) {
+      try { ScriptApp.deleteTrigger(trigger); } catch (_) {}
+    });
+    ScriptApp.newTrigger(GOLUB_COMMIT_HANDLER).timeBased().everyMinutes(1).create();
+    // Seed heartbeat so request bursts do not recreate a just-installed timer.
+    // The timer itself refreshes this every execution; if it never runs the
+    // heartbeat becomes stale and the next owner message repairs it again.
+    props.setProperty(GOLUB_COMMIT_TIMER_HEARTBEAT_PROP, String(now));
   });
 }
 
 function GOLUB_OWNER_hasCommitTimer_() {
-  return ScriptApp.getProjectTriggers().some(function(trigger) {
-    return trigger.getHandlerFunction() === GOLUB_COMMIT_HANDLER;
-  });
+  return GOLUB_OWNER_commitTimerTriggers_().length > 0;
 }
 
 function GOLUB_OWNER_deliveryKey_(updateId) {
@@ -125,6 +153,21 @@ function GOLUB_OWNER_cleanCommitted_(key, meta, props) {
   props.deleteProperty(key + '_META');
 }
 
+function GOLUB_OWNER_readPreparedCommit_(key, meta, props) {
+  if (!meta || !meta.chunks) throw new Error('COMMIT_PAYLOAD_INVALID');
+  var encoded = '';
+  for (var i = 0; i < Number(meta.chunks || 0); i++) {
+    var part = props.getProperty(key + '_PART_' + i);
+    if (part === null) throw new Error('COMMIT_PAYLOAD_PART_MISSING');
+    encoded += part;
+  }
+  var raw = Utilities.newBlob(Utilities.base64DecodeWebSafe(encoded)).getDataAsString('UTF-8');
+  if (GOLUB_OWNER_commitDigest_(raw) !== String(meta.digest || '')) throw new Error('COMMIT_PAYLOAD_DIGEST_MISMATCH');
+  var stored = JSON.parse(raw);
+  if (!stored || !stored.commit || !String(stored.answer || '').trim()) throw new Error('COMMIT_PAYLOAD_INVALID');
+  return stored;
+}
+
 function GOLUB_OWNER_attemptCommit_(key, props) {
   var claim = GOLUB_OWNER_commitLock_(function() {
     var meta = JSON.parse(props.getProperty(key + '_META') || 'null');
@@ -191,8 +234,198 @@ function GOLUB_OWNER_attemptCommit_(key, props) {
   });
 }
 
+function GOLUB_OWNER_aiRetryDelay_(retryAfterMs, attempts) {
+  var hinted = Math.max(0, Number(retryAfterMs || 0) || 0);
+  var backoff = Math.min(300000, 5000 * Math.pow(2, Math.min(Math.max(0, Number(attempts || 1) - 1), 6)));
+  return Math.min(300000, Math.max(5000, hinted, backoff));
+}
+
+function GOLUB_OWNER_prepareAiRetry_(message, sender, updateId, retryAfterMs, props) {
+  if (!/^\d+$/.test(String(updateId))) throw new Error('AI_RETRY_UPDATE_ID_INVALID');
+  props = props || PropertiesService.getScriptProperties();
+  var key = GOLUB_AI_RETRY_PREFIX + String(updateId);
+  var prepared = GOLUB_OWNER_commitLock_(function() {
+    if (props.getProperty(key + '_META')) return {key:key, duplicate:true};
+    var raw = JSON.stringify({
+      updateId:Number(updateId),
+      message:GOLUB_OWNER_messageContext_(message, true),
+      sender:{id:String(sender && sender.id || ''), is_bot:Boolean(sender && sender.is_bot),
+        first_name:String(sender && sender.first_name || ''), last_name:String(sender && sender.last_name || ''),
+        username:String(sender && sender.username || '')}
+    });
+    var encoded = Utilities.base64EncodeWebSafe(raw, Utilities.Charset.UTF_8);
+    var chunks = Math.ceil(encoded.length / GOLUB_COMMIT_CHUNK_SIZE);
+    if (chunks < 1 || chunks > 16) throw new Error('AI_RETRY_PAYLOAD_SIZE_INVALID');
+    var values = {};
+    for (var i = 0; i < chunks; i++) values[key + '_PART_' + i] = encoded.slice(i * GOLUB_COMMIT_CHUNK_SIZE, (i + 1) * GOLUB_COMMIT_CHUNK_SIZE);
+    props.setProperties(values, false);
+    props.setProperty(key + '_META', JSON.stringify({
+      version:GOLUB_AI_RETRY_VERSION, updateId:String(updateId), chunks:chunks,
+      digest:GOLUB_OWNER_commitDigest_(raw), state:'waiting', attempts:0,
+      createdAt:Date.now(), nextAttemptAt:Date.now() + GOLUB_OWNER_aiRetryDelay_(retryAfterMs, 1),
+      leaseUntil:0
+    }));
+    return {key:key, duplicate:false};
+  });
+  // AI_WAIT must be self-starting. Do not assume a previous durable-commit
+  // timer exists: a capacity-only failure can happen before any commit job.
+  GOLUB_OWNER_ensureCommitTimer_();
+  return prepared;
+}
+
+function GOLUB_OWNER_readAiRetry_(key, meta, props) {
+  var encoded = '';
+  for (var i = 0; i < Number(meta.chunks || 0); i++) {
+    var part = props.getProperty(key + '_PART_' + i);
+    if (!part) throw new Error('AI_RETRY_PAYLOAD_PART_MISSING');
+    encoded += part;
+  }
+  var raw = Utilities.newBlob(Utilities.base64DecodeWebSafe(encoded)).getDataAsString('UTF-8');
+  if (GOLUB_OWNER_commitDigest_(raw) !== String(meta.digest || '')) throw new Error('AI_RETRY_PAYLOAD_DIGEST_MISMATCH');
+  var payload = JSON.parse(raw);
+  if (!payload || Number(payload.updateId) !== Number(meta.updateId) || !payload.message || !payload.sender) throw new Error('AI_RETRY_PAYLOAD_INVALID');
+  return payload;
+}
+
+function GOLUB_OWNER_cleanAiRetry_(key, meta, props) {
+  for (var i = 0; i < Number(meta.chunks || 0); i++) props.deleteProperty(key + '_PART_' + i);
+  props.deleteProperty(key + '_META');
+}
+
+function GOLUB_OWNER_updateAiRetry_(key, meta, props, retryAfterMs) {
+  meta.state = 'retry';
+  meta.leaseUntil = 0;
+  meta.nextAttemptAt = Date.now() + GOLUB_OWNER_aiRetryDelay_(retryAfterMs, meta.attempts);
+  props.setProperty(key + '_META', JSON.stringify(meta));
+}
+
+function GOLUB_OWNER_retryPendingAi_(props) {
+  var all = props.getProperties();
+  var now = Date.now();
+  var expired = 0;
+  Object.keys(all).filter(function(key) {
+    return key.indexOf(GOLUB_AI_RETRY_PREFIX) === 0 && /_META$/.test(key);
+  }).forEach(function(metaKey) {
+    var meta = null;
+    try { meta = JSON.parse(all[metaKey]); } catch (_) {}
+    if (!meta || now - Number(meta.createdAt || 0) <= GOLUB_AI_RETRY_STALE_MS) return;
+    try {
+      GOLUB_OWNER_cleanAiRetry_(metaKey.slice(0, -5), meta, props);
+      expired += 1;
+    } catch (_) {}
+  });
+  if (expired) {
+    try { props.setProperty(GOLUB_OWNER_WEBHOOK_PROP.lastIngress,
+      'PRIVATE_OWNER_AI_WAIT_EXPIRED ' + expired + ' ' + new Date().toISOString()); } catch (_) {}
+  }
+  all = props.getProperties();
+  var jobs = Object.keys(all).filter(function(key) {
+    return key.indexOf(GOLUB_AI_RETRY_PREFIX) === 0 && /_META$/.test(key);
+  }).map(function(key) {
+    try { return {key:key.slice(0, -5), meta:JSON.parse(all[key])}; } catch (_) { return null; }
+  }).filter(function(job) {
+    return job && Number(job.meta.nextAttemptAt || 0) <= Date.now()
+      && !(job.meta.state === 'processing' && Number(job.meta.leaseUntil || 0) > Date.now());
+  }).sort(function(a,b) { return Number(a.meta.createdAt || 0) - Number(b.meta.createdAt || 0); });
+
+  var summary = {version:GOLUB_AI_RETRY_VERSION, attempted:0, answered:0, pending:0, abandoned:0, expired:expired};
+  var started = Date.now();
+  for (var i = 0; i < jobs.length && summary.attempted < 2 && Date.now() - started < 120000; i++) {
+    var job = jobs[i], meta = job.meta, payload = null;
+    var claimed = false;
+    try {
+      GOLUB_OWNER_commitLock_(function() {
+        var current = JSON.parse(props.getProperty(job.key + '_META') || 'null');
+        if (!current || Number(current.nextAttemptAt || 0) > Date.now()
+          || (current.state === 'processing' && Number(current.leaseUntil || 0) > Date.now())) return;
+        current.state = 'processing';
+        current.attempts = Number(current.attempts || 0) + 1;
+        current.leaseUntil = Date.now() + 150000;
+        props.setProperty(job.key + '_META', JSON.stringify(current));
+        meta = current;
+        claimed = true;
+      });
+      if (!claimed) continue;
+      summary.attempted += 1;
+
+      // If any Telegram send was already attempted, never send again from the AI retry queue.
+      if (GOLUB_OWNER_deliveryRecord_(props, meta.updateId)) {
+        GOLUB_OWNER_cleanAiRetry_(job.key, meta, props);
+        continue;
+      }
+
+      payload = GOLUB_OWNER_readAiRetry_(job.key, meta, props);
+      var answer = GOLUB_OWNER_aiAnswer_(payload.message, payload.sender, props, payload.updateId);
+      if (answer && answer.retryableAi === true) {
+        GOLUB_OWNER_updateAiRetry_(job.key, meta, props, answer.retryAfterMs);
+        summary.pending += 1;
+        continue;
+      }
+
+      var commitJob = GOLUB_OWNER_prepareCommit_(answer, payload.updateId, props);
+      if (commitJob && commitJob.duplicate) {
+        var existingDelivery = GOLUB_OWNER_deliveryRecord_(props, payload.updateId);
+        var existingKey = GOLUB_COMMIT_PREFIX + String(payload.updateId);
+        var existingMeta = null;
+        try { existingMeta = JSON.parse(props.getProperty(existingKey + '_META') || 'null'); } catch (_) {}
+        if (existingDelivery) {
+          GOLUB_OWNER_cleanAiRetry_(job.key, meta, props);
+          continue;
+        }
+        if (existingMeta && existingMeta.state === 'prepared') {
+          var stored = GOLUB_OWNER_readPreparedCommit_(existingKey, existingMeta, props);
+          answer = {plain:String(stored.answer), html:'', commit:stored.commit, commitAnswer:String(stored.answer)};
+          commitJob = {key:existingKey, duplicate:false, recovered:true};
+        } else {
+          throw new Error('AI_RETRY_COMMIT_STATE_INVALID');
+        }
+      }
+
+      GOLUB_OWNER_recordDelivery_(props, payload.updateId, null, 'answer');
+      var receipt = GOLUB_OWNER_sendAnswer_(payload.message.chat.id, answer);
+      var sentAt = new Date().toISOString();
+      GOLUB_OWNER_recordDelivery_(props, payload.updateId, receipt, 'answer');
+      if (commitJob) GOLUB_OWNER_markCommitSent_(commitJob.key, receipt, props);
+      GOLUB_OWNER_recordHandledUpdate_(props, payload.updateId, {
+        GOLUB_OWNER_LAST_OK:sentAt,
+        GOLUB_OWNER_LAST_ERROR:'',
+        GOLUB_OWNER_LAST_INGRESS:'PRIVATE_OWNER_SENT_AFTER_AI_WAIT ' + sentAt
+      });
+      if (answer && answer.commit && commitJob) {
+        try { GOLUB_OWNER_attemptCommit_(commitJob.key, props); } catch (_) {}
+      }
+      GOLUB_OWNER_cleanAiRetry_(job.key, meta, props);
+      GOLUB_OWNER_recordIngress_(props, 'PRIVATE_OWNER_AI_WAIT_ANSWERED');
+      summary.answered += 1;
+    } catch (error) {
+      try {
+        var delivery = GOLUB_OWNER_deliveryRecord_(props, meta.updateId);
+        if (delivery) {
+          GOLUB_OWNER_cleanAiRetry_(job.key, meta, props);
+        } else if (Number(meta.attempts || 0) >= GOLUB_AI_RETRY_MAX_ATTEMPTS) {
+          // Keep the payload for diagnostics but stop hot-looping; no fake AI answer is sent.
+          meta.state = 'paused';
+          meta.leaseUntil = 0;
+          meta.nextAttemptAt = Date.now() + 3600000;
+          props.setProperty(job.key + '_META', JSON.stringify(meta));
+          summary.abandoned += 1;
+        } else {
+          GOLUB_OWNER_updateAiRetry_(job.key, meta, props, 0);
+          summary.pending += 1;
+        }
+        GOLUB_OWNER_saveDiagnostic_(props, 'ai_retry_timer', error, [], Boolean(delivery), Boolean(delivery && delivery.state === 'confirmed'));
+      } catch (_) { summary.pending += 1; }
+    }
+  }
+  return summary;
+}
+
 function GOLUB_OWNER_retryPendingCommits() {
   var props = PropertiesService.getScriptProperties();
+  // First instruction in the timer is a heartbeat. A listed trigger without a
+  // fresh heartbeat is treated as dead and replaced by owner-private ingress.
+  try { props.setProperty(GOLUB_COMMIT_TIMER_HEARTBEAT_PROP, String(Date.now())); } catch (_) {}
+  var aiRetry = GOLUB_OWNER_retryPendingAi_(props);
   var all = props.getProperties();
   var jobs = Object.keys(all).filter(function(key) {
     return key.indexOf(GOLUB_COMMIT_PREFIX) === 0 && /_META$/.test(key);
@@ -206,7 +439,7 @@ function GOLUB_OWNER_retryPendingCommits() {
     return (job.meta.state !== 'prepared' || recoverable) && Number(job.meta.nextAttemptAt || 0) <= Date.now()
       && !(job.meta.state === 'processing' && Number(job.meta.leaseUntil || 0) > Date.now());
   }).sort(function(a,b) { return a.meta.createdAt - b.meta.createdAt; });
-  var summary = {version:GOLUB_COMMIT_OUTBOX_VERSION, attempted:0, committed:0, pending:0};
+  var summary = {version:GOLUB_COMMIT_OUTBOX_VERSION, attempted:0, committed:0, pending:0, aiRetry:aiRetry};
   var started = Date.now();
   for (var i = 0; i < jobs.length && summary.attempted < 3 && Date.now() - started < 120000; i++) {
     summary.attempted += 1;

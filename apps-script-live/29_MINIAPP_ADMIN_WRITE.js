@@ -559,12 +559,13 @@ function MINIAPP_adminWriteParticipantRecord_(sheet, row) {
 }
 
 function MINIAPP_adminWriteTeamRecord_(sheet, row) {
-  var values = sheet.getRange(row, 1, 1, 12).getDisplayValues()[0];
+  var values = sheet.getRange(row, 1, 1, 13).getDisplayValues()[0];
   return {
     row: row,
     game: MINIAPP_adminWriteCanonicalGame_(values[0]),
     name: MINIAPP_adminWriteValue_(values[1]),
-    leader: MINIAPP_adminWriteValue_(values[3])
+    leader: MINIAPP_adminWriteValue_(values[3]),
+    gameTeamId: MINIAPP_teamLiveReadId_(sheet, values[12], MINIAPP_adminWriteCanonicalGame_(values[0]))
   };
 }
 
@@ -598,11 +599,13 @@ function MINIAPP_adminWriteParticipantRevision_(record) {
 }
 
 function MINIAPP_adminWriteTeamRevision_(record) {
-  return MINIAPP_adminWriteSha256_(JSON.stringify({
+  var source = {
     game: MINIAPP_adminWriteCanonicalGame_(record && record.game),
     name: MINIAPP_adminWriteValue_(record && record.name),
     leader: MINIAPP_adminWriteValue_(record && record.leader)
-  }));
+  };
+  if (record && record.gameTeamId) source.gameTeamId = record.gameTeamId;
+  return MINIAPP_adminWriteSha256_(JSON.stringify(source));
 }
 
 /** Metadata exposed only inside protected adminData. */

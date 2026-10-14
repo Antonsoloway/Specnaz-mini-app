@@ -7,7 +7,7 @@
  * Properties; no owner ID, bot token or webhook secret belongs in source.
  */
 
-const GOLUB_OWNER_WEBHOOK_VERSION = '2.9.1';
+const GOLUB_OWNER_WEBHOOK_VERSION = '2.10.2';
 const GOLUB_OWNER_WEBHOOK_PROP = Object.freeze({
   enabled: 'GOLUB_OWNER_WEBHOOK_ENABLED',
   ownerUserId: 'GOLUB_OWNER_USER_ID',
@@ -361,6 +361,13 @@ function GOLUB_OWNER_aiAnswer_(message, sender, props, updateId) {
   });
   var result = GOLUB_OWNER_signedPost_(endpoint, path, payload, secret);
   if (result.code !== 200 || !result.body || result.body.ok !== true) {
+    if (result.body && result.body.retryableAi === true) {
+      return {
+        retryableAi:true,
+        retryAfterMs:Math.max(1000, Number(result.body.retryAfterMs || 0) || 5000),
+        error:String(result.body.error || 'AI_TEMPORARILY_UNAVAILABLE').slice(0, 120)
+      };
+    }
     var workerError = GOLUB_OWNER_workerError_(result);
     throw new Error('AI_HTTP_' + result.code + (workerError ? '_' + workerError : ''));
   }
@@ -674,6 +681,7 @@ function GOLUB_OWNER_tryHandleTelegram_(e) {
   var updateId = Number(data.update_id);
   var lastUpdateId = Number(props.getProperty(GOLUB_OWNER_WEBHOOK_PROP.lastUpdateId) || -1);
   if (GOLUB_OWNER_deliveryRecord_(props, updateId) ||
+    props.getProperty(GOLUB_AI_RETRY_PREFIX + String(updateId) + '_META') ||
     (isFinite(lastUpdateId) && updateId <= lastUpdateId)) {
     GOLUB_OWNER_recordIngress_(props, 'PRIVATE_DUPLICATE');
     return GOLUB_OWNER_json_({ok:true});
@@ -691,6 +699,12 @@ function GOLUB_OWNER_tryHandleTelegram_(e) {
     GOLUB_OWNER_ensureCommitTimer_();
     stage = 'worker_request';
     var answer = GOLUB_OWNER_aiAnswer_(message, sender, props, updateId);
+    if (answer && answer.retryableAi === true) {
+      stage = 'queue_ai_retry';
+      GOLUB_OWNER_prepareAiRetry_(message, sender, updateId, answer.retryAfterMs, props);
+      GOLUB_OWNER_recordIngress_(props, 'PRIVATE_OWNER_AI_WAIT');
+      return GOLUB_OWNER_json_({ok:true, retrying:true});
+    }
     stage = 'prepare_commit';
     commitJob = GOLUB_OWNER_prepareCommit_(answer, updateId, props);
     if (commitJob && commitJob.duplicate) return GOLUB_OWNER_json_({ok:true});

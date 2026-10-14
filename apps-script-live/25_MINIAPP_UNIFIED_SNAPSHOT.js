@@ -1,7 +1,7 @@
 /*
  * Royal CRM / Таблица ЧП
  * 25_MINIAPP_UNIFIED_SNAPSHOT.js
- * v1.2.7
+ * v1.2.8
  *
  * Atomic Mini App snapshot writer.
  * One source write contains base participants/teams + specnaz score/rank + specnaz history.
@@ -11,8 +11,8 @@
  * one-off trigger. The five-minute trigger remains a durable fallback only.
  */
 
-var MINIAPP_UNIFIED_SNAPSHOT_VERSION = '1.2.7';
-var MINIAPP_UNIFIED_SNAPSHOT_SCHEMA = '1.4.2';
+var MINIAPP_UNIFIED_SNAPSHOT_VERSION = '1.2.8';
+var MINIAPP_UNIFIED_SNAPSHOT_SCHEMA = '1.4.3';
 var MINIAPP_UNIFIED_SEARCH_INDEX_VERSION = '1.1.3';
 var MINIAPP_UNIFIED_SNAPSHOT_HANDLER = 'MINIAPP_exportUnifiedSnapshotToGitHub';
 var MINIAPP_UNIFIED_SNAPSHOT_LAST_HASH = 'MINIAPP_UNIFIED_SNAPSHOT_LAST_HASH';
@@ -96,6 +96,7 @@ function MINIAPP_exportUnifiedSnapshotToGitHub(options) {
       throw new Error('MINIAPP_attachTeamStatusesToSnapshot_ missing');
     }
     var teamStatusStats = MINIAPP_attachTeamStatusesToSnapshot_(stable);
+    MINIAPP_teamLiveAttach_(stable);
     if (!stable || !Array.isArray(stable.participants) || !Array.isArray(stable.teams)) {
       throw new Error('MINIAPP_buildStableSnapshot_ returned invalid data');
     }

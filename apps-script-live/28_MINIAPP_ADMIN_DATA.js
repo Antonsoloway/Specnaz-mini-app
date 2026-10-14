@@ -480,7 +480,7 @@ function MINIAPP_adminReadTeams_(ss, sheet) {
   if (lastRow < 2) return [];
 
   var count = lastRow - 1;
-  var display = sheet.getRange(2, 1, count, 12).getDisplayValues();
+  var display = sheet.getRange(2, 1, count, 13).getDisplayValues();
   var photoMap = typeof MINIAPP_snapshotLoadTeamPhotoMap_ === 'function'
     ? MINIAPP_snapshotLoadTeamPhotoMap_(ss)
     : {};
@@ -513,6 +513,7 @@ function MINIAPP_adminReadTeams_(ss, sheet) {
       name: name,
       photoUrl: key ? MINIAPP_adminValue_(photoMap[key]) : '',
       leader: MINIAPP_adminValue_(row[3]),
+      gameTeamId: MINIAPP_teamLiveReadId_(sheet, row[12], game),
       players: MINIAPP_adminNumberOrText_(row[4]),
       specnazTrips: MINIAPP_adminNumberOrText_(row[5]),
       sort: MINIAPP_adminNumberOrText_(row[6]),
