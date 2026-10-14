@@ -52,3 +52,9 @@ Pending. Existing Apps Script deployment must be updated in place; preserve all 
 live files (including live-only isolation/watchdog files), secrets, bot routes and triggers.
 Never overwrite live from an old repo checkout. Publish new worker route before frontend.
 No watches, captures or game/session changes are authorized by this feature.
+
+
+2026-10-14 owner explicitly approved public publication and rollout. Branch published
+and PR51 created. Source e0202ca: Sosiska CI38626711844/38626722868 success,
+Cloudflare preview Build8c0c7baa-c44b-462c-ba51-2441c612e20f success.
+Earlier publication block is resolved. Production rollout is in progress.
