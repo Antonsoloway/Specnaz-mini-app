@@ -756,3 +756,14 @@ Release marker20261014-v061-team-picker2; no backend, table, bot or agent change
 window capture routers and Android/iPhone touch handlers; taps the actual button,
 checks elementFromPoint owns the visible search, cancels/reopens, filters and binds
 while preserving the draft/photo. Publication/runtime evidence follows below.
+
+
+### Picker regression — published and verified
+
+Source3be776c: both CI38629178787/38629187735 success; Cloudflare preview
+Build7fbbc643-3f9a-44a6-83d3-325f2a93242a success. PR52 merged.
+The actual-modal browser test fails with old z-index20000 at the Android
+elementFromPoint assertion and passes after the fix with Android/iPhone UA
+touch handlers, cancellation/reopen, filtering and binding. No page errors.
+This closes the earlier fixture coverage gap. Real Telegram recheck belongs to owner.
+Frontend release marker20261014-v061-team-picker2. Backend, Sheets and agent unchanged.
