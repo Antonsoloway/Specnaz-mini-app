@@ -145,7 +145,7 @@
   function exportView(){
    if(!exportFrom)exportFrom=period?.from?mskDate(period.from):mskDate(new Date().toISOString());
    if(!exportTo)exportTo=mskDate(new Date().toISOString());
-   return '<details class="sosiska-export"><summary>Сохранить историю команды в файл</summary><p>Выберите даты включительно · МСК. Файл JSON можно передать ИИ для анализа.</p><label>С даты<input type="date" data-export-date="from" value="'+esc(exportFrom)+'"></label><label>По дату<input type="date" data-export-date="to" value="'+esc(exportTo)+'"></label>'+button('export','Подготовить файл')+(exportReady?'<p>Файл готов. Ссылка действует 10 минут.</p>'+button('export-download','Скачать JSON'):'')+'</details>';
+   return '<details class="sosiska-export"'+(exportReady?' open':'')+'><summary>Сохранить историю команды в файл</summary><p>Выберите даты включительно · МСК. Файл JSON можно передать ИИ для анализа.</p><label>С даты<input type="date" data-export-date="from" value="'+esc(exportFrom)+'"></label><label>По дату<input type="date" data-export-date="to" value="'+esc(exportTo)+'"></label>'+button('export','Подготовить файл')+(exportReady?'<p>Файл готов. Ссылка действует 10 минут.</p>'+button('export-download','Скачать JSON'):'')+'</details>';
   }
   document.addEventListener('change',event=>{const kind=event.target.dataset?.exportDate;if(!kind)return;if(kind==='from')exportFrom=event.target.value;else exportTo=event.target.value;exportReady=null;});
   function playerView(){
@@ -367,7 +367,7 @@
     const entry=event.target.closest?.('[data-sosiska-open]');if(entry){event.preventDefault();event.stopImmediatePropagation();open();return;}
     const target=event.target.closest?.('[data-sosiska-action]');if(!target)return;event.preventDefault();event.stopImmediatePropagation();const action=target.dataset.sosiskaAction;
     if(action==='back'){reset();renderPage('home');return;}if(action==='stop-filters'){stopFilterLoading=true;return;}if(action==='stop-period'){stopPeriod=true;return;}if(busy)return;
-    if(action==='export-download'&&exportReady){const tg=window.Telegram?.WebApp;if(Date.parse(exportReady.expiresAt)<=Date.now()){exportReady=null;notice='Ссылка истекла. Подготовьте файл ещё раз.';render();return;}if(tg?.isVersionAtLeast?.('8.0')&&tg.downloadFile){tg.downloadFile({url:exportReady.url,file_name:exportReady.fileName});}else{const a=document.createElement('a');a.href=exportReady.url;a.download=exportReady.fileName;a.rel='noopener noreferrer';a.target='_blank';document.body.appendChild(a);a.click();a.remove();}return;}
+    if(action==='export-download'){if(!exportReady){notice='Период изменён. Подготовьте файл ещё раз.';render();return;}const tg=window.Telegram?.WebApp;if(Date.parse(exportReady.expiresAt)<=Date.now()){exportReady=null;notice='Ссылка истекла. Подготовьте файл ещё раз.';render();return;}if(tg?.isVersionAtLeast?.('8.0')&&tg.downloadFile){tg.downloadFile({url:exportReady.url,file_name:exportReady.fileName});}else{const a=document.createElement('a');a.href=exportReady.url;a.download=exportReady.fileName;a.rel='noopener noreferrer';a.target='_blank';document.body.appendChild(a);a.click();a.remove();}return;}
     const interval=Number(document.querySelector('[data-sosiska-interval]')?.value);
     run(async e=>{
       if(action==='hour'){selectedHour=Number(target.dataset.hour);return;}
