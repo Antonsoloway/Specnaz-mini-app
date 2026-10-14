@@ -21,6 +21,9 @@ const root=path.resolve(__dirname,'..');let browser;
   const wraps=await page.evaluate(()=>[...document.querySelectorAll('.team-live-player-name b')].map(n=>n.getBoundingClientRect().height/parseFloat(getComputedStyle(n).lineHeight)));assert.ok(wraps.every(n=>n<1.2),'all three reported names fit one line');
   const description=await page.locator('.team-live-description').boundingBox(),summary=await page.locator('.team-live-title').boundingBox();assert.ok(description.width>summary.width*.95,'description uses whole width');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),width,'no overflow with real entry CSS');
+  await page.evaluate(()=>{fixture.logo=null;});await page.locator('[data-team-live-refresh]').tap();await page.waitForFunction(()=>document.querySelector('.team-live-emblem')?.textContent===''&&!document.querySelector('.team-live-emblem img'));
+  assert.ok((await page.locator('.team-live-title h3').boundingBox()).width>120,'missing logo still leaves a full-width team name');
+  await page.evaluate(()=>{fixture.logo=126;mode='good';});await page.locator('[data-team-live-refresh]').tap();await page.waitForSelector('.team-live-emblem img');
   await page.locator('.team-live-card').screenshot({path:'/tmp/repaired-card-'+width+'.png'});
   if(admin){
    await page.evaluate(()=>{const modal=document.createElement('div');modal.className='royal-admin-modal-backdrop';modal.dataset.adminWriteModal='1';modal.innerHTML='<div class="royal-admin-modal"><h3>Редактирование</h3><form data-write-team-form="1" class="royal-admin-form"><div class="royal-admin-form-grid"><label class="royal-admin-input"><span>Название</span><input data-write-field="name" value="FORTUNA"></label><label class="royal-admin-input"><span>ID</span><input data-write-field="gameTeamId" value="12"></label></div></form></div>';document.body.appendChild(modal);});
