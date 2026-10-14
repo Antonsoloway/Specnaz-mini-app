@@ -743,3 +743,35 @@ getTeamInfo4298767235 returned integer Logo136; the public projection accepts
 Logo and TeamLogo. Protected native Telegram linked-card acceptance remains
 owner-side. No source-team IDs, watches, Sheet data, bot settings or secrets changed.
 Earlier source-ready/pending notes are historical and superseded.
+
+
+## 2026-10-15 — RM card/editor regression repair (source ready)
+
+Owner screenshots2905/2907/2908 showed narrow name/description columns, network
+errors and repeated loading blocks hiding the admin editor. Root cause: the
+live decorator assumed its host was immediately before the photo; dynamically
+loaded admin-edit-ux moved the edit button to that position on every mutation.
+Both observers remounted/moved indefinitely. Exact original pair reproduced29
+card hosts in450ms. A WeakMap photo-to-host association and parent-level
+single-host lookup no longer depend on adjacency; editor anchor is the live
+card when present. Existing cloned/Back cards reacquire handlers without remount.
+
+Second cause: transport gave team-live/admin-team-live the ordinary5-second
+window and incorrectly tried unsupported GAS fallback. Both game routes now
+have60seconds, no GAS fallback; shared GET reads retry once only for transient
+network/timeout/HTTP failures. No retries for auth, validation or identity errors.
+Existing ordinary/auth/admin write timeouts are unchanged. Failure has a human
+message, stops the loading placeholder and exposes saved photo; prior successful
+data is retained during a failed refresh.
+
+Description spans full width; leadership uses full-width name row plus three
+metrics below. Ochki mne/Nurochka/JluceH0K fit one line at320px. Original photos
+and names untouched. Cache marker20261015-v061-card-repair1; dynamic edit-loader
+cache refreshed. Frontend only; no backend/Sheet/watch/bot/secret changes.
+
+124 Node tests PASS. Existing mobile card/picker fixtures PASS. New regression
+uses ALL current entry CSS and actual transport, emblem, edit-UX and photo-form
+modules at320/390/768px: single host, editor name/ID/file input preserved,6second
+response plus network retry, error/screenshot recovery and refresh PASS, zero
+overflow/page errors. Original observer pair fails the single-host assertion.
+Publication and native Telegram acceptance pending.

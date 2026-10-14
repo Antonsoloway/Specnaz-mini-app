@@ -1,4 +1,4 @@
-.team-live-original:not(.team-live-photo-shown){display:none!important}
+.team-live-original:not(.team-live-photo-shown):not(.team-live-unavailable){display:none!important}
 .team-live-picker-backdrop{position:fixed;inset:0;z-index:100010;background:rgba(8,18,29,.96);overflow:auto;padding:max(18px,env(safe-area-inset-top)) 12px max(30px,env(safe-area-inset-bottom));overscroll-behavior:contain}
 .sosiska-picker{max-width:640px;margin:auto}.team-live-card{margin:20px 0;border-radius:24px;background:#142131;overflow:hidden;border:1px solid #49637f;box-shadow:0 12px 28px #0005}
 .team-live-banner{padding:22px 18px;background:linear-gradient(#a11c49,#711232);border-bottom:5px solid #f3ae20;text-align:center}
@@ -13,3 +13,22 @@
 .team-live-emblem svg{display:block;width:44px;height:48px}.team-live-player-icon svg{display:block;width:28px;height:30px}.team-live-crowns small svg{display:block;width:20px;height:20px;margin:auto}.team-live-player>div:not(.team-live-player-name) b{white-space:nowrap;font-size:15px}@media(max-width:360px){.team-live-player>div:not(.team-live-player-name) b{font-size:13px}}
 
 .team-live-pick-button{width:100%;margin-top:8px;border:1px solid #527d9e!important;background:#234861!important;color:#eef8ff!important;border-radius:12px!important;padding:12px!important;min-height:46px}
+
+/* Two rows keep nicknames readable on narrow Telegram WebViews. */
+.team-live-card{max-width:100%;min-width:0;box-sizing:border-box}
+.team-live-card .team-live-title{grid-template-columns:44px minmax(0,1fr) 62px;align-items:center}
+.team-live-card .team-live-title h3{min-width:0;font-size:clamp(20px,5vw,27px);line-height:1.2;word-break:normal;overflow-wrap:break-word;margin:0}
+.team-live-card .team-live-title>.team-live-description{grid-column:1/-1;min-width:0;white-space:pre-wrap;line-height:1.4;word-break:normal;overflow-wrap:break-word;margin:12px 0 0;font-size:15px}
+.team-live-card .team-live-player{grid-template-columns:repeat(3,minmax(0,1fr));padding:12px;gap:12px 8px;min-width:0;box-sizing:border-box}
+.team-live-player-head{grid-column:1/-1;display:flex;align-items:center;gap:10px;min-width:0}
+.team-live-card .team-live-player-name{flex:1;min-width:0}
+.team-live-card .team-live-player-name b{font-size:20px!important;text-align:left;line-height:1.25;word-break:normal;overflow-wrap:break-word;white-space:normal}
+.team-live-card .team-live-player-icon{flex:0 0 28px}
+.team-live-card .team-live-player small{font-size:12px}
+.team-live-card .team-live-player>div:not(.team-live-player-head){min-width:0;text-align:center}
+.team-live-card .team-live-player>div:not(.team-live-player-head) b{font-size:18px;white-space:nowrap}
+.team-live-card .team-live-crowns small svg{display:inline-block;vertical-align:middle;width:16px;height:16px}
+.team-live-card .team-live-facts>div{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center}
+.team-live-card .team-live-facts span{min-width:0;word-break:normal;overflow-wrap:normal;line-height:1.25}
+.team-live-card .team-live-facts b{white-space:nowrap}
+@media(max-width:360px){.team-live-card .team-live-summary{margin:8px;padding:12px 8px}.team-live-card .team-live-facts{padding:10px 8px;gap:12px}.team-live-card .team-live-facts span{font-size:14px}.team-live-card .team-live-facts b{font-size:17px}.team-live-card .team-live-leadership{padding:0 8px 8px}.team-live-card .team-live-player-name b{font-size:18px!important}}

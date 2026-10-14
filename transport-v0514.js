@@ -199,8 +199,9 @@
 
     let pathname = '';
     try { pathname = new URL(urlString).pathname; } catch (_) {}
+    const isTeamLive=pathname === '/team-live' || pathname === '/admin-team-live';
     if (gasMode) {
-      if (pathname === '/admin-agent' || pathname === '/admin-data' || pathname === '/admin-write' || pathname === '/admin-team-photo') {
+      if (isTeamLive || pathname === '/admin-agent' || pathname === '/admin-data' || pathname === '/admin-write' || pathname === '/admin-team-photo') {
         throw workerRequiredError();
       }
       return fallbackFor(urlString, init);
@@ -211,7 +212,7 @@
     const isAdminWrite = pathname === '/admin-write';
     const isProtectedMedia = pathname === '/project-mayak-media';
     const attempts = isAuth ? 2 : 1;
-    const timeoutMs = pathname === '/admin-agent' ? 120000 : isAuth
+    const timeoutMs = isTeamLive ? 60000 : pathname === '/admin-agent' ? 120000 : isAuth
       ? AUTH_TIMEOUT_MS
       : isAdminData
         ? ADMIN_DATA_TIMEOUT_MS
@@ -237,7 +238,7 @@
       }
     }
 
-    if (pathname === '/admin-agent' || isAdminData || isAdminWrite || pathname === '/admin-team-photo') {
+    if (isTeamLive || pathname === '/admin-agent' || isAdminData || isAdminWrite || pathname === '/admin-team-photo') {
       throw lastError || workerRequiredError();
     }
     if (!GAS_URL) throw lastError || timeoutError(timeoutCode);

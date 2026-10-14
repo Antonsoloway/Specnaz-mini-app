@@ -152,3 +152,10 @@ test('v0.6 refreshes public and visible admin snapshots after the one-off trigge
   assert.match(writeSource, /PUBLIC_REFRESH_PRESERVED_SELECTOR[\s\S]*\.changelog-screen/);
   assert.match(writeSource, /panel\.querySelector\(PUBLIC_REFRESH_PRESERVED_SELECTOR\)/);
 });
+
+test('RM card reads have 60 seconds and never use GAS fallback on either route', async()=>{
+ for(const route of ['/team-live','/admin-team-live']){
+  const t=createTransport();await t.window.fetch('https://royal-crm-miniapp-api.tropical-spoon.workers.dev'+route+'?team=CRM&game=Royal+Match');assert.equal(t.scheduled.at(-1),60000);
+  const bad=createTransport({search:'?gas=https%3A%2F%2Fgas.invalid',fetch:async()=>{throw new TypeError('Failed to fetch');}});await assert.rejects(bad.window.fetch('https://royal-crm-miniapp-api.tropical-spoon.workers.dev'+route),/Failed to fetch/);assert.equal(bad.nativeCalls.length,1);
+ }
+});

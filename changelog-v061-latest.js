@@ -27,6 +27,8 @@
     current.sections.unshift(section);
   }
   if (!Array.isArray(section.changes)) section.changes = [];
+  const CARD_REPAIR='Исправлены повторяющиеся блоки загрузки карточки RM и исчезновение админского редактора. Описание теперь занимает всю ширину, ники лидера и помощников отделены от показателей. Исправлены слишком короткое ожидание сервера и обработка временного сбоя; сохранённый скриншот доступен при ошибке.';
+  if (!section.changes.includes(CARD_REPAIR)) section.changes.unshift(CARD_REPAIR);
   const EMBLEM_CHANGE='Добавлены 176 игровых эмблем Royal Match: перед названиями привязанных команд, в поиске, карточках, профилях игроков и сравнении Сосиски. Эмблема выбирается по номеру сервера; редактирование названия не меняет эмблему.';
   if (!section.changes.includes(EMBLEM_CHANGE)) section.changes.unshift(EMBLEM_CHANGE);
   if (!section.changes.includes(TEAM_CHANGE)) section.changes.unshift(TEAM_CHANGE);

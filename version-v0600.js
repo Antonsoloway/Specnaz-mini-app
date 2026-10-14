@@ -32,7 +32,7 @@
   function loadV061AdminEditUx() {
     if (window.__ROYAL_ADMIN_EDIT_UX_V061__ || document.querySelector('script[data-admin-edit-ux-v061="1"]')) return;
     const script = document.createElement('script');
-    script.src = `admin-edit-ux-v061.js?v=${CACHE}`;
+    script.src = `admin-edit-ux-v061.js?v=${CACHE}&teamLive=20261015-card-repair1`;
     script.async = false;
     script.dataset.adminEditUxV061 = '1';
     document.body.appendChild(script);

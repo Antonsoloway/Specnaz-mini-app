@@ -27,3 +27,8 @@ test('same CRM identity coalesces requests, rename retains emblem by ID; mismatc
 test('session change during game read cannot retain another session response',async()=>{
  let resolve;const {api,c}=runtime(()=>new Promise(r=>resolve=r));const p=api.fetchLive({name:'CRM',gameTeamId:'12'});c.sessionToken='changed';resolve(Response.json({ok:true,data:{teamId:'12',logo:0}}));await assert.rejects(p,/STALE/);assert.doesNotMatch(api.name('CRM','12'),/webp/);
 });
+
+test('game reads retry one transient failure, but never retry access denial or changed identity',async()=>{
+ let calls=0;const {api}=runtime(async()=>{calls++;if(calls===1)throw new TypeError('Failed to fetch');return Response.json({ok:true,data:{teamId:'12',logo:0}});});await api.fetchLive({name:'CRM',gameTeamId:'12'});assert.equal(calls,2);
+ for(const status of [401,403,400]){let calls=0;const r=runtime(async()=>{calls++;return Response.json({ok:false},{status});});await assert.rejects(r.api.fetchLive({name:'CRM',gameTeamId:'12'}));assert.equal(calls,1);}
+});
