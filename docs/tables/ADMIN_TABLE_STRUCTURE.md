@@ -99,10 +99,10 @@ P `Ссылка сообщения`
 - Обе destructive операции требуют optimistic revision, повторной live-проверки под `ScriptLock`, подтверждения в Mini App и записи в admin journal.
 
 
-## Подготовлено 14.10.2026 — привязка команды RM
+## Включено 14.10.2026 — привязка команды RM
 
 Deployment candidate adds `Команды!M` — `ID команды RM`, a text source field.
 It is optional and accepts RM only; RK remains blank. Installation never overwrites
 an occupied M/header/formula. ID is cleared on unlink/delete and follows the entire
 row during sorting. E:L remain formula-owned; photo C uses the existing media flow.
-Not live until the deployment evidence in docs/team-live confirms installation.
+Existing deployment117 confirmed. The M header is created on the first explicit ID write; no teams were automatically linked during rollout.

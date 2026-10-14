@@ -655,3 +655,37 @@ Automatic approval review rejected public git push because implementation author
 was deemed insufficient for public code/docs publication. Remote branch remains absent;
 no workaround attempted. Waiting for explicit owner publication approval. No production
 deploy or data change. Live-only Apps Script modules must be preserved during rollout.
+
+
+## 2026-10-14 — RM ID binding and live leadership cards deployed
+
+Owner explicitly approved publication and rollout. PR51 merged as
+08d93956af047bcc8bc75f3430163f523c86e09b; final source5b623c4 had both Sosiska
+CI38627102983/38627111014 success, including118 Node tests and37workerd checks.
+Mobile fixture320/390/768px PASS; no overflow, max4leader/co-leaders, Back restored,
+photo/form draft preserved, revoked-session removal. Real Telegram acceptance remains owner-side.
+
+Existing Apps Script deployment pinned in live private adminData was updated in place
+to version117; URL unchanged. Fresh pull before installation matched the reviewed
+25/28/29/33baseline; live-only90/99and all unrelated source were preserved.
+New38helper and four candidate files installed. M is an optional text source field
+with collision/formula guard and header created on first explicit ID write.
+No team IDs, watches, captures, bots, webhook URLs or game progress changed by this work.
+
+Live derived data: admin snapshot2026-10-14T19:53:52.013Z advertises
+write.gameTeamLink.enabled=true/gameRoyalMatch/version1.0.0; public snapshot
+2026-10-14T19:53:34.816Z schema1.4.3/writer1.2.8/search1.1.3.
+The successful scheduled refresh supersedes the unsuccessful clasp run attempt,
+which returnedNOT_FOUND and was not used as evidence.
+
+Live Worker healthHTTP200/version1.41.0retained. New routes verified by exact
+400INVALID_REQUEST(other game),405METHOD_NOT_ALLOWED(POST),204OPTIONS,
+401SESSION_MISSING and403ORIGIN_DENIEDresponses. Existing metadata version is
+unchanged by this isolated wrapper. Cloudflare management deployment ID was not
+read: available OAuth metadata requests returned401/403; no login/secret change attempted.
+Frontend app-v0600 actually serves team-live-v061.js/css and the updated picker/editor.
+Two redirects preserve Telegram hash and set releaseBuild20261014-v061-team-live1.
+
+Full live mirror synced through the project's normal script as
+125e655841d741a38024e1fef96f7cd981454578; both mainCI runs success.
+Earlier publication/rollout-pending notes are historical and superseded.
