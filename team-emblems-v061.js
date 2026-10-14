@@ -18,18 +18,25 @@
     if(metadataOnly&&!refresh&&old&&Date.now()-old.at<60000){if(old.error)throw Error('UNAVAILABLE');return old.payload;}
     if(pending.has(key))return pending.get(key);
     const task=(async()=>{
-      const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),35000);
-      try{
-        const params=new URLSearchParams({team:record.name,game:'Royal Match',...(refresh?{refresh:'1'}:{})});
-        const r=await fetch(API+(admin?'/admin-team-live?':'/team-live?')+params,{headers:{Authorization:'Bearer '+token},signal:controller.signal});
-        const payload=await r.json();if(token!==session()||epoch!==generation||!permitted)throw Error('STALE');
-        if(r.status===401||r.status===403){clear(false);throw Error('Откройте приложение заново.');}
-        if(!r.ok||!payload.ok)throw Error(payload.message||'Данные игры не загрузились.');
-        if(payload.data?.teamId!==record.gameTeamId)throw Error('Привязка команды изменилась. Обновите карточку.');
-        if(cache.size>=250&&!cache.has(key))cache.delete(cache.keys().next().value);
-        cache.set(key,{at:Date.now(),payload});remember(record.gameTeamId,logoOf(payload.data));return payload;
-      }catch(e){if(epoch===generation&&token===session()&&permitted)cache.set(key,{at:Date.now(),error:true});throw e;}
-      finally{clearTimeout(timer);}
+      for(let attempt=0;attempt<2;attempt++){
+        const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),60000);
+        try{
+          const params=new URLSearchParams({team:record.name,game:'Royal Match',...(refresh?{refresh:'1'}:{})});
+          const r=await fetch(API+(admin?'/admin-team-live?':'/team-live?')+params,{headers:{Authorization:'Bearer '+token},signal:controller.signal});
+          if(token!==session()||epoch!==generation||!permitted)throw Error('STALE');
+          if(r.status===401||r.status===403){clear(false);throw Object.assign(Error('Откройте приложение заново.'),{denied:true});}
+          if(!r.ok)throw Object.assign(Error('Данные игры не загрузились.'),{transient:[408,425,429,502,503,504].includes(r.status)});
+          const payload=await r.json();
+          if(!payload.ok)throw Error('Данные игры не загрузились.');
+          if(payload.data?.teamId!==record.gameTeamId)throw Error('Привязка команды изменилась. Обновите карточку.');
+          if(cache.size>=250&&!cache.has(key))cache.delete(cache.keys().next().value);
+          cache.set(key,{at:Date.now(),payload});remember(record.gameTeamId,logoOf(payload.data));return payload;
+        }catch(e){
+          const transient=e.transient||e.name==='AbortError'||e.name==='TypeError'||e.code==='WORKER_TIMEOUT'||e.message==='WORKER_TIMEOUT';
+          if(attempt===0&&transient&&epoch===generation&&token===session()&&permitted){await new Promise(r=>setTimeout(r,500));if(epoch!==generation||token!==session()||!permitted)throw Error('STALE');continue;}
+          if(epoch===generation&&token===session()&&permitted)cache.set(key,{at:Date.now(),error:true});throw e;
+        }finally{clearTimeout(timer);}
+      }
     })();pending.set(key,task);try{return await task;}finally{if(pending.get(key)===task)pending.delete(key);}
   }
   function records(admin){try{return admin?(window.RoyalAdminDataV0600?.current?.adminData?.teams||[]):(typeof snapshotState==='undefined'?[]:snapshotState?.teams||[]);}catch{return [];}}

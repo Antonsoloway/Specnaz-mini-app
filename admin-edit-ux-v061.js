@@ -78,7 +78,7 @@
     button.classList.add('royal-admin-edit-top-v061');
 
     if (section.classList.contains('royal-admin-team-detail-shell')) {
-      const photo = section.querySelector('.team-photo-box');
+      const photo = section.querySelector('.team-live-card') || section.querySelector('.team-photo-box');
       if (photo && photo.previousElementSibling !== button) section.insertBefore(button, photo);
       else if (!photo && section.firstElementChild !== button) section.prepend(button);
       return;
