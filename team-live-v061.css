@@ -1,5 +1,5 @@
 .team-live-original:not(.team-live-photo-shown){display:none!important}
-.team-live-picker-backdrop{position:fixed;inset:0;z-index:20000;background:rgba(8,18,29,.96);overflow:auto;padding:max(18px,env(safe-area-inset-top)) 12px max(30px,env(safe-area-inset-bottom));overscroll-behavior:contain}
+.team-live-picker-backdrop{position:fixed;inset:0;z-index:100010;background:rgba(8,18,29,.96);overflow:auto;padding:max(18px,env(safe-area-inset-top)) 12px max(30px,env(safe-area-inset-bottom));overscroll-behavior:contain}
 .sosiska-picker{max-width:640px;margin:auto}.team-live-card{margin:20px 0;border-radius:24px;background:#142131;overflow:hidden;border:1px solid #49637f;box-shadow:0 12px 28px #0005}
 .team-live-banner{padding:22px 18px;background:linear-gradient(#a11c49,#711232);border-bottom:5px solid #f3ae20;text-align:center}
 .team-live-banner h3{margin:0;color:#ffe67e;font-size:clamp(28px,7vw,42px);font-weight:900;text-shadow:2px 3px #223248,-1px -1px #223248}
@@ -11,3 +11,5 @@
 @media(max-width:360px){.team-live-player{grid-template-columns:24px minmax(55px,1fr) 44px 40px 54px;padding:10px 5px;gap:3px}.team-live-player b{font-size:14px}.team-live-player-name b{font-size:16px}.team-live-player small{font-size:10px}}
 
 .team-live-emblem svg{display:block;width:44px;height:48px}.team-live-player-icon svg{display:block;width:28px;height:30px}.team-live-crowns small svg{display:block;width:20px;height:20px;margin:auto}.team-live-player>div:not(.team-live-player-name) b{white-space:nowrap;font-size:15px}@media(max-width:360px){.team-live-player>div:not(.team-live-player-name) b{font-size:13px}}
+
+.team-live-pick-button{width:100%;margin-top:8px;border:1px solid #527d9e!important;background:#234861!important;color:#eef8ff!important;border-radius:12px!important;padding:12px!important;min-height:46px}

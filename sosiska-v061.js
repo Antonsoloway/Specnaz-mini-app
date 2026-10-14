@@ -409,7 +409,7 @@
   window.addEventListener('royal:auth-ready',()=>{reset();decorate();});
   for(const name of ['royal:access-denied','royal:fatal'])window.addEventListener(name,()=>{reset();decorate();});
   window.RoyalAdminDataV0600?.subscribe?.(event=>{if(event.type==='clear'&&['unauthorized','forbidden','session-changed'].includes(event.reason)){const visible=opened;reset();if(visible){const panel=document.getElementById('panel');if(panel)panel.textContent='Админская сессия завершена. Откройте приложение заново.';}}});
-  function pickTeam(choose){reset();if(!admin()||typeof choose!=='function')return;const focus=document.activeElement,host=document.createElement('div');host.className='team-live-picker-backdrop';document.body.appendChild(host);picker={host,choose,focus};opened=true;query='';notice='Найдите команду и проверьте лидера перед привязкой.';render();host.querySelector('input')?.focus();}
-  decorate();window.RoyalSosiska={version:'0.5.5',open,pickTeam,filters:{parse:parseFilters,matches:matchesFilters,fields:teamFilterFields}};
+  function pickTeam(choose){reset();if(!admin()||typeof choose!=='function')return;const focus=document.activeElement;focus?.blur?.();const host=document.createElement('div');host.className='team-live-picker-backdrop';document.body.appendChild(host);picker={host,choose,focus};opened=true;query='';notice='Найдите команду и проверьте лидера перед привязкой.';render();host.querySelector('input')?.focus();}
+  decorate();window.RoyalSosiska={version:'0.5.6',open,pickTeam,filters:{parse:parseFilters,matches:matchesFilters,fields:teamFilterFields}};
 })();
 
