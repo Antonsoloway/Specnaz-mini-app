@@ -50,7 +50,8 @@
     document.querySelectorAll('[data-rm-team-id]').forEach(n=>insert(n,logos.get(n.dataset.rmTeamId)));
     document.querySelectorAll('[data-team]:not(img)').forEach(n=>{let ref;try{const a=JSON.parse(decodeURIComponent(n.dataset.team));if(!Array.isArray(a))return;ref={name:a[0],game:a[1]};}catch{return;}
       const admin=!!n.closest('.royal-admin-screen,.royal-admin-team-detail-shell,.royal-admin-participant-detail-shell')||!!n.dataset.adminRouteTeam;
-      const r=find(ref,admin);if(r)attach(n.querySelector('.team-card-main > strong,span,strong')||n,r,admin);});
+      const r=find(ref,admin);if(r)attach(n.querySelector('.team-card-main > strong,.participant-profile-team-main > b,span,strong,b')||n,r,admin);});
+    document.querySelectorAll('[data-admin-participant-team="1"]').forEach(n=>{const r=find({name:n.dataset.teamName,game:n.dataset.teamGame},true);if(r)attach(n.querySelector('b'),r,true);});
     document.querySelectorAll('[data-admin-team="1"], [data-admin-ranking-team="1"]').forEach(n=>{const name=n.dataset.adminTeamName||n.dataset.teamName||n.querySelector('summary strong')?.textContent;const game=n.dataset.adminTeamFullGame||n.dataset.teamGame||n.querySelector('summary small')?.textContent?.split(' · ')[0];const r=find({name,game},true);if(r)attach(n.querySelector('.team-detail-head h2,summary strong,.royal-admin-team-ranking-main strong'),r,true);});
     const head=document.querySelector('#panel .team-detail-head');if(head&&!head.closest('[data-admin-team]')){const h=head.querySelector('h2'),r=find({name:h?.textContent,game:head.querySelector('.muted')?.textContent},false);if(r)attach(h,r,false);}
   }
