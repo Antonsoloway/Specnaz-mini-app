@@ -3,7 +3,7 @@
   'use strict';
 
   const VERSION = '0.6.1';
-  const PATCH_VERSION = '0.6.1-changelog-latest.3';
+  const PATCH_VERSION = '0.6.1-changelog-latest.4';
   const CHANGE = 'В админском Журнале исправлен порядок записей: все события теперь принудительно сортируются по фактическому времени от новых к старым, независимо от источника записи и порядка, в котором данные пришли с сервера.';
 
   const AGENT_CHANGE = 'Добавлен отдельный админский модуль «Сосиска»: поиск команд Royal Match, выбор по описанию и лидеру, состав игроков, снимки, история изменений и управление отслеживанием.';
@@ -11,6 +11,8 @@
   const FILTER_CHANGE = 'В поиске Сосиски добавлены совместные фильтры: командные очки от указанного значения, ник лидера, число участников, уровень и короны для входа, открытая или закрытая команда. Подробности проверяются по всем найденным командам, включая следующие страницы.';
 
   const PERIOD_CHANGE = 'Снимки от 5 минут, почасовая активность по дням и экспорт истории команды за выбранные даты в JSON. Сосиска: состав отсортирован по уровням и коронам, технический JSON убран. При открытии команды загружается вся история, рассчитываются изменения игроков и скорости уровней/корон в час, отдельно отмечены выходы и сбросы. Причина недоступности ИИ показывается явно.';
+
+  const TEAM_CHANGE = 'Для Royal Match добавлена привязка игрового ID через поиск Сосиски с фильтрами. Вместо скриншота можно показывать актуальные сведения команды, лидера и до трёх помощников. Название редактируется, сохранённый скриншот остаётся доступным.';
 
   const releases = Array.isArray(window.RoyalChangelog?.releases)
     ? window.RoyalChangelog.releases
@@ -25,6 +27,7 @@
     current.sections.unshift(section);
   }
   if (!Array.isArray(section.changes)) section.changes = [];
+  if (!section.changes.includes(TEAM_CHANGE)) section.changes.unshift(TEAM_CHANGE);
   if (!section.changes.includes(CHANGE)) section.changes.unshift(CHANGE);
 
   if (!section.changes.includes(AGENT_CHANGE)) section.changes.unshift(AGENT_CHANGE);
