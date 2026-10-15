@@ -966,3 +966,34 @@ Marker20261015-v061-membership1; current version0.6.1 patch.
 ### Sosiska membership history — verified rollout
 
 PR60 final source92dd83ea480ee2645b82818a441206dd6ce9ac0f (initial d05ad12 plus Russian caption polish) passed PR CI38741642724, mergedceb7b3918df74f268383287b246a0405e8a61a5b. Main CI38741868046 and Pages build/deploy38741867219 PASS. All127Node tests,37workerd/isolation checks and seven browser fixtures PASS. Eight public entry/Sosiska/bundle/CSS/version/changelog files returned HTTP200 and matched reviewed source byte-for-byte. Marker20261015-v061-membership1 is live. Mobile320/390/768 fixture includes capture-refresh with selected membership tab retained; screenshot visually reviewed for readable green return/new and red departed cards. Existing data/history are reused, no new watch activated. Shared membership detail is opt-in; existing backend AI statistics remain unchanged by default. Native Telegram acceptance remains owner-side. Earlier publication-pending note is superseded.
+
+
+## 15.10.2026 — Sequential admin save repair
+
+Owner video2921 shows Save waiting at least94 seconds. Reproduced frontend stale
+snapshot race: a GET started before a successful rename overwrote the committed
+name/revision, breaking later saves until reload. Shared client and writer now
+guard commit generations, including late consumers of an old in-flight GET.
+Known successful rename aliases and local participant memberships follow the new
+team name; authoritative server revisions/conflict checks remain mandatory.
+Complete returned records commit immediately even without queue metadata.
+Unchanged team edits send no write. Removed permanent20s snapshot watchdog;
+startup/focus refresh and bounded post-write confirmation remain.
+
+A delayed acknowledgement gets one bounded same-requestId receipt probe using
+the existing Apps Script deduplication protocol. Frozen photo/payload are identical;
+ambiguous explicit retry keeps the original ID, and changed payload is blocked
+until that result is resolved. Form controls are locked during submission, and a
+late result cannot close/update another editor. Permanent errors are not replayed.
+
+128Node checks and new actual-module browser fixture PASS; old writer FAILS the
+same stale-response reproduction. Fixture includes sequential rename/save,
+local membership aliases, no-op, missing queue metadata, lost receipt and frozen
+photo. CI now runs eight browser fixtures. Existing legacy admin-delete harness
+fails3 tests identically on baseline because it expects12 team columns instead
+of13; no Apps Script changes are part of this patch. Full CI/publication pending.
+Marker20261015-v061-admin-save1; dynamic writer/photo cache keys explicitly bumped.
+
+Actual Apps Script latency remains unmeasured: Cloud Shell device is offline.
+Do not claim server waiting or every save duration solved. No live GAS/Sheets
+mutation or backend deployment. Native Telegram acceptance remains owner-side.

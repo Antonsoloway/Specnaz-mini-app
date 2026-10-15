@@ -242,3 +242,13 @@ test('detail pages distinguish not-found from network failures and expose retry 
   assert.match(team, /data-admin-team-retry/);
   assert.match(team, /TEAM_NOT_FOUND/);
 });
+
+
+test('a read started before a commit cannot roll cache back, including late consumers after release', async()=>{
+ let resolveFetch;const fixture=createClient([],()=>new Promise(resolve=>{resolveFetch=resolve;}));
+ fixture.client.accept(payload('before'));
+ const early=fixture.client.load({force:true});fixture.client.protect('saved');
+ const committed=payload('after',[{requestId:'saved'}]);fixture.client.accept(committed);fixture.client.release('saved');
+ const late=fixture.client.load({force:true});resolveFetch(response(200,payload('stale')));
+ assert.equal(await early,committed);assert.equal(await late,committed);assert.equal(fixture.client.current,committed);
+});

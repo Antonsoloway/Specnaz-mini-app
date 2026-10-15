@@ -1,6 +1,6 @@
 /* Royal CRM Mini App — admin team photo bridge v0.6.0-photo.1 */
 (() => {
-  const VERSION = '0.6.0-photo.1';
+  const VERSION = '0.6.0-photo.2';
   const MAX_SERVER_BYTES = 650000;
   const TARGET_BYTES = 560000;
   const MAX_DIMENSION = 1280;
@@ -166,8 +166,8 @@
     return btoa(binary);
   }
 
-  function selectedPhotoPromise() {
-    const form = document.querySelector('[data-admin-write-modal="1"] [data-write-team-form="1"]');
+  function selectedPhotoPromise(selectedForm=null) {
+    const form = selectedForm || document.querySelector('[data-admin-write-modal="1"] [data-write-team-form="1"]');
     if (!form) return null;
     const state = formStates.get(form);
     if (!state) return null;
@@ -188,6 +188,8 @@
       return nativeFetch(input,init);
     }
 
+    const target=requestBody.op==='createTeam'?requestBody.payload:requestBody.payload?.changes;
+    if(target&&Object.prototype.hasOwnProperty.call(target,'photo'))return nativeFetch(input,init);
     const promise = selectedPhotoPromise();
     if (promise) {
       let photo;
@@ -260,7 +262,7 @@
 
   installCss();
   document.querySelectorAll('[data-write-team-form]').forEach(decorateForm);
-  window.RoyalAdminTeamPhotoV0600 = { version:VERSION, maxBytes:MAX_SERVER_BYTES };
+  window.RoyalAdminTeamPhotoV0600 = { version:VERSION, maxBytes:MAX_SERVER_BYTES,prepare:async form=>{const photo=await selectedPhotoPromise(form);return photo?{...photo}:null;} };
   try {
     if (window.RoyalAdminWriteV0600) window.RoyalAdminWriteV0600.version = '0.6.0-write.4';
   } catch (_) {}
