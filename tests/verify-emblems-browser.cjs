@@ -12,7 +12,15 @@ const root=path.resolve(__dirname,'..');
    const ref=t=>encodeURIComponent(JSON.stringify([t.name,t.game])),esc=s=>s.replaceAll('&','&amp;').replaceAll('<','&lt;');document.getElementById('panel').innerHTML=snapshotState.teams.map(t=>'<button class="team-card" data-team="'+ref(t)+'"><span class="team-card-main"><strong>'+esc(t.name)+'</strong><small>'+t.game+'</small></span></button>').join('');
    window.fetch=async url=>{const name=new URL(url).searchParams.get('team');calls.push(name);activeCalls++;peakCalls=Math.max(peakCalls,activeCalls);await new Promise(r=>setTimeout(r,30));activeCalls--;const t=snapshotState.teams.find(t=>t.name===name&&t.game==='Royal Match');return Response.json({ok:true,data:{teamId:t.gameTeamId,logo:t.gameTeamId==='1'?0:175}});};
   });
-  await page.addScriptTag({path:path.join(root,'team-emblems-v061.js')});await page.waitForSelector('[data-rm-logo="0"]');await page.waitForTimeout(300);
+  await page.addScriptTag({path:path.join(root,'team-emblems-v061.js')});
+  if(width===320){
+   const failures=await page.evaluate(async()=>{
+    const results=await Promise.all(Array.from({length:176},(_,id)=>new Promise(resolve=>{
+     const img=new Image();img.onload=()=>resolve(img.naturalWidth===160&&img.naturalHeight===176?null:id);img.onerror=()=>resolve(id);
+     const template=document.createElement('template');template.innerHTML=RoyalTeamEmblems.image(id);img.src=template.content.firstChild.src;
+    })));return results.filter(id=>id!==null);
+   });assert.deepEqual(failures,[],'every catalogue image must decode, including 74 and151 from owner report');
+  }await page.waitForSelector('[data-rm-logo="0"]');await page.waitForTimeout(300);
   assert.ok(await page.evaluate(()=>calls.length<24),'offscreen teams must not prewarm');assert.ok(await page.evaluate(()=>peakCalls<=2));assert.equal(await page.locator('.team-card').last().locator('.rm-team-emblem').count(),0,'RK never gets RM logo');assert.equal(await page.locator('.team-card strong').first().textContent(),'CRM editable name < &');
   await page.locator('.team-card').nth(23).scrollIntoViewIfNeeded();await page.waitForFunction(()=>document.querySelectorAll('[data-rm-logo="175"]').length>3);
   await page.evaluate(()=>{const t=snapshotState.teams[0];snapshotState.teams=[t];document.getElementById('panel').innerHTML='<div class="team-detail-head"><h2>CRM editable name &lt; &amp;</h2><div class="muted">Royal Match</div></div><button class="membership-pill" data-team="'+encodeURIComponent(JSON.stringify([t.name,t.game]))+'"><span>CRM editable name &lt; &amp;</span><small>Leader</small></button><button class="participant-profile-team-link" data-team="'+encodeURIComponent(JSON.stringify([t.name,t.game]))+'"><span class="participant-profile-team-main"><b>CRM editable name &lt; &amp;</b><small>Leader</small></span></button>';});

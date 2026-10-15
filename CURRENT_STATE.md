@@ -1130,3 +1130,9 @@ retains its facts/text and gets safe layout only. No real-provider or native
 Telegram semantic acceptance is claimed; owner should rerun the analysis to
 review the new Russian report. No new watches, game state, CRM writes, Apps
 Script deployment or bot prompt changes in this task.
+
+### RM missing emblem repair15.10.2026
+15 tracked empty WebPs restored from original supplied catalogue screenshots.
+Emblem image URLs now include version20261015-emblem-repair1. Existing valid
+assets unchanged. CI enforces complete RIFF/WebP files and real browser decode
+of every catalogue image; no backend or CRM data change.

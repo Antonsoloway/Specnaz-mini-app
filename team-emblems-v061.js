@@ -30,7 +30,7 @@
   let queued=new WeakSet();
   let active=0,generation=0,scheduled=false,permitted=true,lastSession=session();
   function remember(id,logo){if(typeof id!=='string'||!valid(logo))return;if(logos.size>=250&&!logos.has(id))logos.delete(logos.keys().next().value);logos.set(id,logo);schedule();}
-  function image(logo){return valid(logo)?'<img class="rm-team-emblem" src="assets/rm-emblems/'+logo+'.webp" width="32" height="34" alt="" aria-hidden="true" loading="lazy" decoding="async" data-rm-logo="'+logo+'">':'';}
+  function image(logo){return valid(logo)?'<img class="rm-team-emblem" src="assets/rm-emblems/'+logo+'.webp?v=20261015-emblem-repair1" width="32" height="34" alt="" aria-hidden="true" loading="lazy" decoding="async" data-rm-logo="'+logo+'">':'';}
   function name(text,id,logo){if(valid(logo))remember(id,logo);return '<span class="rm-team-name"'+(typeof id==='string'?' data-rm-team-id="'+esc(id)+'"':'')+'>'+image(valid(logo)?logo:logos.get(id))+label(text)+'</span>';}
   async function fetchLive(record,admin=false,refresh=false,metadataOnly=false){
     const token=session(),epoch=generation;if(!permitted||!token)throw Error('SESSION_MISSING');
@@ -87,6 +87,6 @@
   for(const type of ['royal:access-denied','royal:fatal'])window.addEventListener(type,()=>clear(false));
   window.addEventListener('royal:auth-ready',()=>{clear(true);lastSession=session();schedule();});
   window.RoyalAdminDataV0600?.subscribe?.(e=>{if(e.type==='clear'&&['unauthorized','forbidden','session-changed'].includes(e.reason))clear(false);else schedule();});
-  window.RoyalTeamEmblems={version:'1.2.0',valid,logoOf,image,name,label,emoji,emojiName,hasEmojiPrefix,remember,fetchLive,decorate};
+  window.RoyalTeamEmblems={version:'1.2.1',valid,logoOf,image,name,label,emoji,emojiName,hasEmojiPrefix,remember,fetchLive,decorate};
   new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true});schedule();
 })();

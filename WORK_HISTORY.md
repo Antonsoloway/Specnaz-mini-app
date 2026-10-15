@@ -1077,3 +1077,20 @@ retains its facts/text and gets safe layout only. No real-provider or native
 Telegram semantic acceptance is claimed; owner should rerun the analysis to
 review the new Russian report. No new watches, game state, CRM writes, Apps
 Script deployment or bot prompt changes in this task.
+
+## 15.10.2026 — Restore missing RM emblem assets
+
+Owner search screenshots show missing logos74 and151 while logo1 loads.
+Repository inspection found15 zero-byte tracked WebPs:4,11,18,46,53,74,81,
+102,109,123,130,137,151,158,165. Restored exact numbered shields with the
+existing extraction script from owner's original catalogue screenshots;
+nonempty existing files retained byte-for-byte. No game reads, CRM writes,
+worker, media or monitoring changes. Added versioned image URLs to bypass
+cached broken responses, refreshed entrypoint asset markers and changelog.
+Prior test only checked file existence; now checks nonempty/full RIFF/WebP
+containers. Browser fixture additionally decodes all176 catalogue images and
+asserts dimensions160x176. Regression rejects old empty74; all176 files pass
+Pillow decode;106 Sosiska node tests pass. Initial local browser executable was empty; alternate existing Chromium
+passed all176 image decodes and mobile widths320/390/768.32 admin tests pass.
+Publication is blocked by automatic approval review requiring explicit user
+authorization for GitHub push; no remote mutation was performed.

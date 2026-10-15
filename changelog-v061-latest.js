@@ -60,7 +60,12 @@
   const READABLE_ANALYSIS = 'ИИ-анализ получает новый формат простым русским языком: короткие выводы, даты по Москве и ключевые игроки без служебных полей. Отчёты отображаются с заголовками и списками; старые таблицы открываются отдельно. Состав и активность игроков свёрнуты по умолчанию. Почасовой график уплотнён: время и числа больше не переносятся по символам.';
   if (!section.changes.includes(READABLE_ANALYSIS)) section.changes.unshift(READABLE_ANALYSIS);
 
+  const EMBLEM_REPAIR='Восстановлены 15 пустых файлов игровых эмблем. Все 176 изображений проверяются на открытие в браузере; исправленные картинки загружаются без старого кэша.';
+  if (!section.changes.includes(EMBLEM_REPAIR)) section.changes.unshift(EMBLEM_REPAIR);
+
   current.changes = current.sections.flatMap(item => Array.isArray(item?.changes) ? item.changes : []);
   window.RoyalChangelog0601 = current;
   window.__ROYAL_CHANGELOG_LATEST_V061__ = PATCH_VERSION;
+
+
 })();
