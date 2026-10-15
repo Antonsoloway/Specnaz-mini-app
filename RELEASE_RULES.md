@@ -269,3 +269,13 @@ commit. Retry only bounded branch/SHA conflicts with the identical bytes and a
 fresh target SHA; denied/rate-limited writes are not blind retries. Batch membership
 reads must preserve game isolation, decoration ambiguity and write only the
 originally owned source cells, without overwriting nick/role/formula columns.
+
+
+### Sosiska human-readable reports
+
+Keep raw player identity in internal analysis stages; final prose uses Russian
+terms, source-backed period boundaries and Moscow time. Never translate names
+or infer unobserved leagues/bonuses/exact activity times. Model output is escaped
+before optional markup rendering. Legacy report text is retained. Full-period
+roster starts collapsed; player/hour details and metric state remain usable.
+Hour labels and numeric rates must remain unbroken under the complete app CSS.

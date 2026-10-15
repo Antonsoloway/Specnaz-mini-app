@@ -1062,3 +1062,35 @@ end-to-end duration and photo acceptance remain owner-side.
 Additional legacy snapshot/endpoint harness:10/11 passed; one unchanged test
 still asserts entry-v1290 although current Wrangler already uses entry-v1420.
 This baseline test drift is unrelated to this patch and outside the required CI.
+
+
+## 15.10.2026 — Readable Sosiska reports and compact hourly profile
+
+Owner screenshots show raw Markdown tables/English field names, wrapped clock
+labels/rates and a long expanded full-period roster. Frontend now escapes model
+HTML and renders a small Markdown subset (headings, emphasis, lists); old tables
+become collapsed labelled row cards. Full-period player roster is collapsed by
+default, with per-team open state retained through metric/player rerenders.
+Opening a historical player's activity expands the roster automatically. Hourly
+buttons have bounded50px height, no shared button margins/padding, one common
+unit label and unbroken clock/rate text. Hour click/details and missing-vs-zero
+semantics remain intact. Single-team duplicate report text is omitted; differing
+legacy per-team report is available in a disclosure.
+
+Only final AI calls receive a readable Russian report contract: four short
+sections, at most five key players, Russian terminology, no field dump/tables,
+explicit Moscow period boundaries and source-over-summary precedence. Internal
+chunks retain raw UserId for correct identity. Final single-team overview reuses
+the report grounded in verified period statistics instead of another rewrite.
+Comparison still includes every selected team; model/keys/providers unchanged.
+Existing stored prose is never silently rewritten or translated. A new analysis
+run is required for the new language contract. Prompt instructions reduce but
+do not prove absence of hallucinations; no real-provider acceptance claimed.
+
+138Node checks PASS. New browser fixture with all real entry CSS at320/390/768
+verifies50-player default collapse/state,24compact cells, one-line clock/rates,
+no horizontal overflow, hour drilldown, safe HTML escaping and old/new report
+rendering. Membership fixture PASS; chart/history fixture result recorded in
+rollout checkpoint. Both hourly and clean new-report screenshots reviewed.
+Worker/full CI/publication pending; marker20261015-v061-readable-analysis1.
+No Apps Script, CRM source data, bot prompt, watch activation or game changes.

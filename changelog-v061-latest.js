@@ -3,7 +3,7 @@
   'use strict';
 
   const VERSION = '0.6.1';
-  const PATCH_VERSION = '0.6.1-changelog-latest.12';
+  const PATCH_VERSION = '0.6.1-changelog-latest.13';
   const CHANGE = 'В админском Журнале исправлен порядок записей: все события теперь принудительно сортируются по фактическому времени от новых к старым, независимо от источника записи и порядка, в котором данные пришли с сервера.';
 
   const AGENT_CHANGE = 'Добавлен отдельный админский модуль «Сосиска»: поиск команд Royal Match, выбор по описанию и лидеру, состав игроков, снимки, история изменений и управление отслеживанием.';
@@ -57,6 +57,8 @@
   const SAVE_REPAIR='Исправлено повторное сохранение в админском редакторе: запоздавшее обновление не возвращает старую карточку после переименования; новое название обновляется и в локальных составах. При долгом ответе выполняется одна безопасная проверка с тем же ID операции. Сохранение без изменений не отправляет лишний запрос.';
   if (!section.changes.includes(SAVE_REPAIR)) section.changes.unshift(SAVE_REPAIR);
   if (!section.changes.includes(MEDIA_SAVE_CHANGE)) section.changes.unshift(MEDIA_SAVE_CHANGE);
+  const READABLE_ANALYSIS = 'ИИ-анализ получает новый формат простым русским языком: короткие выводы, даты по Москве и ключевые игроки без служебных полей. Отчёты отображаются с заголовками и списками; старые таблицы открываются отдельно. Состав и активность игроков свёрнуты по умолчанию. Почасовой график уплотнён: время и числа больше не переносятся по символам.';
+  if (!section.changes.includes(READABLE_ANALYSIS)) section.changes.unshift(READABLE_ANALYSIS);
 
   current.changes = current.sections.flatMap(item => Array.isArray(item?.changes) ? item.changes : []);
   window.RoyalChangelog0601 = current;
