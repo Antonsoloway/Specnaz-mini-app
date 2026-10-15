@@ -32,7 +32,7 @@
   function loadV061AdminEditUx() {
     if (window.__ROYAL_ADMIN_EDIT_UX_V061__ || document.querySelector('script[data-admin-edit-ux-v061="1"]')) return;
     const script = document.createElement('script');
-    script.src = `admin-edit-ux-v061.js?v=${CACHE}&teamLive=20261015-readable-analysis1`;
+    script.src = `admin-edit-ux-v061.js?v=${CACHE}&teamLive=20261015-emblem-repair1`;
     script.async = false;
     script.dataset.adminEditUxV061 = '1';
     document.body.appendChild(script);
@@ -190,7 +190,7 @@
   function loadPhotoModule() {
     if (!window.RoyalAdminTeamPhotoV0600 && !document.querySelector('script[data-admin-team-photo-v0600="1"]')) {
       const photo = document.createElement('script');
-      photo.src = `admin-team-photo-v0600.js?v=${CACHE}&saveRepair=20261015-readable-analysis1`;
+      photo.src = `admin-team-photo-v0600.js?v=${CACHE}&saveRepair=20261015-emblem-repair1`;
       photo.async = false;
       photo.dataset.adminTeamPhotoV0600 = '1';
       document.body.appendChild(photo);
@@ -208,7 +208,7 @@
       return;
     }
     const script = document.createElement('script');
-    script.src = `admin-write-v0600-v3.js?v=${CACHE}&saveRepair=20261015-readable-analysis1`;
+    script.src = `admin-write-v0600-v3.js?v=${CACHE}&saveRepair=20261015-emblem-repair1`;
     script.async = false;
     script.dataset.adminWriteV0600V3 = '1';
     script.addEventListener('load', loadPhotoModule, { once:true });
