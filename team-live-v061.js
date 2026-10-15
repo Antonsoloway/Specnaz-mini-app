@@ -38,24 +38,28 @@
     if(!state.hasData){const old=readSaved(state);if(old)showData(host,state,old);}
     state.loading=true;const button=host.querySelector('[data-team-live-refresh]');if(button)button.disabled=true;
     const status=host.querySelector('[data-team-live-status]');status.textContent=(state.hasData?'Сохранённые данные: '+dated(state.data)+'. ':'')+'Обновляем данные игры…';
-    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),60000);
+    const controller=new AbortController();let timer;
+    const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(Error('TEAM_LIVE_TIMEOUT'));},45000);});
+    const slow=setTimeout(()=>{if(host.isConnected&&session===token())status.textContent=(state.hasData?'Сохранённые данные: '+dated(state.data)+'. ':'')+'Сервер игры отвечает дольше обычного. Ожидание ограничено; сохранённый скриншот можно открыть ниже.';},10000);
     try {
       const params=new URLSearchParams({team:state.name,game:'Royal Match',...(refresh?{refresh:'1'}:{})});
-      let payload,r;
-      if(window.RoyalTeamEmblems){payload=await window.RoyalTeamEmblems.fetchLive({name:state.name,gameTeamId:state.id},state.admin,refresh);r={ok:true,status:200};}
-      else {r=await fetch(API+(state.admin?'/admin-team-live?':'/team-live?')+params,{headers:{Authorization:'Bearer '+session},signal:controller.signal});payload=await r.json();}if(!host.isConnected||session!==token())return;
+      const read=async()=>{
+        if(window.RoyalTeamEmblems)return {payload:await window.RoyalTeamEmblems.fetchLive({name:state.name,gameTeamId:state.id},state.admin,refresh),r:{ok:true,status:200}};
+        const r=await fetch(API+(state.admin?'/admin-team-live?':'/team-live?')+params,{headers:{Authorization:'Bearer '+session},signal:controller.signal});return {r,payload:await r.json()};
+      };
+      const {payload,r}=await Promise.race([read(),timeout]);if(!host.isConnected||session!==token())return;
       if(r.status===401||r.status===403){host.querySelector('[data-team-live-content]').textContent='';throw Object.assign(Error('Откройте приложение заново.'),{denied:true});}
-      if(!r.ok||!payload.ok)throw Error(payload.message||'Данные игры не загрузились.');
+      if(!r.ok||!payload.ok)throw Object.assign(Error(payload.message||'Данные игры не загрузились.'),{busy:payload.error==='TEAM_LIVE_BUSY'});
       if(payload.data.teamId!==state.id||!Array.isArray(payload.data.leadership))throw Error('Привязка команды изменилась. Обновите карточку.');
       const old=readSaved(state);const data=old&&Date.parse(old.fetchedAt)>Date.parse(payload.data.fetchedAt)?old:payload.data;
       showData(host,state,data);saveData(state,data);
       status.textContent=(data.stale?'Сервер игры недоступен. Последние данные: ':'Обновлено: ')+dated(data);
     }catch(error){if(host.isConnected&&session===token()){
       const denied=error.denied;if(denied){forgetSaved();state.hasData=false;}
-      status.textContent=denied?'Откройте приложение заново.':state.hasData?'Не удалось обновить сведения. Последние сохранённые данные: '+dated(state.data):'Сервер игры временно недоступен. Повторите обновление; сохранённый скриншот доступен ниже.';
+      status.textContent=denied?'Откройте приложение заново.':error.busy?'Игровая сессия занята другим запросом. Повторите обновление немного позже.'+(state.hasData?' Последние сохранённые данные: '+dated(state.data):' Сохранённый скриншот доступен ниже.'):state.hasData?'Не удалось обновить сведения. Последние сохранённые данные: '+dated(state.data):'Сервер игры временно недоступен. Повторите обновление; сохранённый скриншот доступен ниже.';
       if(!state.hasData||denied){host.querySelector('[data-team-live-content]').innerHTML='<p>Сведения о команде не загрузились.</p>';state.photo.classList.add('team-live-unavailable');const toggle=host.querySelector('[data-team-live-photo]');if(toggle)toggle.textContent='Скрыть скриншот';}
     }}
-    finally{clearTimeout(timer);state.loading=false;if(button)button.disabled=false;}
+    finally{clearTimeout(timer);clearTimeout(slow);state.loading=false;if(button)button.disabled=false;}
   }
   const editors=new WeakMap();
   function decorateEditors(){
@@ -128,5 +132,5 @@
   window.addEventListener('royal:auth-ready',()=>{saved.clear();clear();lastSession=token();permitted=true;decorate();});
   window.RoyalAdminDataV0600?.subscribe?.(event=>{if(event.type==='clear'&&['unauthorized','forbidden','session-changed'].includes(event.reason)){forgetSaved();permitted=false;clear();}});
   new MutationObserver(decorate).observe(document.body,{childList:true,subtree:true});decorate();
-  window.RoyalTeamLive={version:'1.2.0',card,decorate};
+  window.RoyalTeamLive={version:'1.2.1',card,decorate};
 })();

@@ -1142,3 +1142,12 @@ Directory title occupies full card width above screenshot/active-team badge.
 Names from owner screenshots fit one line at320/390/768. Extreme-length names
 use ellipsis with unchanged raw CRM identity. New full-CSS browser regression
 included in CI. Release marker20261015-v061-team-title1.
+
+### Bounded team-card refresh15.10.2026
+Marker20261015-v061-team-load1. Whole frontend live-card/helper reads bounded45s;
+slow status10s; backend current CRM auth/body15s + game/body25s. Pending reads
+release on timeout, late answers cannot overwrite fresh cache, saved cards stay
+visible and refresh recovers. Busy session gets separate429 explanation without
+immediate replay. Agent source confirms snapshots/cards serialize on one session;
+actual FORTUNA capture overlap is unverified (no connected Commander devices).
+142Node tests and new loading plus existing cache/card/emblem browser tests PASS.

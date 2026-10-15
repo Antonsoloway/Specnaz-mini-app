@@ -66,6 +66,9 @@
   const TEAM_TITLE='В списке команд название с эмблемой расположено одной строкой на всю ширину карточки. Скриншот и значок спецназа размещены ниже; очень длинные названия сокращаются многоточием без переноса.';
   if (!section.changes.includes(TEAM_TITLE)) section.changes.unshift(TEAM_TITLE);
 
+  const TEAM_LOADING='Ожидание сведений о команде ограничено целиком, включая чтение ответа и повтор. Зависший запрос больше не удерживает обновление остальных карточек. При занятой игровой сессии появляется отдельное сообщение; сохранённые данные остаются, кнопка обновления снова доступна.';
+  if (!section.changes.includes(TEAM_LOADING)) section.changes.unshift(TEAM_LOADING);
+
   current.changes = current.sections.flatMap(item => Array.isArray(item?.changes) ? item.changes : []);
   window.RoyalChangelog0601 = current;
   window.__ROYAL_CHANGELOG_LATEST_V061__ = PATCH_VERSION;

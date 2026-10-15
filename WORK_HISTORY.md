@@ -1110,3 +1110,33 @@ widths320/390/768. Owner names fit without clipping; extreme-length names
 ellipsis; no horizontal overflow. Prior CSS fails the regression. Emblem
 conditional-display and full176-image browser fixtures pass;106 Node tests
 pass. New title fixture included in CI; entrypoint markers/changelog updated.
+
+## 15.10.2026 — Bounded team-card updates during session congestion
+
+Owner reported every live team card stuck on update and suggested a simultaneous
+FORTUNA snapshot. Agent source on feat/sosiska-export-20261014 confirms monitor
+capture and getTeamInfo use the same serialized game session. Actual concurrent
+capture at the reported time is unverified: Commander has no connected devices,
+so authenticated agent status/logs unavailable. Public facade health200; protected
+routes correctly401 without credentials. Previous main CI/Pages/Workers Builds
+all PASS; no evidence that title CSS caused this request issue.
+
+Confirmed wait defect: shared frontend helper allowed two60s attempts, used only
+AbortController (including after headers) and the card's own abort signal was
+not connected to the shared helper. A signal-ignoring request/body could retain
+pending and directory slots indefinitely. Whole helper/card reads now race a45s
+deadline including JSON/retry. Timeout releases singleflight, aborts best-effort,
+and late fetch/JSON cannot clear or overwrite a later success. Status changes
+after10s; successful saved card survives failure; no-data fallback shows saved
+screenshot; refresh is enabled after completion. Busy agent gets a bounded429
+TEAM_LIVE_BUSY signal, no immediate replay; authorized server cache stays usable.
+Worker bounds CRM response/body15s and agent response/body25s, preserving current
+access/binding validation and serialized game ownership. No agent/schedule change.
+
+New Node tests cover ignored abort, stalled body, late response/cache poisoning,
+CRM auth timeout and busy/stale behavior. New browser fixture covers public/admin,
+stuck native fetch and body, independent helper/standalone card timeouts, cached
+reopen, late403/JSON, busy no-replay and retry recovery. Old helper fails to settle
+under the regression; fixed runner passes.142Node tests and loading/cache/card/
+emblem browser fixtures PASS locally. New browser scenario included in full CI.
+No actual game API read claimed without authenticated access.
