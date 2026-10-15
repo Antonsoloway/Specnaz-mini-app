@@ -974,7 +974,38 @@ ten slot-specific calls. Only the same matching source cells are written; game,
 ambiguity, suffix, journal/revision/locking and photo-first semantics are retained.
 Eight focused regressions PASS, including signed byte hashing, no-op media,
 immutable conflict retries, bounded/permanent failures and all-five-slot isolation.
-Full CI and actual server rollout pending. Exact end-to-end latency improvement
+Full CI and actual server rollout are verified below. Exact end-to-end latency improvement
 is unmeasured; do not claim every30-second wait or photo failure solved.
 Marker20261015-v061-admin-media2. Temporary diagnostic source/route must be
 removed before final deployment; live mirror and publication checkpoint required.
+
+
+### Admin media save speed — verified live rollout
+
+PR62 sourcef5a2a473bfa6134fc64fe478c1ce692ae277a847 passed full PR CI38780079496,
+mergedd73fd24595c59eda067cc55d239f8de018f21824. Main CI38780473710 and Pages
+38780473578 PASS:136Node checks,37workerd/isolation checks, eight browser
+fixtures. All eight public entry/admin-client/writer/photo/version/changelog
+files match reviewed source byte-for-byte. Marker20261015-v061-admin-media2 live.
+
+After CI PASS, installed only reviewed files07/17 into the existing pinned Apps
+Script deployment, preserving all other live modules and deployment URL. Live
+isolated media validation: first write1127ms, identical bytes283ms with
+unchanged=true (no PUT), cleanup confirmed. Live membership read comparison:
+ten existing slot requests3748ms, one E:AA request452ms; reconstructed all-five-
+slot values were identical. These are individual-stage measurements, not a full
+Telegram save or proof that the owner's earlier failure was a409.
+
+Temporary random-token/expiring diagnostic core branch and file91 were removed
+before final deployment121. Fresh pull verifies no temporary route/file remains
+and the two reviewed source SHA-256 values match runtime. Existing diagnostic90,
+webhooks, bot source, source data and user photos retained. Only isolated private
+media probe files were created and removed; no synthetic CRM team writes.
+Standard sync-live-apps-script-to-github.sh then succeeded: mirror commit
+a894eb1 updates only LIVE_MIRROR_MANIFEST.md; files07/17 already equal deployed
+source. Previous publication/rollout-pending note is superseded. Native Telegram
+end-to-end duration and photo acceptance remain owner-side.
+
+Additional legacy snapshot/endpoint harness:10/11 passed; one unchanged test
+still asserts entry-v1290 although current Wrangler already uses entry-v1420.
+This baseline test drift is unrelated to this patch and outside the required CI.
