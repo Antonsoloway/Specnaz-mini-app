@@ -32,3 +32,4 @@
 .team-live-card .team-live-facts span{min-width:0;word-break:normal;overflow-wrap:normal;line-height:1.25}
 .team-live-card .team-live-facts b{white-space:nowrap}
 @media(max-width:360px){.team-live-card .team-live-summary{margin:8px;padding:12px 8px}.team-live-card .team-live-facts{padding:10px 8px;gap:12px}.team-live-card .team-live-facts span{font-size:14px}.team-live-card .team-live-facts b{font-size:17px}.team-live-card .team-live-leadership{padding:0 8px 8px}.team-live-card .team-live-player-name b{font-size:18px!important}}
+.team-live-card .team-live-title:has(>.team-live-emblem:empty){grid-template-columns:minmax(0,1fr) 62px}
