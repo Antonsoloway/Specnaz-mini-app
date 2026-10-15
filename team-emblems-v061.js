@@ -6,6 +6,13 @@
   const session=()=>typeof sessionToken==='undefined'?'':sessionToken;
   const valid=v=>typeof v==='number'&&Number.isInteger(v)&&v>=0&&v<176;
   const logoOf=t=>t?.TeamLogo??t?.Logo??t?.teamLogo??t?.logo;
+  // Zero-based owner-supplied catalogue. Symbols without an exact Unicode
+  // equivalent use a nearby pictogram; colour variants usually share an emoji.
+  const EMOJI=["⚜️","⚜️","👑","👑","🌴","🌴","🍸","🍸","🦋","🦋","🐿️","🐿️","🐙","🐙","🎯","🎯","🔥","🔥","🥸","🥸","♣️","♣️","⚡","⚡","🚀","🚀","✈️","✈️","🏀","🏀","⭐","⭐","🌵","🌵","🔔","🔔","☂️","☂️","🎂","🎂","🎠","🎠","💣","💣","🍦","🍦","🦴","🦴","☀️","☀️","🧭","🧭","🚢","🚢","💥","💥","🍀","🍀","🌙","🌙","🐷","🐷","🤠","🤠","🏹","🏹","⭐","⭐","🎵","🎵","🎓","🎓","♠️","♠️","🧙","🧙","🤍","❤️","🐈","🐈","⚗️","⚗️","🖌️","🖌️","🧩","🧩","👨‍🍳","👨‍🍳","🎧","🎧","⚓","⚓","🐕","🐕","🎮","🎮","🍦","🍦","🔱","🔱","💰","💰","⛵","⛵","🐬","🐬","🍎","🍏","🐾","🐾","⚔️","⚔️","💀","💀","🏈","🏈","🌼","🌼","🥊","🥊","🇺🇸","🇨🇦","🇬🇧","🇯🇵","🇸🇪","🇬🇧","🇨🇭","🇵🇹","🇳🇱","🇮🇹","🇩🇪","🇫🇷","🇩🇰","🇪🇸","🇰🇷","🇫🇮","🇷🇺","🇧🇪","🇳🇴","🇮🇪","🇲🇽","🇮🇳","🇨🇳","🇧🇷","🇻🇪","🇿🇦","🇭🇰","🇺🇾","🇹🇼","🇺🇦","🇷🇴","🇹🇷","🇵🇱","🇹🇭","🇵🇭","🇦🇹","🇦🇺","🇦🇷","🇨🇴","🇬🇷","🇮🇩","🇨🇿","🇭🇺","🇨🇱","🇭🇷","🇸🇬","🇵🇪","🇮🇱","🇧🇬","🇦🇪","🇳🇬","🇲🇾","🇪🇬","🇻🇳","🇶🇦","🇰🇼"];
+  EMOJI[125]='\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}'; // England, distinct from UK at122.
+  const emoji=logo=>valid(logo)?EMOJI[logo]:'';
+  const hasEmojiPrefix=text=>/^[\p{Extended_Pictographic}\p{Regional_Indicator}♠♣]/u.test(String(text||'').trim());
+  function emojiName(text,logo){const name=String(text||'').trim(),prefix=emoji(logo);return prefix&&name&&!hasEmojiPrefix(name)?prefix+' '+name:name;}
   const logos=new Map(),cache=new Map(),pending=new Map(),queue=[];
   let queued=new WeakSet();
   let active=0,generation=0,scheduled=false,permitted=true,lastSession=session();
@@ -67,6 +74,6 @@
   for(const type of ['royal:access-denied','royal:fatal'])window.addEventListener(type,()=>clear(false));
   window.addEventListener('royal:auth-ready',()=>{clear(true);lastSession=session();schedule();});
   window.RoyalAdminDataV0600?.subscribe?.(e=>{if(e.type==='clear'&&['unauthorized','forbidden','session-changed'].includes(e.reason))clear(false);else schedule();});
-  window.RoyalTeamEmblems={version:'1.0.0',valid,logoOf,image,name,remember,fetchLive,decorate};
+  window.RoyalTeamEmblems={version:'1.1.0',valid,logoOf,image,name,emoji,emojiName,hasEmojiPrefix,remember,fetchLive,decorate};
   new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true});schedule();
 })();

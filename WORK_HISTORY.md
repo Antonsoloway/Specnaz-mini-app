@@ -820,3 +820,24 @@ unlink. New cache fixture is in the full CI workflow. Release marker
 ### Persistent card cache — verified rollout
 
 PR56 source1806054667d7a227b42b92b54f3d88bc6ba6301b passed full PR CI38683261775, merged586a652e78a85952c3ecfbc9d850e74988b0679e. Main CI38683406683 and Pages build/deploy38683406124 PASS. Public app.html, app-v0601.html, app-v0600.html, team-live-v061.js, version-v0600.js and changelog-v061-latest.js returned HTTP200 and matched reviewed source byte-for-byte. Marker20261015-v061-card-cache1 is live. The new cache regression fails on the previous card source at the immediate reopened-card assertion and passes with the fix. Native Telegram/device acceptance remains owner-side; browser page-restart verification is complete. Earlier publication-pending notes are superseded.
+
+
+## 15.10.2026 — emoji from the RM emblem in the team-name editor
+
+Owner requested automatic emoji prefix from the numeric game emblem, including
+Logo136 => Russia => 🇷🇺 FORTUNA. Added explicit catalogue0–175 mapping in the
+existing emblem module, with correct country flags (England distinct from UK),
+shared emoji for most colour variants and nearest pictograms where Unicode has
+no exact equivalent. No team-name/person-specific rules. Unknown IDs add nothing.
+Picker composes the editable name before ordinary Save. An existing linked RM
+editor without an emoji gets a protected metadata read (shared/coalesced cache);
+only the untouched matching name/ID/game/session/form can be updated. Manual
+emoji/name edits survive, no duplicated prefix, no RK reads or mass renames.
+No automatic database write: owner reviews the field then uses normal Save.
+Leader/photo draft/ID and current card cache remain intact.
+
+125Node checks PASS. New browser fixture covers existing editor, Russia prefix,
+slow-response typing/ID races, RK, picker and unknown IDs. Actual Android/iPhone
+picker fixture now asserts prefixed selection. Other card/cache/emblem fixtures
+PASS. Full CI/publication pending; native Telegram acceptance remains owner-side.
+Release marker20261015-v061-emblem-emoji1.
