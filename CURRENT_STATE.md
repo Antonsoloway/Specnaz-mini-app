@@ -997,3 +997,10 @@ Marker20261015-v061-admin-save1; dynamic writer/photo cache keys explicitly bump
 Actual Apps Script latency remains unmeasured: Cloud Shell device is offline.
 Do not claim server waiting or every save duration solved. No live GAS/Sheets
 mutation or backend deployment. Native Telegram acceptance remains owner-side.
+
+
+### Sequential admin saves — verified frontend rollout and server follow-up
+
+PR61 source1de188d668867568d6e4e0884efc6f0f8db1bc6e passed full PR CI38747435272 and merged2183933a9dca7338df34983dc33745e4ed99bf95. Main CI38747719484 and Pages build/deploy38747720846 PASS:128Node tests,37workerd/isolation checks and eight browser fixtures. All eight public entry/admin-client/writer/photo/version/changelog files returned successfully and matched reviewed source byte-for-byte (one transient URL failure succeeded on retry). Marker20261015-v061-admin-save1 is live. Native Telegram save duration/acceptance is still owner-side.
+
+Cloud Shell reconnected during rollout. Backed up local Apps Script source, ran clasp status then clasp pull (41 files), and verified SHA-256 of live files07/29/30/32/33 matches the existing repository mirror. No live source or deployment change. Exact execution latency remains unmeasured: processes API returned403 insufficient authentication scopes; clasp logs reports no configured GCP project; read-only preflight invocation did not establish execution and returned storage NOT_FOUND through stderr despite CLI exit0. No permission expansion or synthetic CRM mutation. Earlier offline-only explanation is superseded by these observed access limitations. Frontend stale-state failure is reproduced/fixed; do not claim the entire Google latency issue solved.
