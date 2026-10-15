@@ -37,28 +37,38 @@
     const key=JSON.stringify([token,admin,record.name,record.gameTeamId]);const old=cache.get(key);
     if(metadataOnly&&!refresh&&old&&Date.now()-old.at<60000){if(old.error)throw Error('UNAVAILABLE');return old.payload;}
     if(pending.has(key))return pending.get(key);
-    const task=(async()=>{
+    // Bound the entire read, including response.json and retry delay. Aborting a
+    // fetch alone does not settle a response body or a signal-ignoring wrapper.
+    const controller=new AbortController();let timer;
+    const timeout=()=>Object.assign(Error('TEAM_LIVE_TIMEOUT'),{code:'TEAM_LIVE_TIMEOUT'});
+    const current=()=>{if(controller.signal.aborted)throw timeout();if(token!==session()||epoch!==generation||!permitted)throw Error('STALE');};
+    const request=(async()=>{
       for(let attempt=0;attempt<2;attempt++){
-        const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),60000);
         try{
+          current();
           const params=new URLSearchParams({team:record.name,game:'Royal Match',...(refresh?{refresh:'1'}:{})});
           const r=await fetch(API+(admin?'/admin-team-live?':'/team-live?')+params,{headers:{Authorization:'Bearer '+token},signal:controller.signal});
-          if(token!==session()||epoch!==generation||!permitted)throw Error('STALE');
+          current();
           if(r.status===401||r.status===403){clear(false);throw Object.assign(Error('Откройте приложение заново.'),{denied:true});}
-          if(!r.ok)throw Object.assign(Error('Данные игры не загрузились.'),{transient:[408,425,429,502,503,504].includes(r.status)});
-          const payload=await r.json();
+          const payload=await r.json();current();
+          if(!r.ok)throw Object.assign(Error('Данные игры не загрузились.'),{busy:r.status===429&&payload.error==='TEAM_LIVE_BUSY',transient:[408,425,429,502,503,504].includes(r.status)&&payload.error!=='TEAM_LIVE_BUSY'});
           if(!payload.ok)throw Error('Данные игры не загрузились.');
           if(payload.data?.teamId!==record.gameTeamId)throw Error('Привязка команды изменилась. Обновите карточку.');
-          if(cache.size>=250&&!cache.has(key))cache.delete(cache.keys().next().value);
-          cache.set(key,{at:Date.now(),payload});remember(record.gameTeamId,logoOf(payload.data));return payload;
+          return payload;
         }catch(e){
-          const transient=e.transient||e.name==='AbortError'||e.name==='TypeError'||e.code==='WORKER_TIMEOUT'||e.message==='WORKER_TIMEOUT';
-          if(attempt===0&&transient&&epoch===generation&&token===session()&&permitted){await new Promise(r=>setTimeout(r,500));if(epoch!==generation||token!==session()||!permitted)throw Error('STALE');continue;}
-          if(epoch===generation&&token===session()&&permitted)cache.set(key,{at:Date.now(),error:true});throw e;
-        }finally{clearTimeout(timer);}
+          const transient=e.transient||e.name==='TypeError'||e.code==='WORKER_TIMEOUT'||e.message==='WORKER_TIMEOUT';
+          if(attempt===0&&transient&&!controller.signal.aborted&&epoch===generation&&token===session()&&permitted){await new Promise(r=>setTimeout(r,500));current();continue;}
+          throw e;
+        }
       }
-    })();pending.set(key,task);try{return await task;}finally{if(pending.get(key)===task)pending.delete(key);}
+    })();
+    const task=Promise.race([request,new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(timeout());},45000);})]).then(payload=>{
+      current();if(cache.size>=250&&!cache.has(key))cache.delete(cache.keys().next().value);
+      cache.set(key,{at:Date.now(),payload});remember(record.gameTeamId,logoOf(payload.data));return payload;
+    }).catch(e=>{if(epoch===generation&&token===session()&&permitted)cache.set(key,{at:Date.now(),error:true});throw e;}).finally(()=>clearTimeout(timer));
+    pending.set(key,task);try{return await task;}finally{if(pending.get(key)===task)pending.delete(key);}
   }
+
   function records(admin){try{return admin?(window.RoyalAdminDataV0600?.current?.adminData?.teams||[]):(typeof snapshotState==='undefined'?[]:snapshotState?.teams||[]);}catch{return [];}}
   function find(ref,admin){const matches=records(admin).filter(t=>t.name===ref.name&&(!ref.game||t.game===ref.game));return matches.length===1&&matches[0].game==='Royal Match'&&matches[0].gameTeamId?matches[0]:null;}
   function insert(node,logo){
@@ -87,6 +97,6 @@
   for(const type of ['royal:access-denied','royal:fatal'])window.addEventListener(type,()=>clear(false));
   window.addEventListener('royal:auth-ready',()=>{clear(true);lastSession=session();schedule();});
   window.RoyalAdminDataV0600?.subscribe?.(e=>{if(e.type==='clear'&&['unauthorized','forbidden','session-changed'].includes(e.reason))clear(false);else schedule();});
-  window.RoyalTeamEmblems={version:'1.2.1',valid,logoOf,image,name,label,emoji,emojiName,hasEmojiPrefix,remember,fetchLive,decorate};
+  window.RoyalTeamEmblems={version:'1.2.2',valid,logoOf,image,name,label,emoji,emojiName,hasEmojiPrefix,remember,fetchLive,decorate};
   new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true});schedule();
 })();

@@ -49,3 +49,17 @@ test('catalogue emoji names follow logo IDs, preserve manual prefixes and reject
  for(const logo of [null,undefined,-1,176,'136']){assert.equal(api.emoji(logo),'');assert.equal(api.emojiName('FORTUNA',logo),'FORTUNA');}
  assert.equal(api.emoji(125),String.fromCodePoint(0x1f3f4,0xe0067,0xe0062,0xe0065,0xe006e,0xe0067,0xe007f));assert.equal(api.emojiName('🇷🇺   FORTUNA',136),'🇷🇺FORTUNA');assert.equal(api.emojiName('FORTUNA TEAM',136),'🇷🇺FORTUNA TEAM');assert.equal(api.emoji(120),'🇺🇸');assert.equal(api.emoji(126),'🇨🇭');assert.equal(api.emoji(175),'🇰🇼');
 });
+
+test('a stuck shared fetch or JSON body releases all waiters and cannot poison a later successful read',async()=>{
+ for(const bodyStall of [false,true]){
+  let mode='hang',finish,calls=0;
+  const {api,c}=runtime(async()=>{calls++;if(mode==='good')return Response.json({ok:true,data:{teamId:'12',logo:1}});
+   const p=new Promise(r=>finish=r);return bodyStall?{ok:true,status:200,json:()=>p}:p;
+  });c.setTimeout=(fn,ms)=>setTimeout(fn,ms===45000?20:ms);
+  const record={name:'CRM',gameTeamId:'12'},a=api.fetchLive(record),b=api.fetchLive(record);
+  const results=await Promise.allSettled([a,b]);assert.ok(results.every(x=>x.status==='rejected'&&x.reason.code==='TEAM_LIVE_TIMEOUT'));assert.equal(calls,1);
+  mode='good';await api.fetchLive(record);assert.equal(calls,2);assert.match(api.name('CRM','12'),/\/1.webp/);
+  finish(bodyStall?{ok:true,data:{teamId:'12',logo:136}}:Response.json({ok:false},{status:403}));await new Promise(r=>setTimeout(r,5));
+  assert.match(api.name('CRM','12'),/\/1.webp/);await api.fetchLive(record,false,false,true);assert.equal(calls,2,'late result cannot clear or overwrite the successful cache');
+ }
+});

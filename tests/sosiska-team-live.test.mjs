@@ -94,3 +94,33 @@ test('standalone snapshot attaches IDs using the explicit CRM spreadsheet',()=>{
  const snapshot={teams:[{name:'CRM',game:'Royal Match'},{name:'CRM',game:'Royal Kingdom'}]};
  s.context.MINIAPP_teamLiveAttach_(snapshot);assert.equal(snapshot.teams[0].gameTeamId,'12');assert.equal(snapshot.teams[1].gameTeamId,undefined);
 });
+
+test('bounded game reads release singleflight on ignored abort and stalled JSON; late result cannot replace newer cache',async()=>{
+ for(const bodyStall of [false,true]){
+  let time=100000,mode='hang',finish,calls=0;
+  const handle=createTeamLive({now:()=>time,agentTimeoutMs:15,crm:async()=>Response.json({snapshot:{teams:[{name:'CRM',game:'Royal Match',gameTeamId:'12'}]}}),fetchAgent:async()=>{
+   calls++;if(mode==='good')return Response.json({ok:true,data:{...team,TeamName:'Current'}});
+   const p=new Promise(r=>finish=r);return bodyStall?{ok:true,json:()=>p}:p;
+  }});
+  const responses=await Promise.all([handle(request(),env),handle(request(),env)]);assert.ok(responses.every(r=>r.status===502));assert.equal(calls,1);
+  mode='good';assert.equal((await (await handle(request(),env)).json()).data.name,'Current');assert.equal(calls,2);
+  finish(bodyStall?{ok:true,data:{...team,TeamName:'Late'}}:Response.json({ok:true,data:{...team,TeamName:'Late'}}));await new Promise(r=>setTimeout(r,5));
+  assert.equal((await (await handle(request(),env)).json()).data.name,'Current');assert.equal(calls,2);
+ }
+});
+test('CRM authorization headers and body have a deadline and never bypass access checks with stale game data',async()=>{
+ for(const bodyStall of [false,true]){
+  let hang=false,calls=0,time=100000;
+  const handle=createTeamLive({now:()=>time,authTimeoutMs:15,crm:()=>hang?(bodyStall?{ok:true,json:()=>new Promise(()=>{})}:new Promise(()=>{})):Response.json({snapshot:{teams:[{name:'CRM',game:'Royal Match',gameTeamId:'12'}]}}),fetchAgent:async()=>{calls++;return Response.json({ok:true,data:team});}});
+  assert.equal((await handle(request(),env)).status,200);hang=true;time+=61000;
+  assert.equal((await handle(request(),env)).status,502);assert.equal(calls,1,'no game read or stale response before current authorization');
+ }
+});
+
+test('busy agent preserves an authorized saved response and returns a bounded busy signal when no saved data exists',async()=>{
+ let busy=true,time=100000,calls=0;
+ const handle=createTeamLive({now:()=>time,crm:async()=>Response.json({snapshot:{teams:[{name:'CRM',game:'Royal Match',gameTeamId:'12'}]}}),fetchAgent:async()=>{calls++;return busy?Response.json({ok:false,errorCode:'ROYAL_MATCH_AGENT_BUSY'},{status:429}):Response.json({ok:true,data:team});}});
+ const response=await handle(request(),env);assert.equal(response.status,429);assert.equal((await response.json()).error,'TEAM_LIVE_BUSY');assert.equal(calls,1);
+ busy=false;assert.equal((await handle(request(),env)).status,200);time+=61000;busy=true;
+ const saved=await (await handle(request(),env)).json();assert.equal(saved.data.stale,true);assert.equal(saved.data.teamId,'12');
+});
