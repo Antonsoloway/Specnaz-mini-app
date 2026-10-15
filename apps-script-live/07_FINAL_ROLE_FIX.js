@@ -290,20 +290,19 @@ function finalRoleCascadeTeamRename_(ss, game, oldTeam, newTeam) {
   if (lastRow < firstRow) return 0;
   const count = lastRow - firstRow + 1;
   let changed = 0;
+  const membershipValues = base.getRange(firstRow, 5, count, 23).getDisplayValues();
 
   FINALROLE_SLOTS_.forEach(function(slot) {
-    const teamValues = base.getRange(firstRow, slot.teamCol, count, 1).getDisplayValues();
     const gameCol = 22 + slot.number; // W:AA = игра 1..5
-    const gameValues = base.getRange(firstRow, gameCol, count, 1).getDisplayValues();
 
     for (let i = 0; i < count; i++) {
-      const rawTeam = finalRoleClean_(teamValues[i][0]);
+      const rawTeam = finalRoleClean_(membershipValues[i][slot.teamCol - 5]);
       if (!rawTeam) continue;
 
       const existingName = finalRoleStripTeamSuffix_(rawTeam);
       if (finalRoleExactTeamKey_(existingName) !== oldKey) continue;
 
-      const membershipGame = finalRoleCanonicalGame_(gameValues[i][0], rawTeam);
+      const membershipGame = finalRoleCanonicalGame_(membershipValues[i][gameCol - 5], rawTeam);
       if (membershipGame !== canonicalGame) continue;
 
       const row = firstRow + i;
@@ -360,19 +359,18 @@ function finalRoleRepairDecoratedTeamMemberships_(ss, options) {
   let checked = 0;
   let changed = 0;
   const repaired = [];
+  const membershipValues = base.getRange(firstRow, 5, count, 23).getDisplayValues();
 
   FINALROLE_SLOTS_.forEach(function(slot) {
-    const teamValues = base.getRange(firstRow, slot.teamCol, count, 1).getDisplayValues();
     const gameCol = 22 + slot.number;
-    const gameValues = base.getRange(firstRow, gameCol, count, 1).getDisplayValues();
 
     for (let i = 0; i < count; i++) {
-      const rawTeam = finalRoleClean_(teamValues[i][0]);
+      const rawTeam = finalRoleClean_(membershipValues[i][slot.teamCol - 5]);
       if (!rawTeam) continue;
       checked++;
 
       const teamName = finalRoleStripTeamSuffix_(rawTeam);
-      const game = finalRoleCanonicalGame_(gameValues[i][0], rawTeam);
+      const game = finalRoleCanonicalGame_(membershipValues[i][gameCol - 5], rawTeam);
       if (!game || !teamName) continue;
 
       if (exact[finalRoleGameTeamKey_(game, teamName)]) continue;

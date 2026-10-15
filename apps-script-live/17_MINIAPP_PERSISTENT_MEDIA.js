@@ -14,7 +14,7 @@
  *   are no longer retried.
  */
 
-var MINIAPP_PERSISTENT_MEDIA_VERSION = '1.1.0';
+var MINIAPP_PERSISTENT_MEDIA_VERSION = '1.1.1';
 var MINIAPP_TEAM_MEDIA_SPREADSHEET_ID = '1kkADcKysWdoGy95O36z9jCaoGUUHN0g4XH4LwVtAK_o';
 var MINIAPP_TEAM_MEDIA_SHEET = 'Команды';
 var MINIAPP_TEAM_MEDIA_DIRTY_ROWS_PROP = 'MINIAPP_TEAM_MEDIA_DIRTY_ROWS';
@@ -330,35 +330,38 @@ function MINIAPP_writeDirtyRows_(rows) {
 
 function MINIAPP_teamGithubUpsert_(cfg, path, blob, message) {
   var url = 'https://api.github.com/repos/' + cfg.repo + '/contents/' + MINIAPP_mediaEncodePath_(path);
-  var existing = UrlFetchApp.fetch(url + '?ref=' + encodeURIComponent(cfg.branch), {
-    method: 'get',
-    muteHttpExceptions: true,
-    headers: MINIAPP_mediaGithubHeaders_(cfg)
-  });
-
-  var payload = {
-    message: message,
-    content: Utilities.base64Encode(blob.getBytes()),
-    branch: cfg.branch
-  };
-
-  if (existing.getResponseCode() === 200) {
-    var body = JSON.parse(existing.getContentText());
-    if (body && body.sha) payload.sha = body.sha;
-  } else if (existing.getResponseCode() !== 404) {
-    throw new Error('GitHub media lookup HTTP ' + existing.getResponseCode());
+  var bytes = blob.getBytes();
+  // Git blob identity lets unchanged bytes avoid another content-write request.
+  var gitBytes = Utilities.newBlob('blob ' + bytes.length + '\x00').getBytes().concat(bytes);
+  var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_1, gitBytes);
+  var blobSha = digest.map(function(b) { return ('0' + ((b + 256) % 256).toString(16)).slice(-2); }).join('');
+  var content = Utilities.base64Encode(bytes);
+  for (var attempt = 0; attempt < 3; attempt++) {
+    var existing = UrlFetchApp.fetch(url + '?ref=' + encodeURIComponent(cfg.branch), {
+      method: 'get', muteHttpExceptions: true, headers: MINIAPP_mediaGithubHeaders_(cfg)
+    });
+    var payload = { message: message, content: content, branch: cfg.branch };
+    if (existing.getResponseCode() === 200) {
+      var body = JSON.parse(existing.getContentText());
+      if (body && body.sha === blobSha) return { ok: true, unchanged: true };
+      if (body && body.sha) payload.sha = body.sha;
+    } else if (existing.getResponseCode() !== 404) {
+      throw new Error('GitHub media lookup HTTP ' + existing.getResponseCode());
+    }
+    var response = UrlFetchApp.fetch(url, {
+      method: 'put', contentType: 'application/json', payload: JSON.stringify(payload),
+      muteHttpExceptions: true, headers: MINIAPP_mediaGithubHeaders_(cfg)
+    });
+    var code = response.getResponseCode();
+    if (code === 200 || code === 201) return { ok: true, unchanged: false };
+    // Snapshot/media publishers can advance the same Git branch between GET/PUT.
+    // Re-read SHA and replay the identical bytes; never retry denied/rate-limited writes.
+    var detail = {};
+    try { detail = JSON.parse(response.getContentText()); } catch (_) {}
+    var shaConflict = code === 409 || (code === 422 && /sha|already exists/i.test(String(detail.message || '')));
+    if (shaConflict && attempt < 2) continue;
+    throw new Error('GitHub media upsert HTTP ' + code);
   }
-
-  var response = UrlFetchApp.fetch(url, {
-    method: 'put',
-    contentType: 'application/json',
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true,
-    headers: MINIAPP_mediaGithubHeaders_(cfg)
-  });
-
-  var code = response.getResponseCode();
-  if (code !== 200 && code !== 201) throw new Error('GitHub media upsert HTTP ' + code);
 }
 
 function MINIAPP_teamGithubDelete_(cfg, path, message) {

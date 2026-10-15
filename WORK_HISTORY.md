@@ -951,3 +951,30 @@ mutation or backend deployment. Native Telegram acceptance remains owner-side.
 PR61 source1de188d668867568d6e4e0884efc6f0f8db1bc6e passed full PR CI38747435272 and merged2183933a9dca7338df34983dc33745e4ed99bf95. Main CI38747719484 and Pages build/deploy38747720846 PASS:128Node tests,37workerd/isolation checks and eight browser fixtures. All eight public entry/admin-client/writer/photo/version/changelog files returned successfully and matched reviewed source byte-for-byte (one transient URL failure succeeded on retry). Marker20261015-v061-admin-save1 is live. Native Telegram save duration/acceptance is still owner-side.
 
 Cloud Shell reconnected during rollout. Backed up local Apps Script source, ran clasp status then clasp pull (41 files), and verified SHA-256 of live files07/29/30/32/33 matches the existing repository mirror. No live source or deployment change. Exact execution latency remains unmeasured: processes API returned403 insufficient authentication scopes; clasp logs reports no configured GCP project; read-only preflight invocation did not establish execution and returned storage NOT_FOUND through stderr despite CLI exit0. No permission expansion or synthetic CRM mutation. Earlier offline-only explanation is superseded by these observed access limitations. Frontend stale-state failure is reproduced/fixed; do not claim the entire Google latency issue solved.
+
+
+## 15.10.2026 — Admin photo write conflicts and membership read cost
+
+Owner reports approximately30-second saves after the previous improvement;
+screenshot also shows TEAM_PHOTO_STORE_FAILED. Exact message originates in
+file32 while storing bytes in private GitHub media, before CRM source mutation.
+Fresh clasp status/pull confirms files32/33 equal the reviewed baseline.
+A temporary random-token, expiring diagnostic on the existing pinned deployment
+measured GitHub repository GET380ms, media directory GET1242ms and Sheet read532ms;
+a second probe created/deleted an isolated temporary media file (HTTP201/200,
+2203ms). Current token has push permission and primary quota remaining4723.
+These probes do not prove the earlier failure was a409 or rule out transient
+secondary limits; no actual team or membership was changed by diagnostics.
+
+Source fix: media upsert compares real Git blob SHA and skips identical content;
+409 and SHA-related422 conflicts re-read SHA and retry identical bytes, at most
+three PUT attempts. Auth, rate limits and other failures are never blindly retried.
+Rename cascade and decorated membership repair each read E:AA once instead of
+ten slot-specific calls. Only the same matching source cells are written; game,
+ambiguity, suffix, journal/revision/locking and photo-first semantics are retained.
+Eight focused regressions PASS, including signed byte hashing, no-op media,
+immutable conflict retries, bounded/permanent failures and all-five-slot isolation.
+Full CI and actual server rollout pending. Exact end-to-end latency improvement
+is unmeasured; do not claim every30-second wait or photo failure solved.
+Marker20261015-v061-admin-media2. Temporary diagnostic source/route must be
+removed before final deployment; live mirror and publication checkpoint required.
