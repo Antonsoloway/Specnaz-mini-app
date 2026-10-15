@@ -62,9 +62,11 @@
     if(!permitted||!token()||!window.RoyalTeamEmblems)return;
     document.querySelectorAll('[data-write-team-form]').forEach(form=>{
       const field=form.querySelector('[data-write-field="name"]'),id=form.querySelector('[data-write-field="gameTeamId"]'),game=form.querySelector('[data-write-field="game"]');
-      if(!field||!id||game?.value!=='Royal Match'||!id.value||window.RoyalTeamEmblems.hasEmojiPrefix(field.value))return;
+      if(!field||!id||game?.value!=='Royal Match'||!id.value)return;
       let state=editors.get(form);if(!state){state={touched:false,key:''};editors.set(form,state);}
-      const key=id.value;if(state.touched||state.key===key)return;
+      if(state.touched)return;
+      if(window.RoyalTeamEmblems.hasEmojiPrefix(field.value)){field.value=window.RoyalTeamEmblems.emojiName(field.value,null);return;}
+      const key=id.value;if(state.key===key)return;
       const records=window.RoyalAdminDataV0600?.current?.adminData?.teams||[];
       const matches=records.filter(t=>t.game==='Royal Match'&&t.gameTeamId===key&&t.name===field.value);if(matches.length!==1)return;
       state.key=key;const session=token(),initial=field.value;
