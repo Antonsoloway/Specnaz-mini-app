@@ -1,12 +1,14 @@
 /* Royal CRM Mini App — shared protected admin-data client v0.6.0 */
 (() => {
-  const VERSION = '0.6.0-admin-data-client.1';
+  const VERSION = '0.6.0-admin-data-client.2';
   const RETRY_DELAYS_MS = Object.freeze([0, 700, 1600]);
   let payload = null;
   let payloadSession = '';
   let loading = null;
   let loadingSession = '';
+  let loadingGeneration = 0;
   let cacheEpoch = 0;
+  let acceptedGeneration = 0;
   const listeners = new Set();
   const protectedRequestIds = new Set();
 
@@ -42,6 +44,7 @@
       notify('reject-stale', data, 'pending-write');
       return false;
     }
+    acceptedGeneration += 1;
     payload = data;
     payloadSession = clean(session);
     notify('accept', data);
@@ -152,6 +155,7 @@
     if (cached && !force) return Promise.resolve(cached);
 
     if (!loading || loadingSession !== requestSession) {
+      loadingGeneration = acceptedGeneration;
       const operation = request(requestSession, cacheEpoch);
       loading = operation;
       loadingSession = requestSession;
@@ -163,9 +167,10 @@
       }).catch(() => {});
     }
 
-    const operation = loading;
+    const operation = loading, generationAtStart = loadingGeneration;
     return operation.then(data => {
       if (!commit) return data;
+      if (generationAtStart !== acceptedGeneration && payloadSession === requestSession && payload) return payload;
       if (accept(data, requestSession)) return data;
       return payloadSession === requestSession && payload ? payload : data;
     }).catch(error => {

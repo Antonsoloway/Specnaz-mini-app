@@ -111,9 +111,9 @@ test('protected admin-data never falls through to unsupported GAS JSONP', async 
 test('explicit WRITE_BUSY is retried safely with the same request id', () => {
   assert.match(writeSource, /WRITE_BUSY_RETRY_DELAYS_MS = \[700, 1400, 2500\]/);
   assert.match(writeSource, /clean\(error\?\.code\) === 'WRITE_BUSY'/);
-  assert.match(writeSource, /return await postWriteOnce\(id, op, payload\)/);
+  assert.match(writeSource, /postWriteOnce\(id, op, payload\)/);
   assert.match(writeSource, /Ждём и повторяем автоматически/);
-  assert.match(writeSource, /const VERSION = '0\.6\.0-write\.5-ui\.11'/);
+  assert.match(writeSource, /const VERSION = '0\.6\.0-write\.5-ui\.12'/);
 });
 
 test('all admin-data retry and cache behavior lives in the shared client', () => {

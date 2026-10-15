@@ -248,3 +248,15 @@ or reasons for leaving. Partial history must be marked. Historical absentees
 cannot inflate the current roster count or be sent to current-roster-only profile
 lookup; keep their activity accessible. Membership event detail is opt-in for
 the frontend and must not inflate existing backend AI period payloads.
+
+
+### Sequential admin writes
+
+A private GET started before an accepted mutation cannot roll back committed
+records, including consumers joining that in-flight GET after commit. Apply
+known rename aliases locally without bypassing server revision/access checks.
+Receipt probes and explicit retry of an ambiguous outcome must retain the same
+requestId and immutable payload/photo; never create a fresh logical mutation.
+Permanent errors are not replayed. Complete successful records must not wait
+for a full snapshot solely because queue metadata is absent. No permanent
+full-snapshot watchdog; late results must not control a different modal.

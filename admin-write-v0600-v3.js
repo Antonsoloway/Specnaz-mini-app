@@ -1,8 +1,9 @@
 /* Royal CRM Mini App — protected Admin Write/Delete UI v0.6.0-write.5 */
 (() => {
-  const VERSION = '0.6.0-write.5-ui.11';
+  const VERSION = '0.6.0-write.5-ui.12';
   const WRITE_BUSY_RETRY_DELAYS_MS = [700, 1400, 2500];
   const TRANSPORT_RETRY_DELAY_MS = 700;
+  const RECEIPT_CHECK_DELAY_MS = 20000;
   const SNAPSHOT_POLL_DELAYS_MS = [2500, 4000, 7000, 12000, 20000, 35000, 60000, 90000, 120000];
   const PUBLIC_SNAPSHOT_POLL_DELAYS_MS = [2500, 3500, 5000, 8000, 12000, 18000, 30000, 45000];
   const PUBLIC_SNAPSHOT_WATCH_MS = 20000;
@@ -17,6 +18,11 @@
     liveRefreshTimer:0,
     modal:null,
     observerBusy:false,
+    commitGeneration:0,
+    teamRenames:new Map(),
+    receiptChecking:false,
+    uncertainWrite:null,
+    activeWrite:false,
     pendingRequestIds:new Set()
   };
 
@@ -141,8 +147,10 @@
 
   async function refreshVisibleAdminSnapshot() {
     if (!isAdminScreen() || state.modal || state.pendingRequestIds.size || state.loading) return false;
+    const generation = state.commitGeneration;
     const before = clean(state.payload?.dataHash || state.payload?.generatedAt);
     const data = await fetchAdminSnapshot();
+    if (generation !== state.commitGeneration || state.pendingRequestIds.size || state.modal) return false;
     const after = clean(data?.dataHash || data?.generatedAt);
     if (!after || after === before) return false;
     state.payload = data;
@@ -174,7 +182,7 @@
           refreshVisibleAdminSnapshot()
         ]);
       }
-      scheduleLiveSnapshotRefresh();
+      // One-shot startup/focus refresh; no permanent polling watchdog.
     }, Math.max(1000, Number(delay) || PUBLIC_SNAPSHOT_WATCH_MS));
   }
 
@@ -186,8 +194,9 @@
     // snapshot. This also lets an admin safely open the next edit immediately.
     if (state.payload && (!force || state.pendingRequestIds.size)) return state.payload;
     if (state.loading) return state.loading;
-    const payloadBeforeFetch = state.payload;
+    const payloadBeforeFetch = state.payload, generation = state.commitGeneration;
     state.loading = fetchAdminSnapshot(force, allowStale).then(data => {
+      if (generation !== state.commitGeneration && state.payload) return state.payload;
       if (state.pendingRequestIds.size) {
         const allPendingConfirmed = [...state.pendingRequestIds]
           .every(requestId => journalContains(data,requestId));
@@ -240,7 +249,9 @@
   function findTeamByNode(node) {
     const identity = teamIdentityFromNode(node);
     if (!identity.name || !identity.game) return null;
-    return teams().find(t => clean(t?.name) === identity.name && clean(t?.game) === identity.game) || null;
+    let key=teamIdentity(identity);const seen=new Set();
+    while(!teams().some(t=>teamIdentity(t)===key)&&state.teamRenames.has(key)&&!seen.has(key)){seen.add(key);key=state.teamRenames.get(key);}
+    return teams().find(t => teamIdentity(t) === key) || null;
   }
 
   function injectEditUi() {
@@ -543,13 +554,16 @@
     const gameTeamId=game==='Royal Match'?clean(linkInput?.value):'';
     if(gameTeamId&&!/^[1-9]\d{0,18}$/.test(gameTeamId))throw Error('Введите корректный ID команды.');
     const link=linkInput?{gameTeamId}:{};
-    if (creating) return adminWrite('createTeam',{ game, name, leader, ...link });
+    const photoInput=form.querySelector('[data-admin-team-photo-input]');
+    if(!creating&&name===clean(source.name)&&leader===clean(source.leader)&&(!linkInput||gameTeamId===clean(source.gameTeamId))&&!photoInput?.files?.length)return {ok:true,unchanged:true,message:'Изменений нет.'};
+    const prepared=typeof window.RoyalAdminTeamPhotoV0600?.prepare==='function'?{photo:await window.RoyalAdminTeamPhotoV0600.prepare(form)}:{};
+    if (creating) return adminWrite('createTeam',{ game, name, leader, ...link, ...prepared });
     if (!source.revision) throw new Error('Карточка устарела: нет revision. Нажмите «Обновить» и откройте её снова.');
     return adminWrite('updateTeam',{
       game:source.game,
       name:source.name,
       expectedRevision:source.revision,
-      changes:{ name, leader, ...link }
+      changes:{ name, leader, ...link, ...prepared }
     });
   }
 
@@ -581,16 +595,37 @@
     return data;
   }
 
-  async function adminWrite(op, payload) {
+  function postWithReceiptCheck(id,op,payload,session){
+    return new Promise((resolve,reject)=>{
+      let settled=false,probe=false,probeDone=false,primaryError=null;
+      const finish=(fn,value)=>{if(settled)return;settled=true;clearTimeout(timer);fn(value);};
+      const timer=setTimeout(()=>{
+        if(settled)return;if(sessionToken!==session){finish(reject,Error('Сессия изменилась. Откройте редактор заново.'));return;}
+        probe=true;state.receiptChecking=true;modalStatus('Ответ задерживается. Проверяем подтверждение сохранения…');
+        postWriteOnce(id,op,payload).then(v=>finish(resolve,v),()=>{probeDone=true;if(primaryError)finish(reject,primaryError);});
+      },RECEIPT_CHECK_DELAY_MS);
+      postWriteOnce(id,op,payload).then(v=>finish(resolve,v),error=>{
+        if(error.httpStatus&&![408,425,429,502,503,504].includes(error.httpStatus)){finish(reject,error);return;}
+        primaryError=error;if(!probe||probeDone)finish(reject,error);
+      });
+    });
+  }
+  async function performAdminWrite(op, payload) {
     if (!sessionToken) throw new Error('Сессия приложения не готова. Откройте приложение заново.');
-    const id = requestId();
+    const session=sessionToken, signature=JSON.stringify({op,payload}), pending=state.uncertainWrite;
+    if(pending&&pending.session===session&&pending.signature!==signature)throw Error('Предыдущее сохранение ещё не подтверждено. Повторите его с прежними полями, чтобы проверить результат.');
+    const id=pending?.session===session?pending.id:requestId();state.receiptChecking=false;
     let busyRetries = 0;
     let transportRetries = 0;
 
     while (true) {
       try {
-        return await postWriteOnce(id, op, payload);
+        if(sessionToken!==session)throw Error('Сессия изменилась. Откройте редактор заново.');
+        const result=await (transportRetries===0&&!state.receiptChecking?postWithReceiptCheck(id,op,payload,session):postWriteOnce(id, op, payload));
+        if(sessionToken!==session)throw Error('Сессия изменилась. Откройте редактор заново.');
+        state.uncertainWrite=null;return result;
       } catch (error) {
+        if(sessionToken!==session)throw error;
         // Snapshot/export triggers share the Apps Script lock with mutations.
         // WRITE_BUSY is an explicit proof that no mutation started, so retrying
         // with the SAME requestId is safe and keeps server idempotency intact.
@@ -604,15 +639,21 @@
 
         // Retry only one true transport failure. SAME requestId means a lost
         // response after a committed write cannot repeat the mutation.
-        if (!error?.httpStatus && transportRetries < 1) {
+        if (!error?.httpStatus && transportRetries < 1 && !state.receiptChecking) {
           transportRetries += 1;
           modalStatus('Проверяем результат и безопасно повторяем запрос…');
           await new Promise(resolve => setTimeout(resolve, TRANSPORT_RETRY_DELAY_MS));
           continue;
         }
+        if(!error.httpStatus||[502,503,504].includes(error.httpStatus)){state.uncertainWrite={id,session,signature};error.message='Ответ на сохранение не подтверждён. Повторно нажмите «Сохранить»: проверим тот же запрос без повторной записи.';}else state.uncertainWrite=null;
         throw error;
       }
     }
+  }
+
+  async function adminWrite(op,payload){
+    if(state.activeWrite)throw Error('Предыдущее сохранение ещё выполняется. Дождитесь его результата.');
+    state.activeWrite=true;try{return await performAdminWrite(op,payload);}finally{state.activeWrite=false;}
   }
 
   function confirmDelete(message) {
@@ -673,6 +714,7 @@
     const data = state.payload;
     const admin = data?.adminData;
     if (!data?.ok || !admin) return false;
+    state.commitGeneration += 1;
 
     if (result?.entityType === 'participant') {
       const list = Array.isArray(admin.participants) ? admin.participants : [];
@@ -706,6 +748,11 @@
       if (result.deleted) {
         if (index >= 0) list.splice(index, 1);
       } else if (result.record) {
+        const oldTeam=index>=0?list[index]:null;
+        if(oldTeam&&teamIdentity(oldTeam)!==teamIdentity(result.record)){
+          state.teamRenames.set(teamIdentity(oldTeam),teamIdentity(result.record));
+          for(const p of admin.participants||[])if(Array.isArray(p.memberships))p.memberships=p.memberships.map(m=>lower(m.game)===lower(oldTeam.game)&&lower(m.team)===lower(oldTeam.name)?{...m,team:result.record.name}:m);
+        }
         const next = {
           ...(index >= 0 ? list[index] : {}),
           ...result.record,
@@ -725,6 +772,7 @@
       requestId:clean(result?.requestId),
       queuedAt:clean(result?.adminSnapshot?.queuedAt) || new Date().toISOString()
     };
+    window.RoyalAdminDataV0600?.accept?.(data);
     try { window.RoyalAdminV0600?.acceptPayload?.(data); } catch (_) {}
     return true;
   }
@@ -739,8 +787,9 @@
     for (const delay of SNAPSHOT_POLL_DELAYS_MS) {
       if (!state.pendingRequestIds.size) return;
       await new Promise(resolve => setTimeout(resolve,delay));
+      const generation=state.commitGeneration;
       const data = await fetchAdminSnapshot().catch(() => null);
-      if (!data) continue;
+      if (!data||generation!==state.commitGeneration) continue;
 
       const confirmed = [...state.pendingRequestIds]
         .filter(requestId => journalContains(data,requestId));
@@ -750,6 +799,7 @@
       });
       if (state.pendingRequestIds.size) continue;
 
+      if(window.RoyalAdminDataV0600?.accept?.(data)===false)continue;
       state.payload = data;
       try { window.RoyalAdminV0600?.acceptPayload?.(data); } catch (_) {}
       setTimeout(() => { if (state.editing && isAdminScreen()) injectEditUi(); },180);
@@ -757,14 +807,15 @@
     }
   }
 
-  async function refreshAfterMutation(result) {
-    if (result?.adminSnapshot?.queued === true) {
+  async function refreshAfterMutation(result,submittedModal=state.modal) {
+    const closeCommittedModal=()=>{if(state.modal===submittedModal)closeModal();};
+    if (result?.adminSnapshot?.queued === true || result?.record || result?.deleted) {
       if (result?.requestId) {
         state.pendingRequestIds.add(clean(result.requestId));
         window.RoyalAdminDataV0600?.protect?.(result.requestId);
       }
       applyCommittedResult(result);
-      closeModal();
+      closeCommittedModal();
       showMessage(result?.message || 'Изменение сохранено. Данные обновляются в фоне.');
       setTimeout(() => { if (state.editing && isAdminScreen()) injectEditUi(); },100);
       refreshSnapshotInBackground().catch(() => null);
@@ -773,7 +824,7 @@
     }
 
     await new Promise(resolve => setTimeout(resolve,650));
-    closeModal();
+    closeCommittedModal();
     state.payload = null;
     try { window.RoyalAdminV0600?.clearCache?.(); } catch (_) {}
     try { await window.RoyalAdminV0600?.refresh?.(); } catch (_) {}
@@ -861,6 +912,9 @@
   }
 
   async function submitForm(form) {
+    const submittedModal=state.modal;
+    const controls=[...form.querySelectorAll('input,select,textarea,button:not([data-write-close])')].map(node=>[node,node.disabled]);
+    controls.forEach(([node])=>{node.disabled=true;});
     const save = form.querySelector('.is-save');
     if (save) save.disabled = true;
     modalStatus(form.matches('[data-write-team-form]')
@@ -870,12 +924,15 @@
       const result = form.matches('[data-write-participant-form]')
         ? await saveParticipant(form)
         : await saveTeam(form);
-      modalStatus(result?.message || 'Сохранено.', 'ok');
-      await refreshAfterMutation(result);
+      if(result?.unchanged){if(state.modal===submittedModal)closeModal();showMessage(result.message);return;}
+      if(state.modal===submittedModal)modalStatus(result?.message || 'Сохранено.', 'ok');
+      await refreshAfterMutation(result,submittedModal);
     } catch (error) {
-      modalStatus(error?.message || 'Изменение не сохранено.', 'error');
+      if(state.modal===submittedModal)modalStatus(error?.message || 'Изменение не сохранено.', 'error');
+      else showMessage(error?.message || 'Изменение не сохранено.', true);
       if (error?.conflict) state.payload = null;
     } finally {
+      controls.forEach(([node,disabled])=>{if(node.isConnected)node.disabled=disabled;});
       if (save) save.disabled = false;
     }
   }
@@ -1102,6 +1159,9 @@
 
   window.RoyalAdminDataV0600?.subscribe?.(event => {
     if (event?.type !== 'clear' || !['unauthorized','forbidden','session-changed'].includes(clean(event?.reason))) return;
+    state.commitGeneration += 1;
+    state.teamRenames.clear();
+    state.uncertainWrite=null;
     state.payload = null;
     state.editing = false;
     state.pendingRequestIds.clear();

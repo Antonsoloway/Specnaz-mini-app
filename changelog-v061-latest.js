@@ -3,7 +3,7 @@
   'use strict';
 
   const VERSION = '0.6.1';
-  const PATCH_VERSION = '0.6.1-changelog-latest.10';
+  const PATCH_VERSION = '0.6.1-changelog-latest.11';
   const CHANGE = 'В админском Журнале исправлен порядок записей: все события теперь принудительно сортируются по фактическому времени от новых к старым, независимо от источника записи и порядка, в котором данные пришли с сервера.';
 
   const AGENT_CHANGE = 'Добавлен отдельный админский модуль «Сосиска»: поиск команд Royal Match, выбор по описанию и лидеру, состав игроков, снимки, история изменений и управление отслеживанием.';
@@ -51,6 +51,9 @@
 
   const MEMBERSHIP_CHANGE='В Сосиске добавлены «Выбывшие» и «Новенькие» за всё время слежения с датами изменений. В составе новенькие и вернувшиеся отмечены зелёным, выбывшие — красным и показаны отдельно. Исходный состав первого снимка не считается новеньким.';
   if (!section.changes.includes(MEMBERSHIP_CHANGE)) section.changes.unshift(MEMBERSHIP_CHANGE);
+
+  const SAVE_REPAIR='Исправлено повторное сохранение в админском редакторе: запоздавшее обновление не возвращает старую карточку после переименования; новое название обновляется и в локальных составах. При долгом ответе выполняется одна безопасная проверка с тем же ID операции. Сохранение без изменений не отправляет лишний запрос.';
+  if (!section.changes.includes(SAVE_REPAIR)) section.changes.unshift(SAVE_REPAIR);
 
   current.changes = current.sections.flatMap(item => Array.isArray(item?.changes) ? item.changes : []);
   window.RoyalChangelog0601 = current;
