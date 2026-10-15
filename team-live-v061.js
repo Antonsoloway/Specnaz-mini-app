@@ -57,9 +57,31 @@
     }}
     finally{clearTimeout(timer);state.loading=false;if(button)button.disabled=false;}
   }
+  const editors=new WeakMap();
+  function decorateEditors(){
+    if(!permitted||!token()||!window.RoyalTeamEmblems)return;
+    document.querySelectorAll('[data-write-team-form]').forEach(form=>{
+      const field=form.querySelector('[data-write-field="name"]'),id=form.querySelector('[data-write-field="gameTeamId"]'),game=form.querySelector('[data-write-field="game"]');
+      if(!field||!id||game?.value!=='Royal Match'||!id.value||window.RoyalTeamEmblems.hasEmojiPrefix(field.value))return;
+      let state=editors.get(form);if(!state){state={touched:false,key:''};editors.set(form,state);}
+      const key=id.value;if(state.touched||state.key===key)return;
+      const records=window.RoyalAdminDataV0600?.current?.adminData?.teams||[];
+      const matches=records.filter(t=>t.game==='Royal Match'&&t.gameTeamId===key&&t.name===field.value);if(matches.length!==1)return;
+      state.key=key;const session=token(),initial=field.value;
+      window.RoyalTeamEmblems.fetchLive(matches[0],true,false,true).then(payload=>{
+        if(!permitted||session!==token()||!form.isConnected||state.touched||game.value!=='Royal Match'||id.value!==key||field.value!==initial)return;
+        field.value=window.RoyalTeamEmblems.emojiName(initial,payload.data.logo);
+      }).catch(()=>{});
+    });
+  }
+  document.addEventListener('input',event=>{
+    if(!event.target.matches?.('[data-write-team-form] [data-write-field="name"]'))return;
+    const form=event.target.closest('form'),state=editors.get(form)||{key:''};state.touched=true;editors.set(form,state);
+  },true);
   function decorate() {
     if(lastSession!==token()){saved.clear();clear();lastSession=token();}
     if(!permitted||!token())return;
+    decorateEditors();
     const panel=document.getElementById('panel'),photo=panel?.querySelector('.team-photo-box');
     if(!photo)return;
     const adminShell=panel.querySelector('[data-admin-team="1"]'),admin=!!adminShell;
@@ -87,7 +109,7 @@
   window.addEventListener('click',event=>{
     const pick=event.target.closest?.('[data-team-live-pick]');
     if(pick){event.preventDefault();event.stopImmediatePropagation();const form=pick.closest('form');if(form?.querySelector('[data-write-field="game"]')?.value!=='Royal Match')return;
-      window.RoyalSosiska?.pickTeam(data=>{if(!form.isConnected)return;form.querySelector('[data-write-field="gameTeamId"]').value=data.TeamId;form.querySelector('[data-write-field="name"]').value=data.TeamName||'';});return;}
+      window.RoyalSosiska?.pickTeam(data=>{if(!form.isConnected)return;form.querySelector('[data-write-field="gameTeamId"]').value=data.TeamId;form.querySelector('[data-write-field="name"]').value=window.RoyalTeamEmblems?.emojiName(data.TeamName,window.RoyalTeamEmblems.logoOf(data))??data.TeamName??'';editors.set(form,{touched:false,key:String(data.TeamId)});});return;}
     const control=event.target.closest?.('[data-team-live-refresh],[data-team-live-photo]');if(!control)return;
     event.preventDefault();event.stopImmediatePropagation();const host=control.closest('.team-live-card'),state=states.get(host);if(!state)return;
     if(control.matches('[data-team-live-refresh]'))load(host,true);
@@ -104,5 +126,5 @@
   window.addEventListener('royal:auth-ready',()=>{saved.clear();clear();lastSession=token();permitted=true;decorate();});
   window.RoyalAdminDataV0600?.subscribe?.(event=>{if(event.type==='clear'&&['unauthorized','forbidden','session-changed'].includes(event.reason)){forgetSaved();permitted=false;clear();}});
   new MutationObserver(decorate).observe(document.body,{childList:true,subtree:true});decorate();
-  window.RoyalTeamLive={version:'1.1.0',card,decorate};
+  window.RoyalTeamLive={version:'1.2.0',card,decorate};
 })();

@@ -32,3 +32,16 @@ test('game reads retry one transient failure, but never retry access denial or c
  let calls=0;const {api}=runtime(async()=>{calls++;if(calls===1)throw new TypeError('Failed to fetch');return Response.json({ok:true,data:{teamId:'12',logo:0}});});await api.fetchLive({name:'CRM',gameTeamId:'12'});assert.equal(calls,2);
  for(const status of [401,403,400]){let calls=0;const r=runtime(async()=>{calls++;return Response.json({ok:false},{status});});await assert.rejects(r.api.fetchLive({name:'CRM',gameTeamId:'12'}));assert.equal(calls,1);}
 });
+
+
+test('catalogue emoji names follow logo IDs, preserve manual prefixes and reject unknown IDs',()=>{
+ const {api}=runtime();
+ for(let i=0;i<176;i++){assert.ok(api.emoji(i));assert.equal(api.emojiName('Team',i),api.emoji(i)+' Team');}
+ assert.equal(api.emojiName('FORTUNA',136),'🇷🇺 FORTUNA');
+ assert.equal(api.emojiName('Banda 220 V',22),'⚡ Banda 220 V');
+ assert.equal(api.emojiName('Aquamarine',0),'⚜️ Aquamarine');
+ assert.equal(api.emojiName('🇷🇺 FORTUNA',136),'🇷🇺 FORTUNA');
+ assert.equal(api.emojiName('⭐ Custom name',136),'⭐ Custom name');
+ for(const logo of [null,undefined,-1,176,'136']){assert.equal(api.emoji(logo),'');assert.equal(api.emojiName('FORTUNA',logo),'FORTUNA');}
+ assert.equal(api.emoji(125),String.fromCodePoint(0x1f3f4,0xe0067,0xe0062,0xe0065,0xe006e,0xe0067,0xe007f));assert.equal(api.emoji(120),'🇺🇸');assert.equal(api.emoji(126),'🇨🇭');assert.equal(api.emoji(175),'🇰🇼');
+});

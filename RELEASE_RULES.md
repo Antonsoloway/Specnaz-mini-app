@@ -218,3 +218,11 @@ CRM binding lookup, followed by background refresh on every open. Separate users
 and public/admin modes; include game and linked game ID in identity. Never persist
 session tokens. Keep the saved timestamp and data on transient network failure;
 auth denial clears saved cards. Storage failure must not prevent network loading.
+
+
+### Team-name emoji prefill
+
+RM name prefix uses only validated numeric catalogue identity. Preserve manual
+prefixes and typing; never overwrite a changed game, ID, session or closed form
+from a late response. Auto-prefill is a draft edit; only normal Save persists it.
+Unknown logos and RK have no inferred prefix; no mass renaming on data load.
