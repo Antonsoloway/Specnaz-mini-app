@@ -36,7 +36,7 @@ const root=path.resolve(__dirname,'..');let browser;
   await page.locator('[data-hour="3"]').click();assert.match(await page.locator('.sosiska-hour-days h4').textContent(),/03:00–04:00/);
   if(width===390){await page.locator('.sosiska-hour-grid').screenshot({path:'/tmp/sosiska-compact-hours.png'});await page.locator('#sosiskaAnalysis').screenshot({path:'/tmp/sosiska-readable-analysis.png'});}
   await page.locator('.sosiska-period-roster > summary').click();assert.equal(await page.locator('.sosiska-period-roster .sosiska-player').first().isVisible(),false);
-  await page.evaluate(()=>{reportMode='new';});await page.locator('[data-sosiska-action="team"]').click();await page.waitForSelector('#sosiskaAnalysis .sosiska-analysis ul');assert.equal(await page.locator('.sosiska-report-table').count(),0);assert.equal(await page.locator('#sosiskaAnalysis .sosiska-analysis').count(),1);
+  await page.evaluate(()=>{reportMode='new';});await page.locator('[data-sosiska-action="team"]').click();await page.waitForFunction(()=>document.querySelector('#sosiskaAnalysis .sosiska-analysis')?.textContent.includes('Прирост подтверждён.')&&document.querySelector('.sosiska-screen')?.getAttribute('aria-busy')==='false');assert.equal(await page.locator('.sosiska-report-table').count(),0);assert.equal(await page.locator('#sosiskaAnalysis .sosiska-analysis').count(),1);
   if(width===390)await page.locator('#sosiskaAnalysis').screenshot({path:'/tmp/sosiska-new-readable-analysis.png'});
   await page.close();
  }
