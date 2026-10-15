@@ -908,3 +908,8 @@ CSS covers multi-page history, joins/exits/returns, same names, baseline, red/gr
 roster, historical drilldown, reopen without duplicates, empty/gapped history and
 zero overflow. Full CI/publication pending; native Telegram acceptance owner-side.
 Marker20261015-v061-membership1; current version0.6.1 patch.
+
+
+### Sosiska membership history — verified rollout
+
+PR60 final source92dd83ea480ee2645b82818a441206dd6ce9ac0f (initial d05ad12 plus Russian caption polish) passed PR CI38741642724, mergedceb7b3918df74f268383287b246a0405e8a61a5b. Main CI38741868046 and Pages build/deploy38741867219 PASS. All127Node tests,37workerd/isolation checks and seven browser fixtures PASS. Eight public entry/Sosiska/bundle/CSS/version/changelog files returned HTTP200 and matched reviewed source byte-for-byte. Marker20261015-v061-membership1 is live. Mobile320/390/768 fixture includes capture-refresh with selected membership tab retained; screenshot visually reviewed for readable green return/new and red departed cards. Existing data/history are reused, no new watch activated. Shared membership detail is opt-in; existing backend AI statistics remain unchanged by default. Native Telegram acceptance remains owner-side. Earlier publication-pending note is superseded.
