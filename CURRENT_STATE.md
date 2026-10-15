@@ -1092,5 +1092,41 @@ verifies50-player default collapse/state,24compact cells, one-line clock/rates,
 no horizontal overflow, hour drilldown, safe HTML escaping and old/new report
 rendering. Membership fixture PASS; chart/history fixture result recorded in
 rollout checkpoint. Both hourly and clean new-report screenshots reviewed.
-Worker/full CI/publication pending; marker20261015-v061-readable-analysis1.
+Verified rollout recorded below; marker20261015-v061-readable-analysis1.
 No Apps Script, CRM source data, bot prompt, watch activation or game changes.
+
+
+### Readable Sosiska analysis — verified publication
+
+PR63 final source68e8f2aadc3d1bb025248e92a8b515926299e8b1 (initial760160a)
+passed PR CI38783830515 and mergedcf877359bdd01eed48bb15ba04d7fe7bab53b078.
+Initial CI caught a fixture waiting on the old DOM during report refresh; fixed
+the wait to require the new text and completed render, without production changes.
+Main CI38784113024 and Pages38784110122 PASS:138Node tests,37workerd/isolation
+checks and nine browser fixtures. Both additional801-snapshot chart/history
+fixtures also PASS (zoom/pan/keyboard/pinch/player isolation). All eight public
+entry/Sosiska/bundle/CSS/version/changelog files match reviewed source bytes.
+Marker20261015-v061-readable-analysis1 is live.
+
+Worker publication independently confirmed by production Cloudflare Workers
+Builds check116591812617 for the exact merge SHA:success, build
+bf72353b-1593-49c1-a700-9fb6bda97597, Version ID
+19e6402c-51f1-40bd-b088-a017f326122e (completed18:16UTC).
+Health returns200/legacy1.41.0 with a browser User-Agent and frontend Origin;
+health remains delegated to the existing wrapper and is not the release marker.
+Python's default User-Agent received Cloudflare1010, not an application failure.
+
+Manual pinned-source deploy was started after CI PASS, then Commander stopped
+responding; its process2970 result and active-version/binding comparison were
+not recovered. Before deployment, all13bindings and active version
+bf57982d-f513-456c-837e-6899dbcf1ba7 were backed up privately. The manual
+source68e8 and merged source have identical runtime code; production Workers
+Builds success and its version above supersede the earlier unconfirmed-rollout
+note. Do not blindly redeploy on resume; inspect /tmp/readable-worker-* receipts
+and current management version if needed. No secret values copied into docs.
+
+Final model instruction applies on a NEW analysis run. Existing stored prose
+retains its facts/text and gets safe layout only. No real-provider or native
+Telegram semantic acceptance is claimed; owner should rerun the analysis to
+review the new Russian report. No new watches, game state, CRM writes, Apps
+Script deployment or bot prompt changes in this task.
