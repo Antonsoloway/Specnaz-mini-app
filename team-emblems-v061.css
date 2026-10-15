@@ -7,3 +7,30 @@
 .rm-team-emblem[hidden]{display:none!important}
 .rm-team-name:has(>.rm-team-emblem[data-rm-loaded="1"]):not(:has(>.rm-team-emblem[hidden])) .rm-team-emoji-prefix{display:none!important}
 .team-live-title:has(>.team-live-emblem>.rm-team-emblem[data-rm-loaded="1"]):not(:has(>.team-live-emblem>.rm-team-emblem[hidden]))>h3>.rm-team-emoji-prefix{display:none!important}
+
+/* Directory titles use the full card width; media and badges stay below. */
+#panel .teams-list > .team-card{
+  display:grid;grid-template-columns:58px minmax(0,1fr) auto;
+  column-gap:12px;row-gap:4px;align-items:center;
+  padding:14px!important;
+}
+#panel .teams-list > .team-card > .team-card-main{display:contents}
+#panel .teams-list > .team-card > .team-card-main > strong{
+  grid-column:1/-1;grid-row:1;display:block;min-width:0;max-width:100%;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal;
+  line-height:36px;margin:0 0 5px;
+}
+#panel .teams-list > .team-card > .team-card-main > span{grid-column:2;grid-row:2;margin:0}
+#panel .teams-list > .team-card > .team-card-main > small{grid-column:2;grid-row:3;margin:0;align-self:start}
+#panel .teams-list > .team-card > .team-card-icon{grid-column:1;grid-row:2/4;align-self:center}
+#panel .teams-list > .team-card > .chevron{grid-column:3;grid-row:2/4}
+#panel .teams-list > .team-card.active-team-gold-v0559::after{
+  position:static;transform:none;grid-column:3;grid-row:2/4;
+  width:64px;height:64px;align-self:center;
+}
+@media(max-width:360px){
+  #panel .teams-list > .team-card{grid-template-columns:54px minmax(0,1fr) auto;column-gap:8px;padding:12px!important}
+  #panel .teams-list > .team-card.active-team-gold-v0559::after{width:54px;height:54px}
+}
+
+.team-card-main > strong > .rm-team-emoji-prefix{display:inline;margin:0;opacity:1}

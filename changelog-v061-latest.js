@@ -63,6 +63,9 @@
   const EMBLEM_REPAIR='Восстановлены 15 пустых файлов игровых эмблем. Все 176 изображений проверяются на открытие в браузере; исправленные картинки загружаются без старого кэша.';
   if (!section.changes.includes(EMBLEM_REPAIR)) section.changes.unshift(EMBLEM_REPAIR);
 
+  const TEAM_TITLE='В списке команд название с эмблемой расположено одной строкой на всю ширину карточки. Скриншот и значок спецназа размещены ниже; очень длинные названия сокращаются многоточием без переноса.';
+  if (!section.changes.includes(TEAM_TITLE)) section.changes.unshift(TEAM_TITLE);
+
   current.changes = current.sections.flatMap(item => Array.isArray(item?.changes) ? item.changes : []);
   window.RoyalChangelog0601 = current;
   window.__ROYAL_CHANGELOG_LATEST_V061__ = PATCH_VERSION;
