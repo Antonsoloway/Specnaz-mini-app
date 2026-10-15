@@ -228,3 +228,12 @@ from a late response. Auto-prefill is a draft edit; only normal Save persists it
 Unknown logos and RK have no inferred prefix; no mass renaming on data load.
 
 Owner format correction15.10.2026: no separator between team emoji and name (🇷🇺FORTUNA). Preserve spaces inside the actual team name.
+
+
+### Emoji beside a linked game emblem
+
+Suppress a leading name emoji only visually and only when the linked emblem
+image has loaded successfully. Retain original textContent and CRM/data-route
+identities. No bound ID, unknown/pending/broken image, unlink or cleared emblem
+means the original emoji remains visible. Stored names and editor values retain
+the no-space emoji prefix; this display rule must never mass-rename records.

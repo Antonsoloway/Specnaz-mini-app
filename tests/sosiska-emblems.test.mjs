@@ -5,7 +5,7 @@ import {readFile,access} from 'node:fs/promises';
 import {projectTeam} from '../worker/src/team-live.js';
 import {normalizePlayerProfile} from '../worker/src/sosiska-api.js';
 const source=await readFile(new URL('../team-emblems-v061.js',import.meta.url),'utf8');
-function runtime(fetch){const c={sessionToken:'fixture',fetch,queueMicrotask(){},URLSearchParams,AbortController,setTimeout,clearTimeout,window:{addEventListener(){}},document:{body:{},querySelectorAll:()=>[]},MutationObserver:class{observe(){}}};vm.createContext(c);vm.runInContext(source,c);return {api:c.window.RoyalTeamEmblems,c};}
+function runtime(fetch){const c={sessionToken:'fixture',fetch,queueMicrotask(){},URLSearchParams,AbortController,setTimeout,clearTimeout,window:{addEventListener(){}},document:{addEventListener(){},body:{},querySelectorAll:()=>[]},MutationObserver:class{observe(){}}};vm.createContext(c);vm.runInContext(source,c);return {api:c.window.RoyalTeamEmblems,c};}
 test('all 176 catalogue IDs have assets; zero and final ID render, unknown IDs never become another emblem',async()=>{
  const catalog=JSON.parse(await readFile(new URL('../assets/rm-emblems/catalog.json',import.meta.url)));assert.equal(catalog.count,176);assert.equal(catalog.entries.length,176);
  for(let i=0;i<176;i++){assert.equal(catalog.entries[i].id,i);await access(new URL('../assets/rm-emblems/'+i+'.webp',import.meta.url));}
