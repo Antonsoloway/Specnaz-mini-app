@@ -1136,3 +1136,9 @@ Script deployment or bot prompt changes in this task.
 Emblem image URLs now include version20261015-emblem-repair1. Existing valid
 assets unchanged. CI enforces complete RIFF/WebP files and real browser decode
 of every catalogue image; no backend or CRM data change.
+
+### One-line team directory titles15.10.2026
+Directory title occupies full card width above screenshot/active-team badge.
+Names from owner screenshots fit one line at320/390/768. Extreme-length names
+use ellipsis with unchanged raw CRM identity. New full-CSS browser regression
+included in CI. Release marker20261015-v061-team-title1.

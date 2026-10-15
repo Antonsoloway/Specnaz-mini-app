@@ -1094,3 +1094,19 @@ Pillow decode;106 Sosiska node tests pass. Initial local browser executable was 
 passed all176 image decodes and mobile widths320/390/768.32 admin tests pass.
 Publication is blocked by automatic approval review requiring explicit user
 authorization for GitHub push; no remote mutation was performed.
+
+## 15.10.2026 — One-line directory team names
+
+Owner screenshots show RM/RK names wrapping between a58px screenshot and
+active-team badge. Directory cards now use a full-width one-line title row;
+existing screenshot and active-team badge occupy the rows below. Long names
+retain full raw text/CRM identity and show visual ellipsis only when necessary.
+Existing admin summary nowrap stays intact. Inline emoji fallback prevents a
+prefix-only line before/without a loaded emblem. Scope is directory cards,
+not team detail/report/member names; no data mutation or backend change.
+Full CSS/browser fixture (including injected screenshot-preview styles) covers
+all owner example names and RM/RK/linked/unlinked/active/inactive cases at
+widths320/390/768. Owner names fit without clipping; extreme-length names
+ellipsis; no horizontal overflow. Prior CSS fails the regression. Emblem
+conditional-display and full176-image browser fixtures pass;106 Node tests
+pass. New title fixture included in CI; entrypoint markers/changelog updated.
