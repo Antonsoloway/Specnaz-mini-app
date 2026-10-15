@@ -2,12 +2,12 @@
 export const sortedMembers=members=>[...(members??[])].sort((a,b)=>
  (Number(b.Level??0)+Number(b.Crown??0))-(Number(a.Level??0)+Number(a.Crown??0))||
  Number(b.Level??0)-Number(a.Level??0)||String(a.UserId).localeCompare(String(b.UserId)));
-export function createPeriodAccumulator(teamId,{retainIntervals=false}={}){
+export function createPeriodAccumulator(teamId,{retainIntervals=false,membershipHistory=false}={}){
  let newer=null,expected=null,head=null,count=0,from=null,to=null,teamName='',complete=false;
  const players=new Map(),series=[];
  const ensure=m=>{
   let p=players.get(m.UserId);
-  if(!p){p={userId:m.UserId,name:m.Name,current:count===0,level:m.Level,crown:m.Crown,levelGain:0,crownGain:0,helpGain:0,observedHours:0,levelHours:0,crownHours:0,levelResets:0,crownResets:0,helpResets:0,joined:0,left:0,intervals:0,series:[],hourly:Array.from({length:24},(_,hour)=>({hour,hours:0,levelHours:0,crownHours:0,helpHours:0,levels:0,crowns:0,help:0}))};players.set(m.UserId,p);}
+  if(!p){p={userId:m.UserId,name:m.Name,current:count===0,level:m.Level,crown:m.Crown,levelGain:0,crownGain:0,helpGain:0,observedHours:0,levelHours:0,crownHours:0,levelResets:0,crownResets:0,helpResets:0,joined:0,left:0,...(membershipHistory?{baseline:false,firstSeenAt:null,lastSeenAt:null,lastMember:{...m},membershipEvents:[]}:{}),intervals:0,series:[],hourly:Array.from({length:24},(_,hour)=>({hour,hours:0,levelHours:0,crownHours:0,helpHours:0,levels:0,crowns:0,help:0}))};players.set(m.UserId,p);}
   return p;
  };
  const numeric=v=>Number.isSafeInteger(v)&&v>=0;
@@ -19,7 +19,7 @@ export function createPeriodAccumulator(teamId,{retainIntervals=false}={}){
   if(n!==expected)throw Error('PERIOD_HISTORY_INCOMPLETE');
   const old=new Map(s.raw.Members.map(m=>[m.UserId,m]));
   if(old.size!==s.raw.Members.length)throw Error('PERIOD_INVALID');
-  for(const m of old.values())ensure(m);
+  for(const m of old.values()){const p=ensure(m);if(membershipHistory){p.firstSeenAt=s.capturedAt;if(!p.lastSeenAt)p.lastSeenAt=s.capturedAt;if(n===1)p.baseline=true;}}
   if(newer){
    const dt=(Date.parse(newer.capturedAt)-Date.parse(s.capturedAt))/3600000;
    if(!(dt>0))throw Error('PERIOD_INVALID_TIME');
@@ -27,7 +27,7 @@ export function createPeriodAccumulator(teamId,{retainIntervals=false}={}){
    const interval={from:s.capturedAt,to:newer.capturedAt,hours:dt,levels:0,crowns:0,help:0,active:0,observed:0};
    for(const [id,m] of old){
     const p=ensure(m),v=next.get(id);
-    if(!v){p.left++;continue;}
+    if(!v){p.left++;if(membershipHistory)p.membershipEvents.push({type:'left',from:s.capturedAt,to:newer.capturedAt});continue;}
     p.observedHours+=dt;p.intervals++;
     const point={from:s.capturedAt,to:newer.capturedAt,hours:dt,levels:null,crowns:null,help:null};
     for(const [field,gain,resets,hours] of [['Level','levelGain','levelResets','levelHours'],['Crown','crownGain','crownResets','crownHours'],['HelpCount','helpGain','helpResets',null]]){
@@ -41,13 +41,13 @@ export function createPeriodAccumulator(teamId,{retainIntervals=false}={}){
     appendPoint(p.series,point,retainIntervals);addHourly(p.hourly,point);
    }
    appendPoint(series,interval,retainIntervals);
-   for(const [id,m] of next)if(!old.has(id))ensure(m).joined++;
+   for(const [id,m] of next)if(!old.has(id)){const p=ensure(m);p.joined++;if(membershipHistory)p.membershipEvents.push({type:'joined',from:s.capturedAt,to:newer.capturedAt});}
   }
   newer=s;from=s.capturedAt;count++;expected--;
   if(n===1){if(record.changes?.baseline!==true)throw Error('PERIOD_HISTORY_INCOMPLETE');complete=true;}
  }
  function result(){
-  const rows=[...players.values()].map(p=>({...p,
+  const rows=[...players.values()].map(p=>({...p,...(membershipHistory?{lastMember:{...p.lastMember},membershipEvents:p.membershipEvents.map(e=>({...e})).reverse()}:{}),
    levelsPerHour:p.levelHours?p.levelGain/p.levelHours:null,
    crownsPerHour:p.crownHours?p.crownGain/p.crownHours:null,
    series:[...p.series].reverse(),hourly:p.hourly.map(h=>({...h,levelsPerHour:h.levelHours?h.levels/h.levelHours:null,crownsPerHour:h.crownHours?h.crowns/h.crownHours:null}))}));

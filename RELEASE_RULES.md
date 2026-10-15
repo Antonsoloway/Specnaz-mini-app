@@ -237,3 +237,14 @@ image has loaded successfully. Retain original textContent and CRM/data-route
 identities. No bound ID, unknown/pending/broken image, unlink or cleared emblem
 means the original emoji remains visible. Stored names and editor values retain
 the no-space emoji prefix; this display rule must never mass-rename records.
+
+
+### Sosiska membership history
+
+Membership identity is raw UserId across every stored snapshot page. Initial
+baseline is not an arrival. Preserve repeated exit/return events without duplicate
+player identities; report interval observation dates, never invented exact times
+or reasons for leaving. Partial history must be marked. Historical absentees
+cannot inflate the current roster count or be sent to current-roster-only profile
+lookup; keep their activity accessible. Membership event detail is opt-in for
+the frontend and must not inflate existing backend AI period payloads.
