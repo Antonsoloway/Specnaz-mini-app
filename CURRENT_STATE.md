@@ -927,3 +927,8 @@ Sosiska helper/live title, unlinked/RK/unknown fallback, unlink/revocation resto
 and unchanged textContent/data-team identity. Existing320/390/768 layouts, editor,
 picker, card cache and prefix tests PASS. Full CI/publication pending; native
 Telegram acceptance of this display adjustment remains owner-side.
+
+
+### Conditional emblem/emoji display — verified rollout
+
+PR59 source92304daeaaff5dbf861ceebd5a6194eb64723eb9 passed full PR CI38686868912, merged4f0c091d507aeeb4d0421bb01b2e21172358d844. Main CI38687027724 and Pages build/deploy38687027395 PASS. Eight public entry/module/CSS/changelog files returned HTTP200 and matched reviewed source byte-for-byte. Final marker20261015-v061-emblem-display1 is live. Only linked teams with a successfully loaded actual emblem suppress the display prefix; raw names, editor values, routing and unlinked/failure fallbacks retain the emoji. All six browser fixtures and125Node checks PASS. No backend/data mutation. Native Telegram acceptance of this display change remains owner-side; previous emoji-prefill acceptance was confirmed by owner. Earlier publication-pending note is superseded.
