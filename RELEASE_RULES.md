@@ -260,3 +260,12 @@ requestId and immutable payload/photo; never create a fresh logical mutation.
 Permanent errors are not replayed. Complete successful records must not wait
 for a full snapshot solely because queue metadata is absent. No permanent
 full-snapshot watchdog; late results must not control a different modal.
+
+
+### Team media conflict recovery
+
+Compare immutable bytes with Git blob identity before creating a redundant media
+commit. Retry only bounded branch/SHA conflicts with the identical bytes and a
+fresh target SHA; denied/rate-limited writes are not blind retries. Batch membership
+reads must preserve game isolation, decoration ambiguity and write only the
+originally owned source cells, without overwriting nick/role/formula columns.
