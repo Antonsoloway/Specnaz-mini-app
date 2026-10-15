@@ -31,8 +31,8 @@ const root=path.resolve(__dirname,'..');let browser;
    assert.equal(await page.locator('[data-write-field="name"]').inputValue(),'FORTUNA');assert.equal(await page.locator('[data-write-field="gameTeamId"]').inputValue(),'12');assert.equal(await page.locator('.team-live-card').count(),1);assert.equal(await page.locator('[data-admin-team-photo-input]').count(),1);
    await page.evaluate(()=>document.querySelector('[data-admin-write-modal]').remove());
   }
-  await page.evaluate(()=>{const panel=document.getElementById('panel');panel.querySelector('.team-live-card').remove();mode='fail';panel.innerHTML=panel.innerHTML;});await page.waitForFunction(()=>document.querySelector('[data-team-live-status]').textContent.includes('недоступен'),{timeout:10000});
-  assert.equal(await page.locator('.team-live-card').count(),1);assert.equal(await page.locator('.team-photo-box').isVisible(),true);assert.ok(!(await page.locator('.team-live-card').textContent()).includes('Failed to fetch'));assert.ok(!(await page.locator('.team-live-card').textContent()).includes('Получаем сведения'));
+  await page.evaluate(()=>{const panel=document.getElementById('panel');panel.querySelector('.team-live-card').remove();mode='fail';panel.innerHTML=panel.innerHTML;});await page.waitForFunction(()=>document.querySelector('[data-team-live-status]').textContent.includes('Не удалось обновить'),{timeout:10000});
+  assert.equal(await page.locator('.team-live-card').count(),1);assert.equal(await page.locator('.team-live-player').count(),3);assert.ok(!(await page.locator('.team-live-card').textContent()).includes('Failed to fetch'));assert.ok(!(await page.locator('.team-live-card').textContent()).includes('Получаем сведения'));
   await page.evaluate(()=>{mode='good';});await page.locator('[data-team-live-refresh]').tap();await page.waitForSelector('.team-live-player');assert.equal(await page.locator('.team-live-card').count(),1);
   await page.evaluate(()=>window.dispatchEvent(new Event('royal:access-denied')));assert.equal(await page.locator('.team-live-card').count(),0);
   await page.close();

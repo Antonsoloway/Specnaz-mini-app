@@ -846,3 +846,25 @@ verification follows; native Telegram acceptance remains owner-side.
 ### 15.10.2026 — final card repair published and verified
 
 PR55 source ec12e88f1f5d36e741da8a31d84d883f441dcfb1 passed PR CI38640508561 and merged as 4dad9db717758ba5e67ffa19000a914e1d74e8e4. Main CI38682392058 PASS (all Node, workerd/isolation and three browser fixtures); Pages38682391614 build/deploy PASS. Public app.html, app-v0600.html, version-v0600.js, team-live-v061.js/css, team-emblems-v061.js, transport-v0514.js and admin-edit-ux-v061.js returned HTTP200 and matched reviewed merge source byte-for-byte. Entry marker confirmed20261015-v061-card-repair2. Missing-emblem title guard is live. No additional backend change in this follow-up. Native Telegram/device acceptance remains pending owner verification; automated browser checks do not claim native Telegram verification.
+
+
+## 15.10.2026 — RM cards: persistent saved data and background refresh
+
+Owner requested instant last-data rendering when reopening a linked team, followed
+by a background fetch and retention on network failure. Previously data survived
+only inside the same mounted card; recreating it showed the loading placeholder.
+team-live-v061.js now keeps up to100 successful cards per authenticated owner/mode
+in localStorage with a memory fallback. Identity includes game, CRM name and game
+team ID. No session token is persisted. Cache is shown only behind current session
+and current CRM binding; public/admin/users/changed IDs are isolated. Access denial
+clears saved data. Each open still revalidates over the existing protected route.
+Saved timestamp remains visible while updating and on transient failure. A stale
+server response cannot replace a newer saved timestamp. Storage denial/corruption
+is nonfatal; unlink removes the card. No polling or backend/Sheet changes.
+
+124Node checks PASS. Browser regressions PASS:320/390/768 layouts, editor/picker,
+emblems, plus actual page restart with a new session for the same user, immediate
+cache paint before unresolved fetch, background replacement, failed-refresh
+retention, user/mode/ID isolation,403/revocation purge, broken/disabled storage and
+unlink. New cache fixture is in the full CI workflow. Release marker
+20261015-v061-card-cache1. Publication/CI and native Telegram acceptance pending.
