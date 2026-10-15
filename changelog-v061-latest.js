@@ -3,7 +3,7 @@
   'use strict';
 
   const VERSION = '0.6.1';
-  const PATCH_VERSION = '0.6.1-changelog-latest.8';
+  const PATCH_VERSION = '0.6.1-changelog-latest.9';
   const CHANGE = 'В админском Журнале исправлен порядок записей: все события теперь принудительно сортируются по фактическому времени от новых к старым, независимо от источника записи и порядка, в котором данные пришли с сервера.';
 
   const AGENT_CHANGE = 'Добавлен отдельный админский модуль «Сосиска»: поиск команд Royal Match, выбор по описанию и лидеру, состав игроков, снимки, история изменений и управление отслеживанием.';
@@ -45,6 +45,9 @@
 
   const EMOJI_CHANGE='При привязке Royal Match эмодзи эмблемы автоматически добавляется вплотную перед названием команды, без пробела (🇷🇺FORTUNA). В редакторе уже привязанной команды эмодзи подставляется, если его ещё нет; название можно изменить вручную перед сохранением.';
   if (!section.changes.includes(EMOJI_CHANGE)) section.changes.unshift(EMOJI_CHANGE);
+
+  const EMBLEM_DISPLAY='Если у привязанной команды загрузилась игровая эмблема, начальный эмодзи в отображаемом названии скрывается: остаются эмблема и название. Без привязки или при недоступной эмблеме полное название с эмодзи сохраняется.';
+  if (!section.changes.includes(EMBLEM_DISPLAY)) section.changes.unshift(EMBLEM_DISPLAY);
 
   current.changes = current.sections.flatMap(item => Array.isArray(item?.changes) ? item.changes : []);
   window.RoyalChangelog0601 = current;

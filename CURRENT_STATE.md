@@ -904,3 +904,26 @@ PR57 merged9a6ac1fb1bf7cbdaa01d4d76654c57fed7855b7e after PR CI38684610520 PASS.
 ### Emoji no-space format — verified final rollout
 
 PR58 source5e373f5a13477a552adff5b0ccae20adc2aaf7c3 passed full PR CI38685163651; merged20a476318dada49230b350f712a7ef41fd9b0d8f. Main CI38685327283 and Pages build/deploy38685326817 PASS. Public app.html, app-v0601.html, app-v0600.html, team-live-v061.js, team-emblems-v061.js, version-v0600.js and changelog-v061-latest.js returned HTTP200 and matched reviewed source byte-for-byte. Final marker20261015-v061-emblem-emoji2 is live. Final owner format is 🇷🇺FORTUNA with zero separating spaces; internal team-name spaces remain. Existing linked-editor draft normalization and repeated picker selection are covered. No automatic CRM writes; normal Save persists the edited name. Native Telegram/device acceptance remains owner-side. Earlier follow-up-publication-pending note is superseded.
+
+
+## 15.10.2026 — hide name emoji only beside a loaded linked emblem
+
+Owner confirmed emoji prefill works in Telegram, then reported duplicate emoji +
+shield in participant membership pills and CRM team headings (2912/2913). Owner
+clarified the condition: only linked teams with an obtained avatar suppress the
+name prefix; unlinked teams retain their original emoji name.
+
+The shared emblem renderer now wraps only a leading emoji in a display span.
+CSS hides that span only after the actual image load succeeds. Raw textContent,
+datasets, full CRM names, editor values, routing and stored Sheet/cache data are
+unchanged. Public/admin team headings, membership pills, shared Sosiska names and
+live-card titles use this rule. Pending, unknown, failed images and unlinked/RK
+teams retain the prefix; image failure, unlink and auth clearing restore it.
+No extra game queries, polling or backend changes. Marker20261015-v061-emblem-display1.
+
+125Node checks and six browser fixtures PASS locally. New actual-image regression
+covers delayed/successful/broken images, public/admin headings, membership pills,
+Sosiska helper/live title, unlinked/RK/unknown fallback, unlink/revocation restore
+and unchanged textContent/data-team identity. Existing320/390/768 layouts, editor,
+picker, card cache and prefix tests PASS. Full CI/publication pending; native
+Telegram acceptance of this display adjustment remains owner-side.

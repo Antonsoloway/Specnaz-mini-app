@@ -13,12 +13,25 @@
   const emoji=logo=>valid(logo)?EMOJI[logo]:'';
   const hasEmojiPrefix=text=>/^[\p{Extended_Pictographic}\p{Regional_Indicator}♠♣]/u.test(String(text||'').trim());
   function emojiName(text,logo){const name=String(text||'').trim(),prefix=emoji(logo);if(hasEmojiPrefix(name))return name.replace(/^((?:\p{Extended_Pictographic}|\p{Regional_Indicator}|\p{Emoji_Modifier}|[\uFE0E\uFE0F\u200D\u{E0020}-\u{E007F}])+)\s+/u,'$1');return prefix&&name?prefix+name:name;}
+  const PREFIX=/^\s*(?:(?:\p{Extended_Pictographic}|\p{Regional_Indicator}|\p{Emoji_Modifier}|[\uFE0E\uFE0F\u200D\u{E0020}-\u{E007F}])+\s*)+/u;
+  // Keep original textContent/CRM identity intact. Only the visual prefix is hidden,
+  // and only while a corresponding image has actually loaded successfully.
+  function label(text){const raw=String(text??''),prefix=raw.match(PREFIX)?.[0];return prefix&&raw.slice(prefix.length).trim()?'<span class="rm-team-emoji-prefix">'+esc(prefix)+'</span>'+esc(raw.slice(prefix.length)):esc(raw);}
+  function wrapPrefix(node){
+    if(node.querySelector('.rm-team-emoji-prefix'))return;
+    const first=n=>{for(const child of n.childNodes){if(child.nodeType===3&&child.textContent.trim())return child;if(child.nodeType===1&&!child.matches('.rm-team-emblem')){const found=first(child);if(found)return found;}}};
+    const text=first(node),prefix=text?.textContent.match(PREFIX)?.[0];if(!prefix||!text.textContent.slice(prefix.length).trim())return;
+    const span=document.createElement('span');span.className='rm-team-emoji-prefix';span.textContent=prefix;text.splitText(prefix.length);text.replaceWith(span);
+  }
+  function loaded(img){if(img.matches?.('.rm-team-emblem')&&img.complete&&img.naturalWidth>0){img.hidden=false;img.dataset.rmLoaded='1';}}
+  document.addEventListener('load',event=>loaded(event.target),true);
+  document.addEventListener('error',event=>{const img=event.target;if(img.matches?.('.rm-team-emblem')){delete img.dataset.rmLoaded;img.hidden=true;}},true);
   const logos=new Map(),cache=new Map(),pending=new Map(),queue=[];
   let queued=new WeakSet();
   let active=0,generation=0,scheduled=false,permitted=true,lastSession=session();
   function remember(id,logo){if(typeof id!=='string'||!valid(logo))return;if(logos.size>=250&&!logos.has(id))logos.delete(logos.keys().next().value);logos.set(id,logo);schedule();}
   function image(logo){return valid(logo)?'<img class="rm-team-emblem" src="assets/rm-emblems/'+logo+'.webp" width="32" height="34" alt="" aria-hidden="true" loading="lazy" decoding="async" data-rm-logo="'+logo+'">':'';}
-  function name(text,id,logo){if(valid(logo))remember(id,logo);return '<span class="rm-team-name"'+(typeof id==='string'?' data-rm-team-id="'+esc(id)+'"':'')+'>'+image(valid(logo)?logo:logos.get(id))+esc(text)+'</span>';}
+  function name(text,id,logo){if(valid(logo))remember(id,logo);return '<span class="rm-team-name"'+(typeof id==='string'?' data-rm-team-id="'+esc(id)+'"':'')+'>'+image(valid(logo)?logo:logos.get(id))+label(text)+'</span>';}
   async function fetchLive(record,admin=false,refresh=false,metadataOnly=false){
     const token=session(),epoch=generation;if(!permitted||!token)throw Error('SESSION_MISSING');
     const key=JSON.stringify([token,admin,record.name,record.gameTeamId]);const old=cache.get(key);
@@ -50,8 +63,8 @@
   function find(ref,admin){const matches=records(admin).filter(t=>t.name===ref.name&&(!ref.game||t.game===ref.game));return matches.length===1&&matches[0].game==='Royal Match'&&matches[0].gameTeamId?matches[0]:null;}
   function insert(node,logo){
     if(!valid(logo)||!node?.isConnected)return;
-    const old=node.querySelector(':scope > .rm-team-emblem');if(old?.dataset.rmLogo===String(logo))return;old?.remove();
-    node.insertAdjacentHTML('afterbegin',image(logo));node.classList.add('rm-team-name');
+    wrapPrefix(node);const old=node.querySelector(':scope > .rm-team-emblem');if(old?.dataset.rmLogo===String(logo)){loaded(old);return;}old?.remove();
+    node.insertAdjacentHTML('afterbegin',image(logo));node.classList.add('rm-team-name');loaded(node.querySelector(':scope > .rm-team-emblem'));
   }
   function pump(){while(active<2&&queue.length){const job=queue.shift();if(!job.node.isConnected||job.epoch!==generation){queued.delete(job.node);continue;}active++;
     fetchLive(job.record,job.admin,false,true).then(p=>{if(job.epoch===generation&&job.node.isConnected){const current=find({name:job.record.name,game:'Royal Match'},job.admin);if(current?.gameTeamId===job.record.gameTeamId)insert(job.node,logoOf(p.data));}}).catch(()=>{}).finally(()=>{queued.delete(job.node);active--;pump();});}}
@@ -74,6 +87,6 @@
   for(const type of ['royal:access-denied','royal:fatal'])window.addEventListener(type,()=>clear(false));
   window.addEventListener('royal:auth-ready',()=>{clear(true);lastSession=session();schedule();});
   window.RoyalAdminDataV0600?.subscribe?.(e=>{if(e.type==='clear'&&['unauthorized','forbidden','session-changed'].includes(e.reason))clear(false);else schedule();});
-  window.RoyalTeamEmblems={version:'1.1.0',valid,logoOf,image,name,emoji,emojiName,hasEmojiPrefix,remember,fetchLive,decorate};
+  window.RoyalTeamEmblems={version:'1.2.0',valid,logoOf,image,name,label,emoji,emojiName,hasEmojiPrefix,remember,fetchLive,decorate};
   new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true});schedule();
 })();
