@@ -20,3 +20,12 @@
 .sosiska-profile-stat>span svg{display:block;width:48px;height:48px;margin:auto;filter:drop-shadow(0 2px 1px #b2a483)}.sosiska-profile-avatar svg{width:42px;height:42px;display:block;margin:auto}.sosiska-profile-identity p{font-size:12px}
 
 .sosiska-hour-cell{cursor:pointer;font:inherit;color:inherit;width:100%;margin:0}.sosiska-hour-cell[aria-pressed="true"]{outline:3px solid #38bdf8;outline-offset:2px}.sosiska-table-scroll{overflow:auto;max-height:55vh}.sosiska-hour-days table{width:100%;border-collapse:collapse;font-size:.85rem}.sosiska-hour-days th,.sosiska-hour-days td{padding:.6rem .4rem;text-align:right;border-bottom:1px solid #365064;white-space:nowrap}.sosiska-hour-days th:first-child,.sosiska-hour-days td:first-child{text-align:left}.sosiska-export{margin:1rem 0}.sosiska-export input{max-width:100%;box-sizing:border-box}
+
+/* Membership history: colour plus a readable status, never colour alone. */
+.sosiska-screen .sosiska-member.is-new,.sosiska-screen .sosiska-player.is-new{border:2px solid #49d48a;background:linear-gradient(130deg,#123c30,#142830)}
+.sosiska-screen .sosiska-member.is-left,.sosiska-screen .sosiska-player.is-left{border:2px solid #f1767f;background:linear-gradient(130deg,#48212c,#252332)}
+.sosiska-screen .sosiska-membership-badge{display:inline-block;border-radius:8px;padding:4px 8px;margin:6px 0;color:#b7ffd5;background:#125139;font-size:14px;font-weight:700}
+.sosiska-screen .is-left .sosiska-membership-badge{color:#ffd1d5;background:#702c3a}
+.sosiska-membership-events{padding-left:20px;overflow-wrap:anywhere}.sosiska-membership-events li{margin:10px 0}.sosiska-membership-history h4{overflow-wrap:anywhere}
+
+.sosiska-screen .sosiska-member.is-new,.sosiska-screen .sosiska-member.is-left{padding:10px 12px;border-radius:12px;margin:10px 0}

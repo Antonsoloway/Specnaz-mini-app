@@ -932,3 +932,32 @@ Telegram acceptance of this display adjustment remains owner-side.
 ### Conditional emblem/emoji display — verified rollout
 
 PR59 source92304daeaaff5dbf861ceebd5a6194eb64723eb9 passed full PR CI38686868912, merged4f0c091d507aeeb4d0421bb01b2e21172358d844. Main CI38687027724 and Pages build/deploy38687027395 PASS. Eight public entry/module/CSS/changelog files returned HTTP200 and matched reviewed source byte-for-byte. Final marker20261015-v061-emblem-display1 is live. Only linked teams with a successfully loaded actual emblem suppress the display prefix; raw names, editor values, routing and unlinked/failure fallbacks retain the emoji. All six browser fixtures and125Node checks PASS. No backend/data mutation. Native Telegram acceptance of this display change remains owner-side; previous emoji-prefill acceptance was confirmed by owner. Earlier publication-pending note is superseded.
+
+
+## 15.10.2026 — Sosiska all-time newcomers and departed players
+
+Owner requested «Выбывшие»/«Новенькие» controls for every membership change over
+all stored observation history, and red/green roster marking. Existing adjacent-
+snapshot joins/exits already used UserId but had no dedicated UI/date event log.
+The streaming accumulator now optionally records membership intervals, baseline
+identity, first/last observation and latest known member fields. Full-history
+frontend opts in; default server/AI statistics payload remains unchanged, with
+a regression guarding against membership-event payload inflation. No D1 migration,
+new writes/watch jobs, external provider, Apps Script or bot change.
+
+Buttons show unique player counts after complete pagination; each list retains
+all observed entries/exits and interval dates, including newcomers who later left
+and players who returned. Baseline-only members are not newcomers; same-name
+players remain separate by UserId. Current newcomers/returnees are green; absent
+historical members appear separately in red without inflating current roster
+counts. Historical player click opens recorded activity, not a current-roster
+profile lookup. Current live membership determines present/absent UI status.
+Date labels explicitly mean changes observed between checks, not exact departure
+times; left vs excluded is not inferred. Partial/gapped history is marked as such.
+A manual capture refreshes team+period, preserving the chosen roster/history tab.
+
+127Node checks PASS. New browser regression at320/390/768 with all actual entry
+CSS covers multi-page history, joins/exits/returns, same names, baseline, red/green
+roster, historical drilldown, reopen without duplicates, empty/gapped history and
+zero overflow. Full CI/publication pending; native Telegram acceptance owner-side.
+Marker20261015-v061-membership1; current version0.6.1 patch.

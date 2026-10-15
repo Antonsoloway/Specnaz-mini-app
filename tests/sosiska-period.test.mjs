@@ -41,3 +41,22 @@ test('comparison uses overlap and excludes boundary intervals, not lifetime tota
 test('large histories remain bounded without losing all-period totals',()=>{
  const a=createPeriodAccumulator('1');for(let n=1100;n>0;n--)a.add(record(n,[m('A',n)]));const r=a.result();assert.ok(r.series.length<=512);assert.equal(r.series.reduce((n,p)=>n+p.levels,0),1099);assert.equal(r.players[0].hourly.reduce((n,h)=>n+h.levels,0),1099);
 });
+
+test('membership history spans all pages, records interval dates and preserves returning player identity',()=>{
+ const a=createPeriodAccumulator('1',{membershipHistory:true});
+ const same=id=>({...m(id,100),Name:'Same name'});
+ const snapshots=[record(6,[same('A'),same('C')]),record(5,[same('A')]),record(4,[same('B')]),record(3,[same('A'),same('B')]),record(2,[same('A'),same('B')]),record(1,[same('A')])];
+ snapshots.slice(0,2).forEach(a.add);const partial=a.result();assert.equal(partial.complete,false);
+ snapshots.slice(2).forEach(a.add);const r=a.result(),by=id=>r.players.find(p=>p.userId===id);
+ assert.equal(r.complete,true);assert.equal(r.players.length,3);
+ assert.equal(by('A').baseline,true);assert.equal(by('A').joined,1);assert.equal(by('A').left,1);assert.equal(by('A').current,true);
+ assert.deepEqual(by('A').membershipEvents.map(e=>e.type),['left','joined']);
+ assert.deepEqual(by('A').membershipEvents[0],{type:'left',from:record(3,[]).snapshot.capturedAt,to:record(4,[]).snapshot.capturedAt});
+ assert.equal(by('B').baseline,false);assert.equal(by('B').joined,1);assert.equal(by('B').left,1);assert.equal(by('B').current,false);
+ assert.equal(by('C').baseline,false);assert.equal(by('C').joined,1);assert.equal(by('C').left,0);assert.equal(by('C').current,true);
+ assert.equal(by('B').firstSeenAt,record(2,[]).snapshot.capturedAt);assert.equal(by('B').lastSeenAt,record(4,[]).snapshot.capturedAt);assert.equal(by('B').lastMember.UserId,'B');
+ r.players[0].membershipEvents[0].type='tampered';assert.notEqual(a.result().players[0].membershipEvents[0].type,'tampered');
+ const single=createPeriodAccumulator('1',{membershipHistory:true});single.add(record(1,[same('A')]));assert.equal(single.result().players[0].joined,0);assert.deepEqual(single.result().players[0].membershipEvents,[]);assert.equal(single.result().players[0].baseline,true);
+});
+
+test('membership event detail is opt-in and does not inflate existing AI period payloads',()=>{const a=createPeriodAccumulator('1');a.add(record(1,[m('A',100)]));const p=a.result().players[0];assert.equal('membershipEvents' in p,false);assert.equal('lastMember' in p,false);});
