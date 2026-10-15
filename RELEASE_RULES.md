@@ -226,3 +226,5 @@ RM name prefix uses only validated numeric catalogue identity. Preserve manual
 prefixes and typing; never overwrite a changed game, ID, session or closed form
 from a late response. Auto-prefill is a draft edit; only normal Save persists it.
 Unknown logos and RK have no inferred prefix; no mass renaming on data load.
+
+Owner format correction15.10.2026: no separator between team emoji and name (🇷🇺FORTUNA). Preserve spaces inside the actual team name.

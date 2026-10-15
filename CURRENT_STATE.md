@@ -894,3 +894,8 @@ slow-response typing/ID races, RK, picker and unknown IDs. Actual Android/iPhone
 picker fixture now asserts prefixed selection. Other card/cache/emblem fixtures
 PASS. Full CI/publication pending; native Telegram acceptance remains owner-side.
 Release marker20261015-v061-emblem-emoji1.
+
+
+### Emoji rollout and owner correction: no separating space
+
+PR57 merged9a6ac1fb1bf7cbdaa01d4d76654c57fed7855b7e after PR CI38684610520 PASS. Main CI38684751635 and Pages38684751554 PASS. Seven public entry/module/changelog files matched reviewed source byte-for-byte. Owner then explicitly clarified: no space between emoji and name, exactly 🇷🇺FORTUNA. This supersedes the earlier spaced example. Auto-prefill now joins prefix directly to name and removes spacing after an existing leading emoji when initializing an untouched linked editor; manual symbol and internal name spacing remain intact. Tests cover new/existing prefix, repeated bind and internal name spaces. Marker20261015-v061-emblem-emoji2; full follow-up CI/publication pending.
