@@ -846,3 +846,8 @@ Release marker20261015-v061-emblem-emoji1.
 ### Emoji rollout and owner correction: no separating space
 
 PR57 merged9a6ac1fb1bf7cbdaa01d4d76654c57fed7855b7e after PR CI38684610520 PASS. Main CI38684751635 and Pages38684751554 PASS. Seven public entry/module/changelog files matched reviewed source byte-for-byte. Owner then explicitly clarified: no space between emoji and name, exactly 🇷🇺FORTUNA. This supersedes the earlier spaced example. Auto-prefill now joins prefix directly to name and removes spacing after an existing leading emoji when initializing an untouched linked editor; manual symbol and internal name spacing remain intact. Tests cover new/existing prefix, repeated bind and internal name spaces. Marker20261015-v061-emblem-emoji2; full follow-up CI/publication pending.
+
+
+### Emoji no-space format — verified final rollout
+
+PR58 source5e373f5a13477a552adff5b0ccae20adc2aaf7c3 passed full PR CI38685163651; merged20a476318dada49230b350f712a7ef41fd9b0d8f. Main CI38685327283 and Pages build/deploy38685326817 PASS. Public app.html, app-v0601.html, app-v0600.html, team-live-v061.js, team-emblems-v061.js, version-v0600.js and changelog-v061-latest.js returned HTTP200 and matched reviewed source byte-for-byte. Final marker20261015-v061-emblem-emoji2 is live. Final owner format is 🇷🇺FORTUNA with zero separating spaces; internal team-name spaces remain. Existing linked-editor draft normalization and repeated picker selection are covered. No automatic CRM writes; normal Save persists the edited name. Native Telegram/device acceptance remains owner-side. Earlier follow-up-publication-pending note is superseded.
