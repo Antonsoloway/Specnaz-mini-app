@@ -30,6 +30,7 @@ const root=path.resolve(__dirname,'..');
  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:b.x+b.width*.4,y:cy},{x:b.x+b.width*.6,y:cy}]});
  await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:b.x+b.width*.25,y:cy},{x:b.x+b.width*.75,y:cy}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});assert.notEqual(await read(),initial);
  await chart.locator('[data-chart-action="reset"]').click();
+ await page.locator('.sosiska-period-roster > summary').click();
  await page.locator('[data-sosiska-action="player"][data-player-id="p"]').click();const player=page.locator('.sosiska-player-detail .sosiska-chart');assert.equal(await player.count(),1);await player.locator('[data-chart-action="in"]').click();assert.match(await player.locator('[data-chart-range]').textContent(),/×2$/);
  await page.locator('[data-sosiska-action="player"][data-player-id="q"]').click();assert.equal(await page.locator('.sosiska-player-detail').count(),1);assert.match(await page.locator('.sosiska-player-detail [data-chart-range]').textContent(),/×1$/);
  await page.locator('.sosiska-player-detail .sosiska-chart').screenshot({path:'/tmp/sosiska-zoom-mobile.png'});

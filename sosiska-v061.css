@@ -29,3 +29,20 @@
 .sosiska-membership-events{padding-left:20px;overflow-wrap:anywhere}.sosiska-membership-events li{margin:10px 0}.sosiska-membership-history h4{overflow-wrap:anywhere}
 
 .sosiska-screen .sosiska-member.is-new,.sosiska-screen .sosiska-member.is-left{padding:10px 12px;border-radius:12px;margin:10px 0}
+
+/* Compact hourly profile: override shared game/admin button padding and wrapping. */
+.sosiska-screen .sosiska-hour-unit{font-size:12px;color:#c7ddeb;margin-top:12px}
+.sosiska-screen .sosiska-hour-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:7px 0}
+.sosiska-screen .sosiska-hour-grid .sosiska-hour-cell{box-sizing:border-box;min-width:0;min-height:0!important;height:50px!important;margin:0!important;padding:5px 2px!important;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;line-height:1.1;box-shadow:none}
+.sosiska-screen .sosiska-hour-cell b,.sosiska-screen .sosiska-hour-cell span{display:block;box-sizing:border-box;min-width:0;max-width:100%;margin:0;white-space:nowrap!important;word-break:normal!important;overflow-wrap:normal!important;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.sosiska-screen .sosiska-hour-cell b{font-size:11px;line-height:1.1}
+.sosiska-screen .sosiska-hour-cell span{font-size:13px;line-height:1.1}
+.sosiska-screen .sosiska-hour-key{font-size:12px;line-height:1.4;margin:8px 0}
+@media(min-width:600px){.sosiska-screen .sosiska-hour-grid{grid-template-columns:repeat(6,minmax(0,1fr))}}
+.sosiska-screen .sosiska-disclosure{margin:16px 0;border:1px solid #3e586a;border-radius:12px;padding:12px;min-width:0}
+.sosiska-screen .sosiska-disclosure>summary{cursor:pointer;font-weight:700;line-height:1.4;overflow-wrap:anywhere}
+.sosiska-screen .sosiska-analysis{white-space:normal;line-height:1.55;font-size:15px;overflow-wrap:anywhere;min-width:0}
+.sosiska-screen .sosiska-analysis h4{font-size:17px;margin:18px 0 8px;color:#d7ecfa}
+.sosiska-screen .sosiska-analysis p{margin:10px 0}.sosiska-screen .sosiska-analysis ul{padding-left:22px;margin:10px 0}.sosiska-screen .sosiska-analysis li{margin:8px 0}
+.sosiska-screen .sosiska-report-row{display:grid;grid-template-columns:minmax(0,1fr);gap:3px;margin:12px 0;padding:10px;border-radius:8px;background:#102330}
+.sosiska-screen .sosiska-report-row dt{font-size:12px;color:#a9c1d0;margin-top:8px}.sosiska-screen .sosiska-report-row dt:first-child{margin-top:0}.sosiska-screen .sosiska-report-row dd{margin:0;overflow-wrap:anywhere}

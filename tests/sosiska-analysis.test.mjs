@@ -49,3 +49,15 @@ test('exhausted provider retries stop after five attempts and preserve history c
 test('selected teams analysis includes only chosen IDs and preserves duplicate scope',async()=>{
  const s=setup({'1':2,'2':2,'3':2});const j=await s.make().start(undefined,['1','3']);assert.equal((await s.make().start(undefined,['3','1'])).jobId,j.jobId);const done=await finish(s,j.jobId);assert.equal(done.scope,'selected');assert.deepEqual(done.teams.map(t=>t.teamId),['1','3']);assert.equal(s.calls.some(b=>b.operation==='list'),false);
 });
+
+test('final display contract uses readable Russian terms and explicit Moscow boundaries without losing IDs',async()=>{
+ let body;const input={teamId:'fixture-id',teamName:'TeamName',from:'2026-10-12T22:30:00Z',to:'2026-10-13T00:30:00Z',period:{players:[{userId:'123',name:'Same',levelGain:3}]}};
+ const result=await requestSosiskaAnalysis({input,task:'final',format:'report',env,fetchAI:async(_,init)=>{body=JSON.parse(init.body);return Response.json({choices:[{finish_reason:'stop',message:{content:'## Коротко\nПодтверждён прирост.'}}]});}});
+ const payload=JSON.parse(body.messages[1].content);assert.equal(payload.display.timeZone,'Europe/Moscow');assert.equal(payload.display.periods[0].fromMsk,'13.10.2026, 01:30');assert.equal(payload.display.periods[0].toMsk,'13.10.2026, 03:30');assert.equal(payload.period.players[0][payload.period.playerColumns.indexOf('userId')],'123');
+ assert.match(body.messages[0].content,/простым русским языком/);assert.match(body.messages[0].content,/Без таблиц/);assert.match(body.messages[0].content,/не добавляй даты вне периода/);assert.match(body.messages[0].content,/Не придумывай лиги/);assert.equal(result.presentationVersion,1);
+ let notes;await requestSosiskaAnalysis({input,task:'intermediate',env,fetchAI:async(_,init)=>{notes=JSON.parse(init.body);return Response.json({choices:[{finish_reason:'stop',message:{content:'Internal ID retained'}}]});}});assert.doesNotMatch(notes.messages[0].content,/Это финальный отчёт/);assert.equal(JSON.parse(notes.messages[1].content).display,undefined);
+});
+test('one-team overview reuses the final full-period report instead of another ungrounded rewrite',async()=>{
+ const s=setup({'1':3});const job=await s.make().start('1'),done=await finish(s,job.jobId);
+ assert.equal(done.summary.text,done.teams[0].text);assert.equal(done.teams[0].period.snapshotCount,3);assert.equal(done.summary.period,undefined);assert.equal(s.inputs.filter(x=>x.period).length,1);assert.equal(s.inputs.some(x=>Array.isArray(x.teams)),false);
+});

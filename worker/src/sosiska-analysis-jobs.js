@@ -88,7 +88,7 @@ export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=request
     if(t.summaries===1) {
       const report=await storage.get(key(j,`summary:${t.teamId}:${t.level}:0`));
       const period=await periodStats(j,t);
-      const final=await analyze({input:{period,teamId:t.teamId,teamName:t.name,from:t.from,to:t.to,snapshotCount:t.count,complete:t.complete,analysis:report},task:'Ответ до 450 слов, с выводами и ведущими игроками; не повторяй полный список счётчиков. Составь итоговый анализ ВСЕЙ истории этой команды. Охват задан явно. Опиши динамику по времени, игроков, изменения состава и неопределённости. Один снимок не даёт динамики; прямо сообщи это.',env});
+      const final=await analyze({format:'report',input:{period,teamId:t.teamId,teamName:t.name,from:t.from,to:t.to,snapshotCount:t.count,complete:t.complete,analysis:report},task:'Ответ до 450 слов, с выводами и ведущими игроками; не повторяй полный список счётчиков. Составь итоговый анализ ВСЕЙ истории этой команды. Охват задан явно. Опиши динамику по времени, игроков, изменения состава и неопределённости. Один снимок не даёт динамики; прямо сообщи это.',env});
       await storage.put(key(j,`report:${t.teamId}`),{...final,period});await nextTeam(j);return;
     }
     const batch=[];let chars=0;
@@ -99,8 +99,14 @@ export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=request
   }
   async function nextTeam(j){j.teamIndex++;j.phase=j.teamIndex<j.teams.length?'fetch':'overall';}
   async function overall(j) {
+    if(j.scope==='team'&&j.teams.length===1){
+      // Reuse the final report already grounded in full-period statistics.
+      const {period:verifiedStats,...report}=await storage.get(key(j,`report:${j.teams[0].teamId}`));
+      await storage.put(key(j,'overall'),report);
+      j.state='done';j.completedAt=new Date(now()).toISOString();return;
+    }
     const teams=[];for(const t of j.teams)teams.push({teamId:t.teamId,teamName:t.name,count:t.count,from:t.from,to:t.to,report:(await storage.get(key(j,`report:${t.teamId}`)))?.text});
-    const report=await analyze({input:{scope:j.scope,teams},task:j.scope==='team'?'Ответ до 400 слов. Подведи итог полной истории только этой команды: динамика, темп, вклад игроков, состав и ограничения наблюдений.': 'Ответ до 400 слов. Сделай сравнительный итог по ВСЕМ командам и их полной истории: динамика, темп, вклад игроков, состав, отличия периодов и ограничения сравнения. Не сравнивай разную длительность как равную. Не пропускай команды без снимков, отметь нехватку данных.',env});
+    const report=await analyze({format:'report',input:{scope:j.scope,teams},task:j.scope==='team'?'Ответ до 400 слов. Подведи итог полной истории только этой команды: динамика, темп, вклад игроков, состав и ограничения наблюдений.': 'Ответ до 400 слов. Сделай сравнительный итог по ВСЕМ командам и их полной истории: динамика, темп, вклад игроков, состав, отличия периодов и ограничения сравнения. Не сравнивай разную длительность как равную. Не пропускай команды без снимков, отметь нехватку данных.',env});
     await storage.put(key(j,'overall'),report);j.state='done';j.completedAt=new Date(now()).toISOString();
   }
   async function step() {
