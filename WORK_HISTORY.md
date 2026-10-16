@@ -1,6 +1,6 @@
-## 2026-10-16 — Agent tile self-diagnostics prepared
+## 2026-10-16 — Agent tile self-diagnostics published
 
-The admin home card now shows a server-verified game level and short-lived online/offline/busy state. A fresh game Ping is required for green; configured health alone is insufficient. Card reads stop outside the visible home view, expire after90 seconds, preserve the last known level on failure, and clear on session/access changes. The generic card/status projection supports future agents without adding placeholders. Credentials remain behind the existing admin authorization. Source validation and live publication are tracked in docs/sosiska/AGENT_STATUS_20261016.md.
+The admin home card now shows a server-verified game level and short-lived online/offline/busy state. A fresh game Ping is required for green; configured health alone is insufficient. Card reads stop outside the visible home view, expire after90 seconds, preserve the last known level on failure, and clear on session/access changes. The generic card/status projection supports future agents without adding placeholders. Credentials remain behind the existing admin authorization. CI/Pages/Worker Builds passed; the deployed agent independently confirmed online and level14800. Source validation and live publication are tracked in docs/sosiska/AGENT_STATUS_20261016.md.
 
 ## 2026-09-12 — Owner ingress resilience installed; behavioral acceptance pending
 
