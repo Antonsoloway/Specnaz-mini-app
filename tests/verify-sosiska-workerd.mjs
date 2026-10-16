@@ -21,6 +21,8 @@ const options={rootPath:dirname(scriptPath),name:'sosiska-fixture',modules:true,
   const b=await request.json();
   if(u.hostname==='api.groq.com')return Response.json({choices:[{finish_reason:'stop',message:{content:'Fixture whole-history analysis'}}]});
   if(u.hostname==='specnaz-royal-match-agent-stage1.specnaz-sosiska.workers.dev') {
+    if(b.operation==='health')return Response.json({ok:true,data:{networkEnabled:true,sessionConfigured:true}});
+    if(b.operation==='diagnostics')return Response.json({ok:true,data:{online:true,level:14800,maxLevel:14800,checkedAt:new Date().toISOString()}});
     assert.ok(['list','history'].includes(b.operation));
     if(b.operation==='list')return Response.json({ok:true,data:{watches:[{teamId:'1',enabled:true}]}});
     const records=[record(3),record(2),record(1)].filter(r=>r.sequence<(b.before??Infinity)).slice(0,b.limit);
@@ -33,6 +35,7 @@ const invoke=async body=>{const r=await mf.dispatchFetch('https://miniapp.test/a
 try {
   mf=new Miniflare(convertV4MiniflareOptions?{...convertV4MiniflareOptions(options),resourcePersistencePath:persist}:options);
   const denied=await mf.dispatchFetch('https://miniapp.test/admin-agent',{method:'POST',headers:{Authorization:'Bearer forged','Content-Type':'application/json'},body:'{"operation":"analysis"}'});assert.equal(denied.status,401);
+  const status=await invoke({operation:'status'});assert.equal(status.agents[0].status,'online');assert.equal(status.agents[0].level,14800);assert.equal(status.agents[0].levelVerified,true);
   const job=await invoke({operation:'analysis',teamId:'1'});assert.equal(job.state,'running');
   await mf.dispose();mf=new Miniflare(convertV4MiniflareOptions?{...convertV4MiniflareOptions(options),resourcePersistencePath:persist}:options);
   assert.equal((await invoke({operation:'analysisStatus',jobId:job.jobId})).jobId,job.jobId);
@@ -42,5 +45,5 @@ try {
   const timeline=await invoke({operation:'analysisTimeline',jobId:job.jobId,teamId:'1',limit:20});assert.equal(timeline.points.length,3);assert.equal(timeline.points.at(-1).sequence,1);
   await mf.dispose();mf=new Miniflare(convertV4MiniflareOptions?{...convertV4MiniflareOptions(options),resourcePersistencePath:persist}:options);
   assert.equal((await invoke({operation:'analysisStatus'})).state,'done');
-  console.log(JSON.stringify({checks:5,sqliteAlarms:'pass',coldStart:'pass',fullHistory:'3/3',outboundHosts:[...new Set(calls)],liveNetworkCalls:0}));
+  console.log(JSON.stringify({checks:6,gameDiagnostics:'pass',sqliteAlarms:'pass',coldStart:'pass',fullHistory:'3/3',outboundHosts:[...new Set(calls)],liveNetworkCalls:0}));
 }finally{await mf?.dispose();await rm(persist,{recursive:true,force:true});}

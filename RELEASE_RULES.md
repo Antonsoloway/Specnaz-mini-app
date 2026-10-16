@@ -279,3 +279,8 @@ or infer unobserved leagues/bonuses/exact activity times. Model output is escape
 before optional markup rendering. Legacy report text is retained. Full-period
 roster starts collapsed; player/hour details and metric state remain usable.
 Hour labels and numeric rates must remain unbroken under the complete app CSS.
+
+
+### Agent self-diagnostics
+
+Agent cards remain admin-only. Green online requires a successful game-server read no older than90 seconds; configured health is not proof. Busy queues must not be reported as offline. Connection failures preserve only the last confirmed level, mark it unverified, and clear green. Refresh only while the card is visible; reject late responses after session/access changes. The public-safe status registry contains agent IDs/game/level/state/times only, never credentials or arbitrary upstream URLs.

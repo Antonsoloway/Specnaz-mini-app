@@ -1,4 +1,5 @@
 import {prepareHistoryExport} from './sosiska-export.js';
+import {readSosiskaStatus} from './agent-status.js';
 // Browser receives game data only. Agent credentials never leave this facade.
 const AGENT_ORIGIN = 'https://specnaz-royal-match-agent-stage1.specnaz-sosiska.workers.dev';
 const id = value => typeof value === 'string' && /^[1-9]\d{0,18}$/.test(value) && BigInt(value) <= 9223372036854775807n;
@@ -6,7 +7,7 @@ const object = value => value !== null && typeof value === 'object' && !Array.is
 const invalid = () => { throw Object.assign(new Error('INVALID_REQUEST'), {status:400}); };
 export function validateAgentAction(body) {
   if (!object(body)) invalid();
-  const keys = {prepareExport:['teamId','from','to'],profile:['userId'],health:[],search:['query'],team:['teamId'],list:[],watch:['teamId','intervalMinutes'],unwatch:['teamId'],capture:['teamId'],history:['teamId','limit','before'],analysis:['teamId','teamIds'],analysisStatus:['jobId','teamId','teamIds'],analysisTimeline:['jobId','teamId','limit','before']}[body.operation];
+  const keys = {status:[],prepareExport:['teamId','from','to'],profile:['userId'],health:[],search:['query'],team:['teamId'],list:[],watch:['teamId','intervalMinutes'],unwatch:['teamId'],capture:['teamId'],history:['teamId','limit','before'],analysis:['teamId','teamIds'],analysisStatus:['jobId','teamId','teamIds'],analysisTimeline:['jobId','teamId','limit','before']}[body.operation];
   if (!Array.isArray(keys) || Object.keys(body).some(k => !['operation',...keys].includes(k))) invalid();
   if(keys.includes('userId')&&!id(body.userId))invalid();
   if (keys.includes('teamId') && !(['analysis','analysisStatus'].includes(body.operation) && body.teamId===undefined) && !id(body.teamId)) invalid();
@@ -60,6 +61,7 @@ export function createSosiskaApi({authorizeAdmin,fetchAgent=fetch,fetchAI=fetch}
       }
       if(body.operation==='prepareExport')return json({ok:true,data:await prepareHistoryExport(request,env,body)});
       const invoke = (operation,payload={}) => call('/v1/invoke',{protocolVersion:1,operation,payload});
+      if(body.operation==='status')return json({ok:true,data:{agents:[await readSosiskaStatus(invoke)]}});
       if(body.operation==='search') {
         const variants=queryVariants(body.query),candidates=new Map(),warnings=[];
         const add=(row,source)=>{
