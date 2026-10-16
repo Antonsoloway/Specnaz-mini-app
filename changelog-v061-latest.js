@@ -3,7 +3,7 @@
   'use strict';
 
   const VERSION = '0.6.1';
-  const PATCH_VERSION = '0.6.1-changelog-latest.13';
+  const PATCH_VERSION = '0.6.1-changelog-latest.14';
   const CHANGE = 'В админском Журнале исправлен порядок записей: все события теперь принудительно сортируются по фактическому времени от новых к старым, независимо от источника записи и порядка, в котором данные пришли с сервера.';
 
   const AGENT_CHANGE = 'Добавлен отдельный админский модуль «Сосиска»: поиск команд Royal Match, выбор по описанию и лидеру, состав игроков, снимки, история изменений и управление отслеживанием.';
@@ -68,6 +68,9 @@
 
   const TEAM_LOADING='Ожидание сведений о команде ограничено целиком, включая чтение ответа и повтор. Зависший запрос больше не удерживает обновление остальных карточек. При занятой игровой сессии появляется отдельное сообщение; сохранённые данные остаются, кнопка обновления снова доступна.';
   if (!section.changes.includes(TEAM_LOADING)) section.changes.unshift(TEAM_LOADING);
+
+  const AGENT_STATUS='На карточке агента Сосиска показаны подтверждённый игровой уровень и состояние связи: онлайн, офлайн или занят. Самодиагностика обновляется автоматически; последний известный уровень сохраняется при временном отсутствии связи.';
+  if (!section.changes.includes(AGENT_STATUS)) section.changes.unshift(AGENT_STATUS);
 
   current.changes = current.sections.flatMap(item => Array.isArray(item?.changes) ? item.changes : []);
   window.RoyalChangelog0601 = current;

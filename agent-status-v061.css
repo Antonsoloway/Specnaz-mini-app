@@ -1,0 +1,9 @@
+.tile .agent-self-status{display:flex;flex-direction:column;gap:4px;margin-top:12px;line-height:1.3;min-width:0}
+.tile .agent-self-level,.tile .agent-self-state{display:block;font-size:13px;font-weight:550;white-space:nowrap;line-height:1.3}
+.tile .agent-self-level{color:#d7e5f1;font-variant-numeric:tabular-nums}
+.tile .agent-self-status[data-level-verified="false"] .agent-self-level{opacity:.7}
+.tile .agent-self-state{display:inline-flex;align-items:center;gap:6px;color:#aebdca}
+.tile .agent-self-state::before{content:"";display:block;width:7px;height:7px;flex:0 0 7px;border-radius:50%;background:currentColor}
+.tile .agent-self-state[data-state="online"]{color:#61df97}
+.tile .agent-self-state[data-state="offline"]{color:#ff9292}
+.tile .agent-self-state[data-state="busy"]{color:#f3c56e}
