@@ -14,6 +14,12 @@ export async function readSosiskaStatus(invoke,now=Date.now){
    .filter(x=>level(x.level)&&x.at).sort((a,b)=>Date.parse(b.at)-Date.parse(a.at));
   if(candidates[0])Object.assign(result,{level:candidates[0].level,maxLevel:level(candidates[0].maxLevel),lastOnlineAt:candidates[0].at});
   if(health?.networkEnabled!==true||health?.sessionConfigured!==true)return result;
+  // A recent successful game read proves the account online even when a separate
+  // scheduled diagnostics read has expired. Configuration alone never proves it.
+  const verified=Date.parse(health?.lastSuccessAt??health?.sessionLifecycle?.lastSuccessAt??'');
+  if(Number.isFinite(verified)&&verified<=now()+5000&&now()-verified<=15*60000)
+   return {...result,status:'online',checkedAt:new Date(now()).toISOString(),
+     lastOnlineAt:new Date(verified).toISOString(),levelVerified:false};
   try{
    const live=await invoke('diagnostics'),checked=Date.parse(live?.checkedAt??''),at=now();
    if(live?.online!==true||!level(live.level)||!level(live.maxLevel)||live.level>live.maxLevel||
