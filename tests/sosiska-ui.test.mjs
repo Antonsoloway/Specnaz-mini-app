@@ -204,3 +204,17 @@ test('picker cancellation discards late search results and does not navigate edi
  s.context.window.RoyalSosiska.pickTeam(()=>selected=true);s.search('Delayed');await settle();s.action('back');release({candidates:[],warnings:[]});await settle();
  assert.equal(selected,false);assert.equal(s.panel.innerHTML,'editor');assert.equal(s.hosts[0].removed,true);
 });
+
+test('Aia tournament group and selected opponents render without automatically capturing or watching',async()=>{
+ const roster={TeamId:'10',TeamName:'BOLTAMnet',Description:'Test',Leader:'111',CoLeaders:[],Type:false,Members:[{UserId:'111',Name:'Alice',Level:10,Crown:0,HelpCount:0}]};
+ const group={available:true,selectedTeamId:'10',eventId:88,groupId:'20',observedAt:1792245600000,teams:[{teamId:'10',name:'BOLTAMnet',position:1,score:158400},{teamId:'11',name:'<script>opponent</script>',position:2,score:35000}]};
+ const players={available:true,teamId:'11',groupId:'20',eventId:88,teamScore:35000,observedAt:1792245600000,playersVerified:true,scoresComplete:false,knownScoreSum:20000,players:[{userId:'555',name:'<b>Bob</b>',score:20000},{userId:'556',name:'Unknown',score:null}]};
+ const s=setup({responder:b=>b.operation==='team'?roster:b.operation==='tournamentGroup'?group:b.operation==='tournamentPlayers'?players:b.operation==='history'?{records:[],nextBefore:null}:{watches:[]}});
+ await s.context.window.RoyalSosiska.open();s.action('team','10');await settle();assert.equal(s.calls.filter(x=>x.operation==='tournamentGroup').length,0);
+ s.action('tournament');await settle();assert.match(s.panel.innerHTML,/группа из 2 команд/);
+ assert.ok(!s.panel.innerHTML.includes('<script>opponent</script>'));
+ s.action('tournament-players','11');await settle();assert.match(s.panel.innerHTML,/Личные турнирные очки/);
+ assert.match(s.panel.innerHTML,/Часть личных очков недоступна/);assert.ok(!s.panel.innerHTML.includes('<b>Bob</b>'));
+ assert.equal(s.calls.filter(x=>x.operation==='tournamentPlayers').length,1);
+ assert.equal(s.calls.filter(x=>['watch','capture'].includes(x.operation)).length,0);
+});

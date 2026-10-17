@@ -33,6 +33,8 @@ invocation_logs = true
 # GITHUB_TOKEN
 # SESSION_SECRET
 # RM_AGENT_API_KEY — private cloud-agent key, used only by /admin-agent.
+# RM_EVENT_API_KEY — dedicated Aia events Worker key, separate from the primary Sosiska key.
+# Configure in Cloudflare Secrets before enabling tournament views; never put this in public JS.
 # SOSISKA_GROQ_KEY — separate analysis credential; no bot settings are changed.
 # BOT_TOKEN is also used server-side as the HMAC key for Worker -> Apps Script
 # admin-write requests and short-lived Google Sheets CellImage source URLs.

@@ -6,6 +6,8 @@
   const PATCH_VERSION = '0.6.1-changelog-latest.14';
   const CHANGE = 'В админском Журнале исправлен порядок записей: все события теперь принудительно сортируются по фактическому времени от новых к старым, независимо от источника записи и порядка, в котором данные пришли с сервера.';
 
+  const AIA_TOURNAMENT_CHANGE = 'В Сосиске можно открыть таблицу 20 команд текущего турнира через отдельный облачный аккаунт Aia и личные очки игроков любой выбранной команды. Неизвестные очки не заменяются нулём; показано время получения, а не неподтверждённое время обновления игры.';
+
   const AGENT_CHANGE = 'Добавлен отдельный админский модуль «Сосиска»: поиск команд Royal Match, выбор по описанию и лидеру, состав игроков, снимки, история изменений и управление отслеживанием.';
 
   const FILTER_CHANGE = 'В поиске Сосиски добавлены совместные фильтры: командные очки от указанного значения, ник лидера, число участников, уровень и короны для входа, открытая или закрытая команда. Подробности проверяются по всем найденным командам, включая следующие страницы.';
@@ -37,6 +39,7 @@
   if (!section.changes.includes(CHANGE)) section.changes.unshift(CHANGE);
 
   if (!section.changes.includes(AGENT_CHANGE)) section.changes.unshift(AGENT_CHANGE);
+  if (!section.changes.includes(AIA_TOURNAMENT_CHANGE)) section.changes.unshift(AIA_TOURNAMENT_CHANGE);
 
   if (!section.changes.includes(FILTER_CHANGE)) section.changes.unshift(FILTER_CHANGE);
 
