@@ -2,12 +2,14 @@ import {prepareHistoryExport} from './sosiska-export.js';
 import {readSosiskaStatus} from './agent-status.js';
 // Browser receives game data only. Agent credentials never leave this facade.
 const AGENT_ORIGIN = 'https://specnaz-royal-match-agent-stage1.specnaz-sosiska.workers.dev';
+const EVENT_ORIGIN = 'https://specnaz-royal-match-events-stage1.soloway3852.workers.dev';
 const id = value => typeof value === 'string' && /^[1-9]\d{0,18}$/.test(value) && BigInt(value) <= 9223372036854775807n;
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+const uint64 = value => typeof value === 'string' && /^[1-9]\d{0,19}$/.test(value) && BigInt(value) <= (1n<<64n)-1n;
 const invalid = () => { throw Object.assign(new Error('INVALID_REQUEST'), {status:400}); };
 export function validateAgentAction(body) {
   if (!object(body)) invalid();
-  const keys = {status:[],prepareExport:['teamId','from','to'],profile:['userId'],health:[],search:['query'],team:['teamId'],list:[],watch:['teamId','intervalMinutes'],unwatch:['teamId'],capture:['teamId'],history:['teamId','limit','before'],analysis:['teamId','teamIds'],analysisStatus:['jobId','teamId','teamIds'],analysisTimeline:['jobId','teamId','limit','before']}[body.operation];
+  const keys = {status:[],prepareExport:['teamId','from','to'],profile:['userId'],tournamentGroup:['teamId'],tournamentPlayers:['teamId'],health:[],search:['query'],team:['teamId'],list:[],watch:['teamId','intervalMinutes'],unwatch:['teamId'],capture:['teamId'],history:['teamId','limit','before'],analysis:['teamId','teamIds'],analysisStatus:['jobId','teamId','teamIds'],analysisTimeline:['jobId','teamId','limit','before']}[body.operation];
   if (!Array.isArray(keys) || Object.keys(body).some(k => !['operation',...keys].includes(k))) invalid();
   if(keys.includes('userId')&&!id(body.userId))invalid();
   if (keys.includes('teamId') && !(['analysis','analysisStatus'].includes(body.operation) && body.teamId===undefined) && !id(body.teamId)) invalid();
@@ -58,6 +60,49 @@ export function createSosiskaApi({authorizeAdmin,fetchAgent=fetch,fetchAI=fetch}
           // The cloud agent's contract exposes decoded read-only data only.
           return result.data;
         } finally {clearTimeout(timer);}
+      }
+      if(body.operation==='tournamentGroup'||body.operation==='tournamentPlayers'){
+        if(typeof env.RM_EVENT_API_KEY!=='string'||env.RM_EVENT_API_KEY.length<32)
+          return json({ok:false,error:'TOURNAMENT_NOT_CONFIGURED',message:'Турнирный агент Aia ещё не подключён к приложению.'},503);
+        const op=body.operation==='tournamentGroup'?'getTournamentGroup':'getTeamTournament';
+        const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);
+        let result;
+        try {
+          const response=await fetchAgent(EVENT_ORIGIN+'/v1/invoke',{method:'POST',headers:{Authorization:'Bearer '+env.RM_EVENT_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({protocolVersion:1,operation:op,payload:{teamId:body.teamId}}),signal:controller.signal,redirect:'manual'});
+          if(!response.ok)throw Object.assign(new Error('TOURNAMENT_UNAVAILABLE'),{status:response.status===429?429:502});
+          result=await response.json();
+        }finally{clearTimeout(timer);}
+        if(result?.ok!==true||result.operation!==op||!object(result.data))
+          throw Object.assign(new Error('TOURNAMENT_INVALID'),{status:502});
+        const d=result.data;
+        if(d.available===false)return json({ok:true,data:{available:false,reason:'NO_EVENT_DATA',teamId:body.teamId}});
+        if(d.available!==true||d.kind!=='tournament'||!uint64(d.groupId)||!Number.isSafeInteger(d.eventId)||d.eventId<=0||!Number.isSafeInteger(d.observedAt)||d.observedAt<0)
+          throw Object.assign(new Error('TOURNAMENT_INVALID'),{status:502});
+        if(op==='getTournamentGroup'){
+          if(d.selectedTeamId!==body.teamId||!Array.isArray(d.teams)||d.teams.length>20||!d.teams.some(t=>t.teamId===body.teamId))
+            throw Object.assign(new Error('TOURNAMENT_INVALID'),{status:502});
+          const teams=d.teams.map((t,i)=>{
+            if(!id(t.teamId)||typeof t.teamName!=='string'||t.teamName.length>180||!Number.isSafeInteger(t.score)||t.score<0||t.displayPosition!==i+1)
+              throw Object.assign(new Error('TOURNAMENT_INVALID'),{status:502});
+            return {teamId:t.teamId,name:t.teamName,score:t.score,position:t.displayPosition};
+          });
+          if(new Set(teams.map(t=>t.teamId)).size!==teams.length)
+            throw Object.assign(new Error('TOURNAMENT_INVALID'),{status:502});
+          return json({ok:true,data:{available:true,groupId:d.groupId,eventId:d.eventId,selectedTeamId:body.teamId,observedAt:d.observedAt,teams,serverFreshnessVerified:false}});
+        }
+        if(d.teamId!==body.teamId||!Array.isArray(d.players)||d.players.length>50||!Number.isSafeInteger(d.teamScore)||d.teamScore<0||
+          typeof d.playersVerified!=='boolean'||typeof d.scoresComplete!=='boolean')
+          throw Object.assign(new Error('TOURNAMENT_INVALID'),{status:502});
+        const players=d.players.map(p=>{
+          if(!id(p.userId)||typeof p.name!=='string'||p.name.length>180||
+            !(p.score===null&&p.rawScore===-1&&p.scoreUnavailable===true||Number.isSafeInteger(p.score)&&p.score>=0))
+            throw Object.assign(new Error('TOURNAMENT_INVALID'),{status:502});
+          return {userId:p.userId,name:p.name,score:p.score};
+        });
+        if(new Set(players.map(p=>p.userId)).size!==players.length)
+          throw Object.assign(new Error('TOURNAMENT_INVALID'),{status:502});
+        return json({ok:true,data:{available:true,teamId:body.teamId,groupId:d.groupId,eventId:d.eventId,observedAt:d.observedAt,teamScore:d.teamScore,players,
+          playersVerified:d.playersVerified,scoresComplete:d.scoresComplete&&players.every(p=>p.score!==null),knownScoreSum:players.reduce((s,p)=>s+(p.score??0),0),serverFreshnessVerified:false}});
       }
       if(body.operation==='prepareExport')return json({ok:true,data:await prepareHistoryExport(request,env,body)});
       const invoke = (operation,payload={}) => call('/v1/invoke',{protocolVersion:1,operation,payload});

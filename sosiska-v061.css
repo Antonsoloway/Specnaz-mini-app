@@ -46,3 +46,14 @@
 .sosiska-screen .sosiska-analysis p{margin:10px 0}.sosiska-screen .sosiska-analysis ul{padding-left:22px;margin:10px 0}.sosiska-screen .sosiska-analysis li{margin:8px 0}
 .sosiska-screen .sosiska-report-row{display:grid;grid-template-columns:minmax(0,1fr);gap:3px;margin:12px 0;padding:10px;border-radius:8px;background:#102330}
 .sosiska-screen .sosiska-report-row dt{font-size:12px;color:#a9c1d0;margin-top:8px}.sosiska-screen .sosiska-report-row dt:first-child{margin-top:0}.sosiska-screen .sosiska-report-row dd{margin:0;overflow-wrap:anywhere}
+
+/* Aia tournament rows: readable on narrow Telegram screens. */
+.sosiska-tournament ol{padding-left:1.3rem}
+.sosiska-tournament li{display:flex;align-items:center;flex-wrap:wrap;gap:.45rem;border-bottom:1px solid rgba(127,127,127,.22);padding:.5rem .1rem}
+.sosiska-tournament li>span{flex:1 1 9rem;min-width:0;overflow-wrap:anywhere}
+.sosiska-tournament li>b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.sosiska-tournament li>button{flex:0 0 auto}
+
+.sosiska-tournament-period,.sosiska-tournament-history{padding:.65rem .8rem;margin:.7rem 0;border:1px solid rgba(127,127,127,.24);border-radius:10px}
+.sosiska-tournament-history h5{font-size:1rem;margin:0 0 .4rem}
+.sosiska-tournament-period h4{margin:.2rem 0 .6rem}
