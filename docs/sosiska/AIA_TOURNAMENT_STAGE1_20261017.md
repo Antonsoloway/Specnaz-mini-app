@@ -25,3 +25,9 @@ The primary Sosiska monitor currently persists team member Level, Crown and Help
 
 ## Verification
 Local: new 5 API tests and a browser VM test (existing admin UI suite) pass. Existing API/UI suites also pass. The full repository test invocation has unrelated pre-existing failures and must be reviewed before production release.
+## Stage 2 source integration (17 October)
+Private agent branch: https://github.com/Antonsoloway/Specnaz-ai/tree/feat/aia-tournament-snapshots-20261017
+
+The primary Sosiska monitor has an additive **optional** Aia event sidecar on every manual and scheduled capture. It stores tournament event/group IDs, team standings, individual scores, unavailable markers and safe per-interval deltas. It does not alter the primary gaming session or old v1 history. The mini-app journal now displays those observations; the full-period view sums only confirmed adjacent increases inside the same event and group, with unknown/restart intervals explicitly excluded. This section supersedes the earlier «Next stage» implementation list, which remains as a historical plan.
+
+**Not deployed:** both Workers still require sidecar secret provisioning, passing CI, canary acceptance and a verified release. No live tournament snapshot history has been claimed.

@@ -5,6 +5,7 @@ const AGENT_ORIGIN = 'https://specnaz-royal-match-agent-stage1.specnaz-sosiska.w
 const EVENT_ORIGIN = 'https://specnaz-royal-match-events-stage1.soloway3852.workers.dev';
 const id = value => typeof value === 'string' && /^[1-9]\d{0,18}$/.test(value) && BigInt(value) <= 9223372036854775807n;
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+const uint64 = value => typeof value === 'string' && /^[1-9]\d{0,19}$/.test(value) && BigInt(value) <= (1n<<64n)-1n;
 const invalid = () => { throw Object.assign(new Error('INVALID_REQUEST'), {status:400}); };
 export function validateAgentAction(body) {
   if (!object(body)) invalid();
@@ -75,7 +76,7 @@ export function createSosiskaApi({authorizeAdmin,fetchAgent=fetch,fetchAI=fetch}
           throw Object.assign(new Error('TOURNAMENT_INVALID'),{status:502});
         const d=result.data;
         if(d.available===false)return json({ok:true,data:{available:false,reason:'NO_EVENT_DATA',teamId:body.teamId}});
-        if(d.available!==true||d.kind!=='tournament'||!id(d.groupId)||!Number.isSafeInteger(d.eventId)||d.eventId<=0||!Number.isSafeInteger(d.observedAt)||d.observedAt<0)
+        if(d.available!==true||d.kind!=='tournament'||!uint64(d.groupId)||!Number.isSafeInteger(d.eventId)||d.eventId<=0||!Number.isSafeInteger(d.observedAt)||d.observedAt<0)
           throw Object.assign(new Error('TOURNAMENT_INVALID'),{status:502});
         if(op==='getTournamentGroup'){
           if(d.selectedTeamId!==body.teamId||!Array.isArray(d.teams)||d.teams.length>20||!d.teams.some(t=>t.teamId===body.teamId))

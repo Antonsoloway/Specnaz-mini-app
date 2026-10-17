@@ -218,3 +218,30 @@ test('Aia tournament group and selected opponents render without automatically c
  assert.equal(s.calls.filter(x=>x.operation==='tournamentPlayers').length,1);
  assert.equal(s.calls.filter(x=>['watch','capture'].includes(x.operation)).length,0);
 });
+
+test('tournament snapshot history counts only same-event gains, not tournament switches or unknown scores',async()=>{
+ const members=[{UserId:'111',Name:'<Player>',Level:10,Crown:0,HelpCount:0}];
+ const data={TeamId:'10',TeamName:'BOLTAMnet',Members:members,Leader:'111',CoLeaders:[],MinLevel:1,MinCrown:0};
+ const record=(sequence,eventId,teamScore,change)=>{
+  const raw={TeamName:'BOLTAMnet',Members:members};
+  return {sequence,snapshot:{teamId:'10',capturedAt:new Date(Date.UTC(2026,9,17,17+sequence)).toISOString(),raw,
+   tournament:{available:true,teamId:'10',eventId,groupId:'555',teamScore,groupObservedAt:1792245600000}},
+   changes:{baseline:sequence===1,joined:[],left:[],members:[],team:[],derived:[],tournament:change}};
+ };
+ const rows=[
+  record(3,78,1000,{comparable:false,reason:'TOURNAMENT_CHANGED'}),
+  record(2,77,100,{comparable:true,teamScoreDelta:10,players:[{userId:'111',name:'<Player>',delta:8}],teams:[]}),
+  record(1,77,90,{comparable:false,reason:'TOURNAMENT_DATA_MISSING'})
+ ];
+ const s=setup({responder:b=>b.operation==='team'?data:b.operation==='history'?{records:rows.slice(0,b.limit),nextBefore:null}:{watches:[]}});
+ await s.context.window.RoyalSosiska.open();s.action('team','10');await settle();
+ assert.match(s.panel.innerHTML,/Турнирные очки по снимкам/);
+ assert.match(s.panel.innerHTML,/сопоставимых интервалов: 1/);
+ assert.match(s.panel.innerHTML,/прирост команды/);
+ assert.ok(!s.panel.innerHTML.includes('<Player>'));
+ assert.ok(!s.panel.innerHTML.includes('прирост команды: <b>+1 010</b>'));
+ s.action('history');await settle();
+ assert.match(s.panel.innerHTML,/Начался другой турнир или изменилась группа/);
+ assert.match(s.panel.innerHTML,/&lt;Player&gt; \+8/);
+ assert.ok(!s.panel.innerHTML.includes('<Player>'));
+});
