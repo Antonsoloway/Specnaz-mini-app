@@ -245,3 +245,30 @@ test('tournament snapshot history counts only same-event gains, not tournament s
  assert.match(s.panel.innerHTML,/&lt;Player&gt; \+8/);
  assert.ok(!s.panel.innerHTML.includes('<Player>'));
 });
+
+test('calendar alternates tournament and battle, chests have no inferred completion time',()=>{
+ const ui=setup();const cycle=ui.context.window.RoyalMatchEventCycle.windowAt;
+ const friday=Date.UTC(2026,9,16,8);
+ assert.equal(cycle(friday).phase,'tournament');
+ assert.equal(cycle(friday+3*86400000-1).phase,'tournament');
+ assert.equal(cycle(friday+3*86400000).phase,'chests');
+ assert.equal(cycle(friday+7*86400000).phase,'battle');
+ assert.equal(cycle(friday+10*86400000).phase,'chests');
+ assert.equal(cycle(friday+14*86400000).phase,'tournament');
+ assert.equal(cycle(friday).end,Date.UTC(2026,9,19,8));
+});
+test('exact-ID standings link focuses opponent and quick watch is explicit',async()=>{
+ const roster=id=>({TeamId:id,TeamName:id==='10'?'SEHAT':'Korea war',Members:[{UserId:'77',Name:'P',Level:1,Crown:0}],Leader:'77',CoLeaders:[],MinLevel:1,MinCrown:0});
+ const group={available:true,eventId:68,groupId:'123',observedAt:1792245600000,teams:[{teamId:'10',name:'SEHAT',position:1,score:100},{teamId:'11',name:'Korea war',position:2,score:50}]};
+ let watches=[];
+ const ui=setup({responder:b=>b.operation==='team'?roster(b.teamId):b.operation==='tournamentGroup'?group:b.operation==='history'?{records:[],nextBefore:null}:b.operation==='watch'?(watches.push(b),{}):{watches:watches.map(w=>({teamId:w.teamId,intervalMinutes:w.intervalMinutes}))}});
+ await ui.context.window.RoyalSosiska.open();ui.action('team','10');await settle();
+ ui.action('tournament');await settle();
+ assert.match(ui.panel.innerHTML,/data-sosiska-action="tournament-team"/);
+ ui.action('tournament-team','11');await settle();
+ assert.match(ui.panel.innerHTML,/Korea war/);
+ assert.match(ui.panel.innerHTML,/Включить слежение · 60 мин/);
+ assert.equal(watches.length,0);
+ ui.action('quick-watch');await settle();
+ assert.deepEqual(watches,[{operation:'watch',teamId:'11',intervalMinutes:60}]);
+});
