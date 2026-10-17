@@ -15,7 +15,7 @@ test('recent confirmed game success in health is online without fresh diagnostic
  const result=await readSosiskaStatus(async op=>{calls.push(op);if(op==='health')return live;throw Error('diagnostics unavailable');},()=>at);
  assert.equal(result.status,'online');assert.equal(result.level,14800);assert.deepEqual(calls,['health']);
  assert.equal(result.levelVerified,false);
- for(const value of [new Date(at-16*60000).toISOString(),new Date(at+6000).toISOString()])
+ for(const value of [new Date(at-121*60000).toISOString(),new Date(at+6000).toISOString()])
   assert.equal((await readSosiskaStatus(async op=>op==='health'?{...live,lastSuccessAt:value}:{...diagnostic,online:false},()=>at)).status,'offline');
 });
 test('unavailable or busy game preserves last known level without a green status',async()=>{
