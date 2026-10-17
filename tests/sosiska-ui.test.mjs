@@ -272,3 +272,59 @@ test('exact-ID standings link focuses opponent and quick watch is explicit',asyn
  ui.action('quick-watch');await settle();
  assert.deepEqual(watches,[{operation:'watch',teamId:'11',intervalMinutes:60}]);
 });
+
+test('tournament and roster are exclusive tabs, never two panels stacked',async()=>{
+ const data=filterTeam('12'),group={available:true,groupId:'555',eventId:90,observedAt:1792245600000,
+  teams:[{teamId:'12',name:'Team 12',score:340,position:1}]};
+ const s=setup({responder:b=>b.operation==='team'?data:b.operation==='tournamentGroup'?group:b.operation==='history'?{records:[],nextBefore:null}:{watches:[]}});
+ await s.context.window.RoyalSosiska.open();
+ s.action('team','12');await settle();
+ s.action('tournament');await settle();
+ assert.match(s.panel.innerHTML,/data-sosiska-tournament/);
+ assert.doesNotMatch(s.panel.innerHTML,/sosiska-roster/);
+ s.action('roster-view');await settle();
+ assert.match(s.panel.innerHTML,/sosiska-roster/);
+ assert.doesNotMatch(s.panel.innerHTML,/data-sosiska-tournament/);
+ s.action('tournament');await settle();
+ assert.match(s.panel.innerHTML,/data-sosiska-tournament/);
+ s.action('history');await settle();
+ assert.doesNotMatch(s.panel.innerHTML,/data-sosiska-tournament/);
+});
+test('initially pending watches are loading, not reported as disabled',async()=>{
+ let release;const pending=new Promise(done=>{release=done;});
+ const s=setup({responder:b=>b.operation==='list'?pending:{watches:[]}});
+ const opening=s.context.window.RoyalSosiska.open();await settle();
+ assert.match(s.panel.innerHTML,/Загружаем список отслеживаемых команд/);
+ assert.doesNotMatch(s.panel.innerHTML,/Отслеживание не включено/);
+ release({watches:[]});await opening;await settle();
+ assert.match(s.panel.innerHTML,/Отслеживание не включено/);
+});
+test('watch list renders and buttons re-enable before any optional history completes',async()=>{
+ const releases=[];
+ const watchers=['12','13','14','15'].map(teamId=>({teamId,intervalMinutes:60,enabled:true}));
+ const s=setup({responder:b=>b.operation==='list'?{watches:watchers}:
+  b.operation==='history'?new Promise(resolve=>releases.push(resolve)):
+  b.operation==='team'?filterTeam(b.teamId):{watches:watchers}});
+ await s.context.window.RoyalSosiska.open();
+ await settle();
+ assert.equal(s.calls.filter(c=>c.operation==='history').length,2,'bounded parallel decoration');
+ assert.match(s.panel.innerHTML,/Отслеживаемые команды/);
+ assert.match(s.panel.innerHTML,/Команда без названия/);
+ assert.match(s.panel.innerHTML,/data-team-id="14"/);
+ assert.doesNotMatch(s.panel.innerHTML,/Отслеживание не включено/);
+ assert.doesNotMatch(s.panel.innerHTML,/Получаем данные/);
+ assert.match(s.panel.innerHTML,/data-sosiska-action="list"/);
+ assert.doesNotMatch(s.panel.innerHTML,/data-sosiska-action="list"\s+disabled/);
+ for(let cycle=0;cycle<3;cycle++){
+   const pending=releases.splice(0);
+   for(const release of pending)release({records:[],nextBefore:null});
+   await settle();
+ }
+});
+test('failed watch list never claims monitoring is off',async()=>{
+ const s=setup({responder:b=>{if(b.operation==='list')throw new Error('upstream busy');return {watches:[]};}});
+ await s.context.window.RoyalSosiska.open();
+ assert.match(s.panel.innerHTML,/Список не загрузился/);
+ assert.match(s.panel.innerHTML,/upstream busy/);
+ assert.doesNotMatch(s.panel.innerHTML,/Отслеживание не включено/);
+});
