@@ -244,6 +244,19 @@ test('tournament snapshot history counts only same-event gains, not tournament s
  assert.match(s.panel.innerHTML,/Начался другой турнир или изменилась группа/);
  assert.match(s.panel.innerHTML,/&lt;Player&gt; \+8/);
  assert.ok(!s.panel.innerHTML.includes('<Player>'));
+ // The full-period analytics card is permanent, independent of the upper tab.
+ for(const tab of ['history','roster-view','left-members','new-members','tournament','period']){
+   if(tab!=='history')s.action(tab);
+   await settle();
+   assert.match(s.panel.innerHTML,/data-sosiska-period-overview/,tab);
+   assert.match(s.panel.innerHTML,/Весь период наблюдения/,tab);
+   assert.match(s.panel.innerHTML,/снимков: 3/,tab);
+   assert.match(s.panel.innerHTML,/Турнирные очки по снимкам/,tab);
+   assert.equal([...s.panel.innerHTML.matchAll(/<h3>Весь период наблюдения<\/h3>/g)].length,1,
+     'full-period section is persistent without duplicate copies for '+tab);
+   if(tab==='tournament')assert.match(s.panel.innerHTML,/<h3>Командный турнир<\/h3>/);
+   if(tab==='roster-view')assert.doesNotMatch(s.panel.innerHTML,/data-sosiska-tournament/);
+ }
 });
 
 test('calendar alternates tournament and battle, chests have no inferred completion time',()=>{
