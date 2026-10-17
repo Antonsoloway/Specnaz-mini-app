@@ -341,3 +341,56 @@ test('failed watch list never claims monitoring is off',async()=>{
  assert.match(s.panel.innerHTML,/upstream busy/);
  assert.doesNotMatch(s.panel.innerHTML,/Отслеживание не включено/);
 });
+
+
+test('event players display latest actual total, last interval, period gain, and clickable personal chart',async()=>{
+ const members=[{UserId:'111',Name:'Alice',Level:100,Crown:0,HelpCount:0},{UserId:'222',Name:'Bob',Level:20,Crown:0,HelpCount:0}];
+ const team={TeamId:'10',TeamName:'Measured',Members:members,Leader:'111',CoLeaders:[],MinLevel:1,MinCrown:0};
+ const record=(seq,eventId,score,players,change)=>{
+   const tm=new Date(Date.UTC(2026,9,17,14+seq)).toISOString();
+   const prev=new Date(Date.UTC(2026,9,17,13+seq)).toISOString();
+   return {sequence:seq,snapshot:{teamId:'10',capturedAt:tm,raw:team,
+     tournament:{available:true,teamId:'10',kind:'tournament',eventId,groupId:'555',teamScore:score,players,
+       playersObservedAt:tm}},changes:{baseline:seq===1,from:prev,to:tm,joined:[],left:[],members:[],team:[],
+       derived:[],tournament:change}};
+ };
+ const al=(score)=>[{userId:'111',name:'Alice',score},{userId:'222',name:'Bob',score:null}];
+ const rows=[
+   record(4,88,200,al(90),{comparable:true,teamScoreDelta:10,players:[{userId:'111',name:'Alice',delta:10}]}),
+   record(3,88,190,al(80),{comparable:true,teamScoreDelta:10,players:[{userId:'111',name:'Alice',delta:10}]}),
+   record(2,87,500,al(400),{comparable:false,reason:'TOURNAMENT_CHANGED'}),
+   record(1,87,450,al(350),{comparable:false})
+ ];
+ const ui=setup({responder:b=>b.operation==='team'?team:b.operation==='history'?{records:rows.slice(0,b.limit),nextBefore:null}:{watches:[]}});
+ await ui.context.window.RoyalSosiska.open();ui.action('team','10');await settle();
+ assert.match(ui.panel.innerHTML,/Личные очки · 2 игроков/);
+ assert.match(ui.panel.innerHTML,/data-sosiska-action="event-player"/);
+ assert.match(ui.panel.innerHTML,/Всего/);
+ assert.match(ui.panel.innerHTML,/Последний Δ/);
+ assert.match(ui.panel.innerHTML,/За период/);
+ assert.match(ui.panel.innerHTML,/90/);
+ assert.doesNotMatch(ui.panel.innerHTML,/прирост команды: <b>\+70<\/b>/);
+ // Unknown Bob remains missing rather than silently claiming zero points.
+ const bobHtml=ui.panel.innerHTML.slice(ui.panel.innerHTML.indexOf('2. Bob'),ui.panel.innerHTML.indexOf('2. Bob')+450);
+ assert.match(bobHtml,/—/);
+ ui.action('event-player',undefined,{eventUser:'111',eventScope:'tournament:88:555'});await settle();
+ assert.match(ui.panel.innerHTML,/data-sosiska-event-person-detail/);
+ assert.match(ui.panel.innerHTML,/Прирост личных очков/);
+ assert.match(ui.panel.innerHTML,/10/);
+ assert.doesNotMatch(ui.panel.innerHTML,/Прирост за период.*\+70/);
+ ui.action('event-player-close');await settle();
+ assert.doesNotMatch(ui.panel.innerHTML,/data-sosiska-event-person-detail/);
+ ui.action('player',undefined,{playerId:'111'});await settle();
+ assert.match(ui.panel.innerHTML,/sosiska-player-detail/);
+ assert.match(ui.panel.innerHTML,/Турниры и битвы/);
+ assert.match(ui.panel.innerHTML,/Прирост личных очков/);
+ assert.match(ui.panel.innerHTML,/Графики активности/);
+});
+test('chart numeric tiles and event player columns fit narrow screens by CSS contract',async()=>{
+ const css=await readFile(new URL('../sosiska-v061.css',import.meta.url),'utf8');
+ assert.match(css,/\.sosiska-screen \.sosiska-chart-stats b\{font-size:clamp/);
+ assert.match(css,/overflow-wrap:anywhere/);
+ assert.match(css,/\.sosiska-event-person-values/);
+ assert.match(css,/grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+ assert.match(css,/\.sosiska-chart-controls>button:last-child\{grid-column:span 4/);
+});

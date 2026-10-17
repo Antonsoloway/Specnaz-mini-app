@@ -61,3 +61,42 @@
 .sosiska-tournament-team-link{border:0;background:transparent;color:inherit;padding:.25rem 0;text-align:left;font:inherit;font-weight:650;text-decoration:underline;text-decoration-color:#64748b;text-underline-offset:4px;cursor:pointer;max-width:100%;overflow-wrap:anywhere}
 .sosiska-tournament-team-link:focus-visible{outline:2px solid #38bdf8;outline-offset:3px;border-radius:4px}
 [data-sosiska-team-focus]{scroll-margin-top:100px}
+
+
+/* Mobile graph: keep every numeric stat INSIDE its own column, never overflow. */
+.sosiska-screen .sosiska-chart,.sosiska-screen .sosiska-chart-stats,
+.sosiska-screen .sosiska-chart-stats>div{min-width:0;max-width:100%;box-sizing:border-box}
+.sosiska-screen .sosiska-chart{overflow:hidden}
+.sosiska-screen .sosiska-chart-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.sosiska-screen .sosiska-chart-stats>div{padding:9px 3px;overflow:hidden}
+.sosiska-screen .sosiska-chart-stats b{font-size:clamp(12px,3.2vw,18px);line-height:1.25;
+  font-variant-numeric:tabular-nums;white-space:normal;overflow-wrap:anywhere;word-break:normal;
+  letter-spacing:-.025em;margin-top:6px}
+.sosiska-screen .sosiska-chart-stats small{font-size:clamp(10px,2.7vw,12px);
+  line-height:1.25;min-height:34px;overflow-wrap:anywhere}
+.sosiska-screen .sosiska-chart-controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.sosiska-screen .sosiska-chart-controls>button{min-width:0!important;width:100%;height:45px;min-height:45px!important;
+  padding:5px!important;line-height:1.1;overflow-wrap:anywhere}
+.sosiska-screen .sosiska-chart-controls>button:last-child{grid-column:span 4;font-size:14px;flex:auto}
+@media(min-width:540px){.sosiska-screen .sosiska-chart-controls{grid-template-columns:repeat(5,minmax(0,1fr))}
+.sosiska-screen .sosiska-chart-controls>button:last-child{grid-column:span 1}}
+
+/* Event scores: exact-ID player row is one tappable item with three labelled metrics. */
+.sosiska-event-person-list{list-style:none!important;padding:0!important;margin:8px 0}
+.sosiska-event-person-row{border-bottom:1px solid #3d5364;padding:6px 0;min-width:0}
+.sosiska-event-person-row>button{display:flex!important;flex-direction:column;gap:8px;
+  width:100%;box-sizing:border-box;min-height:56px;text-align:left!important;
+  background:#203749;border:1px solid #42617a;border-radius:10px;color:#f1f5f9;padding:11px!important;margin:0!important}
+.sosiska-event-person-row>button[aria-expanded=true]{outline:2px solid #74ccf4}
+.sosiska-event-person-name{font-weight:700;overflow-wrap:anywhere;max-width:100%}
+.sosiska-event-person-values,.sosiska-event-player-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;gap:5px}
+.sosiska-event-person-values>span,.sosiska-event-player-metrics>div{display:flex;flex-direction:column;gap:4px;min-width:0;
+  border-radius:7px;background:#132c3b;padding:5px 6px}
+.sosiska-event-person-values small,.sosiska-event-player-metrics small{font-size:11px;color:#b7d2e7;line-height:1.25}
+.sosiska-event-person-values b,.sosiska-event-player-metrics b{font-size:clamp(12px,3.4vw,17px);
+  white-space:normal;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.sosiska-event-player-detail{margin:12px 0;min-width:0;overflow:hidden;scroll-margin-top:85px}
+.sosiska-event-player-detail h5,.sosiska-event-scope h5{font-size:17px;margin:10px 0}
+.sosiska-event-scope{border-top:1px solid #42576a;margin:15px 0;padding-top:8px}
+.sosiska-event-teaser{margin:10px 0;padding:9px;border:1px solid #3b5e75;border-radius:9px}
+.sosiska-event-teaser p{font-size:14px;line-height:1.5}
