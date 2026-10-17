@@ -60,7 +60,9 @@ export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=request
       t.expected--;t.count++;j.processedSnapshots++;
       t.name=t.name??r.snapshot.raw.TeamName;t.to=t.to??r.snapshot.capturedAt;t.from=r.snapshot.capturedAt;
       rows.push(...timelineRows(r));
-      await storage.put(key(j,`point:${t.teamId}:${r.sequence}`),{sequence:r.sequence,capturedAt:r.snapshot.capturedAt,...r.snapshot.derived,members:r.snapshot.raw.Members.map(m=>({userId:m.UserId,name:m.Name,level:m.Level,crown:m.Crown,help:m.HelpCount})),changes:r.changes});
+      await storage.put(key(j,`point:${t.teamId}:${r.sequence}`),{sequence:r.sequence,capturedAt:r.snapshot.capturedAt,...r.snapshot.derived,members:r.snapshot.raw.Members.map(m=>({userId:m.UserId,name:m.Name,level:m.Level,crown:m.Crown,help:m.HelpCount})),changes:r.changes,
+        tournament:r.snapshot.tournament?.available===true?{kind:r.snapshot.tournament.kind,eventId:r.snapshot.tournament.eventId,
+          groupId:r.snapshot.tournament.groupId,teamScore:r.snapshot.tournament.teamScore}:null});
     }
     if(t.expected===0&&page.nextBefore!==null||t.expected>0&&page.nextBefore!==page.records.at(-1).sequence)throw Object.assign(new Error('ANALYSIS_HISTORY_INCOMPLETE'),{permanent:true});
     t.before=page.nextBefore;t.complete=t.expected===0;
@@ -83,12 +85,34 @@ export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=request
     }
     const period=acc.result();delete period.series;period.players=period.players.map(({series,hourly,...p})=>p);return period;
   }
+  async function observedEventStats(j,t){
+    const scopes=new Map();
+    for(let n=t.headSequence;n>0;n--){
+      const point=await storage.get(key(j,`point:${t.teamId}:${n}`));
+      const event=point?.tournament,change=point?.changes?.tournament;
+      if(!event||!['tournament','battle'].includes(event.kind))continue;
+      const scope=[event.kind,event.eventId,event.groupId].join(':');
+      let s=scopes.get(scope);
+      if(!s){s={kind:event.kind,eventId:event.eventId,groupId:event.groupId,
+        latestScore:event.teamScore,lastObservedAt:point.capturedAt,
+        observedGain:0,comparableIntervals:0,knownPlayerProgress:0,players:new Map()};scopes.set(scope,s);}
+      if(change?.comparable!==true)continue;
+      if(Number.isSafeInteger(change.teamScoreDelta)&&change.teamScoreDelta>=0){s.observedGain+=change.teamScoreDelta;s.comparableIntervals++;}
+      if(Number.isSafeInteger(change.knownPlayerProgress)&&change.knownPlayerProgress>=0)s.knownPlayerProgress+=change.knownPlayerProgress;
+      for(const p of change.players??[]){
+        if(!Number.isSafeInteger(p.delta)||p.delta<0)continue;
+        const item=s.players.get(p.userId)||{userId:p.userId,name:p.name,gain:0};
+        item.gain+=p.delta;s.players.set(p.userId,item);
+      }
+    }
+    return [...scopes.values()].map(({players,...s})=>({...s,players:[...players.values()].sort((a,b)=>b.gain-a.gain).slice(0,15)}));
+  }
   async function reduceTeam(j,t) {
     if(t.summaries===0){await storage.put(key(j,`report:${t.teamId}`),{text:'Сохранённых снимков пока нет.',model:null});await nextTeam(j);return;}
     if(t.summaries===1) {
       const report=await storage.get(key(j,`summary:${t.teamId}:${t.level}:0`));
       const period=await periodStats(j,t);
-      const final=await analyze({format:'report',input:{period,teamId:t.teamId,teamName:t.name,from:t.from,to:t.to,snapshotCount:t.count,complete:t.complete,analysis:report},task:'Ответ до 450 слов, с выводами и ведущими игроками; не повторяй полный список счётчиков. Составь итоговый анализ ВСЕЙ истории этой команды. Охват задан явно. Опиши динамику по времени, игроков, изменения состава и неопределённости. Один снимок не даёт динамики; прямо сообщи это.',env});
+      const final=await analyze({format:'report',input:{period,eventStats:await observedEventStats(j,t),teamId:t.teamId,teamName:t.name,from:t.from,to:t.to,snapshotCount:t.count,complete:t.complete,analysis:report},task:'Ответ до 450 слов, с выводами и ведущими игроками; не повторяй полный список счётчиков. Составь итоговый анализ ВСЕЙ истории этой команды. Охват задан явно. Опиши динамику по времени, игроков, изменения состава и неопределённости. Один снимок не даёт динамики; прямо сообщи это.',env});
       await storage.put(key(j,`report:${t.teamId}`),{...final,period});await nextTeam(j);return;
     }
     const batch=[];let chars=0;

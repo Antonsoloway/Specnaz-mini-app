@@ -17,7 +17,7 @@ export function validateAgentAction(body) {
   if(body.operation==='analysis'&&body.teamId===undefined&&body.teamIds===undefined)invalid();
   if (keys.includes('jobId') && !(body.operation==='analysisStatus'&&body.jobId===undefined) && (typeof body.jobId!=='string'||!/^[a-f0-9-]{36}$/.test(body.jobId))) invalid();
   if (body.operation === 'search' && (typeof body.query !== 'string' || !body.query.trim() || body.query.length > 160)) invalid();
-  if (body.operation === 'watch' && (!Number.isInteger(body.intervalMinutes) || body.intervalMinutes < 5 || body.intervalMinutes > 10080)) invalid();
+  if (body.operation === 'watch' && (!Number.isInteger(body.intervalMinutes) || body.intervalMinutes < 60 || body.intervalMinutes > 10080)) invalid();
   if (body.limit !== undefined && (!Number.isInteger(body.limit) || body.limit < 1 || body.limit > 20)) invalid();
   if (body.before !== undefined && (!Number.isSafeInteger(body.before) || body.before < 1)) invalid();
   if(body.operation==='prepareExport'&&(![body.from,body.to].every(x=>typeof x==='string'&&/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(x)&&Number.isFinite(Date.parse(x)))||body.from>=body.to))invalid();
