@@ -40,7 +40,7 @@
   }
   const measuredWidths=new WeakMap();
   const titleResize=typeof ResizeObserver==='undefined'?null:new ResizeObserver(entries=>{
-    for(const entry of entries){const width=entry.contentRect.width;if(measuredWidths.get(entry.target)===width)continue;measuredWidths.set(entry.target,width);fitTitle(entry.target);}
+    for(const entry of entries){if(!entry.target.isConnected){titleResize.unobserve(entry.target);continue;}const width=entry.contentRect.width;if(measuredWidths.get(entry.target)===width)continue;measuredWidths.set(entry.target,width);fitTitle(entry.target);}
   });
   document.fonts?.ready?.then(()=>document.querySelectorAll('.team-live-card').forEach(fitTitle));
   document.fonts?.addEventListener?.('loadingdone',()=>document.querySelectorAll('.team-live-card').forEach(fitTitle));
