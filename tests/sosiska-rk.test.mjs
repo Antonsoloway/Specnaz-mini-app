@@ -111,3 +111,22 @@ test('RK profile interface labels battle only and uses arena+kingdom native stat
  assert.match(js,/event:game==='rk'\?'Битва':'Турнир \/ битва'/);
  for(const required of ['Статистика арены','Основная статистика','Победы на уровнях','Построенные районы','stats.totalCup','stats.highestWeeklyWins','stats.worldBestRank','Текущие кубки'])assert(js.includes(required),required);
 });
+
+test('RK profile facade propagates original observation timestamp and cache status safely',async()=>{
+ const when='2026-10-18T13:21:45.000Z',uid='201';
+ const handle=createSosiskaApi({authorizeAdmin:async()=>{},fetchAgent:async(url,init)=>{
+  assert.match(url,/royal-kingdom-search-stage1/);
+  assert.equal(JSON.parse(init.body).operation,'getProfile');
+  return Response.json({ok:true,data:{RequestedUserId:uid,Profile:{UserId:uid,Name:'Player',Level:5400,Cup:25000,TeamId:'100'},
+   ClientStats:[{key:9,value:'46450'},{key:2,value:'14361'}],BackendStats:[],
+   statsAvailable:true,observedAt:when,cacheStatus:'stale'}});
+ }});
+ const response=await handle(req({operation:'profile',game:'rk',userId:uid}),env);
+ assert.equal(response.status,200);
+ const result=(await response.json()).data;
+ assert.equal(result.stats.totalCup,'46450');
+ assert.equal(result.stats.levelWins,'14361');
+ assert.equal(result.fetchedAt,when);
+ assert.equal(result.cacheStatus,'stale');
+ assert.equal(result.crown,25000);
+});
