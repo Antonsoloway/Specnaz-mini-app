@@ -20,4 +20,14 @@ Sheet uses existing text M and legacy header `ID команды RM`, scoped by g
 4. Deploy reviewed Mini App Worker with existing bindings/vars/secrets preserved and publish v0.6.6 via the established main/Pages route after CI PASS. Verify served entry/assets and Telegram authorization hash preservation.
 5. Owner: edit RK team, search with filters, bind/save, reopen public/admin card, verify leader/helper order and screenshot toggle.
 
-Current status: source prepared, Cloud Shell offline at preparation; no claim of v0.6.6 live deployment.
+## Verified publication
+
+Published source merge1168b4e3b111faeb81eba1ee49bb8c63167eabb0, PR78. Main CI39158906368 and Pages39158906442 PASS; Workers Builds58f02fe7-a7bf-4038-a032-a0418759953a PASS. The two Apps Script candidate files matched the fresh live baseline before patching; existing deployment is now version123. Post-deploy clasp pull matches reviewed files; standard full mirror sync67b9c2a updated apps-script-live and its SHA manifest.
+
+Manual Worker versionea2b1479-3870-4b7b-94a2-2e00ec6395a2 retained all18 pre-existing bindings. Main build then published version5bc96f80-1622-4543-9a6f-9582db518e61. Public app/index/entry/changelog/admin editor/Sosiska/card/helper assets (nine files) match source bytes. Worker health200; RK public/admin live routes correctly401 without a session.
+
+152 Sosiska/asset tests,32 admin tests, workerd/isolation and all browser regressions PASS. New real-form fixture runs under all entry CSS at320/390/768. A release test initially expected the previous v0.6.5 target; updated that explicit expectation and added v0.6.6 changelog/entry validation before the successful CI.
+
+An optional Apps Script API execution of admin snapshot refresh returned storage NOT_FOUND; it is not a successful refresh receipt. Web App deployment123 is separately verified by deployment listing and pulled source. No additional CRM writes or invented team binding were used for acceptance. Owner still verifies authenticated save/reopen in native Telegram.
+
+Current status: v0.6.6 published; Telegram behavioral acceptance pending.
