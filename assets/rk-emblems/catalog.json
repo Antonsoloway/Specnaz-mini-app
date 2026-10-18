@@ -1,0 +1,1482 @@
+{
+  "game": "rk",
+  "build": 33931,
+  "count": 184,
+  "firstId": 0,
+  "lastId": 183,
+  "order": "zero-based, four per row, left to right, top to bottom",
+  "entries": [
+    {
+      "id": 0,
+      "source": "2988.jpg",
+      "row": 0,
+      "column": 0,
+      "description": "жёлтая лилия на красном",
+      "asset": "assets/rk-emblems/0.webp"
+    },
+    {
+      "id": 1,
+      "source": "2988.jpg",
+      "row": 0,
+      "column": 1,
+      "description": "белая лилия на бирюзовом",
+      "asset": "assets/rk-emblems/1.webp"
+    },
+    {
+      "id": 2,
+      "source": "2988.jpg",
+      "row": 0,
+      "column": 2,
+      "description": "чёрная корона на золотом",
+      "asset": "assets/rk-emblems/2.webp"
+    },
+    {
+      "id": 3,
+      "source": "2988.jpg",
+      "row": 0,
+      "column": 3,
+      "description": "жёлтая корона на красном",
+      "asset": "assets/rk-emblems/3.webp"
+    },
+    {
+      "id": 4,
+      "source": "2988.jpg",
+      "row": 1,
+      "column": 0,
+      "description": "жёлтая утка на синем",
+      "asset": "assets/rk-emblems/4.webp"
+    },
+    {
+      "id": 5,
+      "source": "2988.jpg",
+      "row": 1,
+      "column": 1,
+      "description": "белая утка на розовом",
+      "asset": "assets/rk-emblems/5.webp"
+    },
+    {
+      "id": 6,
+      "source": "2988.jpg",
+      "row": 1,
+      "column": 2,
+      "description": "белая башня на красном",
+      "asset": "assets/rk-emblems/6.webp"
+    },
+    {
+      "id": 7,
+      "source": "2988.jpg",
+      "row": 1,
+      "column": 3,
+      "description": "белая башня на синем",
+      "asset": "assets/rk-emblems/7.webp"
+    },
+    {
+      "id": 8,
+      "source": "2988.jpg",
+      "row": 2,
+      "column": 0,
+      "description": "белый конь на чёрном",
+      "asset": "assets/rk-emblems/8.webp"
+    },
+    {
+      "id": 9,
+      "source": "2988.jpg",
+      "row": 2,
+      "column": 1,
+      "description": "чёрный конь на белом",
+      "asset": "assets/rk-emblems/9.webp"
+    },
+    {
+      "id": 10,
+      "source": "2988.jpg",
+      "row": 2,
+      "column": 2,
+      "description": "жёлтый колокол на фиолетовом",
+      "asset": "assets/rk-emblems/10.webp"
+    },
+    {
+      "id": 11,
+      "source": "2988.jpg",
+      "row": 2,
+      "column": 3,
+      "description": "жёлтый колокол на бирюзовом",
+      "asset": "assets/rk-emblems/11.webp"
+    },
+    {
+      "id": 12,
+      "source": "2988.jpg",
+      "row": 3,
+      "column": 0,
+      "description": "жёлтая пальма на фиолетовом",
+      "asset": "assets/rk-emblems/12.webp"
+    },
+    {
+      "id": 13,
+      "source": "2988.jpg",
+      "row": 3,
+      "column": 1,
+      "description": "белая пальма на зелёном",
+      "asset": "assets/rk-emblems/13.webp"
+    },
+    {
+      "id": 14,
+      "source": "2988.jpg",
+      "row": 3,
+      "column": 2,
+      "description": "белый бант на красном",
+      "asset": "assets/rk-emblems/14.webp"
+    },
+    {
+      "id": 15,
+      "source": "2988.jpg",
+      "row": 3,
+      "column": 3,
+      "description": "розовый бант на чёрном",
+      "asset": "assets/rk-emblems/15.webp"
+    },
+    {
+      "id": 16,
+      "source": "2988.jpg",
+      "row": 4,
+      "column": 0,
+      "description": "белая колонна на синем",
+      "asset": "assets/rk-emblems/16.webp"
+    },
+    {
+      "id": 17,
+      "source": "2988.jpg",
+      "row": 4,
+      "column": 1,
+      "description": "белая колонна на красном",
+      "asset": "assets/rk-emblems/17.webp"
+    },
+    {
+      "id": 18,
+      "source": "2988.jpg",
+      "row": 4,
+      "column": 2,
+      "description": "белая молния на синем",
+      "asset": "assets/rk-emblems/18.webp"
+    },
+    {
+      "id": 19,
+      "source": "2988.jpg",
+      "row": 4,
+      "column": 3,
+      "description": "жёлтая молния на фиолетовом",
+      "asset": "assets/rk-emblems/19.webp"
+    },
+    {
+      "id": 20,
+      "source": "2988.jpg",
+      "row": 5,
+      "column": 0,
+      "description": "зелёный динозавр на чёрном",
+      "asset": "assets/rk-emblems/20.webp"
+    },
+    {
+      "id": 21,
+      "source": "2988.jpg",
+      "row": 5,
+      "column": 1,
+      "description": "жёлтый динозавр на фиолетовом",
+      "asset": "assets/rk-emblems/21.webp"
+    },
+    {
+      "id": 22,
+      "source": "2988.jpg",
+      "row": 5,
+      "column": 2,
+      "description": "белые вишни на зелёном",
+      "asset": "assets/rk-emblems/22.webp"
+    },
+    {
+      "id": 23,
+      "source": "2988.jpg",
+      "row": 5,
+      "column": 3,
+      "description": "белые вишни на розовом",
+      "asset": "assets/rk-emblems/23.webp"
+    },
+    {
+      "id": 24,
+      "source": "2989.jpg",
+      "row": 0,
+      "column": 0,
+      "description": "белый пазл на синем",
+      "asset": "assets/rk-emblems/24.webp"
+    },
+    {
+      "id": 25,
+      "source": "2989.jpg",
+      "row": 0,
+      "column": 1,
+      "description": "синий пазл на золотом",
+      "asset": "assets/rk-emblems/25.webp"
+    },
+    {
+      "id": 26,
+      "source": "2989.jpg",
+      "row": 0,
+      "column": 2,
+      "description": "белое сердце на красном",
+      "asset": "assets/rk-emblems/26.webp"
+    },
+    {
+      "id": 27,
+      "source": "2989.jpg",
+      "row": 0,
+      "column": 3,
+      "description": "красное сердце на белом",
+      "asset": "assets/rk-emblems/27.webp"
+    },
+    {
+      "id": 28,
+      "source": "2989.jpg",
+      "row": 1,
+      "column": 0,
+      "description": "красный огонь на чёрном",
+      "asset": "assets/rk-emblems/28.webp"
+    },
+    {
+      "id": 29,
+      "source": "2989.jpg",
+      "row": 1,
+      "column": 1,
+      "description": "жёлтый огонь на красном",
+      "asset": "assets/rk-emblems/29.webp"
+    },
+    {
+      "id": 30,
+      "source": "2989.jpg",
+      "row": 1,
+      "column": 2,
+      "description": "белая белка на розовом",
+      "asset": "assets/rk-emblems/30.webp"
+    },
+    {
+      "id": 31,
+      "source": "2989.jpg",
+      "row": 1,
+      "column": 3,
+      "description": "белая белка на зелёном",
+      "asset": "assets/rk-emblems/31.webp"
+    },
+    {
+      "id": 32,
+      "source": "2989.jpg",
+      "row": 2,
+      "column": 0,
+      "description": "белый компас на фиолетовом",
+      "asset": "assets/rk-emblems/32.webp"
+    },
+    {
+      "id": 33,
+      "source": "2989.jpg",
+      "row": 2,
+      "column": 1,
+      "description": "жёлтый компас на синем",
+      "asset": "assets/rk-emblems/33.webp"
+    },
+    {
+      "id": 34,
+      "source": "2989.jpg",
+      "row": 2,
+      "column": 2,
+      "description": "чёрный шлем на белом",
+      "asset": "assets/rk-emblems/34.webp"
+    },
+    {
+      "id": 35,
+      "source": "2989.jpg",
+      "row": 2,
+      "column": 3,
+      "description": "жёлтый шлем на чёрном",
+      "asset": "assets/rk-emblems/35.webp"
+    },
+    {
+      "id": 36,
+      "source": "2989.jpg",
+      "row": 3,
+      "column": 0,
+      "description": "зелёная ёлка на чёрном",
+      "asset": "assets/rk-emblems/36.webp"
+    },
+    {
+      "id": 37,
+      "source": "2989.jpg",
+      "row": 3,
+      "column": 1,
+      "description": "белая ёлка на зелёном",
+      "asset": "assets/rk-emblems/37.webp"
+    },
+    {
+      "id": 38,
+      "source": "2989.jpg",
+      "row": 3,
+      "column": 2,
+      "description": "жёлтый цветок на красном",
+      "asset": "assets/rk-emblems/38.webp"
+    },
+    {
+      "id": 39,
+      "source": "2989.jpg",
+      "row": 3,
+      "column": 3,
+      "description": "белый цветок на розовом",
+      "asset": "assets/rk-emblems/39.webp"
+    },
+    {
+      "id": 40,
+      "source": "2989.jpg",
+      "row": 4,
+      "column": 0,
+      "description": "белый храм на красном",
+      "asset": "assets/rk-emblems/40.webp"
+    },
+    {
+      "id": 41,
+      "source": "2989.jpg",
+      "row": 4,
+      "column": 1,
+      "description": "чёрный храм на золотом",
+      "asset": "assets/rk-emblems/41.webp"
+    },
+    {
+      "id": 42,
+      "source": "2989.jpg",
+      "row": 4,
+      "column": 2,
+      "description": "белый скворечник на бирюзовом",
+      "asset": "assets/rk-emblems/42.webp"
+    },
+    {
+      "id": 43,
+      "source": "2989.jpg",
+      "row": 4,
+      "column": 3,
+      "description": "жёлтый скворечник на фиолетовом",
+      "asset": "assets/rk-emblems/43.webp"
+    },
+    {
+      "id": 44,
+      "source": "2989.jpg",
+      "row": 5,
+      "column": 0,
+      "description": "жёлтая свинка на синем",
+      "asset": "assets/rk-emblems/44.webp"
+    },
+    {
+      "id": 45,
+      "source": "2989.jpg",
+      "row": 5,
+      "column": 1,
+      "description": "белая свинка на розовом",
+      "asset": "assets/rk-emblems/45.webp"
+    },
+    {
+      "id": 46,
+      "source": "2989.jpg",
+      "row": 5,
+      "column": 2,
+      "description": "белый геймпад на синем",
+      "asset": "assets/rk-emblems/46.webp"
+    },
+    {
+      "id": 47,
+      "source": "2989.jpg",
+      "row": 5,
+      "column": 3,
+      "description": "жёлтый геймпад на красном",
+      "asset": "assets/rk-emblems/47.webp"
+    },
+    {
+      "id": 48,
+      "source": "2990.jpg",
+      "row": 0,
+      "column": 0,
+      "description": "белая лапа на фиолетовом",
+      "asset": "assets/rk-emblems/48.webp"
+    },
+    {
+      "id": 49,
+      "source": "2990.jpg",
+      "row": 0,
+      "column": 1,
+      "description": "чёрная лапа на белом",
+      "asset": "assets/rk-emblems/49.webp"
+    },
+    {
+      "id": 50,
+      "source": "2990.jpg",
+      "row": 0,
+      "column": 2,
+      "description": "белый клевер на зелёном",
+      "asset": "assets/rk-emblems/50.webp"
+    },
+    {
+      "id": 51,
+      "source": "2990.jpg",
+      "row": 0,
+      "column": 3,
+      "description": "зелёный клевер на чёрном",
+      "asset": "assets/rk-emblems/51.webp"
+    },
+    {
+      "id": 52,
+      "source": "2990.jpg",
+      "row": 1,
+      "column": 0,
+      "description": "белый якорь на синем",
+      "asset": "assets/rk-emblems/52.webp"
+    },
+    {
+      "id": 53,
+      "source": "2990.jpg",
+      "row": 1,
+      "column": 1,
+      "description": "чёрный якорь на голубом",
+      "asset": "assets/rk-emblems/53.webp"
+    },
+    {
+      "id": 54,
+      "source": "2990.jpg",
+      "row": 1,
+      "column": 2,
+      "description": "белая ракета на красном",
+      "asset": "assets/rk-emblems/54.webp"
+    },
+    {
+      "id": 55,
+      "source": "2990.jpg",
+      "row": 1,
+      "column": 3,
+      "description": "белая ракета на фиолетовом",
+      "asset": "assets/rk-emblems/55.webp"
+    },
+    {
+      "id": 56,
+      "source": "2990.jpg",
+      "row": 2,
+      "column": 0,
+      "description": "розовая звезда на чёрном",
+      "asset": "assets/rk-emblems/56.webp"
+    },
+    {
+      "id": 57,
+      "source": "2990.jpg",
+      "row": 2,
+      "column": 1,
+      "description": "жёлтая звезда на синем",
+      "asset": "assets/rk-emblems/57.webp"
+    },
+    {
+      "id": 58,
+      "source": "2990.jpg",
+      "row": 2,
+      "column": 2,
+      "description": "белая нота на чёрном",
+      "asset": "assets/rk-emblems/58.webp"
+    },
+    {
+      "id": 59,
+      "source": "2990.jpg",
+      "row": 2,
+      "column": 3,
+      "description": "чёрная нота на белом",
+      "asset": "assets/rk-emblems/59.webp"
+    },
+    {
+      "id": 60,
+      "source": "2990.jpg",
+      "row": 3,
+      "column": 0,
+      "description": "жёлтый жёлудь на фиолетовом",
+      "asset": "assets/rk-emblems/60.webp"
+    },
+    {
+      "id": 61,
+      "source": "2990.jpg",
+      "row": 3,
+      "column": 1,
+      "description": "чёрный жёлудь на белом",
+      "asset": "assets/rk-emblems/61.webp"
+    },
+    {
+      "id": 62,
+      "source": "2990.jpg",
+      "row": 3,
+      "column": 2,
+      "description": "белый парусник на бирюзовом",
+      "asset": "assets/rk-emblems/62.webp"
+    },
+    {
+      "id": 63,
+      "source": "2990.jpg",
+      "row": 3,
+      "column": 3,
+      "description": "белый парусник на синем",
+      "asset": "assets/rk-emblems/63.webp"
+    },
+    {
+      "id": 64,
+      "source": "2990.jpg",
+      "row": 4,
+      "column": 0,
+      "description": "белый дельфин на синем",
+      "asset": "assets/rk-emblems/64.webp"
+    },
+    {
+      "id": 65,
+      "source": "2990.jpg",
+      "row": 4,
+      "column": 1,
+      "description": "синий дельфин на золотом",
+      "asset": "assets/rk-emblems/65.webp"
+    },
+    {
+      "id": 66,
+      "source": "2990.jpg",
+      "row": 4,
+      "column": 2,
+      "description": "белый торт на красном",
+      "asset": "assets/rk-emblems/66.webp"
+    },
+    {
+      "id": 67,
+      "source": "2990.jpg",
+      "row": 4,
+      "column": 3,
+      "description": "жёлтый торт на розовом",
+      "asset": "assets/rk-emblems/67.webp"
+    },
+    {
+      "id": 68,
+      "source": "2990.jpg",
+      "row": 5,
+      "column": 0,
+      "description": "белый зонт на фиолетовом",
+      "asset": "assets/rk-emblems/68.webp"
+    },
+    {
+      "id": 69,
+      "source": "2990.jpg",
+      "row": 5,
+      "column": 1,
+      "description": "белый зонт на чёрном",
+      "asset": "assets/rk-emblems/69.webp"
+    },
+    {
+      "id": 70,
+      "source": "2990.jpg",
+      "row": 5,
+      "column": 2,
+      "description": "белый полумесяц на синем",
+      "asset": "assets/rk-emblems/70.webp"
+    },
+    {
+      "id": 71,
+      "source": "2990.jpg",
+      "row": 5,
+      "column": 3,
+      "description": "жёлтый полумесяц на фиолетовом",
+      "asset": "assets/rk-emblems/71.webp"
+    },
+    {
+      "id": 72,
+      "source": "2991.jpg",
+      "row": 0,
+      "column": 0,
+      "description": "белый череп на чёрном",
+      "asset": "assets/rk-emblems/72.webp"
+    },
+    {
+      "id": 73,
+      "source": "2991.jpg",
+      "row": 0,
+      "column": 1,
+      "description": "чёрный череп на белом",
+      "asset": "assets/rk-emblems/73.webp"
+    },
+    {
+      "id": 74,
+      "source": "2991.jpg",
+      "row": 0,
+      "column": 2,
+      "description": "белый осьминог на розовом",
+      "asset": "assets/rk-emblems/74.webp"
+    },
+    {
+      "id": 75,
+      "source": "2991.jpg",
+      "row": 0,
+      "column": 3,
+      "description": "белый осьминог на синем",
+      "asset": "assets/rk-emblems/75.webp"
+    },
+    {
+      "id": 76,
+      "source": "2991.jpg",
+      "row": 1,
+      "column": 0,
+      "description": "белая маска на бирюзовом",
+      "asset": "assets/rk-emblems/76.webp"
+    },
+    {
+      "id": 77,
+      "source": "2991.jpg",
+      "row": 1,
+      "column": 1,
+      "description": "жёлтая маска на фиолетовом",
+      "asset": "assets/rk-emblems/77.webp"
+    },
+    {
+      "id": 78,
+      "source": "2991.jpg",
+      "row": 1,
+      "column": 2,
+      "description": "белый паровоз на красном",
+      "asset": "assets/rk-emblems/78.webp"
+    },
+    {
+      "id": 79,
+      "source": "2991.jpg",
+      "row": 1,
+      "column": 3,
+      "description": "чёрный паровоз на белом",
+      "asset": "assets/rk-emblems/79.webp"
+    },
+    {
+      "id": 80,
+      "source": "2991.jpg",
+      "row": 2,
+      "column": 0,
+      "description": "белый коктейль на розовом",
+      "asset": "assets/rk-emblems/80.webp"
+    },
+    {
+      "id": 81,
+      "source": "2991.jpg",
+      "row": 2,
+      "column": 1,
+      "description": "белый коктейль на бирюзовом",
+      "asset": "assets/rk-emblems/81.webp"
+    },
+    {
+      "id": 82,
+      "source": "2991.jpg",
+      "row": 2,
+      "column": 2,
+      "description": "чёрная колба на зелёном",
+      "asset": "assets/rk-emblems/82.webp"
+    },
+    {
+      "id": 83,
+      "source": "2991.jpg",
+      "row": 2,
+      "column": 3,
+      "description": "жёлтая колба на фиолетовом",
+      "asset": "assets/rk-emblems/83.webp"
+    },
+    {
+      "id": 84,
+      "source": "2991.jpg",
+      "row": 3,
+      "column": 0,
+      "description": "белая пика на синем",
+      "asset": "assets/rk-emblems/84.webp"
+    },
+    {
+      "id": 85,
+      "source": "2991.jpg",
+      "row": 3,
+      "column": 1,
+      "description": "чёрная пика на белом",
+      "asset": "assets/rk-emblems/85.webp"
+    },
+    {
+      "id": 86,
+      "source": "2991.jpg",
+      "row": 3,
+      "column": 2,
+      "description": "белая кость на красном",
+      "asset": "assets/rk-emblems/86.webp"
+    },
+    {
+      "id": 87,
+      "source": "2991.jpg",
+      "row": 3,
+      "column": 3,
+      "description": "жёлтая кость на чёрном",
+      "asset": "assets/rk-emblems/87.webp"
+    },
+    {
+      "id": 88,
+      "source": "2991.jpg",
+      "row": 4,
+      "column": 0,
+      "description": "белый кот на фиолетовом",
+      "asset": "assets/rk-emblems/88.webp"
+    },
+    {
+      "id": 89,
+      "source": "2991.jpg",
+      "row": 4,
+      "column": 1,
+      "description": "белый кот на чёрном",
+      "asset": "assets/rk-emblems/89.webp"
+    },
+    {
+      "id": 90,
+      "source": "2991.jpg",
+      "row": 4,
+      "column": 2,
+      "description": "белые скрещённые мечи на синем",
+      "asset": "assets/rk-emblems/90.webp"
+    },
+    {
+      "id": 91,
+      "source": "2991.jpg",
+      "row": 4,
+      "column": 3,
+      "description": "жёлтые скрещённые мечи на красном",
+      "asset": "assets/rk-emblems/91.webp"
+    },
+    {
+      "id": 92,
+      "source": "2991.jpg",
+      "row": 5,
+      "column": 0,
+      "description": "зелёный кактус на чёрном",
+      "asset": "assets/rk-emblems/92.webp"
+    },
+    {
+      "id": 93,
+      "source": "2991.jpg",
+      "row": 5,
+      "column": 1,
+      "description": "белый кактус на зелёном",
+      "asset": "assets/rk-emblems/93.webp"
+    },
+    {
+      "id": 94,
+      "source": "2991.jpg",
+      "row": 5,
+      "column": 2,
+      "description": "чёрная птица на белом",
+      "asset": "assets/rk-emblems/94.webp"
+    },
+    {
+      "id": 95,
+      "source": "2991.jpg",
+      "row": 5,
+      "column": 3,
+      "description": "белая птица на бирюзовом",
+      "asset": "assets/rk-emblems/95.webp"
+    },
+    {
+      "id": 96,
+      "source": "2993.jpg",
+      "row": 0,
+      "column": 0,
+      "description": "белая собака на чёрном",
+      "asset": "assets/rk-emblems/96.webp"
+    },
+    {
+      "id": 97,
+      "source": "2993.jpg",
+      "row": 0,
+      "column": 1,
+      "description": "белая собака на синем",
+      "asset": "assets/rk-emblems/97.webp"
+    },
+    {
+      "id": 98,
+      "source": "2993.jpg",
+      "row": 0,
+      "column": 2,
+      "description": "жёлтое солнце на красном",
+      "asset": "assets/rk-emblems/98.webp"
+    },
+    {
+      "id": 99,
+      "source": "2993.jpg",
+      "row": 0,
+      "column": 3,
+      "description": "жёлтое солнце на чёрном",
+      "asset": "assets/rk-emblems/99.webp"
+    },
+    {
+      "id": 100,
+      "source": "2993.jpg",
+      "row": 1,
+      "column": 0,
+      "description": "белая кисть на розовом",
+      "asset": "assets/rk-emblems/100.webp"
+    },
+    {
+      "id": 101,
+      "source": "2993.jpg",
+      "row": 1,
+      "column": 1,
+      "description": "жёлтая кисть на красном",
+      "asset": "assets/rk-emblems/101.webp"
+    },
+    {
+      "id": 102,
+      "source": "2993.jpg",
+      "row": 1,
+      "column": 2,
+      "description": "белая капля на бирюзовом",
+      "asset": "assets/rk-emblems/102.webp"
+    },
+    {
+      "id": 103,
+      "source": "2993.jpg",
+      "row": 1,
+      "column": 3,
+      "description": "белая капля на синем",
+      "asset": "assets/rk-emblems/103.webp"
+    },
+    {
+      "id": 104,
+      "source": "2993.jpg",
+      "row": 2,
+      "column": 0,
+      "description": "жёлтая тыква на фиолетовом",
+      "asset": "assets/rk-emblems/104.webp"
+    },
+    {
+      "id": 105,
+      "source": "2993.jpg",
+      "row": 2,
+      "column": 1,
+      "description": "оранжевая тыква на чёрном",
+      "asset": "assets/rk-emblems/105.webp"
+    },
+    {
+      "id": 106,
+      "source": "2993.jpg",
+      "row": 2,
+      "column": 2,
+      "description": "жёлтый вигвам на чёрном",
+      "asset": "assets/rk-emblems/106.webp"
+    },
+    {
+      "id": 107,
+      "source": "2993.jpg",
+      "row": 2,
+      "column": 3,
+      "description": "чёрный вигвам на зелёном",
+      "asset": "assets/rk-emblems/107.webp"
+    },
+    {
+      "id": 108,
+      "source": "2993.jpg",
+      "row": 3,
+      "column": 0,
+      "description": "чёрный цилиндр на белом",
+      "asset": "assets/rk-emblems/108.webp"
+    },
+    {
+      "id": 109,
+      "source": "2993.jpg",
+      "row": 3,
+      "column": 1,
+      "description": "чёрный цилиндр на зелёном",
+      "asset": "assets/rk-emblems/109.webp"
+    },
+    {
+      "id": 110,
+      "source": "2993.jpg",
+      "row": 3,
+      "column": 2,
+      "description": "белое яйцо на бирюзовом",
+      "asset": "assets/rk-emblems/110.webp"
+    },
+    {
+      "id": 111,
+      "source": "2993.jpg",
+      "row": 3,
+      "column": 3,
+      "description": "жёлтое яйцо на красном",
+      "asset": "assets/rk-emblems/111.webp"
+    },
+    {
+      "id": 112,
+      "source": "2993.jpg",
+      "row": 4,
+      "column": 0,
+      "description": "чёрные очки и усы на голубом",
+      "asset": "assets/rk-emblems/112.webp"
+    },
+    {
+      "id": 113,
+      "source": "2993.jpg",
+      "row": 4,
+      "column": 1,
+      "description": "белые очки и усы на чёрном",
+      "asset": "assets/rk-emblems/113.webp"
+    },
+    {
+      "id": 114,
+      "source": "2993.jpg",
+      "row": 4,
+      "column": 2,
+      "description": "жёлтое перо на фиолетовом",
+      "asset": "assets/rk-emblems/114.webp"
+    },
+    {
+      "id": 115,
+      "source": "2993.jpg",
+      "row": 4,
+      "column": 3,
+      "description": "зелёное перо на чёрном",
+      "asset": "assets/rk-emblems/115.webp"
+    },
+    {
+      "id": 116,
+      "source": "2993.jpg",
+      "row": 5,
+      "column": 0,
+      "description": "жёлтая бомба на красном",
+      "asset": "assets/rk-emblems/116.webp"
+    },
+    {
+      "id": 117,
+      "source": "2993.jpg",
+      "row": 5,
+      "column": 1,
+      "description": "чёрная бомба на белом",
+      "asset": "assets/rk-emblems/117.webp"
+    },
+    {
+      "id": 118,
+      "source": "2993.jpg",
+      "row": 5,
+      "column": 2,
+      "description": "чёрный меч на золотом",
+      "asset": "assets/rk-emblems/118.webp"
+    },
+    {
+      "id": 119,
+      "source": "2993.jpg",
+      "row": 5,
+      "column": 3,
+      "description": "белый меч на красном",
+      "asset": "assets/rk-emblems/119.webp"
+    },
+    {
+      "id": 120,
+      "source": "2995.jpg",
+      "row": 0,
+      "column": 0,
+      "description": "чёрная трефа на белом",
+      "asset": "assets/rk-emblems/120.webp"
+    },
+    {
+      "id": 121,
+      "source": "2995.jpg",
+      "row": 0,
+      "column": 1,
+      "description": "белая трефа на красном",
+      "asset": "assets/rk-emblems/121.webp"
+    },
+    {
+      "id": 122,
+      "source": "2995.jpg",
+      "row": 0,
+      "column": 2,
+      "description": "жёлтая рыба на чёрном",
+      "asset": "assets/rk-emblems/122.webp"
+    },
+    {
+      "id": 123,
+      "source": "2995.jpg",
+      "row": 0,
+      "column": 3,
+      "description": "белая рыба на синем",
+      "asset": "assets/rk-emblems/123.webp"
+    },
+    {
+      "id": 124,
+      "source": "2995.jpg",
+      "row": 1,
+      "column": 0,
+      "description": "белая бабочка на розовом",
+      "asset": "assets/rk-emblems/124.webp"
+    },
+    {
+      "id": 125,
+      "source": "2995.jpg",
+      "row": 1,
+      "column": 1,
+      "description": "жёлтая бабочка на фиолетовом",
+      "asset": "assets/rk-emblems/125.webp"
+    },
+    {
+      "id": 126,
+      "source": "2995.jpg",
+      "row": 1,
+      "column": 2,
+      "description": "жёлтая шляпа волшебника на синем",
+      "asset": "assets/rk-emblems/126.webp"
+    },
+    {
+      "id": 127,
+      "source": "2995.jpg",
+      "row": 1,
+      "column": 3,
+      "description": "зелёная шляпа волшебника на чёрном",
+      "asset": "assets/rk-emblems/127.webp"
+    },
+    {
+      "id": 128,
+      "source": "2995.jpg",
+      "row": 2,
+      "column": 0,
+      "description": "США",
+      "asset": "assets/rk-emblems/128.webp"
+    },
+    {
+      "id": 129,
+      "source": "2995.jpg",
+      "row": 2,
+      "column": 1,
+      "description": "Канада",
+      "asset": "assets/rk-emblems/129.webp"
+    },
+    {
+      "id": 130,
+      "source": "2995.jpg",
+      "row": 2,
+      "column": 2,
+      "description": "Великобритания",
+      "asset": "assets/rk-emblems/130.webp"
+    },
+    {
+      "id": 131,
+      "source": "2995.jpg",
+      "row": 2,
+      "column": 3,
+      "description": "Япония",
+      "asset": "assets/rk-emblems/131.webp"
+    },
+    {
+      "id": 132,
+      "source": "2995.jpg",
+      "row": 3,
+      "column": 0,
+      "description": "Швеция",
+      "asset": "assets/rk-emblems/132.webp"
+    },
+    {
+      "id": 133,
+      "source": "2995.jpg",
+      "row": 3,
+      "column": 1,
+      "description": "Англия",
+      "asset": "assets/rk-emblems/133.webp"
+    },
+    {
+      "id": 134,
+      "source": "2995.jpg",
+      "row": 3,
+      "column": 2,
+      "description": "Швейцария",
+      "asset": "assets/rk-emblems/134.webp"
+    },
+    {
+      "id": 135,
+      "source": "2995.jpg",
+      "row": 3,
+      "column": 3,
+      "description": "Португалия",
+      "asset": "assets/rk-emblems/135.webp"
+    },
+    {
+      "id": 136,
+      "source": "2995.jpg",
+      "row": 4,
+      "column": 0,
+      "description": "Нидерланды",
+      "asset": "assets/rk-emblems/136.webp"
+    },
+    {
+      "id": 137,
+      "source": "2995.jpg",
+      "row": 4,
+      "column": 1,
+      "description": "Италия",
+      "asset": "assets/rk-emblems/137.webp"
+    },
+    {
+      "id": 138,
+      "source": "2995.jpg",
+      "row": 4,
+      "column": 2,
+      "description": "Германия",
+      "asset": "assets/rk-emblems/138.webp"
+    },
+    {
+      "id": 139,
+      "source": "2995.jpg",
+      "row": 4,
+      "column": 3,
+      "description": "Франция",
+      "asset": "assets/rk-emblems/139.webp"
+    },
+    {
+      "id": 140,
+      "source": "2995.jpg",
+      "row": 5,
+      "column": 0,
+      "description": "Дания",
+      "asset": "assets/rk-emblems/140.webp"
+    },
+    {
+      "id": 141,
+      "source": "2995.jpg",
+      "row": 5,
+      "column": 1,
+      "description": "Испания",
+      "asset": "assets/rk-emblems/141.webp"
+    },
+    {
+      "id": 142,
+      "source": "2995.jpg",
+      "row": 5,
+      "column": 2,
+      "description": "Южная Корея",
+      "asset": "assets/rk-emblems/142.webp"
+    },
+    {
+      "id": 143,
+      "source": "2995.jpg",
+      "row": 5,
+      "column": 3,
+      "description": "Финляндия",
+      "asset": "assets/rk-emblems/143.webp"
+    },
+    {
+      "id": 144,
+      "source": "2996.jpg",
+      "row": 0,
+      "column": 0,
+      "description": "Россия",
+      "asset": "assets/rk-emblems/144.webp"
+    },
+    {
+      "id": 145,
+      "source": "2996.jpg",
+      "row": 0,
+      "column": 1,
+      "description": "Бельгия",
+      "asset": "assets/rk-emblems/145.webp"
+    },
+    {
+      "id": 146,
+      "source": "2996.jpg",
+      "row": 0,
+      "column": 2,
+      "description": "Норвегия",
+      "asset": "assets/rk-emblems/146.webp"
+    },
+    {
+      "id": 147,
+      "source": "2996.jpg",
+      "row": 0,
+      "column": 3,
+      "description": "Ирландия",
+      "asset": "assets/rk-emblems/147.webp"
+    },
+    {
+      "id": 148,
+      "source": "2996.jpg",
+      "row": 1,
+      "column": 0,
+      "description": "Мексика",
+      "asset": "assets/rk-emblems/148.webp"
+    },
+    {
+      "id": 149,
+      "source": "2996.jpg",
+      "row": 1,
+      "column": 1,
+      "description": "Индия",
+      "asset": "assets/rk-emblems/149.webp"
+    },
+    {
+      "id": 150,
+      "source": "2996.jpg",
+      "row": 1,
+      "column": 2,
+      "description": "Китай",
+      "asset": "assets/rk-emblems/150.webp"
+    },
+    {
+      "id": 151,
+      "source": "2996.jpg",
+      "row": 1,
+      "column": 3,
+      "description": "Бразилия",
+      "asset": "assets/rk-emblems/151.webp"
+    },
+    {
+      "id": 152,
+      "source": "2996.jpg",
+      "row": 2,
+      "column": 0,
+      "description": "Венесуэла",
+      "asset": "assets/rk-emblems/152.webp"
+    },
+    {
+      "id": 153,
+      "source": "2996.jpg",
+      "row": 2,
+      "column": 1,
+      "description": "ЮАР",
+      "asset": "assets/rk-emblems/153.webp"
+    },
+    {
+      "id": 154,
+      "source": "2996.jpg",
+      "row": 2,
+      "column": 2,
+      "description": "Гонконг",
+      "asset": "assets/rk-emblems/154.webp"
+    },
+    {
+      "id": 155,
+      "source": "2996.jpg",
+      "row": 2,
+      "column": 3,
+      "description": "Уругвай",
+      "asset": "assets/rk-emblems/155.webp"
+    },
+    {
+      "id": 156,
+      "source": "2996.jpg",
+      "row": 3,
+      "column": 0,
+      "description": "Тайвань",
+      "asset": "assets/rk-emblems/156.webp"
+    },
+    {
+      "id": 157,
+      "source": "2996.jpg",
+      "row": 3,
+      "column": 1,
+      "description": "Украина",
+      "asset": "assets/rk-emblems/157.webp"
+    },
+    {
+      "id": 158,
+      "source": "2996.jpg",
+      "row": 3,
+      "column": 2,
+      "description": "Румыния",
+      "asset": "assets/rk-emblems/158.webp"
+    },
+    {
+      "id": 159,
+      "source": "2996.jpg",
+      "row": 3,
+      "column": 3,
+      "description": "Турция",
+      "asset": "assets/rk-emblems/159.webp"
+    },
+    {
+      "id": 160,
+      "source": "2996.jpg",
+      "row": 4,
+      "column": 0,
+      "description": "Польша",
+      "asset": "assets/rk-emblems/160.webp"
+    },
+    {
+      "id": 161,
+      "source": "2996.jpg",
+      "row": 4,
+      "column": 1,
+      "description": "Таиланд",
+      "asset": "assets/rk-emblems/161.webp"
+    },
+    {
+      "id": 162,
+      "source": "2996.jpg",
+      "row": 4,
+      "column": 2,
+      "description": "Филиппины",
+      "asset": "assets/rk-emblems/162.webp"
+    },
+    {
+      "id": 163,
+      "source": "2996.jpg",
+      "row": 4,
+      "column": 3,
+      "description": "Австрия",
+      "asset": "assets/rk-emblems/163.webp"
+    },
+    {
+      "id": 164,
+      "source": "2996.jpg",
+      "row": 5,
+      "column": 0,
+      "description": "Австралия",
+      "asset": "assets/rk-emblems/164.webp"
+    },
+    {
+      "id": 165,
+      "source": "2996.jpg",
+      "row": 5,
+      "column": 1,
+      "description": "Аргентина",
+      "asset": "assets/rk-emblems/165.webp"
+    },
+    {
+      "id": 166,
+      "source": "2996.jpg",
+      "row": 5,
+      "column": 2,
+      "description": "Колумбия",
+      "asset": "assets/rk-emblems/166.webp"
+    },
+    {
+      "id": 167,
+      "source": "2996.jpg",
+      "row": 5,
+      "column": 3,
+      "description": "Греция",
+      "asset": "assets/rk-emblems/167.webp"
+    },
+    {
+      "id": 168,
+      "source": "2997.jpg",
+      "row": 0,
+      "column": 0,
+      "description": "Индонезия",
+      "asset": "assets/rk-emblems/168.webp"
+    },
+    {
+      "id": 169,
+      "source": "2997.jpg",
+      "row": 0,
+      "column": 1,
+      "description": "Чехия",
+      "asset": "assets/rk-emblems/169.webp"
+    },
+    {
+      "id": 170,
+      "source": "2997.jpg",
+      "row": 0,
+      "column": 2,
+      "description": "Венгрия",
+      "asset": "assets/rk-emblems/170.webp"
+    },
+    {
+      "id": 171,
+      "source": "2997.jpg",
+      "row": 0,
+      "column": 3,
+      "description": "Чили",
+      "asset": "assets/rk-emblems/171.webp"
+    },
+    {
+      "id": 172,
+      "source": "2997.jpg",
+      "row": 1,
+      "column": 0,
+      "description": "Хорватия",
+      "asset": "assets/rk-emblems/172.webp"
+    },
+    {
+      "id": 173,
+      "source": "2997.jpg",
+      "row": 1,
+      "column": 1,
+      "description": "Сингапур",
+      "asset": "assets/rk-emblems/173.webp"
+    },
+    {
+      "id": 174,
+      "source": "2997.jpg",
+      "row": 1,
+      "column": 2,
+      "description": "Перу",
+      "asset": "assets/rk-emblems/174.webp"
+    },
+    {
+      "id": 175,
+      "source": "2997.jpg",
+      "row": 1,
+      "column": 3,
+      "description": "Израиль",
+      "asset": "assets/rk-emblems/175.webp"
+    },
+    {
+      "id": 176,
+      "source": "2997.jpg",
+      "row": 2,
+      "column": 0,
+      "description": "Болгария",
+      "asset": "assets/rk-emblems/176.webp"
+    },
+    {
+      "id": 177,
+      "source": "2997.jpg",
+      "row": 2,
+      "column": 1,
+      "description": "ОАЭ",
+      "asset": "assets/rk-emblems/177.webp"
+    },
+    {
+      "id": 178,
+      "source": "2997.jpg",
+      "row": 2,
+      "column": 2,
+      "description": "Нигерия",
+      "asset": "assets/rk-emblems/178.webp"
+    },
+    {
+      "id": 179,
+      "source": "2997.jpg",
+      "row": 2,
+      "column": 3,
+      "description": "Малайзия",
+      "asset": "assets/rk-emblems/179.webp"
+    },
+    {
+      "id": 180,
+      "source": "2997.jpg",
+      "row": 3,
+      "column": 0,
+      "description": "Египет",
+      "asset": "assets/rk-emblems/180.webp"
+    },
+    {
+      "id": 181,
+      "source": "2997.jpg",
+      "row": 3,
+      "column": 1,
+      "description": "Вьетнам",
+      "asset": "assets/rk-emblems/181.webp"
+    },
+    {
+      "id": 182,
+      "source": "2997.jpg",
+      "row": 3,
+      "column": 2,
+      "description": "Катар",
+      "asset": "assets/rk-emblems/182.webp"
+    },
+    {
+      "id": 183,
+      "source": "2997.jpg",
+      "row": 3,
+      "column": 3,
+      "description": "Кувейт",
+      "asset": "assets/rk-emblems/183.webp"
+    }
+  ]
+}

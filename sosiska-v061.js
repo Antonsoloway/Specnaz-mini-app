@@ -23,7 +23,7 @@
   const disclosure=(key,title,html,kind='')=>'<details class="sosiska-disclosure '+kind+'" data-sosiska-section="'+esc(key)+'"'+(openSections.has(key)?' open':'')+'><summary>'+esc(title)+'</summary>'+html+'</details>';
   const details=new Map(),timelines=new Map(),size=4;let pollTimer=null,filters={},filterLoading=false,stopFilterLoading=false,searchWarnings=[],period=null,periodLoading=false,stopPeriod=false,teamView='period',selected=new Map(),comparison=null,playerId=null,metric='levels';
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const teamName=(text,id,logo)=>game==='rk'?esc(text):window.RoyalTeamEmblems?.name(text,id,logo)||esc(text);
+  const teamName=(text,id,logo)=>game==='rk'?(window.RoyalKingdomEmblems?.name(text,id,logo)||esc(text)):(window.RoyalTeamEmblems?.name(text,id,logo)||esc(text));
   const emblemLogo=t=>t?.TeamLogo??t?.Logo??t?.teamLogo??t?.logo;
   const value=v=>v==null?'—':typeof v==='object'?'—':String(v);
   const when=v=>v?new Date(v).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'}):'—';
