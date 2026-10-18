@@ -1,6 +1,6 @@
 // Public-safe diagnostics for the admin agent cards. Add future agents here
 // with their own probe; browser input cannot select an arbitrary upstream.
-export const AGENT_CATALOG=Object.freeze([{id:'sosiska',name:'Сосиска',game:'RM'}]);
+export const AGENT_CATALOG=Object.freeze([{id:'sosiska',name:'Сосиска',game:'RM'},{id:'sosiska-rk',name:'Сосиска RK',game:'RK'}]);
 const level=n=>Number.isInteger(n)&&n>0&&n<=2147483647?n:null;
 const validTime=v=>typeof v==='string'&&Number.isFinite(Date.parse(v))?v:null;
 export async function readSosiskaStatus(invoke,now=Date.now){
@@ -28,4 +28,15 @@ export async function readSosiskaStatus(invoke,now=Date.now){
     checkedAt:live.checkedAt,lastOnlineAt:live.checkedAt};
   }catch(error){return {...result,status:error?.status===429?'busy':'offline',checkedAt:new Date(now()).toISOString()};}
  }catch(error){return {...result,status:error?.status===429?'busy':'offline'};}
+}
+
+
+export async function readKingdomStatus(invoke,now=Date.now){
+ const base={...AGENT_CATALOG[1],status:'offline',level:null,maxLevel:null,levelVerified:false,checkedAt:new Date(now()).toISOString()};
+ try{
+  const h=await invoke(),at=Date.parse(h?.checkedAt??'');
+  if(h?.game!=='rk'||h?.online!==true||!Number.isInteger(h.level)||h.level<=0||
+    !Number.isInteger(h.maxLevel)||h.maxLevel<h.level||!Number.isFinite(at)||at>now()+5000||now()-at>90000)return base;
+  return {...base,status:'online',level:h.level,maxLevel:h.maxLevel,levelVerified:true,checkedAt:h.checkedAt,lastOnlineAt:h.checkedAt};
+ }catch{return base;}
 }

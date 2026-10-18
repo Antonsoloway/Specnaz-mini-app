@@ -155,7 +155,18 @@ export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=request
   return {start:(teamId,teamIds)=>serial(()=>start(teamId,teamIds)),status,timeline,step:()=>serial(step)};
 }
 export class SosiskaAnalysisJobs {
-  constructor(ctx,env){this.jobs=createAnalysisJobs({storage:ctx.storage,env});}
+  constructor(ctx,env,fetchAgent=fetch,analyze=requestSosiskaAnalysis){this.jobs=createAnalysisJobs({storage:ctx.storage,env,fetchAgent,analyze});}
   async fetch(request){try{const b=await request.json();const data=b.operation==='start'?await this.jobs.start(b.teamId,b.teamIds):b.operation==='status'?await this.jobs.status(b.jobId,b.teamId,b.teamIds):b.operation==='timeline'?await this.jobs.timeline(b.jobId,b.teamId,b.before,b.limit):null;if(!data)return json({ok:false,error:'ANALYSIS_INVALID'},400);return json({ok:true,data});}catch(e){return json({ok:false,error:safeError(e)},503);}}
   async alarm(){await this.jobs.step();}
+}
+
+
+export class SosiskaKingdomAnalysisJobs extends SosiskaAnalysisJobs{
+ constructor(ctx,env){
+  super(ctx,env,async(_url,opts)=>{
+   if(!env.SOSISKA_RK_MONITOR)return Response.json({ok:false,error:'RK_MONITOR_NOT_CONFIGURED'},{status:503});
+   const stub=env.SOSISKA_RK_MONITOR.get(env.SOSISKA_RK_MONITOR.idFromName('kingdom-monitor-v1'));
+   return stub.fetch('https://rk-monitor.internal',{method:'POST',headers:{'Content-Type':'application/json'},body:opts.body});
+  },args=>requestSosiskaAnalysis({...args,task:'Это игра Royal Kingdom (RK), не Royal Match. В истории поле Crown означает игровые кубки Cup, а не короны. Не приписывай событию RK расписание RM. Чужие личные очки в битвах могут быть недоступны. '+args.task}));
+ }
 }
