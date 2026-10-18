@@ -264,7 +264,7 @@ export async function handleKingdom(request,env,body,json,fetcher=fetch){
    if(!d)return json({ok:false,error:'RK_NOT_CONFIGURED'},503);
    const p=d.Profile;if(d.RequestedUserId!==body.userId||p?.UserId!==body.userId)throw Error('RK_PROFILE_INVALID');
    return json({ok:true,data:{userId:body.userId,name:p.Name,level:p.Level,crown:Number.isSafeInteger(p.Cup)&&p.Cup>=0?p.Cup:null,teamId:p.TeamId,
-    teamName:p.TeamName??'',joinedAt:null,profileSetting:p.ProfileSetting,stats:normalizeKingdomProfileStats(d),statsAvailable:d.statsAvailable===true,game:'rk',fetchedAt:new Date().toISOString()}});
+    teamName:p.TeamName??'',joinedAt:null,profileSetting:p.ProfileSetting,stats:normalizeKingdomProfileStats(d),statsAvailable:d.statsAvailable===true,game:'rk',fetchedAt:typeof d.observedAt==='string'&&!Number.isNaN(Date.parse(d.observedAt))?d.observedAt:new Date().toISOString(),cacheStatus:['live','hit','stale'].includes(d.cacheStatus)?d.cacheStatus:'live'}});
   }
   if(['tournamentGroup','tournamentPlayers'].includes(operation)){
    const battle=await invoke(RK_EVENT_ORIGIN,env.RK_EVENT_API_KEY,'getTeamClash');
