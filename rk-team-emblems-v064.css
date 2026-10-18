@@ -15,3 +15,5 @@
 [data-admin-participant-team] b>.rk-team-emblem,
 .team-detail-head h2>.rk-team-emblem{margin-right:7px}
 .team-detail-head h2>.rk-team-emblem{width:40px!important;height:44px!important}
+
+.team-card-main>strong>.rk-team-emoji-prefix{display:inline;margin:0;opacity:1}
