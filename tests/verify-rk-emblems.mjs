@@ -37,3 +37,16 @@ test('source references RK assets and keeps RM names untouched',async()=>{
  assert.equal(catalog.entries[0].asset,'assets/rk-emblems/0.webp');
  assert.equal(catalog.entries[183].asset,'assets/rk-emblems/183.webp');
 });
+
+test('RK emoji catalogue covers every ID and preserves editable names without duplicate prefixes',async()=>{
+ const ctx={window:{},document:{addEventListener(){}}};vm.createContext(ctx);
+ vm.runInContext(await readFile(new URL('rk-team-emblems-v064.js',here),'utf8'),ctx);
+ const api=ctx.window.RoyalKingdomEmblems;
+ for(let id=0;id<184;id++)assert.ok(api.emoji(id),'RK emoji '+id);
+ assert.equal(api.emojiName('FORTUNA',144),'🇷🇺FORTUNA');
+ assert.equal(api.emojiName('WeAreJustice',159),'🇹🇷WeAreJustice');
+ assert.equal(api.emojiName('Da budet Swet',52),'⚓Da budet Swet');
+ assert.equal(api.emojiName('🌟 Kingdom Team',144),'🌟Kingdom Team');
+ assert.equal(api.emojiName('Kingdom Team',999),'Kingdom Team');
+ assert.equal(api.emojiName(api.emojiName('Team',8),8),'♞Team');
+});

@@ -50,7 +50,7 @@
   function card(data) {
     const rk=data.game==='Royal Kingdom',currency=rk?'Кубки':'Короны';
     const emblem=rk?window.RoyalKingdomEmblems:window.RoyalTeamEmblems;
-    const title=rk?esc(data.name):(emblem?.label(data.name)||esc(data.name));
+    const title=rk?(window.RoyalKingdomEmblems?.label(data.name)||esc(data.name)):(emblem?.label(data.name)||esc(data.name));
     const fact=(label,value)=>'<div><span>'+label+'</span><b>'+num(value)+'</b></div>';
     const stars=rk&&data.star!=null?'<div class="team-live-stars" aria-label="Звёзд команды: '+esc(data.star)+'">'+Array.from({length:data.star},()=>icon('star')).join('')+'</div>':'';
     return '<header class="team-live-banner"><h3>О команде</h3></header><div class="team-live-summary"><div class="team-live-title"><span class="team-live-emblem" aria-hidden="true">'+(emblem?.image(data.logo)||'')+'</span><h3><span class="team-live-name">'+title+'</span></h3>'+stars+'<div class="team-live-places"><small>Места</small><b>'+num(data.memberCount)+'/'+num(data.capacity)+'</b></div><p class="team-live-description">'+esc(data.description)+'</p></div><div class="team-live-facts">'+fact('Очки команды',data.score)+fact('Требуемый уровень',data.minLevel)+fact(rk?'Нужно кубков':'Короны входа',data.minCrowns)+'<div><span>Тип команды</span><b>'+esc(data.type||'—')+'</b></div></div></div><div class="team-live-leadership">'+data.leadership.slice(0,4).map(m=>'<article class="team-live-player"><div class="team-live-player-head"><span class="team-live-player-icon" aria-hidden="true">'+icon(m.role==='Лидер'?'crown':'star')+'</span><div class="team-live-player-name"><b title="'+esc(m.name)+'">'+esc(m.name)+'</b><small>'+esc(m.role)+'</small></div></div><div class="team-live-crowns"><small>'+icon(rk?'cup':'crown')+' '+currency+'</small><b>'+playerNum(m.crowns)+'</b></div><div><small>Уровень</small><b>'+playerNum(m.level)+'</b></div></article>').join('')+'</div>';
@@ -89,17 +89,18 @@
     if(!permitted||!token()||!window.RoyalTeamEmblems)return;
     document.querySelectorAll('[data-write-team-form]').forEach(form=>{
       const field=form.querySelector('[data-write-field="name"]'),id=form.querySelector('[data-write-field="gameTeamId"]'),game=form.querySelector('[data-write-field="game"]');
-      if(!field||!id||game?.value!=='Royal Match'||!id.value)return;
+      const selectedGame=game?.value,emblems=selectedGame==='Royal Kingdom'?window.RoyalKingdomEmblems:window.RoyalTeamEmblems;
+      if(!field||!id||!['Royal Match','Royal Kingdom'].includes(selectedGame)||!emblems||!id.value)return;
       let state=editors.get(form);if(!state){state={touched:false,key:''};editors.set(form,state);}
       if(state.touched)return;
-      if(window.RoyalTeamEmblems.hasEmojiPrefix(field.value)){field.value=window.RoyalTeamEmblems.emojiName(field.value,null);return;}
+      if(emblems.hasEmojiPrefix(field.value)){field.value=emblems.emojiName(field.value,null);return;}
       const key=id.value;if(state.key===key)return;
       const records=window.RoyalAdminDataV0600?.current?.adminData?.teams||[];
-      const matches=records.filter(t=>t.game==='Royal Match'&&t.gameTeamId===key&&t.name===field.value);if(matches.length!==1)return;
+      const matches=records.filter(t=>t.game===selectedGame&&t.gameTeamId===key&&t.name===field.value);if(matches.length!==1)return;
       state.key=key;const session=token(),initial=field.value;
       window.RoyalTeamEmblems.fetchLive(matches[0],true,false,true).then(payload=>{
-        if(!permitted||session!==token()||!form.isConnected||state.touched||game.value!=='Royal Match'||id.value!==key||field.value!==initial)return;
-        field.value=window.RoyalTeamEmblems.emojiName(initial,payload.data.logo);
+        if(!permitted||session!==token()||!form.isConnected||state.touched||game.value!==selectedGame||id.value!==key||field.value!==initial)return;
+        field.value=emblems.emojiName(initial,payload.data.logo);
       }).catch(()=>{});
     });
   }
@@ -139,7 +140,7 @@
   window.addEventListener('click',event=>{
     const pick=event.target.closest?.('[data-team-live-pick]');
     if(pick){event.preventDefault();event.stopImmediatePropagation();const form=pick.closest('form'),selectedGame=form?.querySelector('[data-write-field="game"]')?.value,session=token();if(!['Royal Match','Royal Kingdom'].includes(selectedGame))return;
-      window.RoyalSosiska?.pickTeam(data=>{if(!form.isConnected||session!==token()||form.querySelector('[data-write-field="game"]').value!==selectedGame)return;form.querySelector('[data-write-field="gameTeamId"]').value=data.TeamId;form.querySelector('[data-write-field="name"]').value=selectedGame==='Royal Kingdom'?String(data.TeamName??''):(window.RoyalTeamEmblems?.emojiName(data.TeamName,window.RoyalTeamEmblems.logoOf(data))??data.TeamName??'');editors.set(form,{touched:false,key:String(data.TeamId)});},selectedGame);return;}
+      window.RoyalSosiska?.pickTeam(data=>{if(!form.isConnected||session!==token()||form.querySelector('[data-write-field="game"]').value!==selectedGame)return;form.querySelector('[data-write-field="gameTeamId"]').value=data.TeamId;form.querySelector('[data-write-field="name"]').value=(selectedGame==='Royal Kingdom'?window.RoyalKingdomEmblems:window.RoyalTeamEmblems)?.emojiName(data.TeamName,(selectedGame==='Royal Kingdom'?window.RoyalKingdomEmblems:window.RoyalTeamEmblems)?.logoOf(data))??data.TeamName??'';editors.set(form,{touched:false,key:String(data.TeamId)});},selectedGame);return;}
     const control=event.target.closest?.('[data-team-live-refresh],[data-team-live-photo]');if(!control)return;
     event.preventDefault();event.stopImmediatePropagation();const host=control.closest('.team-live-card'),state=states.get(host);if(!state)return;
     if(control.matches('[data-team-live-refresh]'))load(host,true);
