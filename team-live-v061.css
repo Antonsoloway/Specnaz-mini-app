@@ -53,5 +53,4 @@
 .team-live-card .team-live-title>.team-live-places{grid-row:2;grid-column:3}
 .team-live-card .team-live-title>.team-live-description{grid-row:3}
 
-.team-live-title:has(>.team-live-emblem>.rm-team-emblem[data-rm-loaded="1"]):not(:has(>.team-live-emblem>.rm-team-emblem[hidden]))>h3 .rm-team-emoji-prefix{display:none!important}
 .team-live-card .team-live-title:has(>.team-live-emblem:empty){grid-template-columns:0 minmax(0,1fr) 62px}
