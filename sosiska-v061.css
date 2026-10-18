@@ -106,3 +106,9 @@
 .sosiska-game-tabs button{min-width:0;border:1px solid #52697b;background:#223543;color:#e2e8f0;border-radius:12px;padding:12px 6px;font:inherit;font-weight:650;white-space:normal}
 .sosiska-game-tabs button.active{background:#32658a;border-color:#9ed5fa;color:#fff}
 .sosiska-game-tabs button:focus-visible{outline:3px solid #a5d8ff;outline-offset:2px}
+
+/* Native Royal Kingdom profile: arena and general stats have their own game panels. */
+.sosiska-game-profile .sosiska-rk-arena-title{background:linear-gradient(#087f5b,#075b43);border-color:#e8ba46;color:#fff6c8}
+.sosiska-game-profile .sosiska-rk-main-title{background:linear-gradient(#a51531,#750c29);border-color:#efb74a;color:#fff0c9}
+.sosiska-game-profile .sosiska-profile-stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 7px}
+.sosiska-game-profile .sosiska-profile-stat small{overflow-wrap:anywhere}

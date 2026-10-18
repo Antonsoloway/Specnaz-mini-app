@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {normalizeKingdomTeam,createKingdomMonitor} from '../worker/src/sosiska-rk-monitor.js';
-import {createSosiskaApi,validateAgentAction} from '../worker/src/sosiska-api.js';
+import {createSosiskaApi,validateAgentAction,normalizeKingdomProfileStats} from '../worker/src/sosiska-api.js';
 import {readKingdomStatus} from '../worker/src/agent-status.js';
 
 const rkTeam=(level=10)=>({Status:0,TeamId:'100',TeamName:'RK team',TeamLogo:3,
@@ -86,4 +86,28 @@ test('RK auth, body and admin boundary prevent upstream requests',async()=>{
  fetchAgent:async()=>{calls++;throw Error('should not');}});
  const res=await handle(req({operation:'search',game:'rk',query:'RK'}),env);
  assert.equal(res.status,403);assert.equal(calls,0);
+});
+
+test('RK stats use native keyed ClientStats and BackendStats, never RM IDs',()=>{
+ const data={ClientStats:[{key:9,value:'46450'},{key:10,value:'9434'},{key:11,value:'7'},
+ {key:1,value:'13999'},{key:2,value:'14361'},{key:3,value:'652'},{key:4,value:'1123'},
+ {key:7,value:'8'},{key:8,value:'69'}],
+ BackendStats:[{key:1,value:'757'},{key:2,value:'1'},{key:3,value:'0'},{key:4,value:'0'}]};
+ const stats=normalizeKingdomProfileStats(data);
+ assert.equal(stats.totalCup,'46450');assert.equal(stats.highestCup,'9434');
+ assert.equal(stats.arenaWins,'7');assert.equal(stats.firstTryWins,'13999');
+ assert.equal(stats.levelWins,'14361');assert.equal(stats.helpsMade,'652');
+ assert.equal(stats.highestWeeklyWins,'1123');assert.equal(stats.collectionsCompleted,'8');
+ assert.equal(stats.districtsBuilt,'69');assert.equal(stats.worldBestRank,'757');
+ assert.equal(stats.worldTop1000,'1');assert.equal(stats.localBestRank,null);
+ assert.equal(stats.localTop1000,'0');
+ assert.equal(stats.totalCrown,undefined);assert.equal(stats.helpsReceived,undefined);
+ assert.deepEqual(normalizeKingdomProfileStats({}),{});
+ assert.throws(()=>normalizeKingdomProfileStats({ClientStats:[{key:9,value:'0'},{key:9,value:'8'}]}),/RK_PROFILE_INVALID/);
+});
+test('RK profile interface labels battle only and uses arena+kingdom native stats',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const js=await readFile(new URL('../sosiska-v061.js',import.meta.url),'utf8');
+ assert.match(js,/event:game==='rk'\?'Битва':'Турнир \/ битва'/);
+ for(const required of ['Статистика арены','Основная статистика','Победы на уровнях','Построенные районы','stats.totalCup','stats.highestWeeklyWins','stats.worldBestRank','Текущие кубки'])assert(js.includes(required),required);
 });
