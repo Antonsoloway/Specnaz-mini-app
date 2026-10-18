@@ -1,6 +1,6 @@
-## 18.10.2026 — v0.6.7 team cards without help prepared
+## 18.10.2026 — v0.6.7 published: no help, complete one-line titles
 
-Owner confirmed linked RK card works (3002.jpg). By request, remove weekly team help and per-player help from both RM/RK team-card rendering. Player rows now contain two metrics: crowns/cups and level. Owner additionally requires full one-line names without ellipsis/clipping; a dedicated full-width title row and measured font fit preserve the entire raw title, including MICKEY KINGDOM and FGHBBBJNCDTHBCF examples. Observation/history/profile data remain available to their existing consumers; this release changes the team-card UI only. New entry/changelog v0.6.7; root query/hash preservation retained. Source validation and publication pending.
+Owner confirmed the RK linked card works. Team cards now hide weekly team help and leader/co-leader help in both RM/RK. Player rows contain crowns/cups and level. Complete names render on a full-width single line, measured to fit by font size without truncation or ellipsis. Raw CRM text stays intact; fit runs after render/width/font/emblem changes, and disconnected card observers are released. Owner examples MICKEY KINGDOM and FGHBBBJNCDTHBCF plus20 wide characters pass at320/390/768 under complete app CSS. PR79 mergedc7b73a83cd3d12702d21de101f2f2c8b3db14863. Source CI39160679353/39160677135 PASS (152Node,32admin,workerd/isolation/all browser checks), Pages39160862987 PASS. Seven public files match reviewed source. Main CI39160863033: in_progress at documentation time. Apps Script/Worker source and observation/profile/history data unchanged.
 
 ## 18.10.2026 — v0.6.6 RK team links published
 

@@ -289,3 +289,8 @@ Agent cards remain admin-only. Green online requires a successful game-server re
 ### Royal Kingdom linked cards
 
 Select the agent and credential from the server-owned canonical CRM game, never from an arbitrary URL or a caller-supplied team ID. Same numeric IDs in RM and RK are different cache identities. RK uses its own 0–183 emblem catalogue, native Score/MinCup/IsOpen and Cup for players; RM projection is unchanged. Existing Команды!M header `ID команды RM` remains a legacy ownership marker for both games; column A supplies the game. Do not migrate, clear or overwrite unrelated columns. Leader comes first, followed by unique current co-leaders, at most four players. Binding and opening cards never starts monitoring.
+
+
+### Linked team-card title and help display (18.10.2026)
+
+In both RM and RK linked team cards, display the full team name on one line. No ellipsis, truncation or wrapping: reserve enough title width and measure font fit. Keep raw CRM identity unchanged and refit after width/font/emblem updates. Hide weekly team help and player help in this card; keep crowns/cups and level. Other profile/history/observation consumers retain their data.
