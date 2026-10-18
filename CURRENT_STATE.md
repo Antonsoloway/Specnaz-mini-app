@@ -1,6 +1,6 @@
 ## 18.10.2026 — v0.6.7 team cards without help prepared
 
-Owner confirmed linked RK card works (3002.jpg). By request, remove weekly team help and per-player help from both RM/RK team-card rendering. Player rows now contain two metrics: crowns/cups and level. Observation/history/profile data remain available to their existing consumers; this release changes the team-card UI only. New entry/changelog v0.6.7; root query/hash preservation retained. Source validation and publication pending.
+Owner confirmed linked RK card works (3002.jpg). By request, remove weekly team help and per-player help from both RM/RK team-card rendering. Player rows now contain two metrics: crowns/cups and level. Owner additionally requires full one-line names without ellipsis/clipping; a dedicated full-width title row and measured font fit preserve the entire raw title, including MICKEY KINGDOM and FGHBBBJNCDTHBCF examples. Observation/history/profile data remain available to their existing consumers; this release changes the team-card UI only. New entry/changelog v0.6.7; root query/hash preservation retained. Source validation and publication pending.
 
 ## 18.10.2026 — v0.6.6 RK team links published
 

@@ -27,7 +27,23 @@
   }
   function forgetSaved(){saved.clear();if(owner())for(const mode of ['public','admin'])try{localStorage.removeItem(PREFIX+owner()+':'+mode);}catch{}}
   const dated=data=>new Date(data.fetchedAt).toLocaleString('ru-RU',{timeZone:'Europe/Moscow'})+' МСК';
-  function showData(host,state,data){host.dataset.game=state.game;host.querySelector('[data-team-live-content]').innerHTML=card(data);state.hasData=true;state.data=data;state.photo.classList.remove('team-live-unavailable');}
+  function fitTitle(host){
+    const name=host.querySelector('.team-live-name'),heading=name?.parentElement;
+    if(!name||!heading||!host.isConnected)return;
+    name.style.fontSize='';
+    const width=heading.clientWidth;if(!width)return;
+    const initial=parseFloat(getComputedStyle(name).fontSize);
+    if(name.scrollWidth>width){
+      let size=initial*(width-1)/name.scrollWidth;name.style.fontSize=size+'px';
+      for(let i=0;i<4&&name.scrollWidth>width;i++){size*=.98;name.style.fontSize=size+'px';}
+    }
+  }
+  const measuredWidths=new WeakMap();
+  const titleResize=typeof ResizeObserver==='undefined'?null:new ResizeObserver(entries=>{
+    for(const entry of entries){const width=entry.contentRect.width;if(measuredWidths.get(entry.target)===width)continue;measuredWidths.set(entry.target,width);fitTitle(entry.target);}
+  });
+  document.fonts?.ready?.then(()=>document.querySelectorAll('.team-live-card').forEach(fitTitle));
+  function showData(host,state,data){host.dataset.game=state.game;host.querySelector('[data-team-live-content]').innerHTML=card(data);fitTitle(host);titleResize?.observe(host);state.hasData=true;state.data=data;state.photo.classList.remove('team-live-unavailable');}
 
   function card(data) {
     const rk=data.game==='Royal Kingdom',currency=rk?'Кубки':'Короны';
@@ -35,7 +51,7 @@
     const title=rk?esc(data.name):(emblem?.label(data.name)||esc(data.name));
     const fact=(label,value)=>'<div><span>'+label+'</span><b>'+num(value)+'</b></div>';
     const stars=rk&&data.star!=null?'<div class="team-live-stars" aria-label="Звёзд команды: '+esc(data.star)+'">'+Array.from({length:data.star},()=>icon('star')).join('')+'</div>':'';
-    return '<header class="team-live-banner"><h3>О команде</h3></header><div class="team-live-summary"><div class="team-live-title"><span class="team-live-emblem" aria-hidden="true">'+(emblem?.image(data.logo)||'')+'</span><h3>'+title+stars+'</h3><div class="team-live-places"><small>Места</small><b>'+num(data.memberCount)+'/'+num(data.capacity)+'</b></div><p class="team-live-description">'+esc(data.description)+'</p></div><div class="team-live-facts">'+fact('Очки команды',data.score)+fact('Требуемый уровень',data.minLevel)+fact(rk?'Нужно кубков':'Короны входа',data.minCrowns)+'<div><span>Тип команды</span><b>'+esc(data.type||'—')+'</b></div></div></div><div class="team-live-leadership">'+data.leadership.slice(0,4).map(m=>'<article class="team-live-player"><div class="team-live-player-head"><span class="team-live-player-icon" aria-hidden="true">'+icon(m.role==='Лидер'?'crown':'star')+'</span><div class="team-live-player-name"><b title="'+esc(m.name)+'">'+esc(m.name)+'</b><small>'+esc(m.role)+'</small></div></div><div class="team-live-crowns"><small>'+icon(rk?'cup':'crown')+' '+currency+'</small><b>'+playerNum(m.crowns)+'</b></div><div><small>Уровень</small><b>'+playerNum(m.level)+'</b></div></article>').join('')+'</div>';
+    return '<header class="team-live-banner"><h3>О команде</h3></header><div class="team-live-summary"><div class="team-live-title"><span class="team-live-emblem" aria-hidden="true">'+(emblem?.image(data.logo)||'')+'</span><h3><span class="team-live-name">'+title+'</span></h3>'+stars+'<div class="team-live-places"><small>Места</small><b>'+num(data.memberCount)+'/'+num(data.capacity)+'</b></div><p class="team-live-description">'+esc(data.description)+'</p></div><div class="team-live-facts">'+fact('Очки команды',data.score)+fact('Требуемый уровень',data.minLevel)+fact(rk?'Нужно кубков':'Короны входа',data.minCrowns)+'<div><span>Тип команды</span><b>'+esc(data.type||'—')+'</b></div></div></div><div class="team-live-leadership">'+data.leadership.slice(0,4).map(m=>'<article class="team-live-player"><div class="team-live-player-head"><span class="team-live-player-icon" aria-hidden="true">'+icon(m.role==='Лидер'?'crown':'star')+'</span><div class="team-live-player-name"><b title="'+esc(m.name)+'">'+esc(m.name)+'</b><small>'+esc(m.role)+'</small></div></div><div class="team-live-crowns"><small>'+icon(rk?'cup':'crown')+' '+currency+'</small><b>'+playerNum(m.crowns)+'</b></div><div><small>Уровень</small><b>'+playerNum(m.level)+'</b></div></article>').join('')+'</div>';
   }
   async function load(host,refresh=false) {
     const state=states.get(host);if(!permitted||!state||state.loading||!host.isConnected)return;
@@ -90,6 +106,7 @@
     const form=event.target.closest('form'),state=editors.get(form)||{key:''};state.touched=true;editors.set(form,state);
   },true);
   function decorate() {
+    document.querySelectorAll?.('.team-live-card').forEach(fitTitle);
     if(lastSession!==token()){saved.clear();clear();lastSession=token();}
     if(!permitted||!token())return;
     decorateEditors();
@@ -134,7 +151,7 @@
     const label=form.querySelector('[data-team-link-label]');if(label)label.textContent='ID команды '+(event.target.value==='Royal Kingdom'?'РК':'РМ');
     editors.delete(form);
   });
-  function clear(){document.querySelectorAll('.team-live-card').forEach(n=>n.remove());document.querySelectorAll('[data-team-live-mounted]').forEach(n=>{delete n.dataset.teamLiveMounted;n.classList.remove('team-live-original','team-live-photo-shown','team-live-unavailable');});}
+  function clear(){titleResize?.disconnect();document.querySelectorAll('.team-live-card').forEach(n=>n.remove());document.querySelectorAll('[data-team-live-mounted]').forEach(n=>{delete n.dataset.teamLiveMounted;n.classList.remove('team-live-original','team-live-photo-shown','team-live-unavailable');});}
   for(const name of ['royal:access-denied','royal:fatal'])window.addEventListener(name,()=>{forgetSaved();permitted=false;clear();});
   window.addEventListener('royal:auth-ready',()=>{saved.clear();clear();lastSession=token();permitted=true;decorate();});
   window.RoyalAdminDataV0600?.subscribe?.(event=>{if(event.type==='clear'&&['unauthorized','forbidden','session-changed'].includes(event.reason)){forgetSaved();permitted=false;clear();}});

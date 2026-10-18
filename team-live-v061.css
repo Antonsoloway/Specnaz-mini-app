@@ -44,3 +44,11 @@
 .team-live-card[data-game="Royal Kingdom"] .team-live-player-name small{color:#9b3529}
 .team-live-card[data-game="Royal Kingdom"] .team-live-facts b{color:#142d56}
 @media(max-width:360px){.team-live-card[data-game="Royal Kingdom"] .team-live-title{grid-template-columns:44px minmax(0,1fr) 58px}.team-live-card[data-game="Royal Kingdom"] .team-live-emblem img{width:42px!important;height:47px!important}.team-live-stars svg{width:18px;height:19px}}
+
+/* Reserve a full-width title row; display the complete name on one line. */
+.team-live-card .team-live-title h3{grid-column:1/-1;grid-row:1;min-width:0;max-width:100%;white-space:nowrap;word-break:normal;overflow-wrap:normal}
+.team-live-card .team-live-name{display:block;max-width:100%;white-space:nowrap;word-break:normal;overflow-wrap:normal;text-overflow:clip;line-height:1.2}
+.team-live-card .team-live-title>.team-live-emblem{grid-row:2;grid-column:1}
+.team-live-card .team-live-title>.team-live-stars{grid-row:2;grid-column:2;margin:0}
+.team-live-card .team-live-title>.team-live-places{grid-row:2;grid-column:3}
+.team-live-card .team-live-title>.team-live-description{grid-row:3}
