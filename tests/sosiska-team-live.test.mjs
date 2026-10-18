@@ -58,6 +58,7 @@ test('unrelated CRM operations never clear occupied M; blank unlinks only owned 
 });
 test('new card escapes server text and cannot display ordinary roster',async()=>{
  const source=await readFile(new URL('../team-live-v061.js',import.meta.url),'utf8');const context={document:{getElementById:()=>null,addEventListener(){},body:{}},window:{addEventListener(){}},MutationObserver:class{observe(){}},console};vm.createContext(context);vm.runInContext(source,context);
+ for(const game of ['Royal Match','Royal Kingdom'])assert.doesNotMatch(context.window.RoyalTeamLive.card({...projectTeam(team,'now'),game,weeklyHelp:913}),/помощь/i);
  const html=context.window.RoyalTeamLive.card(projectTeam(team,'now'));assert.ok(html.includes('&lt;Team&gt;'));assert.equal((html.match(/class="team-live-player"/g)||[]).length,4);assert.ok(!html.includes('Player 3'));assert.ok(html.indexOf('Player 4')<html.indexOf('Player 2'));
 });
 async function writesFixture() {

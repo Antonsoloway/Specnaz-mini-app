@@ -19,7 +19,7 @@
 .team-live-card .team-live-title{grid-template-columns:44px minmax(0,1fr) 62px;align-items:center}
 .team-live-card .team-live-title h3{min-width:0;font-size:clamp(20px,5vw,27px);line-height:1.2;word-break:normal;overflow-wrap:break-word;margin:0}
 .team-live-card .team-live-title>.team-live-description{grid-column:1/-1;min-width:0;white-space:pre-wrap;line-height:1.4;word-break:normal;overflow-wrap:break-word;margin:12px 0 0;font-size:15px}
-.team-live-card .team-live-player{grid-template-columns:repeat(3,minmax(0,1fr));padding:12px;gap:12px 8px;min-width:0;box-sizing:border-box}
+.team-live-card .team-live-player{grid-template-columns:repeat(2,minmax(0,1fr));padding:12px;gap:12px 8px;min-width:0;box-sizing:border-box}
 .team-live-player-head{grid-column:1/-1;display:flex;align-items:center;gap:10px;min-width:0}
 .team-live-card .team-live-player-name{flex:1;min-width:0}
 .team-live-card .team-live-player-name b{font-size:20px!important;text-align:left;line-height:1.25;word-break:normal;overflow-wrap:break-word;white-space:normal}
