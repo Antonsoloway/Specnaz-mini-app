@@ -8,9 +8,21 @@ compatibility_date = "2026-08-15"
 name = "SOSISKA_ANALYSIS"
 class_name = "SosiskaAnalysisJobs"
 
+[[durable_objects.bindings]]
+name = "SOSISKA_RK_MONITOR"
+class_name = "SosiskaKingdomMonitor"
+
+[[durable_objects.bindings]]
+name = "SOSISKA_RK_ANALYSIS"
+class_name = "SosiskaKingdomAnalysisJobs"
+
 [[migrations]]
 tag = "sosiska-analysis-v1"
 new_sqlite_classes = ["SosiskaAnalysisJobs"]
+
+[[migrations]]
+tag = "sosiska-kingdom-v1"
+new_sqlite_classes = ["SosiskaKingdomMonitor", "SosiskaKingdomAnalysisJobs"]
 
 [vars]
 FRONTEND_ORIGIN = "https://antonsoloway.github.io"
@@ -32,6 +44,8 @@ invocation_logs = true
 # BOT_TOKEN
 # GITHUB_TOKEN
 # SESSION_SECRET
+# RK_AGENT_API_KEY — separate dedicated RK search Worker secret.
+# RK_EVENT_API_KEY — separate Aia RK events Worker secret.
 # RM_AGENT_API_KEY — private cloud-agent key, used only by /admin-agent.
 # RM_EVENT_API_KEY — dedicated Aia events Worker key, separate from the primary Sosiska key.
 # Configure in Cloudflare Secrets before enabling tournament views; never put this in public JS.

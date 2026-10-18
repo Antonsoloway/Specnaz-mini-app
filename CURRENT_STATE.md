@@ -1,3 +1,7 @@
+## 18.10.2026 — Sosiska RM/RK: source prepared, not deployed
+
+Royal CRM Sosiska: dedicated RM and RK admin tabs with isolated routing, native RK search/rosters, Cloudflare-hosted RK monitoring + snapshots, battle score projections, full-period UI, comparison, history, signed export and independently scoped AI jobs. RK Cup is labelled cups rather than RM crowns; missing opponent personal battle scores remain unavailable; RM calendar is never assumed for RK. Profiled agent tests 137 PASS. Existing miniapp Cloudflare account (0dd3beb...) is inaccessible under current separate RK Wrangler login (62c513...); RK read-only probe from workstation timed out. Main/live production unchanged; keys and migration not configured, Telegram acceptance pending. See docs/sosiska/RM_RK_SPLIT_20261018.md.
+
 ## 16.10.2026 — диагностика карточки агента, опубликовано
 
 На главной админской карточке Сосиски добавлены текущий игровой уровень и онлайн/офлайн/занят. Зелёный статус требует отдельного свежего Ping к игровому серверу; health с настроенными ключами не считается доказательством связи. Индикатор обновляется раз в минуту только на видимом главном экране, последняя подтверждённая цифра уровня сохраняется при потере связи. Предусмотрен общий data-agent-id для будущих агентов, новый RK-агент не создавался. Авторизация и ключ остаются серверными. Release marker20261016-v061-agent-status1. Публикация подтверждена: PR67 merged, все CI/Pages/Worker Builds SUCCESS; семь живых файлов совпали с исходниками. Подробности — docs/sosiska/AGENT_STATUS_20261016.md.

@@ -6,7 +6,7 @@ const source=await readFile(new URL('../sosiska-v061.js',import.meta.url),'utf8'
 const periodSource=await readFile(new URL('../sosiska-period-v061.js',import.meta.url),'utf8');
 const settle=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate);};
 function setup({admin=true,responder}={}){
-  const listeners={},docListeners={},tiles=[],calls=[],panel={innerHTML:'',hidden:false},grid={querySelector:()=>tiles.find(x=>!x.removed)||null,appendChild:b=>tiles.push(b)};
+  const listeners={},docListeners={},tiles=[],calls=[],panel={innerHTML:'',hidden:false},grid={querySelector:selector=>tiles.find(x=>!x.removed&&(selector==='[data-sosiska-open]'||selector===('[data-sosiska-open="'+x.dataset.sosiskaOpen+'"]')))||null,querySelectorAll:()=>tiles.filter(x=>!x.removed),appendChild:b=>tiles.push(b)};
   const hosts=[];const document={body:{appendChild:n=>hosts.push(n)},activeElement:{focus(){}},querySelector:s=>s==='.grid'?grid:s==='[data-sosiska-interval]'?{value:'120'}:null,getElementById:()=>panel,createElement:()=>({dataset:{},querySelector:()=>null,remove(){this.removed=true;}}),addEventListener:(type,fn)=>{docListeners[type]=fn;}};
   const context={document,authState:{role:{isChatAdmin:admin}},sessionToken:'session-a',activePage:'home',setActiveNav(){},renderPage(page){panel.innerHTML=page;},FormData:class{constructor(form){this.form=form;}get(name){return this.form.filters?this.form.filters[name]??'':this.form.query;}},Response,AbortController,setTimeout,clearTimeout,console,fetch:async(url,init)=>{const b=JSON.parse(init.body);calls.push(b);return Response.json({ok:true,data:await (responder?responder(b):{watches:[]})});}};
   context.window={addEventListener:(type,fn)=>{listeners[type]=fn;},RoyalNav:{pushCurrent(){}},RoyalAdminDataV0600:{subscribe(fn){listeners.adminClear=fn;}}};vm.createContext(context);vm.runInContext(periodSource,context);vm.runInContext(source,context);
@@ -17,7 +17,7 @@ function setup({admin=true,responder}={}){
 }
 test('tile only appears for admins and opening lists watches without enabling any',async()=>{
   const denied=setup({admin:false});assert.equal(denied.tiles.length,0);await denied.context.window.RoyalSosiska.open();assert.equal(denied.calls.length,0);
-  const s=setup();assert.equal(s.tiles.length,1);await s.context.window.RoyalSosiska.open();assert.deepEqual(s.calls,[{operation:'list'}]);assert.match(s.panel.innerHTML,/Отслеживание не включено/);
+  const s=setup();assert.equal(s.tiles.length,2);await s.context.window.RoyalSosiska.open();assert.deepEqual(s.calls,[{operation:'list'}]);assert.match(s.panel.innerHTML,/Отслеживание не включено/);
 });
 test('same-name results show description and leader, with HTML escaped',async()=>{
   const s=setup({responder:b=>b.operation==='list'?{watches:[]}:b.operation==='search'?{candidates:[{teamId:'1',name:'<img src=x onerror=evil()>',memberCount:1,sources:['search']}],warnings:[]}:{TeamId:'1',TeamName:'Team',Description:'<script>evil()</script>',Leader:'2',CoLeaders:[],Members:[{UserId:'2',Name:'Leader & Co',Level:1,Crown:0,HelpCount:0}]}});
@@ -393,4 +393,28 @@ test('chart numeric tiles and event player columns fit narrow screens by CSS con
  assert.match(css,/\.sosiska-event-person-values/);
  assert.match(css,/grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
  assert.match(css,/\.sosiska-chart-controls>button:last-child\{grid-column:span 4/);
+});
+
+test('RM and RK tabs keep independent requests, game labels, watched lists and recover on switch',async()=>{
+ const s=setup({responder:body=>body.operation==='list'?{watches:[]}:
+  body.operation==='search'?{candidates:[{teamId:'100',name:'RK team',memberCount:1,sources:['search']}],warnings:[]}:
+  body.operation==='history'?{records:[{sequence:1,snapshot:{teamId:'100',capturedAt:'2026-10-18T12:00:00.000Z',
+    raw:{TeamName:'RK team',Members:[{UserId:'201',Name:'A',Level:10,Crown:123,HelpCount:1}]}},changes:{baseline:true}}],nextBefore:null}:
+  {TeamId:'100',TeamName:'RK team',Score:34000,MinCup:0,Type:true,Leader:'201',Members:[{UserId:'201',Name:'A',Level:10,Crown:123,HelpCount:1}]}});
+ assert.equal(s.tiles.length,2);
+ assert.deepEqual(s.tiles.map(t=>t.dataset.agentId),['sosiska','sosiska-rk']);
+ await s.context.window.RoyalSosiska.open('rk');
+ assert.deepEqual(s.calls[0],{operation:'list',game:'rk'});
+ assert.match(s.panel.innerHTML,/Royal Kingdom/);
+ assert.doesNotMatch(s.panel.innerHTML,/Цикл RM по Москве/);
+ s.search('RK team');await settle();assert.match(s.panel.innerHTML,/Кубки.*для входа/);
+ assert.ok(s.calls.filter(c=>c.operation==='search').every(c=>c.game==='rk'));
+ s.action('team','100');await settle();
+ assert.match(s.panel.innerHTML,/Командная битва/);
+ assert.match(s.panel.innerHTML,/Цикл RK определяется данными игрового сервера/);
+ s.action('switch-game',undefined,{game:'rm'});await settle();
+ assert.match(s.panel.innerHTML,/Royal Match/);
+ assert.equal(s.calls.at(-1).operation,'list');
+ assert.equal('game' in s.calls.at(-1),false);
+ assert.doesNotMatch(s.panel.innerHTML,/RK team/);
 });

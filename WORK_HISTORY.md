@@ -1,3 +1,7 @@
+## 18.10.2026 — Sosiska RM/RK: source prepared, not deployed
+
+Royal CRM Sosiska: dedicated RM and RK admin tabs with isolated routing, native RK search/rosters, Cloudflare-hosted RK monitoring + snapshots, battle score projections, full-period UI, comparison, history, signed export and independently scoped AI jobs. RK Cup is labelled cups rather than RM crowns; missing opponent personal battle scores remain unavailable; RM calendar is never assumed for RK. Profiled agent tests 137 PASS. Existing miniapp Cloudflare account (0dd3beb...) is inaccessible under current separate RK Wrangler login (62c513...); RK read-only probe from workstation timed out. Main/live production unchanged; keys and migration not configured, Telegram acceptance pending. See docs/sosiska/RM_RK_SPLIT_20261018.md.
+
 ## 2026-10-16 — Agent tile self-diagnostics published
 
 The admin home card now shows a server-verified game level and short-lived online/offline/busy state. A fresh game Ping is required for green; configured health alone is insufficient. Card reads stop outside the visible home view, expire after90 seconds, preserve the last known level on failure, and clear on session/access changes. The generic card/status projection supports future agents without adding placeholders. Credentials remain behind the existing admin authorization. CI/Pages/Worker Builds passed; the deployed agent independently confirmed online and level14800. Source validation and live publication are tracked in docs/sosiska/AGENT_STATUS_20261016.md.

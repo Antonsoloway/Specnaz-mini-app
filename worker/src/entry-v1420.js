@@ -5,7 +5,8 @@ import {createSosiskaApi} from './sosiska-api.js';
 import {downloadHistoryExport} from './sosiska-export.js';
 const teamLive = createTeamLive({crm:currentWorker.fetch.bind(currentWorker)});
 const agent = createSosiskaApi({authorizeAdmin});
-export {SosiskaAnalysisJobs} from './sosiska-analysis-jobs.js';
+export {SosiskaAnalysisJobs,SosiskaKingdomAnalysisJobs} from './sosiska-analysis-jobs.js';
+export {SosiskaKingdomMonitor} from './sosiska-rk-monitor.js';
 export default {
   async fetch(request,env,ctx) {
     const path=new URL(request.url).pathname;
