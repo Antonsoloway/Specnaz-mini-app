@@ -1,3 +1,7 @@
+## 18.10.2026 — v0.6.8 header order prepared
+
+Owner rejected the title above the emblem. Both RM/RK now put the emblem first and the full title to its right in the same row. Places/stars follow below; help remains hidden. Browser regression checks both games, title geometry and complete one-line names at320/390/768. Publication pending CI.
+
 ## 18.10.2026 — v0.6.7 published: no help, complete one-line titles
 
 Owner confirmed the RK linked card works. Team cards now hide weekly team help and leader/co-leader help in both RM/RK. Player rows contain crowns/cups and level. Complete names render on a full-width single line, measured to fit by font size without truncation or ellipsis. Raw CRM text stays intact; fit runs after render/width/font/emblem changes, and disconnected card observers are released. Owner examples MICKEY KINGDOM and FGHBBBJNCDTHBCF plus20 wide characters pass at320/390/768 under complete app CSS. PR79 mergedc7b73a83cd3d12702d21de101f2f2c8b3db14863. Source CI39160679353/39160677135 PASS (152Node,32admin,workerd/isolation/all browser checks), Pages39160862987 PASS. Seven public files match reviewed source. Main CI39160863033: in_progress at documentation time. Apps Script/Worker source and observation/profile/history data unchanged.

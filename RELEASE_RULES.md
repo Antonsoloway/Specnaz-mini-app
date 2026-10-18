@@ -293,4 +293,4 @@ Select the agent and credential from the server-owned canonical CRM game, never 
 
 ### Linked team-card title and help display (18.10.2026)
 
-In both RM and RK linked team cards, display the full team name on one line. No ellipsis, truncation or wrapping: reserve enough title width and measure font fit. Keep raw CRM identity unchanged and refit after width/font/emblem updates. Hide weekly team help and player help in this card; keep crowns/cups and level. Other profile/history/observation consumers retain their data.
+In both RM and RK linked team cards, display the full team name on one line. Place the emblem to the left of the name in the same row, never below it. No ellipsis, truncation or wrapping: use the remaining title width and measure font fit. Keep raw CRM identity unchanged and refit after width/font/emblem updates. Hide weekly team help and player help in this card; keep crowns/cups and level. Other profile/history/observation consumers retain their data.
