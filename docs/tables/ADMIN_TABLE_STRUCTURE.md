@@ -106,3 +106,8 @@ It is optional and accepts RM only; RK remains blank. Installation never overwri
 an occupied M/header/formula. ID is cleared on unlink/delete and follows the entire
 row during sorting. E:L remain formula-owned; photo C uses the existing media flow.
 Existing deployment117 confirmed. The M header is created on the first explicit ID write; no teams were automatically linked during rollout.
+
+
+## 18.10.2026 — RM/RK game links
+
+Optional `gameTeamId` is a text int64 in the existing owned `Команды!M` column. Its legacy header `ID команды RM` is retained; game is the canonical value from A (`Royal Match` / `Royal Kingdom`). No new column or formula change. Team revision, admin/public snapshots and cascading rename retain the ID under `(name, game)`. Blank explicitly unlinks; an unrelated occupied M is never repurposed.

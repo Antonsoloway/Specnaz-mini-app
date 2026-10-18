@@ -2,13 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
-for(const [file,target] of [['app.html','app-v0605.html'],['app-v0601.html','app-v0600.html']])test(file+' preserves Telegram launch query and hash',async()=>{
+for(const [file,target] of [['app.html','app-v0606.html'],['app-v0601.html','app-v0600.html']])test(file+' preserves Telegram launch query and hash',async()=>{
  const html=await readFile(new URL('../'+file,import.meta.url),'utf8'),script=html.match(/<script>([\s\S]*?)<\/script>/)[1];
  let destination;
  const context={URLSearchParams,window:{location:{search:'?gas=fixture&owner=value',hash:'#tgWebAppData=fixture%26signed',replace(value){destination=value;}}}};
  vm.runInNewContext(script,context);
  const url=new URL(destination,'https://miniapp.test/');
- assert.equal(url.pathname,'/'+target);assert.equal(url.searchParams.get('gas'),'fixture');assert.equal(url.searchParams.get('owner'),'value');assert.equal(url.searchParams.get('releaseBuild'),file==='app.html'?'20261018-v065-rk-profile-retry1':'20261016-v061-agent-status1');assert.equal(url.hash,context.window.location.hash);
+ assert.equal(url.pathname,'/'+target);assert.equal(url.searchParams.get('gas'),'fixture');assert.equal(url.searchParams.get('owner'),'value');assert.equal(url.searchParams.get('releaseBuild'),file==='app.html'?'20261018-v066-rk-team-links1':'20261016-v061-agent-status1');assert.equal(url.hash,context.window.location.hash);
 });
 test('Sosiska appears in current changelog without losing existing entries',async()=>{
  const source=await readFile(new URL('../changelog-v061-latest.js',import.meta.url),'utf8');
@@ -68,4 +68,19 @@ test('profile retry release v0.6.5 preserves RK emblem history and Telegram laun
  vm.runInNewContext(js,ctx);
  assert.equal(ctx.window.RoyalChangelog.version,'0.6.5');
  assert.equal(ctx.window.RoyalChangelog.releases[1].version,'0.6.4');
+});
+
+
+test('v0.6.6 links release retains prior history, installed services and separate emblem sources',async()=>{
+ const html=await readFile(new URL('../app-v0606.html',import.meta.url),'utf8');
+ assert.match(html,/id="versionBadge">v0\.6\.6/);
+ assert.match(html,/window.__ROYAL_BUILD__='0\.6\.6'/);
+ assert.match(html,/team-live-v061\.js\?v=20261018-v066-rk-team-links1/);
+ assert.ok(html.indexOf('changelog-v0605.js')<html.indexOf('changelog-v0606.js'));
+ assert.ok(html.indexOf('rk-team-emblems-v064.js')<html.indexOf('team-live-v061.js'));
+ const code=await readFile(new URL('../changelog-v0606.js',import.meta.url),'utf8');
+ const ctx={window:{RoyalChangelog:{releases:[{version:'0.6.5',title:'Previous'}]}}};
+ vm.runInNewContext(code,ctx);
+ assert.equal(ctx.window.RoyalChangelog.version,'0.6.6');
+ assert.equal(ctx.window.RoyalChangelog.releases[1].version,'0.6.5');
 });

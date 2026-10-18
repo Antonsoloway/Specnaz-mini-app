@@ -101,7 +101,7 @@ function sanitizeSnapshot(source) {
     game: String(item?.game || ''),
     games: Array.isArray(item?.games) ? item.games.map(value => String(value || '')) : [],
     photoUrl: String(item?.photoUrl || ''),
-    ...(item?.game === 'Royal Match' && /^[1-9]\d{0,18}$/.test(item?.gameTeamId || '') ? {gameTeamId: item.gameTeamId} : {}),
+    ...(['Royal Match','Royal Kingdom'].includes(item?.game) && typeof item?.gameTeamId === 'string' && /^[1-9]\d{0,18}$/.test(item.gameTeamId) && BigInt(item.gameTeamId)<=9223372036854775807n ? {gameTeamId: item.gameTeamId} : {}),
     memberCount: Number(item?.memberCount || 0),
     leaderCount: Number(item?.leaderCount || 0),
     assistantCount: Number(item?.assistantCount || 0),

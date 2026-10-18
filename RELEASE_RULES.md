@@ -191,9 +191,9 @@ Admin-preview `v0.6.0` дополнительно использует:
 - The minute retry remains commit-only. Do not automatically resend an ambiguous Telegram operation or discard its prepared payload. Apps Script and Telegram do not share an atomic transaction; offline replay tests are not proof of universal exactly-once delivery.
 
 
-## RM game team link (source prepared 14.10.2026)
+## Game team links (RM/RK, 18.10.2026)
 
-Optional gameTeamId applies only to Royal Match. Sosiska picker must reuse existing
+Optional gameTeamId applies to Royal Match and Royal Kingdom, scoped by canonical game. Sosiska picker must reuse existing
 search/filters and preserve the CRM editor/photo draft. Binding never starts monitoring.
 The live card shows leader first, then co-leaders, at most four game players in total.
 Existing CRM membership list is independent. Store ID as text in owned Команды!M,
@@ -284,3 +284,8 @@ Hour labels and numeric rates must remain unbroken under the complete app CSS.
 ### Agent self-diagnostics
 
 Agent cards remain admin-only. Green online requires a successful game-server read no older than90 seconds; configured health is not proof. Busy queues must not be reported as offline. Connection failures preserve only the last confirmed level, mark it unverified, and clear green. Refresh only while the card is visible; reject late responses after session/access changes. The public-safe status registry contains agent IDs/game/level/state/times only, never credentials or arbitrary upstream URLs.
+
+
+### Royal Kingdom linked cards
+
+Select the agent and credential from the server-owned canonical CRM game, never from an arbitrary URL or a caller-supplied team ID. Same numeric IDs in RM and RK are different cache identities. RK uses its own 0–183 emblem catalogue, native Score/MinCup/IsOpen and Cup for players; RM projection is unchanged. Existing Команды!M header `ID команды RM` remains a legacy ownership marker for both games; column A supplies the game. Do not migrate, clear or overwrite unrelated columns. Leader comes first, followed by unique current co-leaders, at most four players. Binding and opening cards never starts monitoring.

@@ -460,7 +460,7 @@
         <div class="royal-admin-form-grid">
           <label class="royal-admin-input"><span>Игра</span><select data-write-field="game" ${creating ? '' : 'disabled'}><option value="Royal Match"${source?.game === 'Royal Match' ? ' selected' : ''}>Royal Match</option><option value="Royal Kingdom"${source?.game === 'Royal Kingdom' ? ' selected' : ''}>Royal Kingdom</option></select></label>
           <label class="royal-admin-input"><span>Название команды</span><input data-write-field="name" maxlength="180" value="${esc(source?.name)}"></label>
-          ${writeMeta()?.gameTeamLink?.enabled ? `<label class="royal-admin-input is-wide" data-team-link-field><span>ID команды RM</span><input data-write-field="gameTeamId" inputmode="numeric" maxlength="19" value="${esc(source?.gameTeamId)}" ${source?.game === 'Royal Kingdom' ? 'disabled' : ''}><button type="button" class="royal-admin-form-button team-live-pick-button" data-team-live-pick ${source?.game === 'Royal Kingdom' ? 'disabled' : ''}>Найти и привязать команду</button><small>Только RM. Пустое поле отключает привязку. Скриншот сохраняется.</small></label>` : ''}
+          ${writeMeta()?.gameTeamLink?.enabled ? `<label class="royal-admin-input is-wide" data-team-link-field><span data-team-link-label>ID команды ${source?.game === 'Royal Kingdom' ? 'РК' : 'РМ'}</span><input data-write-field="gameTeamId" inputmode="numeric" maxlength="19" value="${esc(source?.gameTeamId)}"><button type="button" class="royal-admin-form-button team-live-pick-button" data-team-live-pick>Найти и привязать команду</button><small>Игра определяет агента поиска. Пустое поле отключает привязку. Скриншот сохраняется.</small></label>` : ''}
           <label class="royal-admin-input is-wide"><span>Лидер / подпись</span><input data-write-field="leader" maxlength="180" value="${esc(source?.leader)}"></label>
         </div>
         <div class="royal-admin-form-note">Игра существующей команды — часть identity и не меняется. Переименование названия каскадно обновляет все 5 membership-слотов этой игры.</div>
@@ -551,8 +551,8 @@
     const leader = clean(form.querySelector('[data-write-field="leader"]')?.value);
     if (!name) throw new Error('Введите название команды.');
     const linkInput=form.querySelector('[data-write-field="gameTeamId"]');
-    const gameTeamId=game==='Royal Match'?clean(linkInput?.value):'';
-    if(gameTeamId&&!/^[1-9]\d{0,18}$/.test(gameTeamId))throw Error('Введите корректный ID команды.');
+    const gameTeamId=clean(linkInput?.value);
+    if(gameTeamId&&(!/^[1-9]\d{0,18}$/.test(gameTeamId)||BigInt(gameTeamId)>9223372036854775807n))throw Error('Введите корректный ID команды.');
     const link=linkInput?{gameTeamId}:{};
     const photoInput=form.querySelector('[data-admin-team-photo-input]');
     if(!creating&&name===clean(source.name)&&leader===clean(source.leader)&&(!linkInput||gameTeamId===clean(source.gameTeamId))&&!photoInput?.files?.length)return {ok:true,unchanged:true,message:'Изменений нет.'};

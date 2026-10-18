@@ -46,9 +46,9 @@ test('bad origin rejected before CRM/agent; preflight and methods bounded',async
 const helper=await readFile(new URL('../apps-script/team-live/38_MINIAPP_TEAM_LIVE.js',import.meta.url),'utf8');
 function sheetSetup(header='',occupied=false){let written=[];const sheet={getMaxRows:()=>5,getRange:(r,c,n=1)=>({getDisplayValue:()=>header,getDisplayValues:()=>Array.from({length:n},()=>[occupied?'occupied':'']),getFormulas:()=>Array.from({length:n},()=>['']),setValue:v=>{written.push([r,c,v]);if(r===1)header=v;return sheet.getRange(r,c,n)},setNumberFormat:()=>sheet.getRange(r,c,n),clearContent:()=>written.push([r,c,'clear'])})};
  const context={MINIAPP_adminWriteError_:(error,message)=>({ok:false,error,message})};vm.createContext(context);vm.runInContext(helper,context);return {sheet,context,written};}
-test('Sheet ID is text int64, RM only and occupied columns are protected',()=>{
+test('Sheet ID is text int64, game scoped and occupied columns are protected',()=>{
  const s=sheetSetup();for(const id of ['0','01','-1','1e3','9223372036854775808',12])assert.equal(s.context.MINIAPP_teamLivePrepare_(s.sheet,'Royal Match',{gameTeamId:id},'').ok,false);
- assert.equal(s.context.MINIAPP_teamLivePrepare_(s.sheet,'Royal Kingdom',{gameTeamId:'12'},'').ok,false);assert.equal(s.written.length,0);
+ assert.equal(s.context.MINIAPP_teamLivePrepare_(s.sheet,'Other Game',{gameTeamId:'12'},'').ok,false);assert.equal(s.written.length,0);
  assert.equal(s.context.MINIAPP_teamLivePrepare_(s.sheet,'Royal Match',{gameTeamId:'9223372036854775807'},'').ok,true);assert.deepEqual(s.written,[[1,13,'ID команды RM']]);
  for(const x of [sheetSetup('Existing'),sheetSetup('',true)]){assert.equal(x.context.MINIAPP_teamLivePrepare_(x.sheet,'Royal Match',{gameTeamId:'12'},'').ok,false);assert.equal(x.written.length,0);}
 });
@@ -77,8 +77,8 @@ test('real Sheet update keeps photo, preserves ID during rename and journals the
  assert.equal(result.ok,true);assert.equal(result.record.gameTeamId,'22');assert.equal(s.rows[1][2],'original photo');assert.equal(result.previousEntityKey,'Royal Match :: CRM');assert.equal(s.journals.length,1);
  const stale=c.MINIAPP_adminWriteFinalUpdateTeam_(s.ctx('updateTeam',{name:'Edited name',game:'Royal Match',expectedRevision:revision,changes:{gameTeamId:'33'}}));assert.equal(stale.ok,false);assert.equal(s.rows[1][12],'22');
 });
-test('real Sheet create writes text ID and rejects RK ID before changing cells',async()=>{
- const s=await writesFixture(),c=s.context;const bad=c.MINIAPP_adminWriteFinalCreateTeam_(s.ctx('createTeam',{game:'Royal Kingdom',name:'New',gameTeamId:'22'}));assert.equal(bad.ok,false);assert.equal(s.rows[2][1],'');
+test('real Sheet create writes text ID and rejects unsupported game before changing cells',async()=>{
+ const s=await writesFixture(),c=s.context;const bad=c.MINIAPP_adminWriteFinalCreateTeam_(s.ctx('createTeam',{game:'Unsupported',name:'New',gameTeamId:'22'}));assert.equal(bad.ok,false);assert.equal(s.rows[2][1],'');
  const result=c.MINIAPP_adminWriteFinalCreateTeam_(s.ctx('createTeam',{game:'Royal Match',name:'New',gameTeamId:'22'}));assert.equal(result.ok,true);assert.equal(result.record.gameTeamId,'22');assert.equal(s.rows[2][12],'22');assert.equal(typeof s.rows[2][12],'string');
 });
 
@@ -123,4 +123,51 @@ test('busy agent preserves an authorized saved response and returns a bounded bu
  const response=await handle(request(),env);assert.equal(response.status,429);assert.equal((await response.json()).error,'TEAM_LIVE_BUSY');assert.equal(calls,1);
  busy=false;assert.equal((await handle(request(),env)).status,200);time+=61000;busy=true;
  const saved=await (await handle(request(),env)).json();assert.equal(saved.data.stale,true);assert.equal(saved.data.teamId,'12');
+});
+
+
+const kingdom={...team,TeamLogo:183,Star:5,Score:764030,MinCup:8000,IsOpen:false,
+ Members:members.map(m=>({...m,Cup:m.Crown+1000}))};
+test('RK linked cards route to RK with a separate credential and isolate identical RM/RK IDs and singleflight',async()=>{
+ const mixedEnv={...env,RK_AGENT_API_KEY:'kingdom-private-key'.repeat(4)},calls=[];
+ let denied=false;
+ const handle=createTeamLive({crm:async()=>denied?Response.json({}, {status:403}):Response.json({snapshot:{teams:['Royal Match','Royal Kingdom'].map(game=>({name:'CRM',game,gameTeamId:'12'}))}}),fetchAgent:async(url,init)=>{
+  const rk=url.includes('kingdom');assert.equal(init.headers.Authorization,'Bearer '+mixedEnv[rk?'RK_AGENT_API_KEY':'RM_AGENT_API_KEY']);calls.push(url);
+  assert.deepEqual(JSON.parse(init.body),{protocolVersion:1,operation:'getTeamInfo',payload:{teamId:'12',includeMembers:true}});
+  return Response.json({ok:true,data:rk?kingdom:team});
+ }});
+ const rkRequest=request('/team-live','team=CRM&game=Royal+Kingdom');
+ const [rm,rk]=await Promise.all([handle(request(),mixedEnv),handle(rkRequest,mixedEnv)]);
+ const rmData=(await rm.json()).data,rkData=(await rk.json()).data;
+ assert.equal(rmData.game,'Royal Match');assert.equal(rkData.game,'Royal Kingdom');
+ assert.equal(rkData.logo,183);assert.equal(rkData.minCrowns,8000);assert.equal(rkData.type,'Закрытая');assert.equal(rkData.star,5);
+ assert.equal(rkData.weeklyHelp,28);assert.equal(rkData.score,764030);
+ assert.deepEqual(rkData.leadership.map(m=>m.userId),['4','2','8','1']);assert.equal(rkData.leadership[0].crowns,1003);
+ await handle(rkRequest,mixedEnv);await handle(request(),mixedEnv);assert.equal(calls.length,2);
+ denied=true;assert.equal((await handle(rkRequest,mixedEnv)).status,403);assert.equal(calls.length,2);
+});
+test('RK requires its own key, rejects wrong team and never uses RM emblem range or key as fallback',async()=>{
+ assert.equal(projectTeam({...team,TeamLogo:183},'now').logo,null);
+ for(const data of [{...kingdom,TeamId:'13'},{...kingdom,Status:1},{...kingdom,Members:[kingdom.Members[0],kingdom.Members[0]]}]){
+  const h=createTeamLive({crm:async()=>Response.json({snapshot:{teams:[{name:'CRM',game:'Royal Kingdom',gameTeamId:'12'}]}}),fetchAgent:async()=>Response.json({ok:true,data})});
+  assert.equal((await h(request('/team-live','team=CRM&game=Royal+Kingdom'),{...env,RK_AGENT_API_KEY:env.RM_AGENT_API_KEY})).status,502);
+ }
+ let calls=0;const h=createTeamLive({crm:async()=>Response.json({snapshot:{teams:[{name:'CRM',game:'Royal Kingdom',gameTeamId:'12'}]}}),fetchAgent:async()=>{calls++;throw Error('wrong agent');}});
+ assert.equal((await h(request('/team-live','team=CRM&game=Royal+Kingdom'),env)).status,502);assert.equal(calls,0);
+});
+test('RK sheet links create, update, unlink and rename with revisions and original screenshots intact',async()=>{
+ const s=await writesFixture(),c=s.context;
+ const created=c.MINIAPP_adminWriteFinalCreateTeam_(s.ctx('createTeam',{game:'Royal Kingdom',name:'RK',gameTeamId:'9223372036854775807'}));
+ assert.equal(created.ok,true);assert.equal(created.record.gameTeamId,'9223372036854775807');assert.equal(s.rows[2][12],'9223372036854775807');
+ c.MINIAPP_adminTeamPhotoPrepareExistingForRename_=()=>({ok:true,changed:false});
+ const updated=c.MINIAPP_adminWriteFinalUpdateTeam_(s.ctx('updateTeam',{name:'RK',game:'Royal Kingdom',expectedRevision:c.MINIAPP_adminWriteTeamRevision_(created.record),changes:{name:'RK new',gameTeamId:'42'}}));
+ assert.equal(updated.ok,true);assert.equal(updated.record.gameTeamId,'42');assert.equal(s.rows[1][12],'12');assert.equal(s.rows[1][2],'original photo');
+ const cleared=c.MINIAPP_adminWriteFinalUpdateTeam_(s.ctx('updateTeam',{name:'RK new',game:'Royal Kingdom',expectedRevision:c.MINIAPP_adminWriteTeamRevision_(updated.record),changes:{gameTeamId:''}}));
+ assert.equal(cleared.ok,true);assert.equal(s.rows[2][12],'');
+});
+test('RK public snapshot ID attachment is scoped by game for same-named CRM teams',()=>{
+ const s=sheetSetup('ID команды RM');Object.assign(s.context,{SPREADSHEET_ID:'crm',SHEET_TEAMS:'Команды',MINIAPP_adminWriteCanonicalGame_:v=>v,MINIAPP_snapshotStripGameSuffix_:v=>v,MINIAPP_snapshotTeamKey_:(n,g)=>n+'|'+g,
+ SpreadsheetApp:{openById:()=>({getSheetByName:()=>({getLastRow:()=>3,getRange:r=>r===1?{getDisplayValue:()=> 'ID команды RM'}:{getDisplayValues:()=>['Royal Match','Royal Kingdom'].map((g,i)=>[g,'Same','','','','','','','','','','',String(12+i)])}})})}});
+ const snapshot={teams:['Royal Match','Royal Kingdom'].map(game=>({name:'Same',game}))};s.context.MINIAPP_teamLiveAttach_(snapshot);
+ assert.deepEqual(snapshot.teams.map(t=>t.gameTeamId),['12','13']);
 });
