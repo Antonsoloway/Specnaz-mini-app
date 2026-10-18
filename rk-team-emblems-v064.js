@@ -15,8 +15,8 @@
   function label(text){const raw=String(text??''),prefix=raw.match(PREFIX)?.[0];return prefix&&raw.slice(prefix.length).trim()?'<span class="rk-team-emoji-prefix">'+escape(prefix)+'</span>'+escape(raw.slice(prefix.length)):escape(raw);}
   const image = logo => valid(logo) ?
     `<img class="rk-team-emblem" src="assets/rk-emblems/${logo}.webp?v=20261018-rk184" width="32" height="35" loading="lazy" decoding="async" alt="" aria-hidden="true" data-rk-logo="${logo}">` : '';
-  const name = (label, teamId, logo) => {
-    const content = `<span class="rk-team-label">${window.RoyalKingdomEmblems.label(label)}</span>`;
+  const name = (text, teamId, logo) => {
+    const content = `<span class="rk-team-label">${label(text)}</span>`;
     return `<span class="rk-team-name"${teamId == null ? '' : ` data-rk-team-id="${escape(teamId)}"`}>${image(logo)}${content}</span>`;
   };
   document.addEventListener('load',event=>{const img=event.target;if(img?.matches?.('.rk-team-emblem')&&img.naturalWidth>0){img.hidden=false;img.dataset.rkLoaded='1';}},true);

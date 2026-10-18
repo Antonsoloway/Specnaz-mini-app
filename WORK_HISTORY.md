@@ -1,6 +1,6 @@
 ## 18.10.2026 — v0.6.8 header order prepared
 
-Owner rejected the title above the emblem. Both RM/RK now put the emblem first and the full title to its right in the same row. Places/stars follow below; help remains hidden. Browser regression checks both games, title geometry and complete one-line names at320/390/768. Publication pending CI.
+Owner rejected the title above the emblem. Both RM/RK now put the emblem first and the full title to its right in the same row. Places/stars follow below; help remains hidden. Browser regression checks both games, title geometry and complete one-line names at320/390/768. Recovered RM rules from PR57/58/59 and prior conversation: no separator, retain manual emoji/internal spaces, Save required, suppress prefix only beside a loaded emblem. Applied to the independent 184-ID RK catalogue, picker and existing linked editor with the same race/draft guards. Browser checks include actual save payload and image success/error fallback. Publication pending CI.
 
 ## 18.10.2026 — v0.6.7 published: no help, complete one-line titles
 

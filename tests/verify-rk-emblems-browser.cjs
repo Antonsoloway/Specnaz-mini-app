@@ -41,6 +41,14 @@ const root=path.resolve(__dirname,'..');
         });
         assert.deepEqual(bad,[],'All RK image IDs must decode in Chromium');
       }
+      // The raw saved name survives while its prefix is visually replaced by the image.
+      await page.evaluate(()=>{document.querySelector('#panel').innerHTML=RoyalKingdomEmblems.name('🇷🇺FORTUNA','22',144);});
+      await page.waitForFunction(()=>document.querySelector('.rk-team-emblem')?.dataset.rkLoaded==='1');
+      assert.equal(await page.locator('.rk-team-label').textContent(),'🇷🇺FORTUNA');
+      assert.equal(await page.locator('.rk-team-emoji-prefix').isVisible(),false);
+      await page.evaluate(()=>document.querySelector('.rk-team-emblem').src='/missing-emblem.webp');
+      await page.waitForFunction(()=>document.querySelector('.rk-team-emblem')?.hidden);
+      assert.equal(await page.locator('.rk-team-emoji-prefix').isVisible(),true);
       assert.deepEqual(errors,[]);
       await page.close();
     }
