@@ -3,3 +3,7 @@
 .rk-team-emblem{display:inline-block!important;flex:none;width:32px!important;height:35px!important;object-fit:contain;vertical-align:middle;filter:drop-shadow(0 2px 2px #0004)}
 .rk-team-emblem[hidden]{display:none!important}
 .sosiska-screen h3 .rk-team-emblem{width:40px!important;height:44px!important}
+
+/* Preserve raw identity; hide only a duplicate prefix beside a loaded RK image. */
+.rk-team-name:has(>.rk-team-emblem[data-rk-loaded="1"]:not([hidden])) .rk-team-emoji-prefix,
+.team-live-title:has(>.team-live-emblem>.rk-team-emblem[data-rk-loaded="1"]:not([hidden]))>h3 .rk-team-emoji-prefix{display:none!important}
