@@ -21,5 +21,6 @@
   };
   document.addEventListener('load',event=>{const img=event.target;if(img?.matches?.('.rk-team-emblem')&&img.naturalWidth>0){img.hidden=false;img.dataset.rkLoaded='1';}},true);
   document.addEventListener('error',event=>{const img=event.target;if(img?.matches?.('.rk-team-emblem')){delete img.dataset.rkLoaded;img.hidden=true;}},true);
-  window.RoyalKingdomEmblems = Object.freeze({version:'1.1.0',valid,logoOf,image,name,emoji,emojiName,hasEmojiPrefix,label});
+  window.RoyalKingdomEmblems = Object.freeze({version:'1.2.0',valid,logoOf,image,name,emoji,emojiName,hasEmojiPrefix,label});
+  window.RoyalTeamEmblems?.decorate();
 })();
