@@ -34,7 +34,8 @@
   function name(text,id,logo){if(valid(logo))remember(id,logo);return '<span class="rm-team-name"'+(typeof id==='string'?' data-rm-team-id="'+esc(id)+'"':'')+'>'+image(valid(logo)?logo:logos.get(id))+label(text)+'</span>';}
   async function fetchLive(record,admin=false,refresh=false,metadataOnly=false){
     const token=session(),epoch=generation;if(!permitted||!token)throw Error('SESSION_MISSING');
-    const key=JSON.stringify([token,admin,record.name,record.gameTeamId]);const old=cache.get(key);
+    const game=record.game||'Royal Match';if(!['Royal Match','Royal Kingdom'].includes(game))throw Error('INVALID_GAME');
+    const key=JSON.stringify([token,admin,game,record.name,record.gameTeamId]);const old=cache.get(key);
     if(metadataOnly&&!refresh&&old&&Date.now()-old.at<60000){if(old.error)throw Error('UNAVAILABLE');return old.payload;}
     if(pending.has(key))return pending.get(key);
     // Bound the entire read, including response.json and retry delay. Aborting a
@@ -46,14 +47,14 @@
       for(let attempt=0;attempt<2;attempt++){
         try{
           current();
-          const params=new URLSearchParams({team:record.name,game:'Royal Match',...(refresh?{refresh:'1'}:{})});
+          const params=new URLSearchParams({team:record.name,game,...(refresh?{refresh:'1'}:{})});
           const r=await fetch(API+(admin?'/admin-team-live?':'/team-live?')+params,{headers:{Authorization:'Bearer '+token},signal:controller.signal});
           current();
           if(r.status===401||r.status===403){clear(false);throw Object.assign(Error('Откройте приложение заново.'),{denied:true});}
           const payload=await r.json();current();
           if(!r.ok)throw Object.assign(Error('Данные игры не загрузились.'),{busy:r.status===429&&payload.error==='TEAM_LIVE_BUSY',transient:[408,425,429,502,503,504].includes(r.status)&&payload.error!=='TEAM_LIVE_BUSY'});
           if(!payload.ok)throw Error('Данные игры не загрузились.');
-          if(payload.data?.teamId!==record.gameTeamId)throw Error('Привязка команды изменилась. Обновите карточку.');
+          if(payload.data?.teamId!==record.gameTeamId||(payload.data.game??'Royal Match')!==game)throw Error('Привязка команды изменилась. Обновите карточку.');
           return payload;
         }catch(e){
           const transient=e.transient||e.name==='TypeError'||e.code==='WORKER_TIMEOUT'||e.message==='WORKER_TIMEOUT';
@@ -64,7 +65,7 @@
     })();
     const task=Promise.race([request,new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(timeout());},45000);})]).then(payload=>{
       current();if(cache.size>=250&&!cache.has(key))cache.delete(cache.keys().next().value);
-      cache.set(key,{at:Date.now(),payload});remember(record.gameTeamId,logoOf(payload.data));return payload;
+      cache.set(key,{at:Date.now(),payload});if(game==='Royal Match')remember(record.gameTeamId,logoOf(payload.data));return payload;
     }).catch(e=>{if(epoch===generation&&token===session()&&permitted)cache.set(key,{at:Date.now(),error:true});throw e;}).finally(()=>clearTimeout(timer));
     pending.set(key,task);try{return await task;}finally{if(pending.get(key)===task)pending.delete(key);}
   }

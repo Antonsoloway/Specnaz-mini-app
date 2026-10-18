@@ -33,3 +33,14 @@
 .team-live-card .team-live-facts b{white-space:nowrap}
 @media(max-width:360px){.team-live-card .team-live-summary{margin:8px;padding:12px 8px}.team-live-card .team-live-facts{padding:10px 8px;gap:12px}.team-live-card .team-live-facts span{font-size:14px}.team-live-card .team-live-facts b{font-size:17px}.team-live-card .team-live-leadership{padding:0 8px 8px}.team-live-card .team-live-player-name b{font-size:18px!important}}
 .team-live-card .team-live-title:has(>.team-live-emblem:empty){grid-template-columns:minmax(0,1fr) 62px}
+
+/* Royal Kingdom: its own badge catalogue, cups and game-style blue summary. */
+.team-live-card[data-game="Royal Kingdom"] .team-live-summary{background:linear-gradient(#619ad6,#5576a1);box-shadow:inset 0 2px #b2d4f1,inset 0 -5px #365879}
+.team-live-card[data-game="Royal Kingdom"] .team-live-title{grid-template-columns:60px minmax(0,1fr) 64px}
+.team-live-card[data-game="Royal Kingdom"] .team-live-emblem img{width:58px!important;height:64px!important;object-fit:contain}
+.team-live-stars{display:flex;gap:2px;margin-top:8px}.team-live-stars svg{width:22px;height:23px}
+.team-live-card[data-game="Royal Kingdom"] .team-live-crowns{background:linear-gradient(#d6c3ce,#ad96a5);border-color:#baaeb4;color:#24345e}
+.team-live-card[data-game="Royal Kingdom"] .team-live-player{background:linear-gradient(#ffedd5,#f2d5b8);color:#25335b}
+.team-live-card[data-game="Royal Kingdom"] .team-live-player-name small{color:#9b3529}
+.team-live-card[data-game="Royal Kingdom"] .team-live-facts b{color:#142d56}
+@media(max-width:360px){.team-live-card[data-game="Royal Kingdom"] .team-live-title{grid-template-columns:44px minmax(0,1fr) 58px}.team-live-card[data-game="Royal Kingdom"] .team-live-emblem img{width:42px!important;height:47px!important}.team-live-stars svg{width:18px;height:19px}}

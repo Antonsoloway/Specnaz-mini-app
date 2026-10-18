@@ -55,3 +55,8 @@ AO `@username для ссылки`
 - Не удалять скрытые helper-листы без dependency scan.
 - После изменений структуры проверять `Карточка команды`, `Поиск`, публичную историю и Telegram-ссылки.
 - Для истории не оставлять формат бывших merged-разделителей на обычных строках.
+
+
+## 18.10.2026 — RM/RK game links
+
+Optional `gameTeamId` is a text int64 in the existing owned `Команды!M` column. Its legacy header `ID команды RM` is retained; game is the canonical value from A (`Royal Match` / `Royal Kingdom`). No new column or formula change. Team revision, admin/public snapshots and cascading rename retain the ID under `(name, game)`. Blank explicitly unlinks; an unrelated occupied M is never repurposed.

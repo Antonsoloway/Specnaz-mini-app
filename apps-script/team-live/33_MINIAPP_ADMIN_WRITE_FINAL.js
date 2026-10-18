@@ -606,7 +606,7 @@ function MINIAPP_adminWriteFinalMeta_() {
     mode: 'single-range-validation-safe',
     rollback: 'source-values-and-role-rules'
   };
-  meta.gameTeamLink = {enabled: true, game: 'Royal Match', version: '1.0.0'};
+  meta.gameTeamLink = {enabled: true, game: 'Royal Match', games: ['Royal Match','Royal Kingdom'], version: '1.1.0'};
   meta.writableTeamFields = ['name', 'leader', 'photo', 'gameTeamId'];
   meta.createTeamFields = ['game', 'name', 'leader', 'photo', 'gameTeamId'];
   var unifiedQueueReady = typeof MINIAPP_queueUnifiedSnapshotRefresh_ === 'function';
