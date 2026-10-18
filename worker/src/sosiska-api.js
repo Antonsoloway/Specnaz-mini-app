@@ -186,6 +186,25 @@ export function normalizePlayerProfile(userId,data){
 
 // RK backend is deliberately separate from RM: no shared team IDs, watch history or
 // source credentials. Every action is authorized by the same Telegram admin facade.
+// The RK 33931 profile returns keyed ClientStats and BackendStats, unlike RM's single Stats array.
+export function normalizeKingdomProfileStats(data){
+ const client={1:'firstTryWins',2:'levelWins',3:'helpsMade',4:'highestWeeklyWins',7:'collectionsCompleted',8:'districtsBuilt',9:'totalCup',10:'highestCup',11:'arenaWins'};
+ const backend={1:'worldBestRank',2:'worldTop1000',3:'localBestRank',4:'localTop1000'};
+ const out={};
+ for(const [rows,mapping] of [[data?.ClientStats,client],[data?.BackendStats,backend]]){
+  if(rows==null)continue;
+  if(!Array.isArray(rows)||rows.length>32)throw Error('RK_PROFILE_INVALID');
+  for(const row of rows){
+   const name=mapping[row?.key];
+   if(!name)continue;
+   if(name in out||typeof row.value!=='string'||!/^\d+$/.test(row.value)||BigInt(row.value)>9223372036854775807n)throw Error('RK_PROFILE_INVALID');
+   out[name]=row.value;
+  }
+ }
+ // Rank zero is an empty leaderboard position, not a genuine #0 rank.
+ for(const k of ['worldBestRank','localBestRank'])if(out[k]==='0')out[k]=null;
+ return out;
+}
 export async function handleKingdom(request,env,body,json,fetcher=fetch){
  const operation=body.operation;
  const invoke=async(origin,secret,action,payload={})=>{
@@ -245,7 +264,7 @@ export async function handleKingdom(request,env,body,json,fetcher=fetch){
    if(!d)return json({ok:false,error:'RK_NOT_CONFIGURED'},503);
    const p=d.Profile;if(d.RequestedUserId!==body.userId||p?.UserId!==body.userId)throw Error('RK_PROFILE_INVALID');
    return json({ok:true,data:{userId:body.userId,name:p.Name,level:p.Level,crown:Number.isSafeInteger(p.Cup)&&p.Cup>=0?p.Cup:null,teamId:p.TeamId,
-    teamName:p.TeamName??'',joinedAt:null,profileSetting:p.ProfileSetting,stats:{},game:'rk',fetchedAt:new Date().toISOString()}});
+    teamName:p.TeamName??'',joinedAt:null,profileSetting:p.ProfileSetting,stats:normalizeKingdomProfileStats(d),statsAvailable:d.statsAvailable===true,game:'rk',fetchedAt:new Date().toISOString()}});
   }
   if(['tournamentGroup','tournamentPlayers'].includes(operation)){
    const battle=await invoke(RK_EVENT_ORIGIN,env.RK_EVENT_API_KEY,'getTeamClash');
