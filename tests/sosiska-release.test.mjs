@@ -2,13 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
-for(const [file,target] of [['app.html','app-v0603.html'],['app-v0601.html','app-v0600.html']])test(file+' preserves Telegram launch query and hash',async()=>{
+for(const [file,target] of [['app.html','app-v0604.html'],['app-v0601.html','app-v0600.html']])test(file+' preserves Telegram launch query and hash',async()=>{
  const html=await readFile(new URL('../'+file,import.meta.url),'utf8'),script=html.match(/<script>([\s\S]*?)<\/script>/)[1];
  let destination;
  const context={URLSearchParams,window:{location:{search:'?gas=fixture&owner=value',hash:'#tgWebAppData=fixture%26signed',replace(value){destination=value;}}}};
  vm.runInNewContext(script,context);
  const url=new URL(destination,'https://miniapp.test/');
- assert.equal(url.pathname,'/'+target);assert.equal(url.searchParams.get('gas'),'fixture');assert.equal(url.searchParams.get('owner'),'value');assert.equal(url.searchParams.get('releaseBuild'),file==='app.html'?'20261018-v063-rk-stats1':'20261016-v061-agent-status1');assert.equal(url.hash,context.window.location.hash);
+ assert.equal(url.pathname,'/'+target);assert.equal(url.searchParams.get('gas'),'fixture');assert.equal(url.searchParams.get('owner'),'value');assert.equal(url.searchParams.get('releaseBuild'),file==='app.html'?'20261018-v064-rk-emblems184':'20261016-v061-agent-status1');assert.equal(url.hash,context.window.location.hash);
 });
 test('Sosiska appears in current changelog without losing existing entries',async()=>{
  const source=await readFile(new URL('../changelog-v061-latest.js',import.meta.url),'utf8');
@@ -44,4 +44,16 @@ test('RK stats release v0.6.3 retains v0.6.2 history and routes Telegram launch 
  vm.runInNewContext(source,ctx);
  assert.equal(ctx.window.RoyalChangelog.version,'0.6.3');
  assert.equal(ctx.window.RoyalChangelog.releases[1].version,'0.6.2');
+});
+
+test('new v0.6.4 entrypoint preserves v0.6.3 and has independent RK scripts',async()=>{
+ const html=await readFile(new URL('../app-v0604.html',import.meta.url),'utf8');
+ assert.match(html,/id="versionBadge">v0\.6\.4/);
+ assert.ok(html.indexOf('changelog-v0603.js')<html.indexOf('changelog-v0604.js'));
+ assert.ok(html.indexOf('rk-team-emblems-v064.js')<html.indexOf('sosiska-v061.js'));
+ const code=await readFile(new URL('../changelog-v0604.js',import.meta.url),'utf8');
+ const ctx={window:{RoyalChangelog:{releases:[{version:'0.6.3',title:'Earlier',changes:['Preserve']}]}}};
+ vm.runInNewContext(code,ctx);
+ assert.equal(ctx.window.RoyalChangelog.version,'0.6.4');
+ assert.equal(ctx.window.RoyalChangelog.releases[1].version,'0.6.3');
 });
