@@ -1,12 +1,13 @@
 /* Deployment candidate. Team game identity is text in Команды!M.
    Only the signed admin-write gateway may mutate it. No game credentials here. */
-var MINIAPP_TEAM_LIVE_HEADER = 'ID команды RM';
+var MINIAPP_TEAM_LIVE_HEADER = 'ID команды RM'; // Keep the existing owned column; game comes from A.
+function MINIAPP_teamLiveGame_(game) { return game === 'Royal Match' || game === 'Royal Kingdom'; }
 function MINIAPP_teamLiveValidId_(id) {
   return typeof id === 'string' && /^[1-9]\d{0,18}$/.test(id) &&
     (id.length < 19 || id <= '9223372036854775807');
 }
 function MINIAPP_teamLiveReadId_(sheet, value, game) {
-  if (game !== 'Royal Match' || sheet.getRange(1, 13).getDisplayValue() !== MINIAPP_TEAM_LIVE_HEADER) return '';
+  if (!MINIAPP_teamLiveGame_(game) || sheet.getRange(1, 13).getDisplayValue() !== MINIAPP_TEAM_LIVE_HEADER) return '';
   var id = String(value || '').trim();
   return MINIAPP_teamLiveValidId_(id) ? id : '';
 }
@@ -15,8 +16,8 @@ function MINIAPP_teamLivePrepare_(sheet, game, input, previous) {
   var id = supplied ? input.gameTeamId : String(previous || '');
   if (typeof id !== 'string' || (id && !MINIAPP_teamLiveValidId_(id)))
     return MINIAPP_adminWriteError_('TEAM_GAME_ID_INVALID', 'Выберите команду через поиск или укажите корректный ID.');
-  if (id && game !== 'Royal Match')
-    return MINIAPP_adminWriteError_('TEAM_GAME_UNSUPPORTED', 'Привязка доступна только для Royal Match.');
+  if (id && !MINIAPP_teamLiveGame_(game))
+    return MINIAPP_adminWriteError_('TEAM_GAME_UNSUPPORTED', 'Выберите Royal Match или Royal Kingdom.');
   if (!supplied) return {ok:true, id:id, changed:false};
   var header = sheet.getRange(1, 13).getDisplayValue();
   if (header !== MINIAPP_TEAM_LIVE_HEADER) {
