@@ -1,6 +1,6 @@
-## 18.10.2026 — v0.6.9 RK list emblems prepared
+## 18.10.2026 — v0.6.9 published: RK emblems replace emoji across CRM surfaces
 
-Owner reported missing RK icon replacement in directory rows. Shared visible-only CRM decorator now supports both games, game-scoped logo cache, public/admin lists, membership links, profiles and rankings. Original names/routes stay intact; loaded images alone suppress prefixes. Unlink/access revocation removes stale images. Publication pending CI.
+Owner reported missing RK icon replacement in directory rows. Shared visible-only CRM decorator now supports both games, game-scoped logo cache, public/admin lists, membership links, profiles and rankings. Original names/routes stay intact; loaded images alone suppress prefixes. Unlink/access revocation removes stale images. PR81 merged as a8fc2d78244aee5ddd662d28f81f4b9093caa8da, reviewed source69884840b5e25ad12611266ff907436f1168625c. Source CI39163164235 PASS (153 Node/asset,32 admin, workerd/isolation and all browser checks). RK browser checks include full app CSS at320/390/768, public directory, admin list/ranking, participant/profile links, same-ID RM/RK isolation, visibility gating, max2requests, raw routing identity, broken-image fallback, unlink and revocation. Pages39163459083 build/deploy/report PASS; all seven public release files byte-match reviewed source. Main CI39163458904 pending at documentation time. Apps Script/Worker source unchanged. Telegram owner acceptance remains unverified.
 
 ## 18.10.2026 — v0.6.8 published: emblem then name, RK emoji parity
 
