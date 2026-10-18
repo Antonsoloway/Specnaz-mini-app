@@ -7,3 +7,13 @@
 /* Preserve raw identity; hide only a duplicate prefix beside a loaded RK image. */
 .rk-team-name:has(>.rk-team-emblem[data-rk-loaded="1"]:not([hidden])) .rk-team-emoji-prefix,
 .team-live-title:has(>.team-live-emblem>.rk-team-emblem[data-rk-loaded="1"]:not([hidden]))>h3 .rk-team-emoji-prefix{display:none!important}
+
+/* CRM decorators attach the image directly to existing list/profile titles. */
+.team-card-main>strong.rk-team-name{display:block}
+.team-card-main>strong>.rk-team-emblem,
+.participant-profile-team-main>b>.rk-team-emblem,
+[data-admin-participant-team] b>.rk-team-emblem,
+.team-detail-head h2>.rk-team-emblem{margin-right:7px}
+.team-detail-head h2>.rk-team-emblem{width:40px!important;height:44px!important}
+
+.team-card-main>strong>.rk-team-emoji-prefix{display:inline;margin:0;opacity:1}

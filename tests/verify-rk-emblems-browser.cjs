@@ -49,9 +49,48 @@ const root=path.resolve(__dirname,'..');
       await page.evaluate(()=>document.querySelector('.rk-team-emblem').src='/missing-emblem.webp');
       await page.waitForFunction(()=>document.querySelector('.rk-team-emblem')?.hidden);
       assert.equal(await page.locator('.rk-team-emoji-prefix').isVisible(),true);
+      // Actual CRM surfaces share the RM visible-only decorator, with isolated game IDs.
+      for(const file of [...new Set([...fs.readFileSync(path.join(root,'app-v0609.html'),'utf8').matchAll(/href="([^"?]+\.css)/g)].map(m=>m[1]))])await page.addStyleTag({path:path.join(root,file)});
+      await page.evaluate(()=>{
+        window.sessionToken='list-fixture';window.calls=[];window.activeCalls=0;window.peakCalls=0;
+        const rk={name:'💀ВЕНОМ',game:'Royal Kingdom',gameTeamId:'1'},rm={name:'⚜️MATCH',game:'Royal Match',gameTeamId:'1'},unlinked={name:'💣Arcane',game:'Royal Kingdom'},offscreen={name:'☀️OFFSCREEN',game:'Royal Kingdom',gameTeamId:'2'};
+        window.snapshotState={teams:[rk,rm,unlinked,offscreen]};window.RoyalAdminDataV0600={current:{adminData:{teams:[rk,rm]}}};
+        window.ref=t=>encodeURIComponent(JSON.stringify([t.name,t.game]));
+        document.querySelector('#panel').innerHTML='<div class="teams-list">'+[rk,rm,unlinked].map((t,i)=>'<button class="team-card" id="list'+i+'" data-team="'+ref(t)+'"><div class="team-card-icon">🏰</div><div class="team-card-main"><strong>'+t.name+'</strong><span>'+t.game+'</span><small>Участников: 2</small></div><span class="chevron">›</span></button>').join('')+'</div>'+
+          '<div id="members"><button class="participant-profile-team-link" data-team="'+ref(rk)+'"><span class="participant-profile-team-main"><b>'+rk.name+'</b><small>Лидер</small></span></button><button class="membership-pill" data-team="'+ref(rk)+'"><span>'+rk.name+'</span></button></div>'+
+          '<section class="royal-admin-screen"><details data-admin-team="1" data-admin-team-name="'+rk.name+'" data-admin-team-full-game="Royal Kingdom"><summary><strong>'+rk.name+'</strong></summary></details><div data-admin-ranking-team="1" data-team-name="'+rk.name+'" data-team-game="Royal Kingdom"><div class="royal-admin-team-ranking-main"><strong>'+rk.name+'</strong></div></div><button data-admin-participant-team="1" data-team-name="'+rk.name+'" data-team-game="Royal Kingdom"><b>'+rk.name+'</b></button></section>'+
+          '<button id="offscreen" style="margin-top:2000px" data-team="'+ref(offscreen)+'"><span>'+offscreen.name+'</span></button>';
+        window.fetch=async url=>{const params=new URL(url).searchParams,game=params.get('game'),name=params.get('team');calls.push({game,name});activeCalls++;peakCalls=Math.max(peakCalls,activeCalls);await new Promise(r=>setTimeout(r,30));activeCalls--;return Response.json({ok:true,data:{teamId:name==='☀️OFFSCREEN'?'2':'1',game,logo:game==='Royal Kingdom'?72:0}});};
+      });
+      await page.addScriptTag({path:path.join(root,'team-emblems-v061.js')});
+      await page.waitForFunction(()=>document.querySelector('#list0 img')?.dataset.rkLoaded==='1'&&document.querySelector('#list1 img')?.dataset.rmLoaded==='1');
+      assert.equal(await page.locator('#list0 strong').innerText(),'ВЕНОМ');
+      assert.equal(await page.locator('#list0 strong').textContent(),'💀ВЕНОМ');
+      assert.equal(await page.locator('#list0 img').getAttribute('data-rk-logo'),'72');
+      assert.equal(await page.locator('#list1 img').getAttribute('data-rm-logo'),'0');
+      assert.equal(await page.locator('#list2 img').count(),0);
+      assert.equal(await page.locator('#list2 strong').innerText(),'💣Arcane');
+      assert.equal(await page.locator('#list0').getAttribute('data-team'),await page.evaluate(()=>ref(snapshotState.teams[0])));
+      assert.equal(await page.evaluate(()=>calls.some(c=>c.name==='☀️OFFSCREEN')),false);
+      assert.ok(await page.evaluate(()=>peakCalls<=2));
+      for(const target of ['.participant-profile-team-main>b','.membership-pill>span','[data-admin-team] summary strong','.royal-admin-team-ranking-main strong','[data-admin-participant-team]>b']){
+        await page.locator(target).scrollIntoViewIfNeeded();
+        await page.waitForFunction(selector=>document.querySelector(selector+' img')?.dataset.rkLoaded==='1',target);
+        assert.equal(await page.locator(target).innerText(),'ВЕНОМ');assert.equal(await page.locator(target).textContent(),'💀ВЕНОМ');
+      }
+      await page.locator('#list0').scrollIntoViewIfNeeded();
+      await page.locator('#list0 img').evaluate(img=>img.src='/missing-list-emblem.webp');
+      await page.waitForFunction(()=>document.querySelector('#list0 img')?.hidden);
+      assert.equal(await page.locator('#list0 strong').innerText(),'💀ВЕНОМ');
+      await page.evaluate(()=>{delete snapshotState.teams[0].gameTeamId;delete RoyalAdminDataV0600.current.adminData.teams[0].gameTeamId;RoyalTeamEmblems.decorate();});
+      assert.equal(await page.locator('#panel .rk-team-emblem').count(),0);
+      assert.equal(await page.locator('#list0 strong').innerText(),'💀ВЕНОМ');
+      assert.equal(await page.locator('#list1 .rm-team-emblem').count(),1,'unlink RK must preserve RM same-ID image');
+      await page.evaluate(()=>window.dispatchEvent(new Event('royal:access-denied')));
+      assert.equal(await page.locator('#panel img').count(),0);
       assert.deepEqual(errors,[]);
       await page.close();
     }
-    console.log('RK: 184 real images, 0/183 and unknown IDs, no RM fallback, 320/390/768px, no browser errors');
+    console.log('RK: 184 real images, 0/183 and unknown IDs, no RM fallback, 320/390/768px, public/admin CRM surfaces, same-ID game isolation, loaded/error/unlink/revocation prefix fallback, no browser errors');
   } finally {await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});

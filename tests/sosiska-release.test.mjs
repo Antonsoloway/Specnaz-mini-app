@@ -2,13 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
-for(const [file,target] of [['app.html','app-v0608.html'],['app-v0601.html','app-v0600.html']])test(file+' preserves Telegram launch query and hash',async()=>{
+for(const [file,target] of [['app.html','app-v0609.html'],['app-v0601.html','app-v0600.html']])test(file+' preserves Telegram launch query and hash',async()=>{
  const html=await readFile(new URL('../'+file,import.meta.url),'utf8'),script=html.match(/<script>([\s\S]*?)<\/script>/)[1];
  let destination;
  const context={URLSearchParams,window:{location:{search:'?gas=fixture&owner=value',hash:'#tgWebAppData=fixture%26signed',replace(value){destination=value;}}}};
  vm.runInNewContext(script,context);
  const url=new URL(destination,'https://miniapp.test/');
- assert.equal(url.pathname,'/'+target);assert.equal(url.searchParams.get('gas'),'fixture');assert.equal(url.searchParams.get('owner'),'value');assert.equal(url.searchParams.get('releaseBuild'),file==='app.html'?'20261018-v068-team-header1':'20261016-v061-agent-status1');assert.equal(url.hash,context.window.location.hash);
+ assert.equal(url.pathname,'/'+target);assert.equal(url.searchParams.get('gas'),'fixture');assert.equal(url.searchParams.get('owner'),'value');assert.equal(url.searchParams.get('releaseBuild'),file==='app.html'?'20261018-v069-rk-list1':'20261016-v061-agent-status1');assert.equal(url.hash,context.window.location.hash);
 });
 test('Sosiska appears in current changelog without losing existing entries',async()=>{
  const source=await readFile(new URL('../changelog-v061-latest.js',import.meta.url),'utf8');
