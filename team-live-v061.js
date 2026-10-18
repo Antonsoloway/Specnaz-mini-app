@@ -43,6 +43,8 @@
     for(const entry of entries){const width=entry.contentRect.width;if(measuredWidths.get(entry.target)===width)continue;measuredWidths.set(entry.target,width);fitTitle(entry.target);}
   });
   document.fonts?.ready?.then(()=>document.querySelectorAll('.team-live-card').forEach(fitTitle));
+  document.fonts?.addEventListener?.('loadingdone',()=>document.querySelectorAll('.team-live-card').forEach(fitTitle));
+  for(const event of ['load','error'])document.addEventListener(event,e=>{const card=e.target?.closest?.('.team-live-card');if(card)fitTitle(card);},true);
   function showData(host,state,data){host.dataset.game=state.game;host.querySelector('[data-team-live-content]').innerHTML=card(data);fitTitle(host);titleResize?.observe(host);state.hasData=true;state.data=data;state.photo.classList.remove('team-live-unavailable');}
 
   function card(data) {
