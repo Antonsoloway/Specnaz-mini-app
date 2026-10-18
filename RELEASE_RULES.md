@@ -222,10 +222,10 @@ auth denial clears saved cards. Storage failure must not prevent network loading
 
 ### Team-name emoji prefill
 
-RM name prefix uses only validated numeric catalogue identity. Preserve manual
+RM and RK name prefixes use their own validated numeric catalogue identities (176 RM,184 RK). Never reuse RM symbol indices for RK. Preserve manual
 prefixes and typing; never overwrite a changed game, ID, session or closed form
 from a late response. Auto-prefill is a draft edit; only normal Save persists it.
-Unknown logos and RK have no inferred prefix; no mass renaming on data load.
+Unknown logos have no inferred prefix; no mass renaming on data load. RK editor/picker behavior follows the same no-space, draft-only, manual-prefix and late-response rules as RM.
 
 Owner format correction15.10.2026: no separator between team emoji and name (🇷🇺FORTUNA). Preserve spaces inside the actual team name.
 
