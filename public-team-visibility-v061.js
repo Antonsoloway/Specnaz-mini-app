@@ -5,10 +5,9 @@
  */
 (() => {
   'use strict';
-  if (String(window.__ROYAL_BUILD__ || '') !== '0.6.1') return;
   if (window.__ROYAL_PUBLIC_TEAM_VISIBILITY_V061__) return;
 
-  const VERSION = '0.6.1-public-team-visibility.1';
+  const VERSION = '0.6.13-public-team-visibility.2';
   const INACTIVE = 'неактивен';
 
   function statusOf(team) {
@@ -16,7 +15,7 @@
   }
 
   function isPublicTeam(team) {
-    return statusOf(team) !== INACTIVE;
+    return statusOf(team) !== INACTIVE && Number(team?.memberCount || 0) > 0;
   }
 
   function applyPublicTeamPolicy() {
@@ -24,6 +23,9 @@
     try { snapshot = snapshotState; }
     catch (_) { return false; }
     if (!snapshot || !Array.isArray(snapshot.teams)) return false;
+
+    // Use the same current roster counters as the visible team card.
+    window.RoyalUX0539?.refreshTeamStats?.();
 
     const all = snapshot.teams;
     const visible = all.filter(isPublicTeam);
@@ -45,6 +47,13 @@
   window.addEventListener('royal:snapshot-ready', () => {
     applyPublicTeamPolicy();
   });
+
+  // Apply synchronously before rendering too: warm snapshots and Back restores
+  // must not briefly publish an inactive/empty directory row.
+  if (typeof renderTeamsPage === 'function') {
+    const native = renderTeamsPage;
+    renderTeamsPage = function (...args) { applyPublicTeamPolicy(); return native(...args); };
+  }
 
   // Covers an already-resolved snapshot during warm-cache/page restore races.
   [0, 120, 600].forEach(delay => window.setTimeout(applyPublicTeamPolicy, delay));

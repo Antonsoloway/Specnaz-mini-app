@@ -143,7 +143,8 @@
   }
 
   function sortedActiveTeams() {
-    const active = teams().filter(isActive);
+    const active = teams().filter(team => isActive(team) &&
+      (!window.RoyalPublicTeamVisibilityV061 || window.RoyalPublicTeamVisibilityV061.isPublicTeam(team)));
     if (window.RoyalTeamSpecnazOrder) return window.RoyalTeamSpecnazOrder.order(active, snapshotState?.participants);
     return active.slice().sort((a, b) => {
       const ag = teamGame(a) === 'Royal Match' ? 0 : teamGame(a) === 'Royal Kingdom' ? 1 : 2;
