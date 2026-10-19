@@ -50,3 +50,16 @@ test('v0.6.12 loads sorting before list wrappers and preserves previous release 
   assert.equal(ctx.window.RoyalChangelog.version,'0.6.12');
   assert.equal(ctx.window.RoyalChangelog.releases[1].version,'0.6.11');
 });
+test('zero specnaz uses activity in base then activity outside, while positive ties still use scored members',()=>{
+ const api=boot().window.RoyalTeamSpecnazOrder;
+ const list=[
+  {name:'Outside',game:rm,specnazTrips:0,activityBase:0,activityOutside:99},
+  {name:'Base',game:rm,specnazTrips:0,activityBase:2,activityOutside:0},
+  {name:'Empty counters',game:rm,specnazTrips:0,activityBase:0,activityOutside:0},
+  {name:'Lower outside',game:rk,specnazTrips:0,activityBase:0,activityOutside:1},
+  {name:'One scorer',game:rm,specnazTrips:5,specnazMemberCount:1,activityBase:999},
+  {name:'Two scorers',game:rm,specnazTrips:5,specnazMemberCount:2,activityBase:0}
+ ];
+ assert.deepEqual(Array.from(api.order(list,[]),t=>t.name),['Two scorers','One scorer','Base','Outside','Lower outside','Empty counters']);
+ assert.deepEqual(Array.from(api.order(list,[],true),t=>t.name),['Two scorers','One scorer','Base','Outside','Lower outside','Empty counters']);
+});

@@ -1,5 +1,7 @@
 import currentWorker from './entry-v1320.js';
 import { loadPrivateSnapshotCached } from './private-snapshot-cache.js';
+import { createDirectoryMetricsLoader, applyDirectoryMetrics } from './team-directory-metrics.js';
+const loadDirectoryMetrics = createDirectoryMetricsLoader();
 
 const WRAPPER_VERSION = '1.33.0';
 const ALLOWED_CHAT_STATE = 'В чате';
@@ -57,13 +59,17 @@ async function handleDirectSnapshot(request, env) {
     );
     if (!viewer) throw appError(403, 'ACCESS_REVOKED', 'Доступ к приложению больше не активен.');
 
-    const snapshot = sanitizeSnapshot(source);
+    let snapshot = applyDirectoryMetrics(sanitizeSnapshot(source), await loadDirectoryMetrics(env));
+    const hashBytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(
+      JSON.stringify([source?.dataHash || '', snapshot.teams]))));
+    snapshot.dataHash = Array.from(hashBytes, b => b.toString(16).padStart(2, '0')).join('');
     const headers = new Headers(cors);
     headers.set('Content-Type', 'application/json; charset=utf-8');
     headers.set('Cache-Control', 'private, max-age=60');
     headers.set('X-Content-Type-Options', 'nosniff');
     headers.set('X-Royal-Snapshot-Path', 'direct-v1330');
-    if (source?.dataHash) headers.set('ETag', `"${String(source.dataHash)}"`);
+    headers.set('ETag', `"${snapshot.dataHash}"`);
+    headers.set('X-Royal-Team-Directory', '1.0.0');
 
     return new Response(JSON.stringify({ ok: true, snapshot }), { status: 200, headers });
   } catch (error) {

@@ -39,9 +39,12 @@
     const byTeam = metrics(participants);
     return (teams || []).map((team, index) => {
       const metric = byTeam.get(teamKey(team)) || { total: 0, scoredMembers: 0 };
-      return { team, index, total: useSheetTotals ? number(team?.specnazTrips) : metric.total,
-        scoredMembers: metric.scoredMembers };
-    }).sort((a, b) => b.total - a.total || b.scoredMembers - a.scoredMembers || a.index - b.index)
+      return { team, index, total: useSheetTotals || team?.specnazTrips != null ? number(team?.specnazTrips) : metric.total,
+        scoredMembers: team?.specnazMemberCount != null ? number(team.specnazMemberCount) : metric.scoredMembers,
+        activityBase: number(team?.activityBase), activityOutside: number(team?.activityOutside) };
+    }).sort((a, b) => b.total - a.total || (a.total === 0 && b.total === 0
+      ? b.activityBase - a.activityBase || b.activityOutside - a.activityOutside
+      : b.scoredMembers - a.scoredMembers) || a.index - b.index)
       .map(item => item.team);
   }
   window.RoyalTeamSpecnazOrder = { order, metrics, teamKey };

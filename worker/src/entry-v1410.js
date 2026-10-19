@@ -50,6 +50,7 @@ export default {
         service:'royal-crm-miniapp-api',
         version:WRAPPER_VERSION,
         achievements:'private-registry+public-projection',
+        teamDirectory:'crm-aggregates-v1',
         achievementAdminWrite:'/admin-achievements',
         achievementJournal:'private-registry+admin-journal-v2'
       }, 200);

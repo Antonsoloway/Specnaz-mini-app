@@ -12,12 +12,12 @@ const [oldPath,newPath]=process.argv.slice(3);
 if(!oldPath||!newPath)throw new Error('Provide legacy and module Worker bundles');
 const persist=await mkdtemp(join(tmpdir(),'sosiska-isolation-'));
 let fixtureCalls=0;
-const snapshot={generatedAt:'2026-10-12T00:00:00Z',participants:[{telegramId:'123',name:'Fixture admin',chatState:'В чате'}],teams:[{name:'Fixture team',game:'RM'}],stats:{participants:1,teams:1}};
+const snapshot={generatedAt:'2026-10-12T00:00:00Z',participants:[{telegramId:'123',name:'Fixture admin',chatState:'В чате',memberships:[{team:'Fixture team',game:'Royal Match',role:'Лидер'}]}],teams:[{name:'Fixture team',game:'Royal Match',memberCount:1,status:'Активен'}],stats:{participants:1,teams:1}};
 const outboundService=async request=>{
  fixtureCalls++;const url=new URL(request.url);
  if(url.hostname==='api.telegram.org')return Response.json({ok:true,result:{status:'administrator'}});
  if(url.hostname==='api.github.com'&&url.pathname.endsWith('/snapshot.json'))return Response.json(snapshot);
- if(url.hostname==='api.github.com'&&url.pathname.endsWith('/admin-snapshot.json'))return Response.json({generatedAt:snapshot.generatedAt,adminData:{participants:snapshot.participants,teams:snapshot.teams,journal:[],write:{}}});
+ if(url.hostname==='api.github.com'&&url.pathname.endsWith('/admin-snapshot.json'))return Response.json({generatedAt:snapshot.generatedAt,adminData:{participants:snapshot.participants,teams:snapshot.teams.map(t=>({...t,specnazTrips:7,activityBase:4,activityOutside:2,leader:'PRIVATE_SENTINEL'})),journal:[{secret:'PRIVATE_SENTINEL'}],write:{}}});
  if(url.hostname==='api.github.com'&&url.pathname.endsWith('/achievements.json'))return new Response('',{status:404});
  throw new Error('Unexpected outbound request in isolation fixture');
 };
@@ -48,7 +48,13 @@ try {
   const b=await newRuntime.dispatchFetch('https://miniapp.test'+path,init);
   assert.equal(a.status,200,path+' legacy success');assert.equal(b.status,200,path+' module success');
   assert.deepEqual([...b.headers],[...a.headers],path+' authenticated headers');
-  assert.equal(await b.text(),await a.text(),path+' authenticated content');checks++;
+  const aText=await a.text(),bText=await b.text();assert.equal(bText,aText,path+' authenticated content');checks++;
+  if(path==='/snapshot'){
+   const body=JSON.parse(bText);assert.equal(body.snapshot.teams[0].activityBase,4);
+   assert.equal(body.snapshot.teams[0].activityOutside,2);assert.equal(body.snapshot.teams[0].specnazTrips,7);
+   assert.equal(body.snapshot.teamDirectoryVersion,'1.0.0');assert.ok(!bText.includes('PRIVATE_SENTINEL'));
+   assert.equal(b.headers.get('X-Royal-Team-Directory'),'1.0.0');
+  }
  }
  assert.ok(fixtureCalls>0);
  console.log(JSON.stringify({checks,legacyRoutes:'identical status/headers/body',authenticatedSnapshotAndAdmin:'pass',fixtureCalls,liveNetworkCalls:0}));
