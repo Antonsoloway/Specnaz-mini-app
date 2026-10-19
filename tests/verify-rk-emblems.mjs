@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
+import {createHash} from 'node:crypto';
 const here=new URL('../',import.meta.url);
 test('all 184 RK assets match zero-based IDs and WebP RIFF structure',async()=>{
  const cat=JSON.parse(await readFile(new URL('assets/rk-emblems/catalog.json',here)));
@@ -43,10 +44,32 @@ test('RK emoji catalogue covers every ID and preserves editable names without du
  vm.runInContext(await readFile(new URL('rk-team-emblems-v064.js',here),'utf8'),ctx);
  const api=ctx.window.RoyalKingdomEmblems;
  for(let id=0;id<184;id++)assert.ok(api.emoji(id),'RK emoji '+id);
- assert.equal(api.emojiName('FORTUNA',144),'🇷🇺FORTUNA');
- assert.equal(api.emojiName('WeAreJustice',159),'🇹🇷WeAreJustice');
+ assert.equal(api.emojiName('FORTUNA',140),'🇷🇺FORTUNA');
+ assert.equal(api.emojiName('WeAreJustice',155),'🇹🇷WeAreJustice');
  assert.equal(api.emojiName('Da budet Swet',52),'⚓Da budet Swet');
- assert.equal(api.emojiName('🌟 Kingdom Team',144),'🌟Kingdom Team');
+ assert.equal(api.emojiName('🌟 Kingdom Team',140),'🌟Kingdom Team');
  assert.equal(api.emojiName('Kingdom Team',999),'Kingdom Team');
  assert.equal(api.emojiName(api.emojiName('Team',8),8),'♞Team');
+});
+
+test('native array IDs, not visual menu order, select every image and emoji',async()=>{
+ const native=JSON.parse(await readFile(new URL('assets/rk-emblems/native-order-33931.json',here)));
+ const cat=JSON.parse(await readFile(new URL('assets/rk-emblems/catalog.json',here)));
+ assert.equal(native.count,184);assert.equal(native.bundleSha256,cat.nativeBundleSha256);
+ assert.deepEqual(native.entries.map(e=>e.serverId),Array.from({length:184},(_,i)=>i));
+ assert.equal(new Set(native.entries.map(e=>e.visualOrder)).size,184);
+ for(const entry of native.entries){
+  const c=cat.entries[entry.serverId];assert.equal(c.visualOrder,entry.visualOrder);
+  assert.equal(c.screenshotIndex,entry.visualOrder-1);
+  assert.equal(c.nativeBackground,entry.background);assert.equal(c.nativeLogo,entry.logo);
+  assert.equal(createHash('sha256').update(await readFile(new URL(c.asset,here))).digest('hex'),c.sha256);
+ }
+ const ctx={window:{},document:{addEventListener(){}}};vm.createContext(ctx);
+ vm.runInContext(await readFile(new URL('rk-team-emblems-v064.js',here),'utf8'),ctx);
+ const api=ctx.window.RoyalKingdomEmblems;
+ for(const [id,visual,emoji,symbol] of [[124,129,'🇺🇸','usa'],[136,141,'🇩🇰','denmark'],[140,145,'🇷🇺','russia'],[144,149,'🇲🇽','mexico'],[155,160,'🇹🇷','turkey'],[179,184,'🇰🇼','kuwait'],[180,125,'🦋','butterfly_1'],[183,128,'🧙','wizard_hat_2']]){
+  const e=native.entries[id];assert.equal(e.visualOrder,visual);assert.ok((e.logo||e.background).endsWith(symbol));assert.equal(api.emoji(id),emoji);
+ }
+ assert.equal(api.emojiName('НА АЗАРТЕ',140),'🇷🇺НА АЗАРТЕ');
+ assert.equal(cat.entries[140].sha256,'d875cae4fe792fa6799f233415e9943c84fdcd3e9c77cceb0ff9010e5df5872e');
 });

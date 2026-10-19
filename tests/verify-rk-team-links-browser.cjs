@@ -19,11 +19,11 @@ const root=path.resolve(__dirname,'..');
    window.fetch=async(url,init={})=>{
     if(String(url).includes('/admin-agent')){
      const b=JSON.parse(init.body);calls.push({kind:'agent',...b});
-     const t={TeamId:'12',TeamName:b.game==='rk'?'WeAreJustice':'Match Team',Leader:'2',CoLeaders:['3'],Members:[{UserId:'3',Name:'Helper',Level:5401,Crown:100},{UserId:'2',Name:'Leader',Level:5401,Crown:200}],Score:764030,TeamLogo:b.game==='rk'?151:0,Type:false,MinLevel:5400,MinCrown:8000};
+     const t={TeamId:'12',TeamName:b.game==='rk'?'WeAreJustice':'Match Team',Leader:'2',CoLeaders:['3'],Members:[{UserId:'3',Name:'Helper',Level:5401,Crown:100},{UserId:'2',Name:'Leader',Level:5401,Crown:200}],Score:764030,TeamLogo:b.game==='rk'?147:0,Type:false,MinLevel:5400,MinCrown:8000};
      return Response.json({ok:true,data:b.operation==='search'?{candidates:[{teamId:'12',name:t.TeamName}],warnings:[]}:t});
     }
     if(String(url).includes('/admin-write')){const b=JSON.parse(init.body);calls.push({kind:'write',...b});return Response.json({ok:true,requestId:b.requestId,entityType:'team',revision:'r2',record:{...b.payload,...b.payload.changes,revision:'r2'}});}
-    if(String(url).includes('team-live')){const g=new URL(url).searchParams.get('game');calls.push({kind:'live',game:g});return Response.json({ok:true,data:{teamId:'12',game:g,name:g==='Royal Kingdom'?'WeAreJustice':'Match Team',logo:g==='Royal Kingdom'?151:0,description:'Friendly & Active players only! ❤️',star:5,weeklyHelp:913,memberCount:49,capacity:50,score:g==='Royal Kingdom'?764030:100,minLevel:5400,minCrowns:8000,type:'Закрытая',leadership:[{userId:'2',name:'Actual leader',role:'Лидер',level:5401,crowns:23830,help:27},{userId:'3',name:'Assistant',role:'Помощник',level:5401,crowns:18766,help:12}],fetchedAt:new Date().toISOString()}});}
+    if(String(url).includes('team-live')){const g=new URL(url).searchParams.get('game');calls.push({kind:'live',game:g});return Response.json({ok:true,data:{teamId:'12',game:g,name:g==='Royal Kingdom'?'WeAreJustice':'Match Team',logo:g==='Royal Kingdom'?147:0,description:'Friendly & Active players only! ❤️',star:5,weeklyHelp:913,memberCount:49,capacity:50,score:g==='Royal Kingdom'?764030:100,minLevel:5400,minCrowns:8000,type:'Закрытая',leadership:[{userId:'2',name:'Actual leader',role:'Лидер',level:5401,crowns:23830,help:27},{userId:'3',name:'Assistant',role:'Помощник',level:5401,crowns:18766,help:12}],fetchedAt:new Date().toISOString()}});}
     return Response.json(payload);
    };
   });

@@ -4,7 +4,7 @@
   "count": 184,
   "firstId": 0,
   "lastId": 183,
-  "order": "zero-based, four per row, left to right, top to bottom",
+  "order": "native TeamLogoCatalog.configsArray index = server TeamLogo; visualOrder is independent",
   "entries": [
     {
       "id": 0,
@@ -12,7 +12,12 @@
       "row": 0,
       "column": 0,
       "description": "жёлтая лилия на красном",
-      "asset": "assets/rk-emblems/0.webp"
+      "asset": "assets/rk-emblems/0.webp",
+      "visualOrder": 1,
+      "screenshotIndex": 0,
+      "nativeBackground": "TeamLogo-Backgrounds-red",
+      "nativeLogo": "TeamLogo-Logos-fleur_de_lis_1",
+      "sha256": "b65286770abb5e5245bf2a7ae044fcd9c85047319fd7d166c3e86f92ae4acd5f"
     },
     {
       "id": 1,
@@ -20,7 +25,12 @@
       "row": 0,
       "column": 1,
       "description": "белая лилия на бирюзовом",
-      "asset": "assets/rk-emblems/1.webp"
+      "asset": "assets/rk-emblems/1.webp",
+      "visualOrder": 2,
+      "screenshotIndex": 1,
+      "nativeBackground": "TeamLogo-Backgrounds-teal",
+      "nativeLogo": "TeamLogo-Logos-fleur_de_lis_2",
+      "sha256": "584211136cb2e12028c8dc8213283a5d4edcfca4bd14cb94dcc551912d3afc0c"
     },
     {
       "id": 2,
@@ -28,7 +38,12 @@
       "row": 0,
       "column": 2,
       "description": "чёрная корона на золотом",
-      "asset": "assets/rk-emblems/2.webp"
+      "asset": "assets/rk-emblems/2.webp",
+      "visualOrder": 3,
+      "screenshotIndex": 2,
+      "nativeBackground": "TeamLogo-Backgrounds-yellow",
+      "nativeLogo": "TeamLogo-Logos-crown_1",
+      "sha256": "5fdd1cd67093c10e557749097bae7f7944f8ddc47f1b7f8cde112ca8dbcaf1a5"
     },
     {
       "id": 3,
@@ -36,7 +51,12 @@
       "row": 0,
       "column": 3,
       "description": "жёлтая корона на красном",
-      "asset": "assets/rk-emblems/3.webp"
+      "asset": "assets/rk-emblems/3.webp",
+      "visualOrder": 4,
+      "screenshotIndex": 3,
+      "nativeBackground": "TeamLogo-Backgrounds-red",
+      "nativeLogo": "TeamLogo-Logos-crown_2",
+      "sha256": "bce0fad87d78c7ee90265e778b148e85135b180fa35107ec28210fc0b49b2c6e"
     },
     {
       "id": 4,
@@ -44,7 +64,12 @@
       "row": 1,
       "column": 0,
       "description": "жёлтая утка на синем",
-      "asset": "assets/rk-emblems/4.webp"
+      "asset": "assets/rk-emblems/4.webp",
+      "visualOrder": 5,
+      "screenshotIndex": 4,
+      "nativeBackground": "TeamLogo-Backgrounds-blue_dark",
+      "nativeLogo": "TeamLogo-Logos-duck_1",
+      "sha256": "6bb87c57863f3efb398e08a7b9c992394668cb9a4651640dead04d5d6ba7cd00"
     },
     {
       "id": 5,
@@ -52,7 +77,12 @@
       "row": 1,
       "column": 1,
       "description": "белая утка на розовом",
-      "asset": "assets/rk-emblems/5.webp"
+      "asset": "assets/rk-emblems/5.webp",
+      "visualOrder": 6,
+      "screenshotIndex": 5,
+      "nativeBackground": "TeamLogo-Backgrounds-pink",
+      "nativeLogo": "TeamLogo-Logos-duck_2",
+      "sha256": "3e72756e753b67adc00ba20e86c249081c327379044b5f7eb0c924d6ef9c63fc"
     },
     {
       "id": 6,
@@ -60,7 +90,12 @@
       "row": 1,
       "column": 2,
       "description": "белая башня на красном",
-      "asset": "assets/rk-emblems/6.webp"
+      "asset": "assets/rk-emblems/6.webp",
+      "visualOrder": 7,
+      "screenshotIndex": 6,
+      "nativeBackground": "TeamLogo-Backgrounds-red",
+      "nativeLogo": "TeamLogo-Logos-castle_1",
+      "sha256": "294904ad7a3ce6024ce9cf883d05a031c3da82affdd34bc7a6b15e73181a8491"
     },
     {
       "id": 7,
@@ -68,7 +103,12 @@
       "row": 1,
       "column": 3,
       "description": "белая башня на синем",
-      "asset": "assets/rk-emblems/7.webp"
+      "asset": "assets/rk-emblems/7.webp",
+      "visualOrder": 8,
+      "screenshotIndex": 7,
+      "nativeBackground": "TeamLogo-Backgrounds-blue_dark",
+      "nativeLogo": "TeamLogo-Logos-castle_2",
+      "sha256": "7603f0a78f76393443cf63c13482f85007b1de1fe12f3a4ef9c64f1dc5f3e538"
     },
     {
       "id": 8,
@@ -76,7 +116,12 @@
       "row": 2,
       "column": 0,
       "description": "белый конь на чёрном",
-      "asset": "assets/rk-emblems/8.webp"
+      "asset": "assets/rk-emblems/8.webp",
+      "visualOrder": 9,
+      "screenshotIndex": 8,
+      "nativeBackground": "TeamLogo-Backgrounds-black",
+      "nativeLogo": "TeamLogo-Logos-horse_1",
+      "sha256": "deb7d7690f6d00e47ffc025e2e60c870461285075c1ff389a06eae9a38e1f8b9"
     },
     {
       "id": 9,
@@ -84,7 +129,12 @@
       "row": 2,
       "column": 1,
       "description": "чёрный конь на белом",
-      "asset": "assets/rk-emblems/9.webp"
+      "asset": "assets/rk-emblems/9.webp",
+      "visualOrder": 10,
+      "screenshotIndex": 9,
+      "nativeBackground": "TeamLogo-Backgrounds-white",
+      "nativeLogo": "TeamLogo-Logos-horse_2",
+      "sha256": "2ec0a2816df883e30bb173b2f75abef4d28fa8df01c288e6ba9cd2c1029eb882"
     },
     {
       "id": 10,
@@ -92,7 +142,12 @@
       "row": 2,
       "column": 2,
       "description": "жёлтый колокол на фиолетовом",
-      "asset": "assets/rk-emblems/10.webp"
+      "asset": "assets/rk-emblems/10.webp",
+      "visualOrder": 11,
+      "screenshotIndex": 10,
+      "nativeBackground": "TeamLogo-Backgrounds-purple",
+      "nativeLogo": "TeamLogo-Logos-cloche_1",
+      "sha256": "00b33714afa568df02031b4f14f09310533d2b56af951774557a869f3713a034"
     },
     {
       "id": 11,
@@ -100,7 +155,12 @@
       "row": 2,
       "column": 3,
       "description": "жёлтый колокол на бирюзовом",
-      "asset": "assets/rk-emblems/11.webp"
+      "asset": "assets/rk-emblems/11.webp",
+      "visualOrder": 12,
+      "screenshotIndex": 11,
+      "nativeBackground": "TeamLogo-Backgrounds-teal",
+      "nativeLogo": "TeamLogo-Logos-cloche_2",
+      "sha256": "99f37bfbef197dd0d3431d3b930bb27c2fa11ace5af031fa8bed4858d35d9283"
     },
     {
       "id": 12,
@@ -108,7 +168,12 @@
       "row": 3,
       "column": 0,
       "description": "жёлтая пальма на фиолетовом",
-      "asset": "assets/rk-emblems/12.webp"
+      "asset": "assets/rk-emblems/12.webp",
+      "visualOrder": 13,
+      "screenshotIndex": 12,
+      "nativeBackground": "TeamLogo-Backgrounds-purple",
+      "nativeLogo": "TeamLogo-Logos-pal_1",
+      "sha256": "df35023b2e3d7f12484a6e88b56ce4289a4b3a8b939a71bca46bd6e318db2062"
     },
     {
       "id": 13,
@@ -116,7 +181,12 @@
       "row": 3,
       "column": 1,
       "description": "белая пальма на зелёном",
-      "asset": "assets/rk-emblems/13.webp"
+      "asset": "assets/rk-emblems/13.webp",
+      "visualOrder": 14,
+      "screenshotIndex": 13,
+      "nativeBackground": "TeamLogo-Backgrounds-green",
+      "nativeLogo": "TeamLogo-Logos-palm_2",
+      "sha256": "3eccd5eaa49e11fa51c145d2ec18765908e82a7e8f2958d640f701bfeff5faf2"
     },
     {
       "id": 14,
@@ -124,7 +194,12 @@
       "row": 3,
       "column": 2,
       "description": "белый бант на красном",
-      "asset": "assets/rk-emblems/14.webp"
+      "asset": "assets/rk-emblems/14.webp",
+      "visualOrder": 15,
+      "screenshotIndex": 14,
+      "nativeBackground": "TeamLogo-Backgrounds-red",
+      "nativeLogo": "TeamLogo-Logos-bow_tie_1",
+      "sha256": "210e1100aa1f5f762631eef1d58d70c50741be1bd202c43274c9b1bdc5f13acb"
     },
     {
       "id": 15,
@@ -132,7 +207,12 @@
       "row": 3,
       "column": 3,
       "description": "розовый бант на чёрном",
-      "asset": "assets/rk-emblems/15.webp"
+      "asset": "assets/rk-emblems/15.webp",
+      "visualOrder": 16,
+      "screenshotIndex": 15,
+      "nativeBackground": "TeamLogo-Backgrounds-black",
+      "nativeLogo": "TeamLogo-Logos-bow_tie_2",
+      "sha256": "4a33806ab38887df069d17212750c7ed4a1726a4eed360b511b3ee0343d62bc3"
     },
     {
       "id": 16,
@@ -140,7 +220,12 @@
       "row": 4,
       "column": 0,
       "description": "белая колонна на синем",
-      "asset": "assets/rk-emblems/16.webp"
+      "asset": "assets/rk-emblems/16.webp",
+      "visualOrder": 17,
+      "screenshotIndex": 16,
+      "nativeBackground": "TeamLogo-Backgrounds-blue_dark",
+      "nativeLogo": "TeamLogo-Logos-column_2",
+      "sha256": "650210e37452edf6296d0db9797dfe2a068b5781b9b41b86f9f45b84f5277a28"
     },
     {
       "id": 17,
@@ -148,7 +233,12 @@
       "row": 4,
       "column": 1,
       "description": "белая колонна на красном",
-      "asset": "assets/rk-emblems/17.webp"
+      "asset": "assets/rk-emblems/17.webp",
+      "visualOrder": 18,
+      "screenshotIndex": 17,
+      "nativeBackground": "TeamLogo-Backgrounds-red",
+      "nativeLogo": "TeamLogo-Logos-column_1",
+      "sha256": "84715d5bbda52f221005ad36e161df915e1146706ce9130b2081dce9fb904985"
     },
     {
       "id": 18,
@@ -156,7 +246,12 @@
       "row": 4,
       "column": 2,
       "description": "белая молния на синем",
-      "asset": "assets/rk-emblems/18.webp"
+      "asset": "assets/rk-emblems/18.webp",
+      "visualOrder": 19,
+      "screenshotIndex": 18,
+      "nativeBackground": "TeamLogo-Backgrounds-blue_dark",
+      "nativeLogo": "TeamLogo-Logos-lightning_1",
+      "sha256": "89930388e3a5c1bb58a57271f8d568c8d1b6d446ee7c32643a86ef17ee4636e3"
     },
     {
       "id": 19,
@@ -164,7 +259,12 @@
       "row": 4,
       "column": 3,
       "description": "жёлтая молния на фиолетовом",
-      "asset": "assets/rk-emblems/19.webp"
+      "asset": "assets/rk-emblems/19.webp",
+      "visualOrder": 20,
+      "screenshotIndex": 19,
+      "nativeBackground": "TeamLogo-Backgrounds-purple",
+      "nativeLogo": "TeamLogo-Logos-lightning_2",
+      "sha256": "3de7869186e5891fa3031a363d0bfa00c3be67a67bf6f8c7f58e01d39d853f77"
     },
     {
       "id": 20,
@@ -172,7 +272,12 @@
       "row": 5,
       "column": 0,
       "description": "зелёный динозавр на чёрном",
-      "asset": "assets/rk-emblems/20.webp"
+      "asset": "assets/rk-emblems/20.webp",
+      "visualOrder": 21,
+      "screenshotIndex": 20,
+      "nativeBackground": "TeamLogo-Backgrounds-black",
+      "nativeLogo": "TeamLogo-Logos-dino_1",
+      "sha256": "17be7128898311be889f88e577342e4ae4bf8fb1cdd6734e59d66bea21663290"
     },
     {
       "id": 21,
@@ -180,7 +285,12 @@
       "row": 5,
       "column": 1,
       "description": "жёлтый динозавр на фиолетовом",
-      "asset": "assets/rk-emblems/21.webp"
+      "asset": "assets/rk-emblems/21.webp",
+      "visualOrder": 22,
+      "screenshotIndex": 21,
+      "nativeBackground": "TeamLogo-Backgrounds-purple",
+      "nativeLogo": "TeamLogo-Logos-dino_2",
+      "sha256": "8c26a8129304ea155b879c931caa86c21e9ef92dea599130e4a3f935cb9d1da2"
     },
     {
       "id": 22,
@@ -188,7 +298,12 @@
       "row": 5,
       "column": 2,
       "description": "белые вишни на зелёном",
-      "asset": "assets/rk-emblems/22.webp"
+      "asset": "assets/rk-emblems/22.webp",
+      "visualOrder": 23,
+      "screenshotIndex": 22,
+      "nativeBackground": "TeamLogo-Backgrounds-green",
+      "nativeLogo": "TeamLogo-Logos-cherry_1",
+      "sha256": "618eaf94bd804e704ca3079739ead4953dfdfa0985c128588bd1cff141f3bd40"
     },
     {
       "id": 23,
@@ -196,7 +311,12 @@
       "row": 5,
       "column": 3,
       "description": "белые вишни на розовом",
-      "asset": "assets/rk-emblems/23.webp"
+      "asset": "assets/rk-emblems/23.webp",
+      "visualOrder": 24,
+      "screenshotIndex": 23,
+      "nativeBackground": "TeamLogo-Backgrounds-pink",
+      "nativeLogo": "TeamLogo-Logos-cherry_2",
+      "sha256": "4f8132f37d61c9481c81f03076d389204626328494a3fa640ea053419c3b3fce"
     },
     {
       "id": 24,
@@ -204,7 +324,12 @@
       "row": 0,
       "column": 0,
       "description": "белый пазл на синем",
-      "asset": "assets/rk-emblems/24.webp"
+      "asset": "assets/rk-emblems/24.webp",
+      "visualOrder": 25,
+      "screenshotIndex": 24,
+      "nativeBackground": "TeamLogo-Backgrounds-blue_dark",
+      "nativeLogo": "TeamLogo-Logos-puzzle_1",
+      "sha256": "f550248d97ab505b62b82b9c05b006a79a772e7990004b873a78a954c68c53a1"
     },
     {
       "id": 25,
@@ -212,7 +337,12 @@
       "row": 0,
       "column": 1,
       "description": "синий пазл на золотом",
-      "asset": "assets/rk-emblems/25.webp"
+      "asset": "assets/rk-emblems/25.webp",
+      "visualOrder": 26,
+      "screenshotIndex": 25,
+      "nativeBackground": "TeamLogo-Backgrounds-yellow",
+      "nativeLogo": "TeamLogo-Logos-puzzle_2",
+      "sha256": "770ed07e3f2932956d0dbd240721d8bbd42ff52975225eadc562dd986c98d7eb"
     },
     {
       "id": 26,
@@ -220,7 +350,12 @@
       "row": 0,
       "column": 2,
       "description": "белое сердце на красном",
-      "asset": "assets/rk-emblems/26.webp"
+      "asset": "assets/rk-emblems/26.webp",
+      "visualOrder": 27,
+      "screenshotIndex": 26,
+      "nativeBackground": "TeamLogo-Backgrounds-red",
+      "nativeLogo": "TeamLogo-Logos-heart_1",
+      "sha256": "d9f3f5a278420513c8c57e2208e02a053f3c0350e7e9a4efc97ca7175f610a03"
     },
     {
       "id": 27,
@@ -228,7 +363,12 @@
       "row": 0,
       "column": 3,
       "description": "красное сердце на белом",
-      "asset": "assets/rk-emblems/27.webp"
+      "asset": "assets/rk-emblems/27.webp",
+      "visualOrder": 28,
+      "screenshotIndex": 27,
+      "nativeBackground": "TeamLogo-Backgrounds-white",
+      "nativeLogo": "TeamLogo-Logos-heart_2",
+      "sha256": "22220080f42248fc87e49bb0ce37bf6c43bc14207d66b09270c95d94b36dba93"
     },
     {
       "id": 28,
@@ -236,7 +376,12 @@
       "row": 1,
       "column": 0,
       "description": "красный огонь на чёрном",
-      "asset": "assets/rk-emblems/28.webp"
+      "asset": "assets/rk-emblems/28.webp",
+      "visualOrder": 29,
+      "screenshotIndex": 28,
+      "nativeBackground": "TeamLogo-Backgrounds-black",
+      "nativeLogo": "TeamLogo-Logos-fire_1",
+      "sha256": "f1e7e185566bd0a15b9fcf80b6838bd58b24843913f8ee49e1dd1aab7cb64d81"
     },
     {
       "id": 29,
@@ -244,7 +389,12 @@
       "row": 1,
       "column": 1,
       "description": "жёлтый огонь на красном",
-      "asset": "assets/rk-emblems/29.webp"
+      "asset": "assets/rk-emblems/29.webp",
+      "visualOrder": 30,
+      "screenshotIndex": 29,
+      "nativeBackground": "TeamLogo-Backgrounds-red",
+      "nativeLogo": "TeamLogo-Logos-fire_2",
+      "sha256": "077f1e9d0a73a823e9ef9fb22ad88519e347c082cd69d794690a693c7fe0b13a"
     },
     {
       "id": 30,
@@ -252,7 +402,12 @@
       "row": 1,
       "column": 2,
       "description": "белая белка на розовом",
-      "asset": "assets/rk-emblems/30.webp"
+      "asset": "assets/rk-emblems/30.webp",
+      "visualOrder": 31,
+      "screenshotIndex": 30,
+      "nativeBackground": "TeamLogo-Backgrounds-pink",
+      "nativeLogo": "TeamLogo-Logos-squirrel_1",
+      "sha256": "3a783e2aa9d10a1c45d0251417f81f0011829af9aaa1f2a243e6a86e1efd536a"
     },
     {
       "id": 31,
@@ -260,7 +415,12 @@
       "row": 1,
       "column": 3,
       "description": "белая белка на зелёном",
-      "asset": "assets/rk-emblems/31.webp"
+      "asset": "assets/rk-emblems/31.webp",
+      "visualOrder": 32,
+      "screenshotIndex": 31,
+      "nativeBackground": "TeamLogo-Backgrounds-green",
+      "nativeLogo": "TeamLogo-Logos-squirrel_2",
+      "sha256": "1e1547aaae02274333fdb6d796795081f963ae56fb1ab8357103bfad2e68189e"
     },
     {
       "id": 32,
@@ -268,7 +428,12 @@
       "row": 2,
       "column": 0,
       "description": "белый компас на фиолетовом",
-      "asset": "assets/rk-emblems/32.webp"
+      "asset": "assets/rk-emblems/32.webp",
+      "visualOrder": 33,
+      "screenshotIndex": 32,
+      "nativeBackground": "TeamLogo-Backgrounds-purple",
+      "nativeLogo": "TeamLogo-Logos-compass_1",
+      "sha256": "85f9ded86cd1c6305b531a2e498abe608b26a5d9a4a90009e726d9a45c2cd61e"
     },
     {
       "id": 33,
@@ -276,7 +441,12 @@
       "row": 2,
       "column": 1,
       "description": "жёлтый компас на синем",
-      "asset": "assets/rk-emblems/33.webp"
+      "asset": "assets/rk-emblems/33.webp",
+      "visualOrder": 34,
+      "screenshotIndex": 33,
+      "nativeBackground": "TeamLogo-Backgrounds-blue_dark",
+      "nativeLogo": "TeamLogo-Logos-compass_2",
+      "sha256": "51338d13024edd19f4ee137fd7151663a65e931eb2ab99f96e6edc93067b6a62"
     },
     {
       "id": 34,
@@ -284,7 +454,12 @@
       "row": 2,
       "column": 2,
       "description": "чёрный шлем на белом",
-      "asset": "assets/rk-emblems/34.webp"
+      "asset": "assets/rk-emblems/34.webp",
+      "visualOrder": 35,
+      "screenshotIndex": 34,
+      "nativeBackground": "TeamLogo-Backgrounds-white",
+      "nativeLogo": "TeamLogo-Logos-helmet_1",
+      "sha256": "cae41a367129c4899b4012c23f6dbcc67571d4a1c2429a0645a2536cc7b1d150"
     },
     {
       "id": 35,
@@ -292,7 +467,12 @@
       "row": 2,
       "column": 3,
       "description": "жёлтый шлем на чёрном",
-      "asset": "assets/rk-emblems/35.webp"
+      "asset": "assets/rk-emblems/35.webp",
+      "visualOrder": 36,
+      "screenshotIndex": 35,
+      "nativeBackground": "TeamLogo-Backgrounds-black",
+      "nativeLogo": "TeamLogo-Logos-helmet_2",
+      "sha256": "b5deba64c2b65abbe0e4001c138b15fc0e7695a64dfb0c04f6a276745da13f18"
     },
     {
       "id": 36,
@@ -300,7 +480,12 @@
       "row": 3,
       "column": 0,
       "description": "зелёная ёлка на чёрном",
-      "asset": "assets/rk-emblems/36.webp"
+      "asset": "assets/rk-emblems/36.webp",
+      "visualOrder": 37,
+      "screenshotIndex": 36,
+      "nativeBackground": "TeamLogo-Backgrounds-black",
+      "nativeLogo": "TeamLogo-Logos-tree_1",
+      "sha256": "6a4a97286a9048598adf87ec546f26eec968eeab7aaabdc84f73f1dc2ae82b34"
     },
     {
       "id": 37,
@@ -308,7 +493,12 @@
       "row": 3,
       "column": 1,
       "description": "белая ёлка на зелёном",
-      "asset": "assets/rk-emblems/37.webp"
+      "asset": "assets/rk-emblems/37.webp",
+      "visualOrder": 38,
+      "screenshotIndex": 37,
+      "nativeBackground": "TeamLogo-Backgrounds-green",
+      "nativeLogo": "TeamLogo-Logos-tree_2",
+      "sha256": "cbe326ab271e480f3a217c5c89cb63bc7967d69fac9cdcc3e46e8c3b0216234c"
     },
     {
       "id": 38,
@@ -316,7 +506,12 @@
       "row": 3,
       "column": 2,
       "description": "жёлтый цветок на красном",
-      "asset": "assets/rk-emblems/38.webp"
+      "asset": "assets/rk-emblems/38.webp",
+      "visualOrder": 39,
+      "screenshotIndex": 38,
+      "nativeBackground": "TeamLogo-Backgrounds-red",
+      "nativeLogo": "TeamLogo-Logos-flower_1",
+      "sha256": "0cda5caefb4b60adf776ec97a53b4136d6aeddf746a115dafd55b0a9bd328614"
     },
     {
       "id": 39,
@@ -324,7 +519,12 @@
       "row": 3,
       "column": 3,
       "description": "белый цветок на розовом",
-      "asset": "assets/rk-emblems/39.webp"
+      "asset": "assets/rk-emblems/39.webp",
+      "visualOrder": 40,
+      "screenshotIndex": 39,
+      "nativeBackground": "TeamLogo-Backgrounds-pink",
+      "nativeLogo": "TeamLogo-Logos-flower_2",
+      "sha256": "bf07f8833653da9453d54cf9fa10de4f1732deb9a911f130ac11c8a94a5f127c"
     },
     {
       "id": 40,
@@ -332,7 +532,12 @@
       "row": 4,
       "column": 0,
       "description": "белый храм на красном",
-      "asset": "assets/rk-emblems/40.webp"
+      "asset": "assets/rk-emblems/40.webp",
+      "visualOrder": 41,
+      "screenshotIndex": 40,
+      "nativeBackground": "TeamLogo-Backgrounds-red",
+      "nativeLogo": "TeamLogo-Logos-bank_1",
+      "sha256": "ac8c148d5b8f05943ab85440386c5ac651ca48e1db2c246dea8dad56d091a878"
     },
     {
       "id": 41,
@@ -340,7 +545,12 @@
       "row": 4,
       "column": 1,
       "description": "чёрный храм на золотом",
-      "asset": "assets/rk-emblems/41.webp"
+      "asset": "assets/rk-emblems/41.webp",
+      "visualOrder": 42,
+      "screenshotIndex": 41,
+      "nativeBackground": "TeamLogo-Backgrounds-yellow",
+      "nativeLogo": "TeamLogo-Logos-bank_2",
+      "sha256": "df82b3bb5f85dde3dbcac6e3f522965c4668a18aad8a05ce2080143c5efb2372"
     },
     {
       "id": 42,
@@ -348,7 +558,12 @@
       "row": 4,
       "column": 2,
       "description": "белый скворечник на бирюзовом",
-      "asset": "assets/rk-emblems/42.webp"
+      "asset": "assets/rk-emblems/42.webp",
+      "visualOrder": 43,
+      "screenshotIndex": 42,
+      "nativeBackground": "TeamLogo-Backgrounds-teal",
+      "nativeLogo": "TeamLogo-Logos-birdhouse_1",
+      "sha256": "546c41aa3e098ec6c840e768e22ec529e5cc7feecabcc7dc6b8fb3d60e745e76"
     },
     {
       "id": 43,
@@ -356,7 +571,12 @@
       "row": 4,
       "column": 3,
       "description": "жёлтый скворечник на фиолетовом",
-      "asset": "assets/rk-emblems/43.webp"
+      "asset": "assets/rk-emblems/43.webp",
+      "visualOrder": 44,
+      "screenshotIndex": 43,
+      "nativeBackground": "TeamLogo-Backgrounds-purple",
+      "nativeLogo": "TeamLogo-Logos-birdhouse_2",
+      "sha256": "817216527e82c1ca8d958512e97a1b4ee9335980fdddd05f5198d08694ebc5bc"
     },
     {
       "id": 44,
@@ -364,7 +584,12 @@
       "row": 5,
       "column": 0,
       "description": "жёлтая свинка на синем",
-      "asset": "assets/rk-emblems/44.webp"
+      "asset": "assets/rk-emblems/44.webp",
+      "visualOrder": 45,
+      "screenshotIndex": 44,
+      "nativeBackground": "TeamLogo-Backgrounds-blue_dark",
+      "nativeLogo": "TeamLogo-Logos-piggy_1",
+      "sha256": "60edc86ef9eee3ebcd946538f2fc7b1cc553dfcc279664aa851c20e0fbf381a7"
     },
     {
       "id": 45,
@@ -372,7 +597,12 @@
       "row": 5,
       "column": 1,
       "description": "белая свинка на розовом",
-      "asset": "assets/rk-emblems/45.webp"
+      "asset": "assets/rk-emblems/45.webp",
+      "visualOrder": 46,
+      "screenshotIndex": 45,
+      "nativeBackground": "TeamLogo-Backgrounds-pink",
+      "nativeLogo": "TeamLogo-Logos-piggy_2",
+      "sha256": "02c522846d66b19c0225df284fad98280872d920da8d569bb3217aa0d697ff76"
     },
     {
       "id": 46,
@@ -380,7 +610,12 @@
       "row": 5,
       "column": 2,
       "description": "белый геймпад на синем",
-      "asset": "assets/rk-emblems/46.webp"
+      "asset": "assets/rk-emblems/46.webp",
+      "visualOrder": 47,
+      "screenshotIndex": 46,
+      "nativeBackground": "TeamLogo-Backgrounds-blue_dark",
+      "nativeLogo": "TeamLogo-Logos-gamepad_1",
+      "sha256": "7c8b13ed3915c4fe8927dab369e5472d3d5631b545f9bd332c5ef689c99d46ed"
     },
     {
       "id": 47,
@@ -388,7 +623,12 @@
       "row": 5,
       "column": 3,
       "description": "жёлтый геймпад на красном",
-      "asset": "assets/rk-emblems/47.webp"
+      "asset": "assets/rk-emblems/47.webp",
+      "visualOrder": 48,
+      "screenshotIndex": 47,
+      "nativeBackground": "TeamLogo-Backgrounds-red",
+      "nativeLogo": "TeamLogo-Logos-gamepad_2",
+      "sha256": "6a3c6d021337f28bd0f1d9c04faa1cc1bace6d471c59f88f2c1924ebdff99473"
     },
     {
       "id": 48,
@@ -396,7 +636,12 @@
       "row": 0,
       "column": 0,
       "description": "белая лапа на фиолетовом",
-      "asset": "assets/rk-emblems/48.webp"
+      "asset": "assets/rk-emblems/48.webp",
+      "visualOrder": 49,
+      "screenshotIndex": 48,
+      "nativeBackground": "TeamLogo-Backgrounds-purple",
+      "nativeLogo": "TeamLogo-Logos-paw_1",
+      "sha256": "d80ddc4e8b619f79862fa44e14badf031e04e44748f4e2eaa088ac9f721a81a4"
     },
     {
       "id": 49,
@@ -404,7 +649,12 @@
       "row": 0,
       "column": 1,
       "description": "чёрная лапа на белом",
-      "asset": "assets/rk-emblems/49.webp"
+      "asset": "assets/rk-emblems/49.webp",
+      "visualOrder": 50,
+      "screenshotIndex": 49,
+      "nativeBackground": "TeamLogo-Backgrounds-white",
+      "nativeLogo": "TeamLogo-Logos-paw_2",
+      "sha256": "aae24fee59ebc0d4888ade5812f960e043e49059aa3ef0eed234a2a6326b7dd7"
     },
     {
       "id": 50,
@@ -412,7 +662,12 @@
       "row": 0,
       "column": 2,
       "description": "белый клевер на зелёном",
-      "asset": "assets/rk-emblems/50.webp"
+      "asset": "assets/rk-emblems/50.webp",
+      "visualOrder": 51,
+      "screenshotIndex": 50,
+      "nativeBackground": "TeamLogo-Backgrounds-green",
+      "nativeLogo": "TeamLogo-Logos-clovern_1",
+      "sha256": "c5ebc6831a7a85ec86834276adf72b3a0dbe1f76ea5742faf3084266cd11d2e2"
     },
     {
       "id": 51,
@@ -420,7 +675,12 @@
       "row": 0,
       "column": 3,
       "description": "зелёный клевер на чёрном",
-      "asset": "assets/rk-emblems/51.webp"
+      "asset": "assets/rk-emblems/51.webp",
+      "visualOrder": 52,
+      "screenshotIndex": 51,
+      "nativeBackground": "TeamLogo-Backgrounds-black",
+      "nativeLogo": "TeamLogo-Logos-clovern_2",
+      "sha256": "69d84dca90ba8a136f44e16ebf52cafc128d812f2be58e198d772bd27fdeb4cf"
     },
     {
       "id": 52,
@@ -428,7 +688,12 @@
       "row": 1,
       "column": 0,
       "description": "белый якорь на синем",
-      "asset": "assets/rk-emblems/52.webp"
+      "asset": "assets/rk-emblems/52.webp",
+      "visualOrder": 53,
+      "screenshotIndex": 52,
+      "nativeBackground": "TeamLogo-Backgrounds-blue_dark",
+      "nativeLogo": "TeamLogo-Logos-hock_1",
+      "sha256": "44cb4f6f3df0f61994b0781bc10973170828d879e72b08296a6ca827e4b50bb6"
     },
     {
       "id": 53,
@@ -436,7 +701,12 @@
       "row": 1,
       "column": 1,
       "description": "чёрный якорь на голубом",
-      "asset": "assets/rk-emblems/53.webp"
+      "asset": "assets/rk-emblems/53.webp",
+      "visualOrder": 54,
+      "screenshotIndex": 53,
+      "nativeBackground": "TeamLogo-Backgrounds-blue_light",
+      "nativeLogo": "TeamLogo-Logos-hock_2",
+      "sha256": "691ee1dea91f7913abaf1dc171e401f1e05854ed982e3f5e0813ca7567155ce2"
     },
     {
       "id": 54,
@@ -444,7 +714,12 @@
       "row": 1,
       "column": 2,
       "description": "белая ракета на красном",
-      "asset": "assets/rk-emblems/54.webp"
+      "asset": "assets/rk-emblems/54.webp",
+      "visualOrder": 55,
+      "screenshotIndex": 54,
+      "nativeBackground": "TeamLogo-Backgrounds-red",
+      "nativeLogo": "TeamLogo-Logos-rocket_1",
+      "sha256": "7414aa743b58f514950d45183a0faa516d1c84414bae2f04382e3084d8292a23"
     },
     {
       "id": 55,
@@ -452,7 +727,12 @@
       "row": 1,
       "column": 3,
       "description": "белая ракета на фиолетовом",
-      "asset": "assets/rk-emblems/55.webp"
+      "asset": "assets/rk-emblems/55.webp",
+      "visualOrder": 56,
+      "screenshotIndex": 55,
+      "nativeBackground": "TeamLogo-Backgrounds-purple",
+      "nativeLogo": "TeamLogo-Logos-rocket_2",
+      "sha256": "e3cf5b3a671c5b81e6552deeef16c3853609aa139e4b2394648dd8dc0792e2e6"
     },
     {
       "id": 56,
@@ -460,7 +740,12 @@
       "row": 2,
       "column": 0,
       "description": "розовая звезда на чёрном",
-      "asset": "assets/rk-emblems/56.webp"
+      "asset": "assets/rk-emblems/56.webp",
+      "visualOrder": 57,
+      "screenshotIndex": 56,
+      "nativeBackground": "TeamLogo-Backgrounds-black",
+      "nativeLogo": "TeamLogo-Logos-star_1",
+      "sha256": "c413b737122ccfe6aea4773a9455e39f320d446c66ca3ce79d5f21ceaeb39833"
     },
     {
       "id": 57,
@@ -468,7 +753,12 @@
       "row": 2,
       "column": 1,
       "description": "жёлтая звезда на синем",
-      "asset": "assets/rk-emblems/57.webp"
+      "asset": "assets/rk-emblems/57.webp",
+      "visualOrder": 58,
+      "screenshotIndex": 57,
+      "nativeBackground": "TeamLogo-Backgrounds-blue_dark",
+      "nativeLogo": "TeamLogo-Logos-star_2",
+      "sha256": "e60e212e3f23d9a649f6bca40727f3830f04f53211cf3b4aec857d8dbf695d70"
     },
     {
       "id": 58,
@@ -476,7 +766,12 @@
       "row": 2,
       "column": 2,
       "description": "белая нота на чёрном",
-      "asset": "assets/rk-emblems/58.webp"
+      "asset": "assets/rk-emblems/58.webp",
+      "visualOrder": 59,
+      "screenshotIndex": 58,
+      "nativeBackground": "TeamLogo-Backgrounds-black",
+      "nativeLogo": "TeamLogo-Logos-music_1",
+      "sha256": "dc847fe6779bf00526dd859747cd12b0ee4877676cb5ecc86c757634bcff59da"
     },
     {
       "id": 59,
@@ -484,7 +779,12 @@
       "row": 2,
       "column": 3,
       "description": "чёрная нота на белом",
-      "asset": "assets/rk-emblems/59.webp"
+      "asset": "assets/rk-emblems/59.webp",
+      "visualOrder": 60,
+      "screenshotIndex": 59,
+      "nativeBackground": "TeamLogo-Backgrounds-white",
+      "nativeLogo": "TeamLogo-Logos-music_2",
+      "sha256": "87e120714aca553600641ab8ec3d608bff42f3dad4ab563f1a60c9962373f46e"
     },
     {
       "id": 60,
@@ -492,7 +792,12 @@
       "row": 3,
       "column": 0,
       "description": "жёлтый жёлудь на фиолетовом",
-      "asset": "assets/rk-emblems/60.webp"
+      "asset": "assets/rk-emblems/60.webp",
+      "visualOrder": 61,
+      "screenshotIndex": 60,
+      "nativeBackground": "TeamLogo-Backgrounds-purple",
+      "nativeLogo": "TeamLogo-Logos-acorn_1",
+      "sha256": "fbb75f5f7642dede70b92e765207d30d4a5f36a7df182a855df6acf92fb5f2ad"
     },
     {
       "id": 61,
@@ -500,7 +805,12 @@
       "row": 3,
       "column": 1,
       "description": "чёрный жёлудь на белом",
-      "asset": "assets/rk-emblems/61.webp"
+      "asset": "assets/rk-emblems/61.webp",
+      "visualOrder": 62,
+      "screenshotIndex": 61,
+      "nativeBackground": "TeamLogo-Backgrounds-white",
+      "nativeLogo": "TeamLogo-Logos-acorn_2",
+      "sha256": "71e2d36a278c8c67a8c88b86dbf54f801205bcee58e7eff7bfebcc0c05d58e3b"
     },
     {
       "id": 62,
@@ -508,7 +818,12 @@
       "row": 3,
       "column": 2,
       "description": "белый парусник на бирюзовом",
-      "asset": "assets/rk-emblems/62.webp"
+      "asset": "assets/rk-emblems/62.webp",
+      "visualOrder": 63,
+      "screenshotIndex": 62,
+      "nativeBackground": "TeamLogo-Backgrounds-teal",
+      "nativeLogo": "TeamLogo-Logos-boat_1",
+      "sha256": "bdc183a71994e1b6a911d68cf08710f2533cd67c8d6ce6c15a992c52f67a4c12"
     },
     {
       "id": 63,
@@ -516,7 +831,12 @@
       "row": 3,
       "column": 3,
       "description": "белый парусник на синем",
-      "asset": "assets/rk-emblems/63.webp"
+      "asset": "assets/rk-emblems/63.webp",
+      "visualOrder": 64,
+      "screenshotIndex": 63,
+      "nativeBackground": "TeamLogo-Backgrounds-blue_dark",
+      "nativeLogo": "TeamLogo-Logos-boat_2",
+      "sha256": "afdaf5e4ef1678f0d0f83ee09ab790171c878f6806eef3dd770862bf9b148635"
     },
     {
       "id": 64,
@@ -524,7 +844,12 @@
       "row": 4,
       "column": 0,
       "description": "белый дельфин на синем",
-      "asset": "assets/rk-emblems/64.webp"
+      "asset": "assets/rk-emblems/64.webp",
+      "visualOrder": 65,
+      "screenshotIndex": 64,
+      "nativeBackground": "TeamLogo-Backgrounds-blue_dark",
+      "nativeLogo": "TeamLogo-Logos-dolphin_1",
+      "sha256": "f89b60ce356c6d984c9857b08ad6ebcd59b490c6ed6ac1d1c90713377794a21e"
     },
     {
       "id": 65,
@@ -532,7 +857,12 @@
       "row": 4,
       "column": 1,
       "description": "синий дельфин на золотом",
-      "asset": "assets/rk-emblems/65.webp"
+      "asset": "assets/rk-emblems/65.webp",
+      "visualOrder": 66,
+      "screenshotIndex": 65,
+      "nativeBackground": "TeamLogo-Backgrounds-yellow",
+      "nativeLogo": "TeamLogo-Logos-dolphin_2",
+      "sha256": "26ac343ecc45293e4ab309dd7bde9b557d584831c3a98a0630f23efaf6aa7670"
     },
     {
       "id": 66,
@@ -540,7 +870,12 @@
       "row": 4,
       "column": 2,
       "description": "белый торт на красном",
-      "asset": "assets/rk-emblems/66.webp"
+      "asset": "assets/rk-emblems/66.webp",
+      "visualOrder": 67,
+      "screenshotIndex": 66,
+      "nativeBackground": "TeamLogo-Backgrounds-red",
+      "nativeLogo": "TeamLogo-Logos-cake_1",
+      "sha256": "616751b67db1a53e31934adc1e902faea13c9f0becca045b10e55b8a4130ba6c"
     },
     {
       "id": 67,
@@ -548,7 +883,12 @@
       "row": 4,
       "column": 3,
       "description": "жёлтый торт на розовом",
-      "asset": "assets/rk-emblems/67.webp"
+      "asset": "assets/rk-emblems/67.webp",
+      "visualOrder": 68,
+      "screenshotIndex": 67,
+      "nativeBackground": "TeamLogo-Backgrounds-pink",
+      "nativeLogo": "TeamLogo-Logos-cake_2",
+      "sha256": "f66840193d776b5dd8369e27a0d2a053a3a5f9f746f1efe31814440afd392e90"
     },
     {
       "id": 68,
@@ -556,7 +896,12 @@
       "row": 5,
       "column": 0,
       "description": "белый зонт на фиолетовом",
-      "asset": "assets/rk-emblems/68.webp"
+      "asset": "assets/rk-emblems/68.webp",
+      "visualOrder": 69,
+      "screenshotIndex": 68,
+      "nativeBackground": "TeamLogo-Backgrounds-purple",
+      "nativeLogo": "TeamLogo-Logos-umbrella_1",
+      "sha256": "95111c00ccb6d062a94acd198cb4b621fb21b2706f30b0cac736802487be0135"
     },
     {
       "id": 69,
@@ -564,7 +909,12 @@
       "row": 5,
       "column": 1,
       "description": "белый зонт на чёрном",
-      "asset": "assets/rk-emblems/69.webp"
+      "asset": "assets/rk-emblems/69.webp",
+      "visualOrder": 70,
+      "screenshotIndex": 69,
+      "nativeBackground": "TeamLogo-Backgrounds-black",
+      "nativeLogo": "TeamLogo-Logos-umbrella_2",
+      "sha256": "e5ab0e5dea08e776b005bd20486cb6232fb581b0229315ab0a7f93564188c9ad"
     },
     {
       "id": 70,
@@ -572,7 +922,12 @@
       "row": 5,
       "column": 2,
       "description": "белый полумесяц на синем",
-      "asset": "assets/rk-emblems/70.webp"
+      "asset": "assets/rk-emblems/70.webp",
+      "visualOrder": 71,
+      "screenshotIndex": 70,
+      "nativeBackground": "TeamLogo-Backgrounds-blue_dark",
+      "nativeLogo": "TeamLogo-Logos-moon_1",
+      "sha256": "decba7f7ac7ca4d683e9133b2b8617471120016187ae2f457390531ef85eb577"
     },
     {
       "id": 71,
@@ -580,7 +935,12 @@
       "row": 5,
       "column": 3,
       "description": "жёлтый полумесяц на фиолетовом",
-      "asset": "assets/rk-emblems/71.webp"
+      "asset": "assets/rk-emblems/71.webp",
+      "visualOrder": 72,
+      "screenshotIndex": 71,
+      "nativeBackground": "TeamLogo-Backgrounds-purple",
+      "nativeLogo": "TeamLogo-Logos-moon_2",
+      "sha256": "6beb2df548bea11e9867443508f54bf1521891e3a3da0077ead9463ff024f78b"
     },
     {
       "id": 72,
@@ -588,7 +948,12 @@
       "row": 0,
       "column": 0,
       "description": "белый череп на чёрном",
-      "asset": "assets/rk-emblems/72.webp"
+      "asset": "assets/rk-emblems/72.webp",
+      "visualOrder": 73,
+      "screenshotIndex": 72,
+      "nativeBackground": "TeamLogo-Backgrounds-black",
+      "nativeLogo": "TeamLogo-Logos-skull_1",
+      "sha256": "26b390bb8e8be73e65259498406b14654ab871d6acfb7455a7a266d9cc98ecbe"
     },
     {
       "id": 73,
@@ -596,7 +961,12 @@
       "row": 0,
       "column": 1,
       "description": "чёрный череп на белом",
-      "asset": "assets/rk-emblems/73.webp"
+      "asset": "assets/rk-emblems/73.webp",
+      "visualOrder": 74,
+      "screenshotIndex": 73,
+      "nativeBackground": "TeamLogo-Backgrounds-white",
+      "nativeLogo": "TeamLogo-Logos-skull_2",
+      "sha256": "87a44cb0178a9b9477afb8fe9e0b1a931bb18e44d1bdfce05f8456cec3453509"
     },
     {
       "id": 74,
@@ -604,7 +974,12 @@
       "row": 0,
       "column": 2,
       "description": "белый осьминог на розовом",
-      "asset": "assets/rk-emblems/74.webp"
+      "asset": "assets/rk-emblems/74.webp",
+      "visualOrder": 75,
+      "screenshotIndex": 74,
+      "nativeBackground": "TeamLogo-Backgrounds-pink",
+      "nativeLogo": "TeamLogo-Logos-octopus_1",
+      "sha256": "f09047a948b98b993bae8aca154af1e5403b624ece1a984547053a556592cca0"
     },
     {
       "id": 75,
@@ -612,7 +987,12 @@
       "row": 0,
       "column": 3,
       "description": "белый осьминог на синем",
-      "asset": "assets/rk-emblems/75.webp"
+      "asset": "assets/rk-emblems/75.webp",
+      "visualOrder": 76,
+      "screenshotIndex": 75,
+      "nativeBackground": "TeamLogo-Backgrounds-blue_dark",
+      "nativeLogo": "TeamLogo-Logos-octopus_2",
+      "sha256": "c54be3ff786830972b4ef3f59e3b2b08a51521741b5d21524952eade76b35c24"
     },
     {
       "id": 76,
@@ -620,7 +1000,12 @@
       "row": 1,
       "column": 0,
       "description": "белая маска на бирюзовом",
-      "asset": "assets/rk-emblems/76.webp"
+      "asset": "assets/rk-emblems/76.webp",
+      "visualOrder": 77,
+      "screenshotIndex": 76,
+      "nativeBackground": "TeamLogo-Backgrounds-teal",
+      "nativeLogo": "TeamLogo-Logos-mask_1",
+      "sha256": "566af114e6b43de688b74c3090348e1e41416e35d83160c71ac02c4602650c14"
     },
     {
       "id": 77,
@@ -628,7 +1013,12 @@
       "row": 1,
       "column": 1,
       "description": "жёлтая маска на фиолетовом",
-      "asset": "assets/rk-emblems/77.webp"
+      "asset": "assets/rk-emblems/77.webp",
+      "visualOrder": 78,
+      "screenshotIndex": 77,
+      "nativeBackground": "TeamLogo-Backgrounds-purple",
+      "nativeLogo": "TeamLogo-Logos-mask_2",
+      "sha256": "4b9a9c1cb80c6057b00b6ff3b8130670fb1255d297b6bc26cb65d59255dd9ff6"
     },
     {
       "id": 78,
@@ -636,7 +1026,12 @@
       "row": 1,
       "column": 2,
       "description": "белый паровоз на красном",
-      "asset": "assets/rk-emblems/78.webp"
+      "asset": "assets/rk-emblems/78.webp",
+      "visualOrder": 79,
+      "screenshotIndex": 78,
+      "nativeBackground": "TeamLogo-Backgrounds-red",
+      "nativeLogo": "TeamLogo-Logos-train_1",
+      "sha256": "2d698fdf88efa5a2e588464bbca5e6005a6aa12b99a08cfd3f81faea5e6cd77d"
     },
     {
       "id": 79,
@@ -644,7 +1039,12 @@
       "row": 1,
       "column": 3,
       "description": "чёрный паровоз на белом",
-      "asset": "assets/rk-emblems/79.webp"
+      "asset": "assets/rk-emblems/79.webp",
+      "visualOrder": 80,
+      "screenshotIndex": 79,
+      "nativeBackground": "TeamLogo-Backgrounds-white",
+      "nativeLogo": "TeamLogo-Logos-train_2",
+      "sha256": "cbcb392a3bd3da1578c05dd900b703bfbb45629392e7794016a127553b6bc62a"
     },
     {
       "id": 80,
@@ -652,7 +1052,12 @@
       "row": 2,
       "column": 0,
       "description": "белый коктейль на розовом",
-      "asset": "assets/rk-emblems/80.webp"
+      "asset": "assets/rk-emblems/80.webp",
+      "visualOrder": 81,
+      "screenshotIndex": 80,
+      "nativeBackground": "TeamLogo-Backgrounds-pink",
+      "nativeLogo": "TeamLogo-Logos-cocktail_1",
+      "sha256": "72557b4de5b3df4c5fff990dd6bb2eb6f6fc012a5366094eca667c724e4aa468"
     },
     {
       "id": 81,
@@ -660,7 +1065,12 @@
       "row": 2,
       "column": 1,
       "description": "белый коктейль на бирюзовом",
-      "asset": "assets/rk-emblems/81.webp"
+      "asset": "assets/rk-emblems/81.webp",
+      "visualOrder": 82,
+      "screenshotIndex": 81,
+      "nativeBackground": "TeamLogo-Backgrounds-teal",
+      "nativeLogo": "TeamLogo-Logos-cocktail_2",
+      "sha256": "538d0a9190572f294d5df941e0cb750a32015341f7cb9e20c3a000271dc56ca0"
     },
     {
       "id": 82,
@@ -668,7 +1078,12 @@
       "row": 2,
       "column": 2,
       "description": "чёрная колба на зелёном",
-      "asset": "assets/rk-emblems/82.webp"
+      "asset": "assets/rk-emblems/82.webp",
+      "visualOrder": 83,
+      "screenshotIndex": 82,
+      "nativeBackground": "TeamLogo-Backgrounds-green",
+      "nativeLogo": "TeamLogo-Logos-tube_1",
+      "sha256": "fed6e8984efee7ae3e2b866c8dcf6c387c8f9a38d9c78481d47c3a7086f2e662"
     },
     {
       "id": 83,
@@ -676,7 +1091,12 @@
       "row": 2,
       "column": 3,
       "description": "жёлтая колба на фиолетовом",
-      "asset": "assets/rk-emblems/83.webp"
+      "asset": "assets/rk-emblems/83.webp",
+      "visualOrder": 84,
+      "screenshotIndex": 83,
+      "nativeBackground": "TeamLogo-Backgrounds-purple",
+      "nativeLogo": "TeamLogo-Logos-tube_2",
+      "sha256": "4ad5d1d7888201350fb564efbfb6b75b36d4a8b98140487f55497e77ae6200a4"
     },
     {
       "id": 84,
@@ -684,7 +1104,12 @@
       "row": 3,
       "column": 0,
       "description": "белая пика на синем",
-      "asset": "assets/rk-emblems/84.webp"
+      "asset": "assets/rk-emblems/84.webp",
+      "visualOrder": 85,
+      "screenshotIndex": 84,
+      "nativeBackground": "TeamLogo-Backgrounds-blue_dark",
+      "nativeLogo": "TeamLogo-Logos-spades_1",
+      "sha256": "907ef24eefe0a10d66ffe4972d640c17bd6d792b436843b32e78ee22f23bf026"
     },
     {
       "id": 85,
@@ -692,7 +1117,12 @@
       "row": 3,
       "column": 1,
       "description": "чёрная пика на белом",
-      "asset": "assets/rk-emblems/85.webp"
+      "asset": "assets/rk-emblems/85.webp",
+      "visualOrder": 86,
+      "screenshotIndex": 85,
+      "nativeBackground": "TeamLogo-Backgrounds-white",
+      "nativeLogo": "TeamLogo-Logos-spades_2",
+      "sha256": "9c8bb617b666d4a1d1ffc9c3a3c371c18d806bf220bce9c43871a3e0d0aa6e0f"
     },
     {
       "id": 86,
@@ -700,7 +1130,12 @@
       "row": 3,
       "column": 2,
       "description": "белая кость на красном",
-      "asset": "assets/rk-emblems/86.webp"
+      "asset": "assets/rk-emblems/86.webp",
+      "visualOrder": 87,
+      "screenshotIndex": 86,
+      "nativeBackground": "TeamLogo-Backgrounds-red",
+      "nativeLogo": "TeamLogo-Logos-bone_1",
+      "sha256": "91adb9bb1d32e07139a6c6e5345db6ba45f754fcc30bf60de6b1e5160ae75df9"
     },
     {
       "id": 87,
@@ -708,7 +1143,12 @@
       "row": 3,
       "column": 3,
       "description": "жёлтая кость на чёрном",
-      "asset": "assets/rk-emblems/87.webp"
+      "asset": "assets/rk-emblems/87.webp",
+      "visualOrder": 88,
+      "screenshotIndex": 87,
+      "nativeBackground": "TeamLogo-Backgrounds-black",
+      "nativeLogo": "TeamLogo-Logos-bone_2",
+      "sha256": "99d45c6a58494633c48a8eb4a3945670e12c9be35a98c41ed8164e54ac84d6f9"
     },
     {
       "id": 88,
@@ -716,7 +1156,12 @@
       "row": 4,
       "column": 0,
       "description": "белый кот на фиолетовом",
-      "asset": "assets/rk-emblems/88.webp"
+      "asset": "assets/rk-emblems/88.webp",
+      "visualOrder": 89,
+      "screenshotIndex": 88,
+      "nativeBackground": "TeamLogo-Backgrounds-purple",
+      "nativeLogo": "TeamLogo-Logos-cat_1",
+      "sha256": "4ce1d4626259bfde3629d3cafd9bdd5f396eb20476171a526db047faba12922e"
     },
     {
       "id": 89,
@@ -724,7 +1169,12 @@
       "row": 4,
       "column": 1,
       "description": "белый кот на чёрном",
-      "asset": "assets/rk-emblems/89.webp"
+      "asset": "assets/rk-emblems/89.webp",
+      "visualOrder": 90,
+      "screenshotIndex": 89,
+      "nativeBackground": "TeamLogo-Backgrounds-black",
+      "nativeLogo": "TeamLogo-Logos-cat_2",
+      "sha256": "28c2e465c4a90a6301bb2d9886649483d322ddc56481e52725b4d2be2ab346ae"
     },
     {
       "id": 90,
@@ -732,7 +1182,12 @@
       "row": 4,
       "column": 2,
       "description": "белые скрещённые мечи на синем",
-      "asset": "assets/rk-emblems/90.webp"
+      "asset": "assets/rk-emblems/90.webp",
+      "visualOrder": 91,
+      "screenshotIndex": 90,
+      "nativeBackground": "TeamLogo-Backgrounds-blue_dark",
+      "nativeLogo": "TeamLogo-Logos-swords_1",
+      "sha256": "4bb55c5b8a4ca8c86f69fc6fbe816bd13ad32768147cebe34ecc215e9f69f0dd"
     },
     {
       "id": 91,
@@ -740,7 +1195,12 @@
       "row": 4,
       "column": 3,
       "description": "жёлтые скрещённые мечи на красном",
-      "asset": "assets/rk-emblems/91.webp"
+      "asset": "assets/rk-emblems/91.webp",
+      "visualOrder": 92,
+      "screenshotIndex": 91,
+      "nativeBackground": "TeamLogo-Backgrounds-red",
+      "nativeLogo": "TeamLogo-Logos-swords_2",
+      "sha256": "31c7c9c02721778832d962105a80f683532de8dc2a1810f974484076a072222a"
     },
     {
       "id": 92,
@@ -748,7 +1208,12 @@
       "row": 5,
       "column": 0,
       "description": "зелёный кактус на чёрном",
-      "asset": "assets/rk-emblems/92.webp"
+      "asset": "assets/rk-emblems/92.webp",
+      "visualOrder": 93,
+      "screenshotIndex": 92,
+      "nativeBackground": "TeamLogo-Backgrounds-black",
+      "nativeLogo": "TeamLogo-Logos-cactus_1",
+      "sha256": "c058665a8f1c98e34bb5aabcc5784a8897020a63596235b359223b147597086e"
     },
     {
       "id": 93,
@@ -756,7 +1221,12 @@
       "row": 5,
       "column": 1,
       "description": "белый кактус на зелёном",
-      "asset": "assets/rk-emblems/93.webp"
+      "asset": "assets/rk-emblems/93.webp",
+      "visualOrder": 94,
+      "screenshotIndex": 93,
+      "nativeBackground": "TeamLogo-Backgrounds-green",
+      "nativeLogo": "TeamLogo-Logos-cactus_2",
+      "sha256": "ad72a9ebce14a2122537899c4031e63972e461b8bd5eb138c209d1004cca2a3c"
     },
     {
       "id": 94,
@@ -764,7 +1234,12 @@
       "row": 5,
       "column": 2,
       "description": "чёрная птица на белом",
-      "asset": "assets/rk-emblems/94.webp"
+      "asset": "assets/rk-emblems/94.webp",
+      "visualOrder": 95,
+      "screenshotIndex": 94,
+      "nativeBackground": "TeamLogo-Backgrounds-white",
+      "nativeLogo": "TeamLogo-Logos-bird_1",
+      "sha256": "9c43f9b27344b47fc8121a782da41d98968523b6fd9e9c2fa47ab8bd0935b6c0"
     },
     {
       "id": 95,
@@ -772,7 +1247,12 @@
       "row": 5,
       "column": 3,
       "description": "белая птица на бирюзовом",
-      "asset": "assets/rk-emblems/95.webp"
+      "asset": "assets/rk-emblems/95.webp",
+      "visualOrder": 96,
+      "screenshotIndex": 95,
+      "nativeBackground": "TeamLogo-Backgrounds-teal",
+      "nativeLogo": "TeamLogo-Logos-bird_2",
+      "sha256": "36a69271c4995af9b97d3acd5f78496f71001f4d097974fc3b59891486b4ed24"
     },
     {
       "id": 96,
@@ -780,7 +1260,12 @@
       "row": 0,
       "column": 0,
       "description": "белая собака на чёрном",
-      "asset": "assets/rk-emblems/96.webp"
+      "asset": "assets/rk-emblems/96.webp",
+      "visualOrder": 97,
+      "screenshotIndex": 96,
+      "nativeBackground": "TeamLogo-Backgrounds-black",
+      "nativeLogo": "TeamLogo-Logos-dog_1",
+      "sha256": "cb05bca879f190941a63bfd7e5e25eb3ca5c8b1fde258da4ddab7f45cbf31ecd"
     },
     {
       "id": 97,
@@ -788,7 +1273,12 @@
       "row": 0,
       "column": 1,
       "description": "белая собака на синем",
-      "asset": "assets/rk-emblems/97.webp"
+      "asset": "assets/rk-emblems/97.webp",
+      "visualOrder": 98,
+      "screenshotIndex": 97,
+      "nativeBackground": "TeamLogo-Backgrounds-blue_dark",
+      "nativeLogo": "TeamLogo-Logos-dog_2",
+      "sha256": "f6ca82ac0a85168443c2536da872c3db459beffded64df63ab902d18a6ccea3a"
     },
     {
       "id": 98,
@@ -796,7 +1286,12 @@
       "row": 0,
       "column": 2,
       "description": "жёлтое солнце на красном",
-      "asset": "assets/rk-emblems/98.webp"
+      "asset": "assets/rk-emblems/98.webp",
+      "visualOrder": 99,
+      "screenshotIndex": 98,
+      "nativeBackground": "TeamLogo-Backgrounds-red",
+      "nativeLogo": "TeamLogo-Logos-sun_1",
+      "sha256": "bd12285307f8211f455396635d60249eeed700979d091345c30080c2fcd843e3"
     },
     {
       "id": 99,
@@ -804,7 +1299,12 @@
       "row": 0,
       "column": 3,
       "description": "жёлтое солнце на чёрном",
-      "asset": "assets/rk-emblems/99.webp"
+      "asset": "assets/rk-emblems/99.webp",
+      "visualOrder": 100,
+      "screenshotIndex": 99,
+      "nativeBackground": "TeamLogo-Backgrounds-black",
+      "nativeLogo": "TeamLogo-Logos-sun_2",
+      "sha256": "105e739d9d1fc2525d807ccb269af3f966296b2051756f0511e98af1b27a23ae"
     },
     {
       "id": 100,
@@ -812,7 +1312,12 @@
       "row": 1,
       "column": 0,
       "description": "белая кисть на розовом",
-      "asset": "assets/rk-emblems/100.webp"
+      "asset": "assets/rk-emblems/100.webp",
+      "visualOrder": 101,
+      "screenshotIndex": 100,
+      "nativeBackground": "TeamLogo-Backgrounds-pink",
+      "nativeLogo": "TeamLogo-Logos-wall_brush_1",
+      "sha256": "672f72076e9260e647d12144d2b2a7d64b1be77756cd879e9500646545a428a6"
     },
     {
       "id": 101,
@@ -820,7 +1325,12 @@
       "row": 1,
       "column": 1,
       "description": "жёлтая кисть на красном",
-      "asset": "assets/rk-emblems/101.webp"
+      "asset": "assets/rk-emblems/101.webp",
+      "visualOrder": 102,
+      "screenshotIndex": 101,
+      "nativeBackground": "TeamLogo-Backgrounds-red",
+      "nativeLogo": "TeamLogo-Logos-wall_brush_2",
+      "sha256": "faa6ad55b49d815626dbf0572d26cfeb66d17c59649abd36ed43c754905f52b2"
     },
     {
       "id": 102,
@@ -828,7 +1338,12 @@
       "row": 1,
       "column": 2,
       "description": "белая капля на бирюзовом",
-      "asset": "assets/rk-emblems/102.webp"
+      "asset": "assets/rk-emblems/102.webp",
+      "visualOrder": 103,
+      "screenshotIndex": 102,
+      "nativeBackground": "TeamLogo-Backgrounds-teal",
+      "nativeLogo": "TeamLogo-Logos-water_1",
+      "sha256": "a488944f5bd63d68503b6202150ccf226667cf3755898e10677772867ae0e559"
     },
     {
       "id": 103,
@@ -836,7 +1351,12 @@
       "row": 1,
       "column": 3,
       "description": "белая капля на синем",
-      "asset": "assets/rk-emblems/103.webp"
+      "asset": "assets/rk-emblems/103.webp",
+      "visualOrder": 104,
+      "screenshotIndex": 103,
+      "nativeBackground": "TeamLogo-Backgrounds-blue_dark",
+      "nativeLogo": "TeamLogo-Logos-water_2",
+      "sha256": "701b338344d3da8e216c087e7290775b51d3eb96ddb487e341dcea5ddcbd7f19"
     },
     {
       "id": 104,
@@ -844,7 +1364,12 @@
       "row": 2,
       "column": 0,
       "description": "жёлтая тыква на фиолетовом",
-      "asset": "assets/rk-emblems/104.webp"
+      "asset": "assets/rk-emblems/104.webp",
+      "visualOrder": 105,
+      "screenshotIndex": 104,
+      "nativeBackground": "TeamLogo-Backgrounds-purple",
+      "nativeLogo": "TeamLogo-Logos-pumpkin_1",
+      "sha256": "f6b4ed27a93151c0d58a696cf49edfbde96a6fd67066db9482f9a8ca0ebde0ab"
     },
     {
       "id": 105,
@@ -852,7 +1377,12 @@
       "row": 2,
       "column": 1,
       "description": "оранжевая тыква на чёрном",
-      "asset": "assets/rk-emblems/105.webp"
+      "asset": "assets/rk-emblems/105.webp",
+      "visualOrder": 106,
+      "screenshotIndex": 105,
+      "nativeBackground": "TeamLogo-Backgrounds-black",
+      "nativeLogo": "TeamLogo-Logos-pumpkin_2",
+      "sha256": "20d09ca8dbfa08bb810c3201b2efbe3598bf49676fcece5d6eae534c29f5a957"
     },
     {
       "id": 106,
@@ -860,7 +1390,12 @@
       "row": 2,
       "column": 2,
       "description": "жёлтый вигвам на чёрном",
-      "asset": "assets/rk-emblems/106.webp"
+      "asset": "assets/rk-emblems/106.webp",
+      "visualOrder": 107,
+      "screenshotIndex": 106,
+      "nativeBackground": "TeamLogo-Backgrounds-black",
+      "nativeLogo": "TeamLogo-Logos-tent_1",
+      "sha256": "c820262fa880bb78f66131db4fb9c991c1517b579254bbb999c99d01262a8c36"
     },
     {
       "id": 107,
@@ -868,7 +1403,12 @@
       "row": 2,
       "column": 3,
       "description": "чёрный вигвам на зелёном",
-      "asset": "assets/rk-emblems/107.webp"
+      "asset": "assets/rk-emblems/107.webp",
+      "visualOrder": 108,
+      "screenshotIndex": 107,
+      "nativeBackground": "TeamLogo-Backgrounds-green",
+      "nativeLogo": "TeamLogo-Logos-tent_2",
+      "sha256": "5bae08e9d06660d32452533b458a3593530d12efa1e76bd024f098264387cffa"
     },
     {
       "id": 108,
@@ -876,7 +1416,12 @@
       "row": 3,
       "column": 0,
       "description": "чёрный цилиндр на белом",
-      "asset": "assets/rk-emblems/108.webp"
+      "asset": "assets/rk-emblems/108.webp",
+      "visualOrder": 109,
+      "screenshotIndex": 108,
+      "nativeBackground": "TeamLogo-Backgrounds-white",
+      "nativeLogo": "TeamLogo-Logos-hat_1",
+      "sha256": "5792b3a5c4690562dffb1f489be21f9ecee0e9cfec4a5ff29cdb012e90c10b1d"
     },
     {
       "id": 109,
@@ -884,7 +1429,12 @@
       "row": 3,
       "column": 1,
       "description": "чёрный цилиндр на зелёном",
-      "asset": "assets/rk-emblems/109.webp"
+      "asset": "assets/rk-emblems/109.webp",
+      "visualOrder": 110,
+      "screenshotIndex": 109,
+      "nativeBackground": "TeamLogo-Backgrounds-green",
+      "nativeLogo": "TeamLogo-Logos-hat_2",
+      "sha256": "481cb877886c31644800174bc1dd017e214b8b34565176287f833fb23bfb0fde"
     },
     {
       "id": 110,
@@ -892,7 +1442,12 @@
       "row": 3,
       "column": 2,
       "description": "белое яйцо на бирюзовом",
-      "asset": "assets/rk-emblems/110.webp"
+      "asset": "assets/rk-emblems/110.webp",
+      "visualOrder": 111,
+      "screenshotIndex": 110,
+      "nativeBackground": "TeamLogo-Backgrounds-teal",
+      "nativeLogo": "TeamLogo-Logos-egg_1",
+      "sha256": "57bacc633e949d0d3b1988f01c7e59ca588a9f3744f43595f491591400c27996"
     },
     {
       "id": 111,
@@ -900,7 +1455,12 @@
       "row": 3,
       "column": 3,
       "description": "жёлтое яйцо на красном",
-      "asset": "assets/rk-emblems/111.webp"
+      "asset": "assets/rk-emblems/111.webp",
+      "visualOrder": 112,
+      "screenshotIndex": 111,
+      "nativeBackground": "TeamLogo-Backgrounds-red",
+      "nativeLogo": "TeamLogo-Logos-egg_2",
+      "sha256": "56d7ce1d20e129fdae421f98b971934c6f1439d02b158f1e493ca191d29c9c89"
     },
     {
       "id": 112,
@@ -908,7 +1468,12 @@
       "row": 4,
       "column": 0,
       "description": "чёрные очки и усы на голубом",
-      "asset": "assets/rk-emblems/112.webp"
+      "asset": "assets/rk-emblems/112.webp",
+      "visualOrder": 113,
+      "screenshotIndex": 112,
+      "nativeBackground": "TeamLogo-Backgrounds-blue_light",
+      "nativeLogo": "TeamLogo-Logos-mustache_1",
+      "sha256": "31cd3715b3297338574c278c3f673e287222e29a3553774732dbac6809ef7b77"
     },
     {
       "id": 113,
@@ -916,7 +1481,12 @@
       "row": 4,
       "column": 1,
       "description": "белые очки и усы на чёрном",
-      "asset": "assets/rk-emblems/113.webp"
+      "asset": "assets/rk-emblems/113.webp",
+      "visualOrder": 114,
+      "screenshotIndex": 113,
+      "nativeBackground": "TeamLogo-Backgrounds-black",
+      "nativeLogo": "TeamLogo-Logos-mustache_2",
+      "sha256": "f214188e64276acbf57ea74abac63eda352cc1c81c146ea6789015b7fd24e6d6"
     },
     {
       "id": 114,
@@ -924,7 +1494,12 @@
       "row": 4,
       "column": 2,
       "description": "жёлтое перо на фиолетовом",
-      "asset": "assets/rk-emblems/114.webp"
+      "asset": "assets/rk-emblems/114.webp",
+      "visualOrder": 115,
+      "screenshotIndex": 114,
+      "nativeBackground": "TeamLogo-Backgrounds-purple",
+      "nativeLogo": "TeamLogo-Logos-quill_1",
+      "sha256": "97cad2b229417ee015e0953662e3254a61cbc1228437002059709c9ca07a4e35"
     },
     {
       "id": 115,
@@ -932,7 +1507,12 @@
       "row": 4,
       "column": 3,
       "description": "зелёное перо на чёрном",
-      "asset": "assets/rk-emblems/115.webp"
+      "asset": "assets/rk-emblems/115.webp",
+      "visualOrder": 116,
+      "screenshotIndex": 115,
+      "nativeBackground": "TeamLogo-Backgrounds-black",
+      "nativeLogo": "TeamLogo-Logos-quill_2",
+      "sha256": "8fb1a588ec0bbf054fa0633c264e23c8c5abf21d80d2ca0a5196b19610bc1882"
     },
     {
       "id": 116,
@@ -940,7 +1520,12 @@
       "row": 5,
       "column": 0,
       "description": "жёлтая бомба на красном",
-      "asset": "assets/rk-emblems/116.webp"
+      "asset": "assets/rk-emblems/116.webp",
+      "visualOrder": 117,
+      "screenshotIndex": 116,
+      "nativeBackground": "TeamLogo-Backgrounds-red",
+      "nativeLogo": "TeamLogo-Logos-bomb_1",
+      "sha256": "39d529e5e6f0410372aa1f263c20dbfff727fea744052eb7045fb879024735fc"
     },
     {
       "id": 117,
@@ -948,7 +1533,12 @@
       "row": 5,
       "column": 1,
       "description": "чёрная бомба на белом",
-      "asset": "assets/rk-emblems/117.webp"
+      "asset": "assets/rk-emblems/117.webp",
+      "visualOrder": 118,
+      "screenshotIndex": 117,
+      "nativeBackground": "TeamLogo-Backgrounds-white",
+      "nativeLogo": "TeamLogo-Logos-bomb_2",
+      "sha256": "ab1827a47aad690315efa39b25f1cf639dc7e20dccca1bf5203ba476e4c71a4d"
     },
     {
       "id": 118,
@@ -956,7 +1546,12 @@
       "row": 5,
       "column": 2,
       "description": "чёрный меч на золотом",
-      "asset": "assets/rk-emblems/118.webp"
+      "asset": "assets/rk-emblems/118.webp",
+      "visualOrder": 119,
+      "screenshotIndex": 118,
+      "nativeBackground": "TeamLogo-Backgrounds-yellow",
+      "nativeLogo": "TeamLogo-Logos-sword_1",
+      "sha256": "755fd1eb5d400e451fe672ee3de4984261743ee96916ef7080311186bb67f66a"
     },
     {
       "id": 119,
@@ -964,7 +1559,12 @@
       "row": 5,
       "column": 3,
       "description": "белый меч на красном",
-      "asset": "assets/rk-emblems/119.webp"
+      "asset": "assets/rk-emblems/119.webp",
+      "visualOrder": 120,
+      "screenshotIndex": 119,
+      "nativeBackground": "TeamLogo-Backgrounds-red",
+      "nativeLogo": "TeamLogo-Logos-sword_2",
+      "sha256": "3a52b29148f76d3a5635ec613e76f4d64b4c996319040013988feb275dbcc81a"
     },
     {
       "id": 120,
@@ -972,7 +1572,12 @@
       "row": 0,
       "column": 0,
       "description": "чёрная трефа на белом",
-      "asset": "assets/rk-emblems/120.webp"
+      "asset": "assets/rk-emblems/120.webp",
+      "visualOrder": 121,
+      "screenshotIndex": 120,
+      "nativeBackground": "TeamLogo-Backgrounds-white",
+      "nativeLogo": "TeamLogo-Logos-club_1",
+      "sha256": "20d65d745a3dcba703d3f89fe8b540f95f3801ec746b5115014999aa928f6651"
     },
     {
       "id": 121,
@@ -980,7 +1585,12 @@
       "row": 0,
       "column": 1,
       "description": "белая трефа на красном",
-      "asset": "assets/rk-emblems/121.webp"
+      "asset": "assets/rk-emblems/121.webp",
+      "visualOrder": 122,
+      "screenshotIndex": 121,
+      "nativeBackground": "TeamLogo-Backgrounds-red",
+      "nativeLogo": "TeamLogo-Logos-club_2",
+      "sha256": "feceb1121ae49bee2a168dee03bce7a4de5466633f8c435c6d63db5ac7a1532d"
     },
     {
       "id": 122,
@@ -988,7 +1598,12 @@
       "row": 0,
       "column": 2,
       "description": "жёлтая рыба на чёрном",
-      "asset": "assets/rk-emblems/122.webp"
+      "asset": "assets/rk-emblems/122.webp",
+      "visualOrder": 123,
+      "screenshotIndex": 122,
+      "nativeBackground": "TeamLogo-Backgrounds-black",
+      "nativeLogo": "TeamLogo-Logos-fish_1",
+      "sha256": "6d3090087c2523e2262ce41bf79ba0ae5f2800978daaedd283a84a51419cf519"
     },
     {
       "id": 123,
@@ -996,487 +1611,793 @@
       "row": 0,
       "column": 3,
       "description": "белая рыба на синем",
-      "asset": "assets/rk-emblems/123.webp"
+      "asset": "assets/rk-emblems/123.webp",
+      "visualOrder": 124,
+      "screenshotIndex": 123,
+      "nativeBackground": "TeamLogo-Backgrounds-blue_dark",
+      "nativeLogo": "TeamLogo-Logos-fish_2",
+      "sha256": "52b5576c62144a80ac7ef88eae6807041e326fe44f5545299416476d12a9ef78"
     },
     {
       "id": 124,
       "source": "2995.jpg",
-      "row": 1,
+      "row": 2,
       "column": 0,
-      "description": "белая бабочка на розовом",
-      "asset": "assets/rk-emblems/124.webp"
+      "description": "США",
+      "asset": "assets/rk-emblems/124.webp",
+      "visualOrder": 129,
+      "screenshotIndex": 128,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-01_usa",
+      "nativeLogo": null,
+      "sha256": "7c161b86e7aca29b24a239db71c81c48b05c561f6d076069a676decf112a0888"
     },
     {
       "id": 125,
       "source": "2995.jpg",
-      "row": 1,
+      "row": 2,
       "column": 1,
-      "description": "жёлтая бабочка на фиолетовом",
-      "asset": "assets/rk-emblems/125.webp"
+      "description": "Канада",
+      "asset": "assets/rk-emblems/125.webp",
+      "visualOrder": 130,
+      "screenshotIndex": 129,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-02_canada",
+      "nativeLogo": null,
+      "sha256": "93393b564e1f5ba1fe11f0aeda0ca1911b4b41f389d991c578224354229b9898"
     },
     {
       "id": 126,
       "source": "2995.jpg",
-      "row": 1,
+      "row": 2,
       "column": 2,
-      "description": "жёлтая шляпа волшебника на синем",
-      "asset": "assets/rk-emblems/126.webp"
+      "description": "Великобритания",
+      "asset": "assets/rk-emblems/126.webp",
+      "visualOrder": 131,
+      "screenshotIndex": 130,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-03_uk",
+      "nativeLogo": null,
+      "sha256": "b44d95408ba33e8d95a98e67d530cfe754e434403e427b8b8d4f177ade35d387"
     },
     {
       "id": 127,
       "source": "2995.jpg",
-      "row": 1,
+      "row": 2,
       "column": 3,
-      "description": "зелёная шляпа волшебника на чёрном",
-      "asset": "assets/rk-emblems/127.webp"
+      "description": "Япония",
+      "asset": "assets/rk-emblems/127.webp",
+      "visualOrder": 132,
+      "screenshotIndex": 131,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-04_japan",
+      "nativeLogo": null,
+      "sha256": "f07ce816649df644ad505d5f94e6f972534587e2425a56363c034b791a072f50"
     },
     {
       "id": 128,
       "source": "2995.jpg",
-      "row": 2,
+      "row": 3,
       "column": 0,
-      "description": "США",
-      "asset": "assets/rk-emblems/128.webp"
+      "description": "Швеция",
+      "asset": "assets/rk-emblems/128.webp",
+      "visualOrder": 133,
+      "screenshotIndex": 132,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-05_sweden",
+      "nativeLogo": null,
+      "sha256": "0a48e140c95fcd1bebd558ef362636c27eda57e134f09a726d410d124da8f92d"
     },
     {
       "id": 129,
       "source": "2995.jpg",
-      "row": 2,
+      "row": 3,
       "column": 1,
-      "description": "Канада",
-      "asset": "assets/rk-emblems/129.webp"
+      "description": "Англия",
+      "asset": "assets/rk-emblems/129.webp",
+      "visualOrder": 134,
+      "screenshotIndex": 133,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-06_england",
+      "nativeLogo": null,
+      "sha256": "8da20bb464bcd5e3eb03315ff60012bbe94341375db13fe12362e50594412f7c"
     },
     {
       "id": 130,
       "source": "2995.jpg",
-      "row": 2,
+      "row": 3,
       "column": 2,
-      "description": "Великобритания",
-      "asset": "assets/rk-emblems/130.webp"
+      "description": "Швейцария",
+      "asset": "assets/rk-emblems/130.webp",
+      "visualOrder": 135,
+      "screenshotIndex": 134,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-07_switzerland",
+      "nativeLogo": null,
+      "sha256": "cdfdc3ea4316c4e976b2325f5674c54d4966f521d25e4e0ff015c9bd350d3f74"
     },
     {
       "id": 131,
       "source": "2995.jpg",
-      "row": 2,
+      "row": 3,
       "column": 3,
-      "description": "Япония",
-      "asset": "assets/rk-emblems/131.webp"
+      "description": "Португалия",
+      "asset": "assets/rk-emblems/131.webp",
+      "visualOrder": 136,
+      "screenshotIndex": 135,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-08_portugal",
+      "nativeLogo": null,
+      "sha256": "0d54aef51e1c583af6d63a1fad59922e8dbbe0c28dd83a612a36c75d0e3a6e22"
     },
     {
       "id": 132,
       "source": "2995.jpg",
-      "row": 3,
+      "row": 4,
       "column": 0,
-      "description": "Швеция",
-      "asset": "assets/rk-emblems/132.webp"
+      "description": "Нидерланды",
+      "asset": "assets/rk-emblems/132.webp",
+      "visualOrder": 137,
+      "screenshotIndex": 136,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-09_netherlands",
+      "nativeLogo": null,
+      "sha256": "ed542a5877f2b6878eeebf32642b7b8a9b4f0027bd129a1cbd59fa4498e2e82d"
     },
     {
       "id": 133,
       "source": "2995.jpg",
-      "row": 3,
+      "row": 4,
       "column": 1,
-      "description": "Англия",
-      "asset": "assets/rk-emblems/133.webp"
+      "description": "Италия",
+      "asset": "assets/rk-emblems/133.webp",
+      "visualOrder": 138,
+      "screenshotIndex": 137,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-10_italy",
+      "nativeLogo": null,
+      "sha256": "722e90fa409e1ec10d3c8223d3d8990a9a44438444ae627bcad9673e8ef35fb5"
     },
     {
       "id": 134,
       "source": "2995.jpg",
-      "row": 3,
+      "row": 4,
       "column": 2,
-      "description": "Швейцария",
-      "asset": "assets/rk-emblems/134.webp"
+      "description": "Германия",
+      "asset": "assets/rk-emblems/134.webp",
+      "visualOrder": 139,
+      "screenshotIndex": 138,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-11_germany",
+      "nativeLogo": null,
+      "sha256": "d9842b2fc48dfb902dc77d6a6344627950ea519346d8eb844894ce9c70794d45"
     },
     {
       "id": 135,
       "source": "2995.jpg",
-      "row": 3,
+      "row": 4,
       "column": 3,
-      "description": "Португалия",
-      "asset": "assets/rk-emblems/135.webp"
+      "description": "Франция",
+      "asset": "assets/rk-emblems/135.webp",
+      "visualOrder": 140,
+      "screenshotIndex": 139,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-12_france",
+      "nativeLogo": null,
+      "sha256": "493efa54d991c4d10dd96745ed3fe4c2f8f184e18bf561af1097309208742745"
     },
     {
       "id": 136,
       "source": "2995.jpg",
-      "row": 4,
+      "row": 5,
       "column": 0,
-      "description": "Нидерланды",
-      "asset": "assets/rk-emblems/136.webp"
+      "description": "Дания",
+      "asset": "assets/rk-emblems/136.webp",
+      "visualOrder": 141,
+      "screenshotIndex": 140,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-13_denmark",
+      "nativeLogo": null,
+      "sha256": "b5db393a1d45bb9e068e7a40e186bdd2edb6f4fd6e3f46245525c69543ddfd3c"
     },
     {
       "id": 137,
       "source": "2995.jpg",
-      "row": 4,
+      "row": 5,
       "column": 1,
-      "description": "Италия",
-      "asset": "assets/rk-emblems/137.webp"
+      "description": "Испания",
+      "asset": "assets/rk-emblems/137.webp",
+      "visualOrder": 142,
+      "screenshotIndex": 141,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-14_spain",
+      "nativeLogo": null,
+      "sha256": "946151bca90bea7eb5bdff8edef44ea644ddf03070f2ea77ee3a75f9d0f40473"
     },
     {
       "id": 138,
       "source": "2995.jpg",
-      "row": 4,
+      "row": 5,
       "column": 2,
-      "description": "Германия",
-      "asset": "assets/rk-emblems/138.webp"
+      "description": "Южная Корея",
+      "asset": "assets/rk-emblems/138.webp",
+      "visualOrder": 143,
+      "screenshotIndex": 142,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-15_korea",
+      "nativeLogo": null,
+      "sha256": "8e5c614a000302d7bdeb8fb3b1ceb4fcddea1d46f633e54e893baeb373fcb673"
     },
     {
       "id": 139,
       "source": "2995.jpg",
-      "row": 4,
-      "column": 3,
-      "description": "Франция",
-      "asset": "assets/rk-emblems/139.webp"
-    },
-    {
-      "id": 140,
-      "source": "2995.jpg",
-      "row": 5,
-      "column": 0,
-      "description": "Дания",
-      "asset": "assets/rk-emblems/140.webp"
-    },
-    {
-      "id": 141,
-      "source": "2995.jpg",
-      "row": 5,
-      "column": 1,
-      "description": "Испания",
-      "asset": "assets/rk-emblems/141.webp"
-    },
-    {
-      "id": 142,
-      "source": "2995.jpg",
-      "row": 5,
-      "column": 2,
-      "description": "Южная Корея",
-      "asset": "assets/rk-emblems/142.webp"
-    },
-    {
-      "id": 143,
-      "source": "2995.jpg",
       "row": 5,
       "column": 3,
       "description": "Финляндия",
-      "asset": "assets/rk-emblems/143.webp"
+      "asset": "assets/rk-emblems/139.webp",
+      "visualOrder": 144,
+      "screenshotIndex": 143,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-16_finland",
+      "nativeLogo": null,
+      "sha256": "7db65a202aff996c7956bfbbbe5450b1b17c4f75130b32ab2228611b38eb90f7"
     },
     {
-      "id": 144,
+      "id": 140,
       "source": "2996.jpg",
       "row": 0,
       "column": 0,
       "description": "Россия",
-      "asset": "assets/rk-emblems/144.webp"
+      "asset": "assets/rk-emblems/140.webp",
+      "visualOrder": 145,
+      "screenshotIndex": 144,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-17_russia",
+      "nativeLogo": null,
+      "sha256": "d875cae4fe792fa6799f233415e9943c84fdcd3e9c77cceb0ff9010e5df5872e"
     },
     {
-      "id": 145,
+      "id": 141,
       "source": "2996.jpg",
       "row": 0,
       "column": 1,
       "description": "Бельгия",
-      "asset": "assets/rk-emblems/145.webp"
+      "asset": "assets/rk-emblems/141.webp",
+      "visualOrder": 146,
+      "screenshotIndex": 145,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-18_belgium",
+      "nativeLogo": null,
+      "sha256": "2198fa6c56204d788c0e7cc5f88fbfb8dbfb8419fc6a0693a25f7dbc49fc31d1"
     },
     {
-      "id": 146,
+      "id": 142,
       "source": "2996.jpg",
       "row": 0,
       "column": 2,
       "description": "Норвегия",
-      "asset": "assets/rk-emblems/146.webp"
+      "asset": "assets/rk-emblems/142.webp",
+      "visualOrder": 147,
+      "screenshotIndex": 146,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-19_norway",
+      "nativeLogo": null,
+      "sha256": "332ae12d384c6dab1927f10ed2ab49172825039a988ef56e9bd328250b491a08"
     },
     {
-      "id": 147,
+      "id": 143,
       "source": "2996.jpg",
       "row": 0,
       "column": 3,
       "description": "Ирландия",
-      "asset": "assets/rk-emblems/147.webp"
+      "asset": "assets/rk-emblems/143.webp",
+      "visualOrder": 148,
+      "screenshotIndex": 147,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-20_ireland",
+      "nativeLogo": null,
+      "sha256": "278765af6472bc8e1239bdaa7e34dcaae3d0a9c7dfc5ca358f714d0889182588"
     },
     {
-      "id": 148,
+      "id": 144,
       "source": "2996.jpg",
       "row": 1,
       "column": 0,
       "description": "Мексика",
-      "asset": "assets/rk-emblems/148.webp"
+      "asset": "assets/rk-emblems/144.webp",
+      "visualOrder": 149,
+      "screenshotIndex": 148,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-21_mexico",
+      "nativeLogo": null,
+      "sha256": "d588a93d507c98ebfdab121c51a3adf1e670843d61fbebdf091fe2222f0e5c04"
     },
     {
-      "id": 149,
+      "id": 145,
       "source": "2996.jpg",
       "row": 1,
       "column": 1,
       "description": "Индия",
-      "asset": "assets/rk-emblems/149.webp"
+      "asset": "assets/rk-emblems/145.webp",
+      "visualOrder": 150,
+      "screenshotIndex": 149,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-22_india",
+      "nativeLogo": null,
+      "sha256": "314001bc13544a9b73034e92eda34483818e01618393a671b22e5b3efd52553e"
     },
     {
-      "id": 150,
+      "id": 146,
       "source": "2996.jpg",
       "row": 1,
       "column": 2,
       "description": "Китай",
-      "asset": "assets/rk-emblems/150.webp"
+      "asset": "assets/rk-emblems/146.webp",
+      "visualOrder": 151,
+      "screenshotIndex": 150,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-23_china",
+      "nativeLogo": null,
+      "sha256": "977cf0053a3db99dd3b85ec787baed821e5bb364caace6b9c6a021a2246a58c1"
     },
     {
-      "id": 151,
+      "id": 147,
       "source": "2996.jpg",
       "row": 1,
       "column": 3,
       "description": "Бразилия",
-      "asset": "assets/rk-emblems/151.webp"
+      "asset": "assets/rk-emblems/147.webp",
+      "visualOrder": 152,
+      "screenshotIndex": 151,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-24_brazil",
+      "nativeLogo": null,
+      "sha256": "2e297035ce06f48fe08e6e075aaffb6691ebba419c6433600e3619b631c07001"
     },
     {
-      "id": 152,
+      "id": 148,
       "source": "2996.jpg",
       "row": 2,
       "column": 0,
       "description": "Венесуэла",
-      "asset": "assets/rk-emblems/152.webp"
+      "asset": "assets/rk-emblems/148.webp",
+      "visualOrder": 153,
+      "screenshotIndex": 152,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-25_venezuela",
+      "nativeLogo": null,
+      "sha256": "0dfe4354574491f82219802cf2f34f40c7c350493b36df996ca7ab6eda699965"
     },
     {
-      "id": 153,
+      "id": 149,
       "source": "2996.jpg",
       "row": 2,
       "column": 1,
       "description": "ЮАР",
-      "asset": "assets/rk-emblems/153.webp"
+      "asset": "assets/rk-emblems/149.webp",
+      "visualOrder": 154,
+      "screenshotIndex": 153,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-26_south_africa",
+      "nativeLogo": null,
+      "sha256": "e5e605d159caf909de23c06588eb6f1327e15af946f32d576d5e6fd17ec6f4ba"
     },
     {
-      "id": 154,
+      "id": 150,
       "source": "2996.jpg",
       "row": 2,
       "column": 2,
       "description": "Гонконг",
-      "asset": "assets/rk-emblems/154.webp"
+      "asset": "assets/rk-emblems/150.webp",
+      "visualOrder": 155,
+      "screenshotIndex": 154,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-27_hong_kong",
+      "nativeLogo": null,
+      "sha256": "b01c475dec669a1a0f18c69b3601f0677bd2af155bf830cd3f954547a55eaaaf"
     },
     {
-      "id": 155,
+      "id": 151,
       "source": "2996.jpg",
       "row": 2,
       "column": 3,
       "description": "Уругвай",
-      "asset": "assets/rk-emblems/155.webp"
+      "asset": "assets/rk-emblems/151.webp",
+      "visualOrder": 156,
+      "screenshotIndex": 155,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-28_uruguay",
+      "nativeLogo": null,
+      "sha256": "3e24ab8d8c7478b08d52c1ce9d398ff3a6745490ceac90ebc45ef8527f1b5e34"
     },
     {
-      "id": 156,
+      "id": 152,
       "source": "2996.jpg",
       "row": 3,
       "column": 0,
       "description": "Тайвань",
-      "asset": "assets/rk-emblems/156.webp"
+      "asset": "assets/rk-emblems/152.webp",
+      "visualOrder": 157,
+      "screenshotIndex": 156,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-29_taiwan",
+      "nativeLogo": null,
+      "sha256": "fbf5295cc2e5baf6edc70c51a70695d4e1cb94bf422d476865c11b329a7cd753"
     },
     {
-      "id": 157,
+      "id": 153,
       "source": "2996.jpg",
       "row": 3,
       "column": 1,
       "description": "Украина",
-      "asset": "assets/rk-emblems/157.webp"
+      "asset": "assets/rk-emblems/153.webp",
+      "visualOrder": 158,
+      "screenshotIndex": 157,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-30_ukraine",
+      "nativeLogo": null,
+      "sha256": "9c6758dbd70f29fe7a10d5b55e566a4d77c60f4dbefa39f58c730fe3bc006eca"
     },
     {
-      "id": 158,
+      "id": 154,
       "source": "2996.jpg",
       "row": 3,
       "column": 2,
       "description": "Румыния",
-      "asset": "assets/rk-emblems/158.webp"
+      "asset": "assets/rk-emblems/154.webp",
+      "visualOrder": 159,
+      "screenshotIndex": 158,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-31_romania",
+      "nativeLogo": null,
+      "sha256": "44eb4dac1d8e380f5318f15a2e2d6627c6e913c49c30c5f085b3ee8829e0fdfd"
     },
     {
-      "id": 159,
+      "id": 155,
       "source": "2996.jpg",
       "row": 3,
       "column": 3,
       "description": "Турция",
-      "asset": "assets/rk-emblems/159.webp"
+      "asset": "assets/rk-emblems/155.webp",
+      "visualOrder": 160,
+      "screenshotIndex": 159,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-32_turkey",
+      "nativeLogo": null,
+      "sha256": "232d785093f7316fe8539116ace2229d5e5b72fca059d5e1043221fb321d709d"
     },
     {
-      "id": 160,
+      "id": 156,
       "source": "2996.jpg",
       "row": 4,
       "column": 0,
       "description": "Польша",
-      "asset": "assets/rk-emblems/160.webp"
+      "asset": "assets/rk-emblems/156.webp",
+      "visualOrder": 161,
+      "screenshotIndex": 160,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-33_poland",
+      "nativeLogo": null,
+      "sha256": "fd6f83cf639eeceb806abc03b8c349a235b0b8abc8a4cbba261ecd7a2e42c4e8"
     },
     {
-      "id": 161,
+      "id": 157,
       "source": "2996.jpg",
       "row": 4,
       "column": 1,
       "description": "Таиланд",
-      "asset": "assets/rk-emblems/161.webp"
+      "asset": "assets/rk-emblems/157.webp",
+      "visualOrder": 162,
+      "screenshotIndex": 161,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-34_thailand",
+      "nativeLogo": null,
+      "sha256": "285f5c8b14fce31f8b97070b772ae04d823516cb1da295192ac5d20e9151a0b8"
     },
     {
-      "id": 162,
+      "id": 158,
       "source": "2996.jpg",
       "row": 4,
       "column": 2,
       "description": "Филиппины",
-      "asset": "assets/rk-emblems/162.webp"
+      "asset": "assets/rk-emblems/158.webp",
+      "visualOrder": 163,
+      "screenshotIndex": 162,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-35_philippines",
+      "nativeLogo": null,
+      "sha256": "c574021e40b573f2eeec6b565dd22a2674fb15a775571ea00d4062709216eea8"
     },
     {
-      "id": 163,
+      "id": 159,
       "source": "2996.jpg",
       "row": 4,
       "column": 3,
       "description": "Австрия",
-      "asset": "assets/rk-emblems/163.webp"
+      "asset": "assets/rk-emblems/159.webp",
+      "visualOrder": 164,
+      "screenshotIndex": 163,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-36_austria",
+      "nativeLogo": null,
+      "sha256": "0145fc0c0c569e129cc45a2df1dfc7fb1fb3373cb0f71a5cdf41501e5e25c254"
     },
     {
-      "id": 164,
+      "id": 160,
       "source": "2996.jpg",
       "row": 5,
       "column": 0,
       "description": "Австралия",
-      "asset": "assets/rk-emblems/164.webp"
+      "asset": "assets/rk-emblems/160.webp",
+      "visualOrder": 165,
+      "screenshotIndex": 164,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-37_austraila",
+      "nativeLogo": null,
+      "sha256": "613aae146ca2125ebee54adbf2b1bf0aa6710a9138b9ca6d0109a2b1ef93b53a"
     },
     {
-      "id": 165,
+      "id": 161,
       "source": "2996.jpg",
       "row": 5,
       "column": 1,
       "description": "Аргентина",
-      "asset": "assets/rk-emblems/165.webp"
+      "asset": "assets/rk-emblems/161.webp",
+      "visualOrder": 166,
+      "screenshotIndex": 165,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-38_argentina",
+      "nativeLogo": null,
+      "sha256": "e13eced9c1b0d756dd93a0ba46c950afdede92c098ed600c320c51a7e0467f78"
     },
     {
-      "id": 166,
+      "id": 162,
       "source": "2996.jpg",
       "row": 5,
       "column": 2,
       "description": "Колумбия",
-      "asset": "assets/rk-emblems/166.webp"
+      "asset": "assets/rk-emblems/162.webp",
+      "visualOrder": 167,
+      "screenshotIndex": 166,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-39_colombia",
+      "nativeLogo": null,
+      "sha256": "0ddc7b9a8616de03591ce8a48204982e5efdae47629acc630f851daefdf85c0a"
     },
     {
-      "id": 167,
+      "id": 163,
       "source": "2996.jpg",
       "row": 5,
       "column": 3,
       "description": "Греция",
-      "asset": "assets/rk-emblems/167.webp"
+      "asset": "assets/rk-emblems/163.webp",
+      "visualOrder": 168,
+      "screenshotIndex": 167,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-40_greece",
+      "nativeLogo": null,
+      "sha256": "be64df1c6a6af7a7df4dc93580e3596d7bae993003b3a639edc39a852a0ab54a"
     },
     {
-      "id": 168,
+      "id": 164,
       "source": "2997.jpg",
       "row": 0,
       "column": 0,
       "description": "Индонезия",
-      "asset": "assets/rk-emblems/168.webp"
+      "asset": "assets/rk-emblems/164.webp",
+      "visualOrder": 169,
+      "screenshotIndex": 168,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-41_indonesia",
+      "nativeLogo": null,
+      "sha256": "f14d58e631b0f48de3ddc7c4440a858b7920394193ce566451ee7d5c586c988e"
     },
     {
-      "id": 169,
+      "id": 165,
       "source": "2997.jpg",
       "row": 0,
       "column": 1,
       "description": "Чехия",
-      "asset": "assets/rk-emblems/169.webp"
+      "asset": "assets/rk-emblems/165.webp",
+      "visualOrder": 170,
+      "screenshotIndex": 169,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-42_czech",
+      "nativeLogo": null,
+      "sha256": "6ce300b893ae123637b72acec12678af02bf755c550f5e0d7a877b0decfb0ca6"
     },
     {
-      "id": 170,
+      "id": 166,
       "source": "2997.jpg",
       "row": 0,
       "column": 2,
       "description": "Венгрия",
-      "asset": "assets/rk-emblems/170.webp"
+      "asset": "assets/rk-emblems/166.webp",
+      "visualOrder": 171,
+      "screenshotIndex": 170,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-43_hungary",
+      "nativeLogo": null,
+      "sha256": "1c412652a78286ecfba9d530e76d3e118df5aea347af708f2f4c7322951a4e9d"
     },
     {
-      "id": 171,
+      "id": 167,
       "source": "2997.jpg",
       "row": 0,
       "column": 3,
       "description": "Чили",
-      "asset": "assets/rk-emblems/171.webp"
+      "asset": "assets/rk-emblems/167.webp",
+      "visualOrder": 172,
+      "screenshotIndex": 171,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-44_chile",
+      "nativeLogo": null,
+      "sha256": "78f13332859d6aa0fab5cb101c940ca60d255ccd7f609f8a68ecefc6b41b8ad5"
     },
     {
-      "id": 172,
+      "id": 168,
       "source": "2997.jpg",
       "row": 1,
       "column": 0,
       "description": "Хорватия",
-      "asset": "assets/rk-emblems/172.webp"
+      "asset": "assets/rk-emblems/168.webp",
+      "visualOrder": 173,
+      "screenshotIndex": 172,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-45_croatia",
+      "nativeLogo": null,
+      "sha256": "a13f8253d2647a9114bf15f76a63c0545fcd5e91f9f5490ba59b8454008a6074"
     },
     {
-      "id": 173,
+      "id": 169,
       "source": "2997.jpg",
       "row": 1,
       "column": 1,
       "description": "Сингапур",
-      "asset": "assets/rk-emblems/173.webp"
+      "asset": "assets/rk-emblems/169.webp",
+      "visualOrder": 174,
+      "screenshotIndex": 173,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-46_singapore",
+      "nativeLogo": null,
+      "sha256": "681a46fbd2f9c481d729079d76545a4d673e94690bcc9fdb989e4705b61b4609"
     },
     {
-      "id": 174,
+      "id": 170,
       "source": "2997.jpg",
       "row": 1,
       "column": 2,
       "description": "Перу",
-      "asset": "assets/rk-emblems/174.webp"
+      "asset": "assets/rk-emblems/170.webp",
+      "visualOrder": 175,
+      "screenshotIndex": 174,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-47_peru",
+      "nativeLogo": null,
+      "sha256": "9b8e6ac6cd524ecf0293906c3dd8901af6ac06e53471ab48bdc64e9723aad9ac"
     },
     {
-      "id": 175,
+      "id": 171,
       "source": "2997.jpg",
       "row": 1,
       "column": 3,
       "description": "Израиль",
-      "asset": "assets/rk-emblems/175.webp"
+      "asset": "assets/rk-emblems/171.webp",
+      "visualOrder": 176,
+      "screenshotIndex": 175,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-48_israel",
+      "nativeLogo": null,
+      "sha256": "2f7119970e6aca9d46f786b3c02456126e59eb49244db4e97850ddfb7f6954e1"
     },
     {
-      "id": 176,
+      "id": 172,
       "source": "2997.jpg",
       "row": 2,
       "column": 0,
       "description": "Болгария",
-      "asset": "assets/rk-emblems/176.webp"
+      "asset": "assets/rk-emblems/172.webp",
+      "visualOrder": 177,
+      "screenshotIndex": 176,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-49_bulgaria",
+      "nativeLogo": null,
+      "sha256": "ccd33f3be32a78738f4ee6b56e76c430f4fbc063a65e706bb7319330bb655419"
     },
     {
-      "id": 177,
+      "id": 173,
       "source": "2997.jpg",
       "row": 2,
       "column": 1,
       "description": "ОАЭ",
-      "asset": "assets/rk-emblems/177.webp"
+      "asset": "assets/rk-emblems/173.webp",
+      "visualOrder": 178,
+      "screenshotIndex": 177,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-50_uae",
+      "nativeLogo": null,
+      "sha256": "34a694efc223d5a01c22ace9d14caf4ed283eeca56b797ebd7812adeda749a27"
     },
     {
-      "id": 178,
+      "id": 174,
       "source": "2997.jpg",
       "row": 2,
       "column": 2,
       "description": "Нигерия",
-      "asset": "assets/rk-emblems/178.webp"
+      "asset": "assets/rk-emblems/174.webp",
+      "visualOrder": 179,
+      "screenshotIndex": 178,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-51_nigeria",
+      "nativeLogo": null,
+      "sha256": "2ee26088456379ea4fcc1c8f52f523dd83ce774f0166100479cd04bb28c10d60"
     },
     {
-      "id": 179,
+      "id": 175,
       "source": "2997.jpg",
       "row": 2,
       "column": 3,
       "description": "Малайзия",
-      "asset": "assets/rk-emblems/179.webp"
+      "asset": "assets/rk-emblems/175.webp",
+      "visualOrder": 180,
+      "screenshotIndex": 179,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-52_malaysia",
+      "nativeLogo": null,
+      "sha256": "dbb6ce520ae3bb4379fd0c0480f4c27447b1b578dfa5152e04da8c000e8ccf7d"
     },
     {
-      "id": 180,
+      "id": 176,
       "source": "2997.jpg",
       "row": 3,
       "column": 0,
       "description": "Египет",
-      "asset": "assets/rk-emblems/180.webp"
+      "asset": "assets/rk-emblems/176.webp",
+      "visualOrder": 181,
+      "screenshotIndex": 180,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-53_egypt",
+      "nativeLogo": null,
+      "sha256": "a5bd283a95aab722a89a9732448e4644d8e472588f07f07913fadd3c0d411480"
     },
     {
-      "id": 181,
+      "id": 177,
       "source": "2997.jpg",
       "row": 3,
       "column": 1,
       "description": "Вьетнам",
-      "asset": "assets/rk-emblems/181.webp"
+      "asset": "assets/rk-emblems/177.webp",
+      "visualOrder": 182,
+      "screenshotIndex": 181,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-54_vietnam",
+      "nativeLogo": null,
+      "sha256": "0a9f0ae8ec8b9e0c528ba758a7644a1bb136c1da25c7cf5ee082c825125d3fc2"
     },
     {
-      "id": 182,
+      "id": 178,
       "source": "2997.jpg",
       "row": 3,
       "column": 2,
       "description": "Катар",
-      "asset": "assets/rk-emblems/182.webp"
+      "asset": "assets/rk-emblems/178.webp",
+      "visualOrder": 183,
+      "screenshotIndex": 182,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-55_qatar",
+      "nativeLogo": null,
+      "sha256": "7ed26dfc52a22386cde2770c9071cebb8acd964d4a51df599a2a206c0debda8a"
     },
     {
-      "id": 183,
+      "id": 179,
       "source": "2997.jpg",
       "row": 3,
       "column": 3,
       "description": "Кувейт",
-      "asset": "assets/rk-emblems/183.webp"
+      "asset": "assets/rk-emblems/179.webp",
+      "visualOrder": 184,
+      "screenshotIndex": 183,
+      "nativeBackground": "TeamLogo-Backgrounds-Flags-56_kuwait",
+      "nativeLogo": null,
+      "sha256": "e183222012f944ae2e46af90a03c41d7188a5e8bf502376949b6ec6f1ff1f569"
+    },
+    {
+      "id": 180,
+      "source": "2995.jpg",
+      "row": 1,
+      "column": 0,
+      "description": "белая бабочка на розовом",
+      "asset": "assets/rk-emblems/180.webp",
+      "visualOrder": 125,
+      "screenshotIndex": 124,
+      "nativeBackground": "TeamLogo-Backgrounds-pink",
+      "nativeLogo": "TeamLogo-Logos-butterfly_1",
+      "sha256": "55dc96d0697283b49fdc5a8198991a6a8e2f5fec666a961465e2d7c7a9f7c049"
+    },
+    {
+      "id": 181,
+      "source": "2995.jpg",
+      "row": 1,
+      "column": 1,
+      "description": "жёлтая бабочка на фиолетовом",
+      "asset": "assets/rk-emblems/181.webp",
+      "visualOrder": 126,
+      "screenshotIndex": 125,
+      "nativeBackground": "TeamLogo-Backgrounds-purple",
+      "nativeLogo": "TeamLogo-Logos-butterfly_2",
+      "sha256": "635a462c9cbba77c81aec1e45e14106dc827c63d24a79a9dcec0623f135dc1eb"
+    },
+    {
+      "id": 182,
+      "source": "2995.jpg",
+      "row": 1,
+      "column": 2,
+      "description": "жёлтая шляпа волшебника на синем",
+      "asset": "assets/rk-emblems/182.webp",
+      "visualOrder": 127,
+      "screenshotIndex": 126,
+      "nativeBackground": "TeamLogo-Backgrounds-blue_dark",
+      "nativeLogo": "TeamLogo-Logos-wizard_hat_1",
+      "sha256": "8e2ca7ef01ce405822ddf0625a92016f8e28ea830c0724f005c57e6559a798f2"
+    },
+    {
+      "id": 183,
+      "source": "2995.jpg",
+      "row": 1,
+      "column": 3,
+      "description": "зелёная шляпа волшебника на чёрном",
+      "asset": "assets/rk-emblems/183.webp",
+      "visualOrder": 128,
+      "screenshotIndex": 127,
+      "nativeBackground": "TeamLogo-Backgrounds-black",
+      "nativeLogo": "TeamLogo-Logos-wizard_hat_2",
+      "sha256": "e7680ec486e7d4b1115cba9b9447a64243835da7b4c30ff0fcf779731d4dacc1"
     }
-  ]
+  ],
+  "nativeBundleSha256": "0f44b2c4b125424c0c2845a37570bbd0631d739f3059e0fdaa7c561da31dd9fc"
 }
