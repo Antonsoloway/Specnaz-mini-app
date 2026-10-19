@@ -300,3 +300,8 @@ Linked RK teams must receive their own game emblem on every CRM surface already 
 RK emblem server identity is the native TeamLogoCatalog.configsArray index, not visualOrder or screenshot position. Validate against the extracted native catalogue: Russia140, flags124–179, new symbols180–183. Keep raw server IDs unchanged; images and editable emoji must share the native mapping. Never repair one team by name or apply a global offset to all IDs.
 
 Sosiska events, team brackets and all help metrics are owner-only for verified Telegram1456874273 (@AnSoloway). Other admins/users must neither receive nor calculate/include them in AI inputs, old reports, timeline/export/profile/raw team payloads. Use server projection after shared cache reads, deny event routes before upstream, separate owner/basic AI namespaces, require current owner authorization for full exports, and default frontend capability to false per session. Preserve storage and normal levels/crowns/cups/roster functionality.
+
+
+### Team specnaz ordering
+
+The team directory and active-team directory sort by total specnaz points descending, then by distinct current CRM members whose individual specnaz score is positive. Use exact CRM name + canonical game; do not collapse symbols or RM/RK names. Repeated membership slots or Telegram IDs cannot inflate scored-member counts. Public totals are computed from the same snapshot memberships/scores as the displayed roster; the admin «Общий спецназ» ranking retains authoritative Команды!F and applies the positive-member tie breaker using private participants. Complete ties preserve prior order. Sorting must not mutate persistent snapshot arrays, reset queries/game filters, or fetch private data for public rendering.

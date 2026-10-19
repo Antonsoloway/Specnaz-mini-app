@@ -203,7 +203,7 @@
 
     try {
       const data = await adminData(false);
-      const teams = [...(Array.isArray(data?.adminData?.teams) ? data.adminData.teams : [])]
+      let teams = [...(Array.isArray(data?.adminData?.teams) ? data.adminData.teams : [])]
         .sort((a,b) => {
           const diff = numeric(b?.[metric.field]) - numeric(a?.[metric.field]);
           if (diff) return diff;
@@ -211,6 +211,10 @@
           if (byName) return byName;
           return game(a?.game).localeCompare(game(b?.game), 'ru', { sensitivity:'base' });
         });
+
+      if (metricKey === 'specnazTrips' && window.RoyalTeamSpecnazOrder) {
+        teams = window.RoyalTeamSpecnazOrder.order(teams, data?.adminData?.participants, true);
+      }
 
       panel.innerHTML = `
         <button type="button" class="royal-back-button" data-royal-back="1">← Назад</button>

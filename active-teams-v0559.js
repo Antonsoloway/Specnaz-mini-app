@@ -143,7 +143,9 @@
   }
 
   function sortedActiveTeams() {
-    return teams().filter(isActive).slice().sort((a, b) => {
+    const active = teams().filter(isActive);
+    if (window.RoyalTeamSpecnazOrder) return window.RoyalTeamSpecnazOrder.order(active, snapshotState?.participants);
+    return active.slice().sort((a, b) => {
       const ag = teamGame(a) === 'Royal Match' ? 0 : teamGame(a) === 'Royal Kingdom' ? 1 : 2;
       const bg = teamGame(b) === 'Royal Match' ? 0 : teamGame(b) === 'Royal Kingdom' ? 1 : 2;
       return ag - bg || String(a?.name || '').localeCompare(String(b?.name || ''), 'ru', { sensitivity: 'base' });

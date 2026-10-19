@@ -1,6 +1,6 @@
 /* Royal CRM Mini App — v0.6.1 visible version guard + final admin-write loader */
 (() => {
-  const VERSION = '0.6.1';
+  const VERSION = typeof BUILD !== 'undefined' ? BUILD : '0.6.1';
   const CACHE = '20260905-v061-self-team-link3';
 
   function apply() {
@@ -141,7 +141,7 @@
       return;
     }
     const detail = document.createElement('script');
-    detail.src = `admin-team-detail-v0600.js?v=${CACHE}`;
+    detail.src = `admin-team-detail-v0600.js?v=${CACHE}&teamOrder=20261019-v0612`;
     detail.async = false;
     detail.dataset.adminTeamDetailV0600 = '1';
     detail.addEventListener('load', loadAdminParticipantDetail, { once:true });
