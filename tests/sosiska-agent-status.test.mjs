@@ -34,7 +34,7 @@ test('status action remains admin-only and exposes only the safe agent projectio
  const env={RM_AGENT_API_KEY:'secret-server-key'.repeat(3)};let calls=0;
  const denied=createSosiskaApi({authorizeAdmin:async()=>{throw Object.assign(Error(),{status:403});},fetchAgent:async()=>{calls++;}});
  assert.equal((await denied(request(),env)).status,403);assert.equal(calls,0);
- const allowed=createSosiskaApi({authorizeAdmin:async()=>{},fetchAgent:async(_,init)=>{
+ const allowed=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'1456874273'}),fetchAgent:async(_,init)=>{
   calls++;const op=JSON.parse(init.body).operation;return Response.json({ok:true,data:op==='health'?{...health,privateToken:'should-not-leak',levelSchedule:{...health.levelSchedule,lastCheckAt:Date.now()}}:{...diagnostic,checkedAt:new Date().toISOString(),privateToken:'should-not-leak'}});
  }});
  const r=await allowed(request(),env),text=await r.text(),data=JSON.parse(text);

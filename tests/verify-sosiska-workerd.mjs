@@ -36,12 +36,20 @@ try {
   mf=new Miniflare(convertV4MiniflareOptions?{...convertV4MiniflareOptions(options),resourcePersistencePath:persist}:options);
   const denied=await mf.dispatchFetch('https://miniapp.test/admin-agent',{method:'POST',headers:{Authorization:'Bearer forged','Content-Type':'application/json'},body:'{"operation":"analysis"}'});assert.equal(denied.status,401);
   const status=await invoke({operation:'status'});assert.equal(status.agents[0].status,'online');assert.equal(status.agents[0].level,14800);assert.equal(status.agents[0].levelVerified,true);
+  const otherEvents=await mf.dispatchFetch('https://miniapp.test/admin-agent',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json','X-Sosiska-Metrics-Scope':'owner'},body:JSON.stringify({operation:'tournamentGroup',teamId:'1'})});assert.equal(otherEvents.status,403);assert.equal((await otherEvents.json()).error,'OWNER_REQUIRED');
+  const basicHistory=await invoke({operation:'history',teamId:'1'});assert.doesNotMatch(JSON.stringify(basicHistory),/HelpCount|helpTotal/);
+  const ownerBody=Buffer.from(JSON.stringify({tg:'1456874273',exp:Math.floor(Date.now()/1000)+600})).toString('base64url');
+  const ownerToken=ownerBody+'.'+createHmac('sha256',sessionSecret).update(ownerBody).digest('base64url');
+  const ownerHistory=await mf.dispatchFetch('https://miniapp.test/admin-agent',{method:'POST',headers:{Authorization:'Bearer '+ownerToken,'Content-Type':'application/json'},body:JSON.stringify({operation:'history',teamId:'1'})});
+  const ownerData=await ownerHistory.json();assert.equal(ownerData.capabilities.ownerTeamMetrics,true);assert.match(JSON.stringify(ownerData),/HelpCount|helpTotal/);
   const job=await invoke({operation:'analysis',teamId:'1'});assert.equal(job.state,'running');
   await mf.dispose();mf=new Miniflare(convertV4MiniflareOptions?{...convertV4MiniflareOptions(options),resourcePersistencePath:persist}:options);
   assert.equal((await invoke({operation:'analysisStatus',jobId:job.jobId})).jobId,job.jobId);
   let result;
   for(let i=0;i<30;i++){result=await invoke({operation:'analysisStatus',jobId:job.jobId});if(result.state!=='running')break;await new Promise(r=>setTimeout(r,1000));}
   assert.equal(result.state,'done');assert.equal(result.processedSnapshots,3);
+  assert.doesNotMatch(JSON.stringify(result),/helpGain|helpTotal|HelpCount/);
+  const wrongScope=await mf.dispatchFetch('https://miniapp.test/admin-agent',{method:'POST',headers:{Authorization:'Bearer '+ownerToken,'Content-Type':'application/json'},body:JSON.stringify({operation:'analysisStatus',jobId:job.jobId})});assert.notEqual(wrongScope.status,200,'owner and basic job stores must be separate');
   const timeline=await invoke({operation:'analysisTimeline',jobId:job.jobId,teamId:'1',limit:20});assert.equal(timeline.points.length,3);assert.equal(timeline.points.at(-1).sequence,1);
   await mf.dispose();mf=new Miniflare(convertV4MiniflareOptions?{...convertV4MiniflareOptions(options),resourcePersistencePath:persist}:options);
   assert.equal((await invoke({operation:'analysisStatus'})).state,'done');

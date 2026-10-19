@@ -61,3 +61,17 @@ test('one-team overview reuses the final full-period report instead of another u
  const s=setup({'1':3});const job=await s.make().start('1'),done=await finish(s,job.jobId);
  assert.equal(done.summary.text,done.teams[0].text);assert.equal(done.teams[0].period.snapshotCount,3);assert.equal(done.summary.period,undefined);assert.equal(s.inputs.filter(x=>x.period).length,1);assert.equal(s.inputs.some(x=>Array.isArray(x.teams)),false);
 });
+
+test('restricted full-history AI never receives help or event inputs at any stage, including after restart',async()=>{
+ const s=setup({'1':12});
+ for(const r of s.histories['1']){
+  r.snapshot.tournament={available:true,kind:'tournament',eventId:777,groupId:'5',teamScore:123456,players:[{userId:'100',name:'private-event-canary',score:888}]};
+  r.changes.tournament={comparable:true,teamScoreDelta:4321};
+  r.changes.members.push({userId:'100',name:'Player',changes:[{field:'HelpCount',before:10,after:20,delta:10}]});
+ }
+ const job=await s.make().start('1',undefined,false),done=await finish(s,job.jobId);
+ assert.equal(done.state,'done');assert.equal(done.teams[0].period.players[0].levelGain,11);
+ assert.doesNotMatch(JSON.stringify(s.inputs),/HelpCount|helpTotal|helpGain|eventScore|eventStats|private-event-canary|123456|4321/);
+ assert.equal(done.teams[0].period.players[0].helpGain,undefined);
+ const point=(await s.make().timeline(job.jobId,'1')).points[0];assert.equal(point.tournament,null);
+});

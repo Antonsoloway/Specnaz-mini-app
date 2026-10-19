@@ -1,3 +1,4 @@
+import {restrictSosiskaData} from './sosiska-access.js';
 import {createPeriodAccumulator} from './sosiska-period.js';
 import {timelineRows,packAnalysisParts,requestSosiskaAnalysis,analysisKeys} from './sosiska-analysis.js';
 const ORIGIN='https://specnaz-royal-match-agent-stage1.specnaz-sosiska.workers.dev';
@@ -16,7 +17,7 @@ export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=request
   }
   async function save(j){j.updatedAt=new Date(now()).toISOString();await storage.put(key(j,'state'),j);}
   const scopeKey=(teamId,ids)=>teamId?'team:'+teamId:'selected:'+JSON.stringify([...ids].sort());
-  async function start(teamId,selectedIds) {
+  async function start(teamId,selectedIds,ownerMetrics=true) {
     if((!teamId&&!selectedIds)||(teamId&&selectedIds))throw new Error('ANALYSIS_INVALID');
     if(!analysisKeys(env).length)throw Object.assign(new Error('ANALYSIS_NOT_CONFIGURED'),{permanent:true});
     const active=await storage.get('analysis:active');
@@ -24,7 +25,7 @@ export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=request
     const watches=selectedIds?selectedIds.map(teamId=>({teamId})):[{teamId}];
     const teamIds=[...new Set(watches.map(w=>w.teamId))];
     if(!teamIds.length)return {available:false,reason:'Нет отслеживаемых команд.'};
-    const j={jobId:uuid(),state:'running',phase:'fetch',scope:selectedIds?'selected':'team',createdAt:new Date(now()).toISOString(),teams:teamIds.map(id=>({teamId:id,count:0,headSequence:null,expected:null,before:null,summaries:0,chunkIndex:0,chunkCount:0,level:0,reduceIndex:0})),teamIndex:0,processedSnapshots:0,retries:0};
+    const j={ownerMetrics,jobId:uuid(),state:'running',phase:'fetch',scope:selectedIds?'selected':'team',createdAt:new Date(now()).toISOString(),teams:teamIds.map(id=>({teamId:id,count:0,headSequence:null,expected:null,before:null,summaries:0,chunkIndex:0,chunkCount:0,level:0,reduceIndex:0})),teamIndex:0,processedSnapshots:0,retries:0};
     await save(j);await storage.put('analysis:active',j.jobId);await storage.put('analysis:scope:'+scopeKey(teamId,selectedIds),j.jobId);await storage.setAlarm(now()+1000);return status(j.jobId);
   }
   async function status(jobId,teamId,selectedIds) {
@@ -55,11 +56,12 @@ export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=request
     }
     if(t.headSequence===null){t.headSequence=page.records[0].sequence;t.expected=t.headSequence;}
     const rows=[];
-    for(const r of page.records) {
+    for(const original of page.records) {
+      const r=restrictSosiskaData(original,j.ownerMetrics!==false);
       if(r.sequence!==t.expected||r.snapshot?.teamId!==t.teamId||!r.changes||!Number.isFinite(Date.parse(r.snapshot.capturedAt))||(r.sequence===1&&!r.changes.baseline))throw Object.assign(new Error('ANALYSIS_HISTORY_INCOMPLETE'),{permanent:true});
       t.expected--;t.count++;j.processedSnapshots++;
       t.name=t.name??r.snapshot.raw.TeamName;t.to=t.to??r.snapshot.capturedAt;t.from=r.snapshot.capturedAt;
-      rows.push(...timelineRows(r));
+      rows.push(...restrictSosiskaData(timelineRows(r),j.ownerMetrics!==false));
       await storage.put(key(j,`point:${t.teamId}:${r.sequence}`),{sequence:r.sequence,capturedAt:r.snapshot.capturedAt,...r.snapshot.derived,members:r.snapshot.raw.Members.map(m=>({userId:m.UserId,name:m.Name,level:m.Level,crown:m.Crown,help:m.HelpCount})),changes:r.changes,
         tournament:r.snapshot.tournament?.available===true?{kind:r.snapshot.tournament.kind,eventId:r.snapshot.tournament.eventId,
           groupId:r.snapshot.tournament.groupId,teamScore:r.snapshot.tournament.teamScore}:null});
@@ -72,7 +74,7 @@ export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=request
   }
   async function analyzeChunk(j,t) {
     const part=await storage.get(key(j,`input:${t.teamId}:${t.chunkIndex}`));
-    const result=await analyze({input:{teamId:t.teamId,teamName:t.name,...part},task:'Ответ до 250 слов: выбери существенные изменения, а не переписывай весь вход. Это часть полного временного ряда в формате JSON lines, возможно фрагмент длинной записи. Проанализируй все содержащиеся интервалы, сохрани даты, UserId, имена, числа и существенные изменения для последующего объединения. Не называй часть всей историей.',env});
+    const result=await analyze({ownerMetrics:j.ownerMetrics!==false,input:{teamId:t.teamId,teamName:t.name,...part},task:'Ответ до 250 слов: выбери существенные изменения, а не переписывай весь вход. Это часть полного временного ряда в формате JSON lines, возможно фрагмент длинной записи. Проанализируй все содержащиеся интервалы, сохрани даты, UserId, имена, числа и существенные изменения для последующего объединения. Не называй часть всей историей.',env});
     await storage.put(key(j,`summary:${t.teamId}:0:${t.summaries}`),result);t.summaries++;t.chunkIndex++;
     if(t.chunkIndex>=t.chunkCount)j.phase=t.complete?'reduce':'fetch';
   }
@@ -83,9 +85,10 @@ export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=request
       if(!p)throw Object.assign(new Error('ANALYSIS_HISTORY_INCOMPLETE'),{permanent:true});
       acc.add({sequence:n,snapshot:{teamId:t.teamId,capturedAt:p.capturedAt,raw:{TeamName:t.name,Members:p.members.map(m=>({UserId:m.userId,Name:m.name,Level:m.level,Crown:m.crown,HelpCount:m.help}))}},changes:{baseline:n===1}});
     }
-    const period=acc.result();delete period.series;period.players=period.players.map(({series,hourly,...p})=>p);return period;
+    const period=acc.result();delete period.series;period.players=period.players.map(({series,hourly,...p})=>p);return restrictSosiskaData(period,j.ownerMetrics!==false);
   }
   async function observedEventStats(j,t){
+    if(j.ownerMetrics===false)return [];
     const scopes=new Map();
     for(let n=t.headSequence;n>0;n--){
       const point=await storage.get(key(j,`point:${t.teamId}:${n}`));
@@ -112,12 +115,12 @@ export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=request
     if(t.summaries===1) {
       const report=await storage.get(key(j,`summary:${t.teamId}:${t.level}:0`));
       const period=await periodStats(j,t);
-      const final=await analyze({format:'report',input:{period,eventStats:await observedEventStats(j,t),teamId:t.teamId,teamName:t.name,from:t.from,to:t.to,snapshotCount:t.count,complete:t.complete,analysis:report},task:'Ответ до 450 слов, с выводами и ведущими игроками; не повторяй полный список счётчиков. Составь итоговый анализ ВСЕЙ истории этой команды. Охват задан явно. Опиши динамику по времени, игроков, изменения состава и неопределённости. Один снимок не даёт динамики; прямо сообщи это.',env});
+      const final=await analyze({ownerMetrics:j.ownerMetrics!==false,format:'report',input:{period,...(j.ownerMetrics!==false?{eventStats:await observedEventStats(j,t)}:{}),teamId:t.teamId,teamName:t.name,from:t.from,to:t.to,snapshotCount:t.count,complete:t.complete,analysis:report},task:'Ответ до 450 слов, с выводами и ведущими игроками; не повторяй полный список счётчиков. Составь итоговый анализ ВСЕЙ истории этой команды. Охват задан явно. Опиши динамику по времени, игроков, изменения состава и неопределённости. Один снимок не даёт динамики; прямо сообщи это.',env});
       await storage.put(key(j,`report:${t.teamId}`),{...final,period});await nextTeam(j);return;
     }
     const batch=[];let chars=0;
     while(t.reduceIndex<t.summaries){const r=await storage.get(key(j,`summary:${t.teamId}:${t.level}:${t.reduceIndex}`));if(batch.length>=2&&chars+JSON.stringify(r).length>6000)break;batch.push(r);chars+=JSON.stringify(r).length;t.reduceIndex++;}
-    const result=await analyze({input:{teamId:t.teamId,parts:batch},task:'Ответ до 300 слов. Объедини ВСЕ эти промежуточные анализы: сохрани хронологию, игроков/UserId и числа, ранние и поздние периоды. Это промежуточное сжатие, не весь итог.',env});
+    const result=await analyze({ownerMetrics:j.ownerMetrics!==false,input:{teamId:t.teamId,parts:batch},task:'Ответ до 300 слов. Объедини ВСЕ эти промежуточные анализы: сохрани хронологию, игроков/UserId и числа, ранние и поздние периоды. Это промежуточное сжатие, не весь итог.',env});
     const n=t.nextSummaries??0;await storage.put(key(j,`summary:${t.teamId}:${t.level+1}:${n}`),result);t.nextSummaries=n+1;
     if(t.reduceIndex===t.summaries){t.level++;t.summaries=t.nextSummaries;t.nextSummaries=0;t.reduceIndex=0;}
   }
@@ -130,7 +133,7 @@ export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=request
       j.state='done';j.completedAt=new Date(now()).toISOString();return;
     }
     const teams=[];for(const t of j.teams)teams.push({teamId:t.teamId,teamName:t.name,count:t.count,from:t.from,to:t.to,report:(await storage.get(key(j,`report:${t.teamId}`)))?.text});
-    const report=await analyze({format:'report',input:{scope:j.scope,teams},task:j.scope==='team'?'Ответ до 400 слов. Подведи итог полной истории только этой команды: динамика, темп, вклад игроков, состав и ограничения наблюдений.': 'Ответ до 400 слов. Сделай сравнительный итог по ВСЕМ командам и их полной истории: динамика, темп, вклад игроков, состав, отличия периодов и ограничения сравнения. Не сравнивай разную длительность как равную. Не пропускай команды без снимков, отметь нехватку данных.',env});
+    const report=await analyze({ownerMetrics:j.ownerMetrics!==false,format:'report',input:{scope:j.scope,teams},task:j.scope==='team'?'Ответ до 400 слов. Подведи итог полной истории только этой команды: динамика, темп, вклад игроков, состав и ограничения наблюдений.': 'Ответ до 400 слов. Сделай сравнительный итог по ВСЕМ командам и их полной истории: динамика, темп, вклад игроков, состав, отличия периодов и ограничения сравнения. Не сравнивай разную длительность как равную. Не пропускай команды без снимков, отметь нехватку данных.',env});
     await storage.put(key(j,'overall'),report);j.state='done';j.completedAt=new Date(now()).toISOString();
   }
   async function step() {
@@ -152,11 +155,11 @@ export function createAnalysisJobs({storage,env,fetchAgent=fetch,analyze=request
       await save(saved);if(saved.state==='failed')await storage.deleteAlarm();else await storage.setAlarm(now()+Math.min(600000,60000*saved.retries));
     }
   }
-  return {start:(teamId,teamIds)=>serial(()=>start(teamId,teamIds)),status,timeline,step:()=>serial(step)};
+  return {start:(teamId,teamIds,ownerMetrics)=>serial(()=>start(teamId,teamIds,ownerMetrics)),status,timeline,step:()=>serial(step)};
 }
 export class SosiskaAnalysisJobs {
   constructor(ctx,env,fetchAgent=fetch,analyze=requestSosiskaAnalysis){this.jobs=createAnalysisJobs({storage:ctx.storage,env,fetchAgent,analyze});}
-  async fetch(request){try{const b=await request.json();const data=b.operation==='start'?await this.jobs.start(b.teamId,b.teamIds):b.operation==='status'?await this.jobs.status(b.jobId,b.teamId,b.teamIds):b.operation==='timeline'?await this.jobs.timeline(b.jobId,b.teamId,b.before,b.limit):null;if(!data)return json({ok:false,error:'ANALYSIS_INVALID'},400);return json({ok:true,data});}catch(e){return json({ok:false,error:safeError(e)},503);}}
+  async fetch(request){try{const b=await request.json();const data=b.operation==='start'?await this.jobs.start(b.teamId,b.teamIds,request.headers.get('X-Sosiska-Metrics-Scope')==='owner'):b.operation==='status'?await this.jobs.status(b.jobId,b.teamId,b.teamIds):b.operation==='timeline'?await this.jobs.timeline(b.jobId,b.teamId,b.before,b.limit):null;if(!data)return json({ok:false,error:'ANALYSIS_INVALID'},400);return json({ok:true,data});}catch(e){return json({ok:false,error:safeError(e)},503);}}
   async alarm(){await this.jobs.step();}
 }
 

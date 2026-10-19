@@ -28,7 +28,7 @@ var SosiskaPeriod = (() => {
     sortedMembers: () => sortedMembers
   });
   var sortedMembers = (members) => [...members ?? []].sort((a, b) => Number(b.Level ?? 0) + Number(b.Crown ?? 0) - (Number(a.Level ?? 0) + Number(a.Crown ?? 0)) || Number(b.Level ?? 0) - Number(a.Level ?? 0) || String(a.UserId).localeCompare(String(b.UserId)));
-  function createPeriodAccumulator(teamId, { retainIntervals = false, membershipHistory = false } = {}) {
+  function createPeriodAccumulator(teamId, { retainIntervals = false, membershipHistory = false, includeHelp = true } = {}) {
     let newer = null, expected = null, head = null, count = 0, from = null, to = null, teamName = "", complete = false;
     const players = /* @__PURE__ */ new Map(), series = [];
     const ensure = (m) => {
@@ -77,6 +77,7 @@ var SosiskaPeriod = (() => {
           p.intervals++;
           const point = { from: s.capturedAt, to: newer.capturedAt, hours: dt, levels: null, crowns: null, help: null };
           for (const [field, gain, resets, hours] of [["Level", "levelGain", "levelResets", "levelHours"], ["Crown", "crownGain", "crownResets", "crownHours"], ["HelpCount", "helpGain", "helpResets", null]]) {
+            if (field === "HelpCount" && !includeHelp) continue;
             if (!numeric(m[field]) || !numeric(v[field])) continue;
             const delta = v[field] - m[field];
             if (delta < 0) {
@@ -136,7 +137,7 @@ var SosiskaPeriod = (() => {
     }
     return { add, result };
   }
-  var activityOrder = (a, b) => Number(b.levelGain > 0 || b.crownGain > 0 || b.helpGain > 0) - Number(a.levelGain > 0 || a.crownGain > 0 || a.helpGain > 0) || b.levelGain - a.levelGain || b.crownGain - a.crownGain || b.helpGain - a.helpGain || String(a.userId).localeCompare(String(b.userId));
+  var activityOrder = (a, b) => Number(b.levelGain > 0 || b.crownGain > 0 || b.helpGain > 0) - Number(a.levelGain > 0 || a.crownGain > 0 || a.helpGain > 0) || b.levelGain - a.levelGain || b.crownGain - a.crownGain || (b.helpGain ?? 0) - (a.helpGain ?? 0) || String(a.userId).localeCompare(String(b.userId));
   function appendPoint(list, point, retainIntervals) {
     list.push(point);
     if (!retainIntervals && list.length > 512) {

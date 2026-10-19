@@ -30,7 +30,7 @@ test('RK personal unknown outside aia team remains unavailable, cannot invent op
   calls.push({url,body:JSON.parse(init.body)});
   return Response.json({ok:true,data:rkClash});
  };
- const handle=createSosiskaApi({authorizeAdmin:async()=>{},fetchAgent});
+ const handle=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'1456874273'}),fetchAgent});
  const response=await handle(req({operation:'tournamentGroup',game:'rk',teamId:'101'}),env);
  assert.equal(response.status,200);
  const d=(await response.json()).data;assert.equal(d.available,true);assert.equal(d.teams.length,2);assert.equal(d.teams[1].score,550);
@@ -42,7 +42,7 @@ test('RK personal unknown outside aia team remains unavailable, cannot invent op
  assert.ok(calls.every(x=>x.body.operation==='getTeamClash'));
 });
 test('RK hybrid search is isolated and uses real RK API, never RM',async()=>{
- const seen=[];const handle=createSosiskaApi({authorizeAdmin:async()=>{},fetchAgent:async(url,options)=>{
+ const seen=[];const handle=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'1456874273'}),fetchAgent:async(url,options)=>{
   seen.push({url,body:JSON.parse(options.body)});
   return Response.json({ok:true,data:{variants:['ХАОС','XAOC','KHAOS'],candidates:[{teamId:'100',name:'XAOC',score:60000,sources:['search','WorldTeams']}],warnings:[],nextOffset:null}});
  }});
@@ -114,7 +114,7 @@ test('RK profile interface labels battle only and uses arena+kingdom native stat
 
 test('RK profile facade propagates original observation timestamp and cache status safely',async()=>{
  const when='2026-10-18T13:21:45.000Z',uid='201';
- const handle=createSosiskaApi({authorizeAdmin:async()=>{},fetchAgent:async(url,init)=>{
+ const handle=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'1456874273'}),fetchAgent:async(url,init)=>{
   assert.match(url,/royal-kingdom-search-stage1/);
   assert.equal(JSON.parse(init.body).operation,'getProfile');
   return Response.json({ok:true,data:{RequestedUserId:uid,Profile:{UserId:uid,Name:'Player',Level:5400,Cup:25000,TeamId:'100'},

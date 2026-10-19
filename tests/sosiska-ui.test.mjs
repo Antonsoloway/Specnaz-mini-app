@@ -5,10 +5,10 @@ import {readFile} from 'node:fs/promises';
 const source=await readFile(new URL('../sosiska-v061.js',import.meta.url),'utf8');
 const periodSource=await readFile(new URL('../sosiska-period-v061.js',import.meta.url),'utf8');
 const settle=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate);};
-function setup({admin=true,responder}={}){
+function setup({admin=true,responder,ownerMetrics=true}={}){
   const listeners={},docListeners={},tiles=[],calls=[],panel={innerHTML:'',hidden:false},grid={querySelector:selector=>tiles.find(x=>!x.removed&&(selector==='[data-sosiska-open]'||selector===('[data-sosiska-open="'+x.dataset.sosiskaOpen+'"]')))||null,querySelectorAll:()=>tiles.filter(x=>!x.removed),appendChild:b=>tiles.push(b)};
   const hosts=[];const document={body:{appendChild:n=>hosts.push(n)},activeElement:{focus(){}},querySelector:s=>s==='.grid'?grid:s==='[data-sosiska-interval]'?{value:'120'}:null,getElementById:()=>panel,createElement:()=>({dataset:{},querySelector:()=>null,remove(){this.removed=true;}}),addEventListener:(type,fn)=>{docListeners[type]=fn;}};
-  const context={document,authState:{role:{isChatAdmin:admin}},sessionToken:'session-a',activePage:'home',setActiveNav(){},renderPage(page){panel.innerHTML=page;},FormData:class{constructor(form){this.form=form;}get(name){return this.form.filters?this.form.filters[name]??'':this.form.query;}},Response,AbortController,setTimeout,clearTimeout,console,fetch:async(url,init)=>{const b=JSON.parse(init.body);calls.push(b);return Response.json({ok:true,data:await (responder?responder(b):{watches:[]})});}};
+  const context={document,authState:{role:{isChatAdmin:admin}},sessionToken:'session-a',activePage:'home',setActiveNav(){},renderPage(page){panel.innerHTML=page;},FormData:class{constructor(form){this.form=form;}get(name){return this.form.filters?this.form.filters[name]??'':this.form.query;}},Response,AbortController,setTimeout,clearTimeout,console,fetch:async(url,init)=>{const b=JSON.parse(init.body);calls.push(b);return Response.json({ok:true,capabilities:{ownerTeamMetrics:ownerMetrics},data:await (responder?responder(b):{watches:[]})});}};
   context.window={addEventListener:(type,fn)=>{listeners[type]=fn;},RoyalNav:{pushCurrent(){}},RoyalAdminDataV0600:{subscribe(fn){listeners.adminClear=fn;}}};vm.createContext(context);vm.runInContext(periodSource,context);vm.runInContext(source,context);
   const action=(name,id,extra={})=>listeners.click({target:{closest:s=>s==='[data-sosiska-action]'?{dataset:{sosiskaAction:name,teamId:id,...extra}}:null},preventDefault(){},stopImmediatePropagation(){}});
   const search=query=>docListeners.submit({target:{query,matches:selector=>selector==='[data-sosiska-search]',querySelector:()=>({blur(){}})},preventDefault(){},stopImmediatePropagation(){}});
@@ -417,4 +417,16 @@ test('RM and RK tabs keep independent requests, game labels, watched lists and r
  assert.equal(s.calls.at(-1).operation,'list');
  assert.equal('game' in s.calls.at(-1),false);
  assert.doesNotMatch(s.panel.innerHTML,/RK team/);
+});
+
+for(const game of ['rm','rk'])test(game+' restricted UI hides help, event panels and denies injected advanced actions',async()=>{
+ const roster={TeamId:'1',TeamName:'Team',Description:'Data',Leader:'777',Members:[{UserId:'777',Name:'Player',Level:100,Crown:5,HelpCount:999}]};
+ const s=setup({ownerMetrics:false,responder:b=>b.operation==='team'?roster:b.operation==='profile'?{userId:'777',name:'Player',level:100,crown:5,stats:{helpsMade:999,helpsReceived:888,firstTryWins:1}}:b.operation==='history'?{records:[],nextBefore:null}:{watches:[]}});
+ await s.context.window.RoyalSosiska.open(game);s.action('team','1');await settle();
+ for(const action of ['tournament','tournament-refresh','tournament-players','event-player'])s.action(action,'1');
+ s.action('metric',undefined,{metric:'help'});await settle();
+ assert.doesNotMatch(s.panel.innerHTML,/data-metric="(?:help|event)"|Командный турнир|Командная битва|Промежуток сундуков|Помощь/);
+ s.action('roster-view');await settle();assert.doesNotMatch(s.panel.innerHTML,/Помощь|999/);
+ s.action('profile',undefined,{profileId:'777'});await settle();assert.doesNotMatch(s.panel.innerHTML,/Оказанная помощь|Полученная помощь|999|888/);
+ assert.equal(s.calls.some(c=>['tournamentGroup','tournamentPlayers'].includes(c.operation)),false);
 });

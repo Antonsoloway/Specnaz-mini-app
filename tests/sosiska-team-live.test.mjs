@@ -35,7 +35,7 @@ test('expired cache falls back to explicitly stale data, expires after 24 hours 
 });
 test('simultaneous opens coalesce and upstream mismatched identity never renders',async()=>{
  const s=setup();await Promise.all([s.handle(request(),env),s.handle(request(),env)]);assert.equal(s.calls,1);
- const bad=createTeamLive({crm:async()=>Response.json({snapshot:{teams:[{name:'CRM',game:'Royal Match',gameTeamId:'12'}]}}),fetchAgent:async()=>Response.json({ok:true,data:{...team,TeamId:'13'}})});
+ const bad=createTeamLive({authorizeMetrics:async()=>({telegramId:'1456874273'}),crm:async()=>Response.json({snapshot:{teams:[{name:'CRM',game:'Royal Match',gameTeamId:'12'}]}}),fetchAgent:async()=>Response.json({ok:true,data:{...team,TeamId:'13'}})});
  assert.equal((await bad(request(),env)).status,502);
 });
 test('bad origin rejected before CRM/agent; preflight and methods bounded',async()=>{
@@ -132,7 +132,7 @@ const kingdom={...team,TeamLogo:183,Star:5,Score:764030,MinCup:8000,IsOpen:false
 test('RK linked cards route to RK with a separate credential and isolate identical RM/RK IDs and singleflight',async()=>{
  const mixedEnv={...env,RK_AGENT_API_KEY:'kingdom-private-key'.repeat(4)},calls=[];
  let denied=false;
- const handle=createTeamLive({crm:async()=>denied?Response.json({}, {status:403}):Response.json({snapshot:{teams:['Royal Match','Royal Kingdom'].map(game=>({name:'CRM',game,gameTeamId:'12'}))}}),fetchAgent:async(url,init)=>{
+ const handle=createTeamLive({authorizeMetrics:async()=>({telegramId:'1456874273'}),crm:async()=>denied?Response.json({}, {status:403}):Response.json({snapshot:{teams:['Royal Match','Royal Kingdom'].map(game=>({name:'CRM',game,gameTeamId:'12'}))}}),fetchAgent:async(url,init)=>{
   const rk=url.includes('kingdom');assert.equal(init.headers.Authorization,'Bearer '+mixedEnv[rk?'RK_AGENT_API_KEY':'RM_AGENT_API_KEY']);calls.push(url);
   assert.deepEqual(JSON.parse(init.body),{protocolVersion:1,operation:'getTeamInfo',payload:{teamId:'12',includeMembers:true}});
   return Response.json({ok:true,data:rk?kingdom:team});
@@ -150,10 +150,10 @@ test('RK linked cards route to RK with a separate credential and isolate identic
 test('RK requires its own key, rejects wrong team and never uses RM emblem range or key as fallback',async()=>{
  assert.equal(projectTeam({...team,TeamLogo:183},'now').logo,null);
  for(const data of [{...kingdom,TeamId:'13'},{...kingdom,Status:1},{...kingdom,Members:[kingdom.Members[0],kingdom.Members[0]]}]){
-  const h=createTeamLive({crm:async()=>Response.json({snapshot:{teams:[{name:'CRM',game:'Royal Kingdom',gameTeamId:'12'}]}}),fetchAgent:async()=>Response.json({ok:true,data})});
+  const h=createTeamLive({authorizeMetrics:async()=>({telegramId:'1456874273'}),crm:async()=>Response.json({snapshot:{teams:[{name:'CRM',game:'Royal Kingdom',gameTeamId:'12'}]}}),fetchAgent:async()=>Response.json({ok:true,data})});
   assert.equal((await h(request('/team-live','team=CRM&game=Royal+Kingdom'),{...env,RK_AGENT_API_KEY:env.RM_AGENT_API_KEY})).status,502);
  }
- let calls=0;const h=createTeamLive({crm:async()=>Response.json({snapshot:{teams:[{name:'CRM',game:'Royal Kingdom',gameTeamId:'12'}]}}),fetchAgent:async()=>{calls++;throw Error('wrong agent');}});
+ let calls=0;const h=createTeamLive({authorizeMetrics:async()=>({telegramId:'1456874273'}),crm:async()=>Response.json({snapshot:{teams:[{name:'CRM',game:'Royal Kingdom',gameTeamId:'12'}]}}),fetchAgent:async()=>{calls++;throw Error('wrong agent');}});
  assert.equal((await h(request('/team-live','team=CRM&game=Royal+Kingdom'),env)).status,502);assert.equal(calls,0);
 });
 test('RK sheet links create, update, unlink and rename with revisions and original screenshots intact',async()=>{

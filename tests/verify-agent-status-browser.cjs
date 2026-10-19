@@ -12,7 +12,7 @@ const root=path.resolve(__dirname,'..');let browser;
     const body=JSON.parse(init.body);calls.push(body.operation);
     if(mode==='network')throw Error('NETWORK');
     if(mode==='denied')return Response.json({ok:false},{status:403});
-    return Response.json({ok:true,data:{agents:[{id:'sosiska',status:mode,level:14800,levelVerified:mode==='online',checkedAt:new Date().toISOString(),lastOnlineAt:new Date().toISOString()}]}});
+    return Response.json({ok:true,capabilities:{ownerTeamMetrics:true},data:{agents:[{id:'sosiska',status:mode,level:14800,levelVerified:mode==='online',checkedAt:new Date().toISOString(),lastOnlineAt:new Date().toISOString()}]}});
    };
   });
   await page.addScriptTag({path:path.join(root,'sosiska-v061.js')});await page.addScriptTag({path:path.join(root,'agent-status-v061.js')});
