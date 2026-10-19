@@ -3,7 +3,7 @@ import currentWorker from './entry-v1410.js';
 import {authorizeAdmin} from './entry-v1380.js';
 import {createSosiskaApi} from './sosiska-api.js';
 import {downloadHistoryExport} from './sosiska-export.js';
-const teamLive = createTeamLive({crm:currentWorker.fetch.bind(currentWorker)});
+const teamLive = createTeamLive({crm:currentWorker.fetch.bind(currentWorker),authorizeMetrics:authorizeAdmin});
 const agent = createSosiskaApi({authorizeAdmin});
 export {SosiskaAnalysisJobs,SosiskaKingdomAnalysisJobs} from './sosiska-analysis-jobs.js';
 export {SosiskaKingdomMonitor} from './sosiska-rk-monitor.js';

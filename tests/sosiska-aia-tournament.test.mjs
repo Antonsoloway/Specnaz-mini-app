@@ -23,7 +23,7 @@ test('only bounded read-only tournament inputs allowed',()=>{
 });
 test('tournament group uses isolated Aia secret and endpoint, never the primary session',async()=>{
   const calls=[];
-  const handle=createSosiskaApi({authorizeAdmin:async()=>{},fetchAgent:mock(group,calls)});
+  const handle=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'1456874273'}),fetchAgent:mock(group,calls)});
   const response=await handle(request({operation:'tournamentGroup',teamId:'10'}),baseEnv);
   const {data}=await response.json();
   assert.equal(response.status,200);
@@ -38,7 +38,7 @@ test('tournament group uses isolated Aia secret and endpoint, never the primary 
   assert.ok(!JSON.stringify(data).includes(baseEnv.RM_EVENT_API_KEY));
 });
 test('personal unknown -1 remains null rather than fabricated zero',async()=>{
-  const calls=[];const handle=createSosiskaApi({authorizeAdmin:async()=>{},fetchAgent:mock(personal,calls)});
+  const calls=[];const handle=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'1456874273'}),fetchAgent:mock(personal,calls)});
   const response=await handle(request({operation:'tournamentPlayers',teamId:'10'}),baseEnv);
   const {data}=await response.json();
   assert.equal(response.status,200);
@@ -52,7 +52,7 @@ test('foreign group, identity mismatch, hidden malformed scores never reach brow
  for(const data of [{...group,selectedTeamId:'11'},{...group,teams:[{...group.teams[0],score:-1},group.teams[1]]},
    {...group,teams:[group.teams[0],group.teams[0]]},{...personal,teamId:'11'},{...personal,players:[{userId:'111',name:'x',score:-1}]}]){
   const calls=[];const body=data.teams?{operation:'tournamentGroup',teamId:'10'}:{operation:'tournamentPlayers',teamId:'10'};
-  const handle=createSosiskaApi({authorizeAdmin:async()=>{},fetchAgent:mock(data,calls)});
+  const handle=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'1456874273'}),fetchAgent:mock(data,calls)});
   const r=await handle(request(body),baseEnv);
   assert.equal(r.status,502);assert.equal((await r.json()).error,'AGENT_UNAVAILABLE');
  }
@@ -61,7 +61,7 @@ test('nonadmin and missing Aia key do not call event service',async()=>{
  let calls=0;
  const handle=createSosiskaApi({authorizeAdmin:async()=>{throw Object.assign(Error('admin'),{status:403});},fetchAgent:async()=>{calls++;}});
  assert.equal((await handle(request({operation:'tournamentGroup',teamId:'10'}),baseEnv)).status,403);
- const noKey=createSosiskaApi({authorizeAdmin:async()=>{},fetchAgent:async()=>{calls++;}});
+ const noKey=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'1456874273'}),fetchAgent:async()=>{calls++;}});
  const r=await noKey(request({operation:'tournamentGroup',teamId:'10'}),{...baseEnv,RM_EVENT_API_KEY:undefined});
  assert.equal(r.status,503);assert.equal((await r.json()).error,'TOURNAMENT_NOT_CONFIGURED');assert.equal(calls,0);
 });

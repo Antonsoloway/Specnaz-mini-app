@@ -7,7 +7,7 @@ const root=path.resolve(__dirname,'..');let browser;
   await page.setContent('<meta name="viewport" content="width=device-width,initial-scale=1"><div class="grid"></div><main id="panel"></main>');
   for(const m of fs.readFileSync(path.join(root,'app-v0600.html'),'utf8').matchAll(/<link[^>]+href="([^?]+\.css)/g))await page.addStyleTag({path:path.join(root,m[1])});
   await page.evaluate(()=>{
-   window.sessionToken='fixture';window.authState={role:{isChatAdmin:true}};window.activePage='home';window.setActiveNav=()=>{};window.alerted=false;window.reportMode='legacy';
+   window.ownerTeamMetrics=true;window.sessionToken='fixture';window.authState={role:{isChatAdmin:true}};window.activePage='home';window.setActiveNav=()=>{};window.alerted=false;window.reportMode='legacy';
    const members=delta=>Array.from({length:50},(_,i)=>({UserId:String(i+1),Name:'Игрок '+(i+1),Level:100+i+delta,Crown:i+delta,HelpCount:delta}));
    window.testTeam={TeamId:'1',TeamName:'Тестовая команда',Members:members(3),Leader:'1',CoLeaders:[],MinLevel:0,MinCrown:0,Type:true,Description:'Тест'};
    window.snapshots=[2,1].map(n=>({sequence:n,snapshot:{teamId:'1',capturedAt:n===1?'2026-10-12T00:00:00Z':'2026-10-12T07:00:00Z',raw:{TeamName:'Тестовая команда',Members:members(n===1?0:3)}},changes:{baseline:n===1}}));
@@ -18,7 +18,7 @@ const root=path.resolve(__dirname,'..');let browser;
     else if(b.operation==='history')data={records:b.limit===1?snapshots.slice(0,1):snapshots,nextBefore:null};
     else if(b.operation==='analysisStatus'){const text=reportMode==='legacy'?legacy:'## Коротко\nПрирост подтверждён.\n\n## Игроки\n- **Игрок 1:** +3 уровня.';data={available:true,state:'done',jobId:'fixture-job',scope:'team',processedSnapshots:2,summary:{text},teams:[{teamId:'1',teamName:'Тестовая команда',count:2,from:snapshots[1].snapshot.capturedAt,to:snapshots[0].snapshot.capturedAt,text}]};}
     else throw Error('Unexpected '+b.operation);
-    return Response.json({ok:true,data});
+    return Response.json({ok:true,capabilities:{ownerTeamMetrics:window.ownerTeamMetrics},data});
    };
   });
   for(const f of ['sosiska-period-v061.js','sosiska-v061.js'])await page.addScriptTag({path:path.join(root,f)});
@@ -38,6 +38,17 @@ const root=path.resolve(__dirname,'..');let browser;
   await page.locator('.sosiska-period-roster > summary').click();assert.equal(await page.locator('.sosiska-period-roster .sosiska-player').first().isVisible(),false);
   await page.evaluate(()=>{reportMode='new';});await page.locator('[data-sosiska-action="team"]').click();await page.waitForFunction(()=>document.querySelector('#sosiskaAnalysis .sosiska-analysis')?.textContent.includes('Прирост подтверждён.')&&document.querySelector('.sosiska-screen')?.getAttribute('aria-busy')==='false');assert.equal(await page.locator('.sosiska-report-table').count(),0);assert.equal(await page.locator('#sosiskaAnalysis .sosiska-analysis').count(),1);
   if(width===390)await page.locator('#sosiskaAnalysis').screenshot({path:'/tmp/sosiska-new-readable-analysis.png'});
+  if(width===390){
+   await page.evaluate(()=>{window.ownerTeamMetrics=false;window.sessionToken='other-admin-session';});
+   for(const game of ['rm','rk']){
+    await page.evaluate(game=>RoyalSosiska.open(game),game);
+    await page.locator('[data-sosiska-action="team"]').click();await page.waitForSelector('.sosiska-period-roster');
+    assert.equal(await page.locator('[data-metric="help"],[data-metric="event"],[data-sosiska-action="tournament"]').count(),0);
+    assert.doesNotMatch(await page.locator('.sosiska-screen').textContent(),/Помощь|Оказанная помощь|Полученная помощь|Командный турнир|Командная битва|Промежуток сундуков/);
+    await page.locator('[data-sosiska-action="roster-view"]').click();
+    assert.doesNotMatch(await page.locator('.sosiska-screen').textContent(),/Помощь/);
+   }
+  }
   await page.close();
  }
  assert.deepEqual(errors,[]);await browser.close();console.log('readability: 320/390/768, 50-player collapse/state, legacy Markdown/table cards, XSS escaped, one report, 24 compact unsplit hours, metric/hour details PASS');

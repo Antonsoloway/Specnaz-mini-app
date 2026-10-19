@@ -9,7 +9,7 @@ const root=process.argv[2]||path.resolve(__dirname,'..');
   await page.evaluate(()=>{
    window.sessionToken='fixture';window.snapshotState={teams:[{name:'CRM',game:'Royal Match',gameTeamId:'12'}]};window.calls=0;
    window.fixture={teamId:'12',name:'Team with a long editable name',description:'Welcome! Description on several lines.\nActive players',memberCount:49,capacity:50,score:806485,minLevel:14300,minCrowns:2000,type:'Открытая',leadership:[{userId:'1',name:'Leader & Friends',role:'Лидер',level:14301,crowns:4311,help:11},...['Second','Third','Fourth'].map((name,i)=>({userId:String(i+2),name,role:'Помощник',level:14301,crowns:4000-i*500,help:i}))],fetchedAt:'2026-10-14T19:00:00.000Z',stale:false};
-   window.fetch=async()=>{calls++;return Response.json({ok:true,data:fixture});};
+   window.fetch=async()=>{calls++;return Response.json({ok:true,capabilities:{ownerTeamMetrics:true},data:fixture});};
   });
   await page.addScriptTag({path:path.join(root,'team-live-v061.js')});await page.waitForSelector('.team-live-player');
   assert.equal(await page.locator('.team-live-player').count(),4);assert.equal(await page.locator('.team-photo-box').isVisible(),false);assert.equal(await page.locator('.team-members-list').textContent(),'Existing CRM members');
@@ -28,7 +28,7 @@ const root=process.argv[2]||path.resolve(__dirname,'..');
  for(const name of ['style.css','admin-write-v0600.css','admin-write-v0600-v2.css','sosiska-v061.css','team-live-v061.css','team-emblems-v061.css'])await page.addStyleTag({path:path.join(root,name)});
  await page.evaluate(()=>{
   window.__ROYAL_BUILD__='0.6.1';window.authState={role:{isChatAdmin:true}};window.sessionToken='fixture';window.calls=[];window.renderPage=()=>{};window.setActiveNav=()=>{};
-  window.fetch=async(_,init)=>{const b=JSON.parse(init.body);calls.push(b.operation);const t={TeamId:'12',TeamName:'Selected team',Leader:'2',CoLeaders:[],Members:[{UserId:'2',Name:'Leader',Level:200,Crown:20}],TeamLogo:0,Type:true,MinLevel:100,MinCrown:0};return Response.json({ok:true,data:b.operation==='search'?{candidates:[{teamId:'12',name:t.TeamName}],warnings:[]}:t});};
+  window.fetch=async(_,init)=>{const b=JSON.parse(init.body);calls.push(b.operation);const t={TeamId:'12',TeamName:'Selected team',Leader:'2',CoLeaders:[],Members:[{UserId:'2',Name:'Leader',Level:200,Crown:20}],TeamLogo:0,Type:true,MinLevel:100,MinCrown:0};return Response.json({ok:true,capabilities:{ownerTeamMetrics:true},data:b.operation==='search'?{candidates:[{teamId:'12',name:t.TeamName}],warnings:[]}:t});};
  });
  for(const name of ['v061-ios-admin-touch-fix.js','v061-admin-ghost-click-guard.js','v061-admin-context-integrity.js','sosiska-period-v061.js','team-emblems-v061.js','sosiska-v061.js','team-live-v061.js'])await page.addScriptTag({path:path.join(root,name)});
  await page.locator('[data-write-field="gameTeamId"]').focus();await page.locator('[data-team-live-pick]').tap();await page.waitForSelector('.sosiska-picker');

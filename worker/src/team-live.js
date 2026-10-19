@@ -1,3 +1,4 @@
+import {restrictSosiskaData,isSosiskaOwner} from './sosiska-access.js';
 import {normalizeKingdomTeam} from './sosiska-rk-monitor.js';
 const GAMES={
  'Royal Match':{key:'RM_AGENT_API_KEY',origin:'https://specnaz-royal-match-agent-stage1.specnaz-sosiska.workers.dev',logos:176},
@@ -35,13 +36,14 @@ async function boundedRead(read,ms,controller){
   let timer;try{return await Promise.race([Promise.resolve().then(read),new Promise((_,reject)=>{timer=setTimeout(()=>{controller?.abort();reject(Error('TEAM_LIVE_TIMEOUT'));},ms);})]);}
   finally{clearTimeout(timer);}
 }
-export function createTeamLive({crm,fetchAgent=fetch,now=()=>Date.now(),authTimeoutMs=15000,agentTimeoutMs=25000}) {
+export function createTeamLive({crm,authorizeMetrics,fetchAgent=fetch,now=()=>Date.now(),authTimeoutMs=15000,agentTimeoutMs=25000}) {
   const cache=new Map(), pending=new Map();
   return async function handle(request,env,ctx) {
     const url=new URL(request.url),admin=url.pathname==='/admin-team-live';
     const origin=String(env.FRONTEND_ORIGIN||'https://antonsoloway.github.io').replace(/\/$/,'');
     const headers={'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Methods':'GET,OPTIONS','Access-Control-Allow-Headers':'Authorization,Content-Type','Vary':'Origin','Cache-Control':'no-store','Content-Type':'application/json; charset=utf-8','X-Content-Type-Options':'nosniff'};
-    const json=(body,status=200)=>Response.json(body,{status,headers});
+    let ownerMetrics=false;
+    const json=(body,status=200)=>Response.json(restrictSosiskaData(body,ownerMetrics),{status,headers});
     if(request.headers.has('Origin')&&request.headers.get('Origin')!==origin)return json({ok:false,error:'ORIGIN_DENIED'},403);
     if(request.method==='OPTIONS')return new Response(null,{status:204,headers});
     if(request.method!=='GET')return json({ok:false,error:'METHOD_NOT_ALLOWED'},405);
@@ -54,6 +56,7 @@ export function createTeamLive({crm,fetchAgent=fetch,now=()=>Date.now(),authTime
         return auth.ok?{auth,body:await auth.json()}:{auth,denied:await auth.text()};
       },authTimeoutMs);
       if(!auth.ok)return new Response(denied,{status:auth.status,headers});
+      try{ownerMetrics=isSosiskaOwner(await authorizeMetrics?.(request,env));}catch{}
       const teams=admin?body.adminData?.teams:body.snapshot?.teams;
       const record=teams?.find(t=>t.name===name&&t.game===game);
       const id=record?.gameTeamId;

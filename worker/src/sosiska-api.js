@@ -1,3 +1,4 @@
+import {isSosiskaOwner,restrictSosiskaData} from './sosiska-access.js';
 import {prepareHistoryExport} from './sosiska-export.js';
 import {readSosiskaStatus,readKingdomStatus} from './agent-status.js';
 import {normalizeKingdomTeam} from './sosiska-rk-monitor.js';
@@ -47,14 +48,16 @@ export function createSosiskaApi({authorizeAdmin,fetchAgent=fetch,fetchAI=fetch}
   return async function handle(request,env) {
     const origin = String(env.FRONTEND_ORIGIN || 'https://antonsoloway.github.io').replace(/\/$/,'');
     const headers = {'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Methods':'POST,OPTIONS','Access-Control-Allow-Headers':'Authorization,Content-Type','Vary':'Origin','Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'};
-    const json = (body,status=200) => new Response(JSON.stringify(body),{status,headers});
+    let ownerMetrics=false;
+    const json = (body,status=200) => new Response(JSON.stringify({...restrictSosiskaData(body,ownerMetrics),capabilities:{ownerTeamMetrics:ownerMetrics}}),{status,headers});
     if (request.headers.has('Origin') && request.headers.get('Origin') !== origin) return json({ok:false,error:'ORIGIN_DENIED'},403);
     if(request.method==='OPTIONS')return new Response(null,{status:204,headers});
     if(request.method!=='POST')return json({ok:false,error:'METHOD_NOT_ALLOWED'},405);
     try {
-      await authorizeAdmin(request,env);
+      const principal=await authorizeAdmin(request,env);ownerMetrics=isSosiskaOwner(principal);
       const body=await readBody(request);
-      if(body.game==='rk'&&body.operation!=='status')return await handleKingdom(request,env,body,json,fetchAgent);
+      if(!ownerMetrics&&['tournamentGroup','tournamentPlayers'].includes(body.operation))return json({ok:false,error:'OWNER_REQUIRED',message:'Эти данные доступны только владельцу.'},403);
+      if(body.game==='rk'&&body.operation!=='status')return await handleKingdom(request,env,body,json,fetchAgent,ownerMetrics);
       if(body.operation==='status'){
         const rk=await readKingdomStatus(async()=>{
           if(typeof env.RK_AGENT_API_KEY!=='string'||env.RK_AGENT_API_KEY.length<32)throw Error('RK_NOT_CONFIGURED');
@@ -122,7 +125,7 @@ export function createSosiskaApi({authorizeAdmin,fetchAgent=fetch,fetchAI=fetch}
         return json({ok:true,data:{available:true,teamId:body.teamId,groupId:d.groupId,eventId:d.eventId,observedAt:d.observedAt,teamScore:d.teamScore,players,
           playersVerified:d.playersVerified,scoresComplete:d.scoresComplete&&players.every(p=>p.score!==null),knownScoreSum:players.reduce((s,p)=>s+(p.score??0),0),serverFreshnessVerified:false}});
       }
-      if(body.operation==='prepareExport')return json({ok:true,data:await prepareHistoryExport(request,env,body)});
+      if(body.operation==='prepareExport')return json({ok:true,data:await prepareHistoryExport(request,env,body,Date.now(),ownerMetrics)});
       const invoke = (operation,payload={}) => call('/v1/invoke',{protocolVersion:1,operation,payload});
       if(body.operation==='search') {
         const variants=queryVariants(body.query),candidates=new Map(),warnings=[];
@@ -158,8 +161,8 @@ export function createSosiskaApi({authorizeAdmin,fetchAgent=fetch,fetchAI=fetch}
       if(['analysis','analysisStatus','analysisTimeline'].includes(body.operation)){
         if(!env.SOSISKA_ANALYSIS)return json({ok:false,error:'ANALYSIS_NOT_CONFIGURED',message:'ИИ-анализ ещё не подключён.'},503);
         const {operation,game:_rmGame,...params}=body;
-        const stub=env.SOSISKA_ANALYSIS.get(env.SOSISKA_ANALYSIS.idFromName('full-history-v1'));
-        const response=await stub.fetch('https://analysis.internal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({operation:{analysis:'start',analysisStatus:'status',analysisTimeline:'timeline'}[operation],...params})});
+        const stub=env.SOSISKA_ANALYSIS.get(env.SOSISKA_ANALYSIS.idFromName(ownerMetrics?'full-history-v1':'basic-full-history-v2'));
+        const response=await stub.fetch('https://analysis.internal',{method:'POST',headers:{'Content-Type':'application/json','X-Sosiska-Metrics-Scope':ownerMetrics?'owner':'basic'},body:JSON.stringify({operation:{analysis:'start',analysisStatus:'status',analysisTimeline:'timeline'}[operation],...params})});
         const result=await response.json();
         if(!response.ok||!result.ok)return json({ok:false,error:result.error||'ANALYSIS_UNAVAILABLE',message:result.error==='ANALYSIS_NOT_CONFIGURED'?'ИИ-анализ ещё не подключён.':result.error==='ANALYSIS_BUSY'?'Предыдущий анализ ещё выполняется в фоне. Повторите запуск после его завершения.':'Анализ временно недоступен. Повторите попытку.'},503);
         return json(result);
@@ -205,7 +208,7 @@ export function normalizeKingdomProfileStats(data){
  for(const k of ['worldBestRank','localBestRank'])if(out[k]==='0')out[k]=null;
  return out;
 }
-export async function handleKingdom(request,env,body,json,fetcher=fetch){
+export async function handleKingdom(request,env,body,json,fetcher=fetch,ownerMetrics=false){
  const operation=body.operation;
  const invoke=async(origin,secret,action,payload={})=>{
   if(typeof secret!=='string'||secret.length<32)
@@ -225,13 +228,13 @@ export async function handleKingdom(request,env,body,json,fetcher=fetch){
   }
   if(['analysis','analysisStatus','analysisTimeline'].includes(operation)){
    if(!env.SOSISKA_RK_ANALYSIS)return json({ok:false,error:'RK_ANALYSIS_NOT_CONFIGURED',message:'ИИ-анализ RK ещё не подключён.'},503);
-   const stub=env.SOSISKA_RK_ANALYSIS.get(env.SOSISKA_RK_ANALYSIS.idFromName('kingdom-full-history-v1'));
+   const stub=env.SOSISKA_RK_ANALYSIS.get(env.SOSISKA_RK_ANALYSIS.idFromName(ownerMetrics?'kingdom-full-history-v1':'kingdom-basic-full-history-v2'));
    const {operation:op,game,...params}=body;
-   const response=await stub.fetch('https://rk-analysis.internal',{method:'POST',headers:{'Content-Type':'application/json'},
+   const response=await stub.fetch('https://rk-analysis.internal',{method:'POST',headers:{'Content-Type':'application/json','X-Sosiska-Metrics-Scope':ownerMetrics?'owner':'basic'},
     body:JSON.stringify({operation:{analysis:'start',analysisStatus:'status',analysisTimeline:'timeline'}[op],...params})});
    const result=await response.json();return json(result,response.ok?200:503);
   }
-  if(operation==='prepareExport')return json({ok:true,data:await prepareHistoryExport(request,env,body)});
+  if(operation==='prepareExport')return json({ok:true,data:await prepareHistoryExport(request,env,body,Date.now(),ownerMetrics)});
   if(operation==='health'){
    const d=await invoke(RK_ORIGIN,env.RK_AGENT_API_KEY,'health');
    return d?json({ok:true,data:d}):json({ok:false,error:'RK_NOT_CONFIGURED'},503);

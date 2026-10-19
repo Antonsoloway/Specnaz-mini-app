@@ -9,8 +9,8 @@ test('nine game profile statistics map exactly; missing fields stay absent, legi
 test('profile target validation preserves int64 IDs',()=>{assert.doesNotThrow(()=>validateAgentAction({operation:'profile',userId:'9223372036854775807'}));for(const userId of [777,'0','x','9223372036854775808'])assert.throws(()=>validateAgentAction({operation:'profile',userId}));});
 test('authorized profile facade invokes only selected player and rejects mismatched request correlation',async()=>{
  const messages=[],env={FRONTEND_ORIGIN:'https://mini.test',RM_AGENT_API_KEY:'private'.repeat(10)};
- const handle=createSosiskaApi({authorizeAdmin:async()=>{},fetchAgent:async(url,init)=>{messages.push(JSON.parse(init.body));return Response.json({ok:true,data:raw});}});
+ const handle=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'1456874273'}),fetchAgent:async(url,init)=>{messages.push(JSON.parse(init.body));return Response.json({ok:true,data:raw});}});
  const request=()=>new Request('https://api.test/admin-agent',{method:'POST',headers:{Origin:env.FRONTEND_ORIGIN,'Content-Type':'application/json'},body:JSON.stringify({operation:'profile',userId:'777'})});
  const result=await handle(request(),env);assert.equal(result.status,200);assert.deepEqual(messages,[{protocolVersion:1,operation:'getProfile',payload:{userId:'777'}}]);assert.equal((await result.json()).data.userId,'777');
- const wrong=createSosiskaApi({authorizeAdmin:async()=>{},fetchAgent:async()=>Response.json({ok:true,data:{...raw,RequestedUserId:'778'}})});assert.equal((await wrong(request(),env)).status,502);
+ const wrong=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'1456874273'}),fetchAgent:async()=>Response.json({ok:true,data:{...raw,RequestedUserId:'778'}})});assert.equal((await wrong(request(),env)).status,502);
 });

@@ -21,8 +21,8 @@ const env={SESSION_SECRET:'test-export-secret',RM_AGENT_API_KEY:'private-test-ke
 const body={teamId:'9223372036854775807',...mskDateRange('2026-10-13','2026-10-14')};
 test('download is signed, short-lived, exact team/range, streaming, and key stays private',async()=>{
  const now=Date.now(),ready=await prepareHistoryExport(new Request('https://api.test/admin-agent'),env,body,now);
- let calls=0;const upstream=async(url,init)=>{calls++;assert.deepEqual(JSON.parse(init.body),{operation:'export',...body});assert.equal(init.headers.Authorization,'Bearer '+env.RM_AGENT_API_KEY);return new Response('{"complete":true}',{headers:{'Content-Type':'application/json'}});};
- const response=await downloadHistoryExport(new Request(ready.url),env,upstream,now+1);assert.equal(response.status,200);assert.equal(await response.text(),'{"complete":true}');assert.equal(calls,1);assert.ok(response.headers.get('Content-Disposition').includes('.json'));assert.ok(!ready.url.includes(env.RM_AGENT_API_KEY));
+ let calls=0;const upstream=async(url,init)=>{calls++;assert.deepEqual(JSON.parse(init.body),{operation:'history',teamId:body.teamId,limit:20});assert.equal(init.headers.Authorization,'Bearer '+env.RM_AGENT_API_KEY);return Response.json({ok:true,data:{records:[],nextBefore:null}});};
+ const response=await downloadHistoryExport(new Request(ready.url),env,upstream,now+1);assert.equal(response.status,200);assert.deepEqual((await response.json()).records,[]);assert.equal(calls,1);assert.ok(response.headers.get('Content-Disposition').includes('.json'));assert.ok(!ready.url.includes(env.RM_AGENT_API_KEY));
  assert.equal((await downloadHistoryExport(new Request(ready.url),env,upstream,now+600001)).status,403);
  const url=new URL(ready.url);url.searchParams.set('token',url.searchParams.get('token').replace(/^./,'X'));assert.equal((await downloadHistoryExport(new Request(url),env,upstream,now)).status,403);
  assert.equal((await downloadHistoryExport(new Request('https://api.test/admin-agent-export'),env,upstream,now)).status,403);
