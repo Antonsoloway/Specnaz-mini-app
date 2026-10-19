@@ -1,3 +1,7 @@
+## Correction19.10.2026
+
+The initial screenshot-order mapping below was incorrect for60 IDs. The184 screenshots are valid images but their menu position is not the server ID. The original33931 TeamLogoCatalog configsArray and native GetLogoById(0x264d208) prove that server IDs124–179 are flags (Russia140), and180–183 are butterfly/wizard additions displayed before flags. `native-order-33931.json` records the original array index, visualOrder and sprite names; catalog.json records provenance and image SHA256. Asset files and editor emojis are now reindexed to native IDs. All56 flags and4 additions change;0–123 remain unchanged. No CRM identities or raw protocol IDs are rewritten.
+
 # RK team emblem catalogue (Royal Kingdom build 33931)
 
 Game-specific zero-based original picture IDs **0–183** from user-supplied screenshots 2988.jpg, 2989.jpg, 2990.jpg, 2991.jpg, 2993.jpg, 2995.jpg, 2996.jpg, 2997.jpg (four columns; six rows per page except last four-row page).

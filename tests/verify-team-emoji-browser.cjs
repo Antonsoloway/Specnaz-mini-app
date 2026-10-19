@@ -26,10 +26,10 @@ const root=path.resolve(__dirname,'..');let browser;
  await page.evaluate(()=>mount('Draft',''));await page.locator('[data-team-live-pick]').click();await page.evaluate(()=>choose({TeamId:'12',TeamName:'FORTUNA',Logo:136}));assert.equal(await input().inputValue(),'🇷🇺FORTUNA');
  await page.locator('[data-team-live-pick]').click();await page.evaluate(()=>choose({TeamId:'12',TeamName:'🇷🇺 FORTUNA',TeamLogo:136}));assert.equal(await input().inputValue(),'🇷🇺FORTUNA');
  await page.locator('[data-team-live-pick]').click();await page.evaluate(()=>choose({TeamId:'12',TeamName:'FORTUNA',Logo:999}));assert.equal(await input().inputValue(),'FORTUNA');
- // RK uses its own catalogue: 144 Russia, 151 Brazil, 159 Turkey (not RM IDs).
- await page.evaluate(()=>mount('Draft','','Royal Kingdom'));await page.locator('[data-team-live-pick]').click();await page.evaluate(()=>choose({TeamId:'21',TeamName:'Kingdom Team',TeamLogo:159}));assert.equal(await input().inputValue(),'🇹🇷Kingdom Team');
- await page.locator('[data-team-live-pick]').click();await page.evaluate(()=>choose({TeamId:'21',TeamName:'🌟 Kingdom Team',TeamLogo:144}));assert.equal(await input().inputValue(),'🌟Kingdom Team');
+ // RK uses its own catalogue: 140 Russia, 147 Brazil, 155 Turkey (not RM IDs).
+ await page.evaluate(()=>mount('Draft','','Royal Kingdom'));await page.locator('[data-team-live-pick]').click();await page.evaluate(()=>choose({TeamId:'21',TeamName:'Kingdom Team',TeamLogo:155}));assert.equal(await input().inputValue(),'🇹🇷Kingdom Team');
+ await page.locator('[data-team-live-pick]').click();await page.evaluate(()=>choose({TeamId:'21',TeamName:'🌟 Kingdom Team',TeamLogo:140}));assert.equal(await input().inputValue(),'🌟Kingdom Team');
  await page.evaluate(()=>{RoyalAdminDataV0600.current.adminData.teams.push({name:'RK existing',game:'Royal Kingdom',gameTeamId:'22'});mount('RK existing','22','Royal Kingdom');});await page.waitForFunction(()=>responses.length===1);
- await page.evaluate(()=>responses.shift().resolve(Response.json({ok:true,data:{teamId:'22',game:'Royal Kingdom',logo:144}})));await page.waitForFunction(()=>document.querySelector('[data-write-field="name"]').value==='🇷🇺RK existing');
+ await page.evaluate(()=>responses.shift().resolve(Response.json({ok:true,data:{teamId:'22',game:'Royal Kingdom',logo:140}})));await page.waitForFunction(()=>document.querySelector('[data-write-field="name"]').value==='🇷🇺RK existing');
  assert.deepEqual(errors,[]);console.log('team emoji: existing linked editor, Russia prefix, manual edits, ID/game race guards, game-scoped RK editor, picker, no duplicates, unknown logo PASS');await browser.close();
 })().catch(async e=>{console.error(e);await browser?.close();process.exit(1)});
