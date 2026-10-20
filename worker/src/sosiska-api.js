@@ -36,6 +36,26 @@ export function queryVariants(query) {
   return [...new Set([q,replace(visual),replace(latin)])].filter(v=>v.length<=160);
 }
 const normalize = value => String(value || '').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu,'');
+
+// Exact team names from search AND leaderboards must precede substring matches.
+// Stable sorting preserves source order within each relevance tier.
+export function rankTeamCandidates(candidates,query,variants=queryVariants(query)) {
+  const exact = value => String(value ?? '').normalize('NFKC').trim().toLowerCase().replace(/\s+/g,' ');
+  const requested=exact(query), alternatives=new Set(variants.map(exact).filter(v=>v!==requested));
+  const requestedKey=normalize(query), keys=[...new Set(variants.map(normalize).filter(Boolean))];
+  const rank=c=>{
+    const name=exact(c.name),key=normalize(c.name);
+    if(name===requested)return 0;
+    if(alternatives.has(name))return 1;
+    if(requestedKey&&key.startsWith(requestedKey))return 2;
+    if(keys.some(q=>key.startsWith(q)))return 3;
+    if(requestedKey&&key.includes(requestedKey))return 4;
+    if(keys.some(q=>key.includes(q)))return 5;
+    return 6;
+  };
+  return [...candidates].sort((a,b)=>rank(a)-rank(b));
+}
+
 async function readBody(request) {
   if (!request.headers.get('Content-Type')?.toLowerCase().startsWith('application/json') || !request.body) invalid();
   const reader = request.body.getReader(); let size=0, chunks=[];
@@ -145,7 +165,7 @@ export function createSosiskaApi({authorizeAdmin,fetchAgent=fetch,fetchAI=fetch}
           for(const key of ['WorldTeams','LocalTeams'])for(const row of data[key]??[])if(queries.some(q=>normalize(row.TeamName).includes(q)))add(row,key);
         } catch {warnings.push('Рейтинги временно недоступны; поиск может быть неполным.');}
         if(!successfulSources)throw Object.assign(new Error('AGENT_UNAVAILABLE'),{status:502});
-        return json({ok:true,data:{query:body.query,variants,candidates:[...candidates.values()],warnings:[...new Set(warnings)]}});
+        return json({ok:true,data:{query:body.query,variants,candidates:rankTeamCandidates([...candidates.values()],body.query,variants),warnings:[...new Set(warnings)]}});
       }
       if(body.operation==='health')return json({ok:true,data:await invoke('health')});
       if(body.operation==='profile'){

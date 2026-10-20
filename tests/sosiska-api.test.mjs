@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {webcrypto} from 'node:crypto';
-import {createSosiskaApi,validateAgentAction,queryVariants} from '../worker/src/sosiska-api.js';
+import {createSosiskaApi,validateAgentAction,queryVariants,rankTeamCandidates} from '../worker/src/sosiska-api.js';
 import {authorizeAdmin} from '../worker/src/entry-v1380.js';
 if(!globalThis.crypto)Object.defineProperty(globalThis,'crypto',{value:webcrypto});
 const env={FRONTEND_ORIGIN:'https://antonsoloway.github.io',RM_AGENT_API_KEY:'private-test-agent-key-'.repeat(3)};
@@ -10,6 +10,25 @@ const response=data=>Response.json({ok:true,data});
 test('non-admin rejected before any game call',async()=>{let calls=0;const handle=createSosiskaApi({authorizeAdmin:async()=>{throw Object.assign(new Error(),{status:403});},fetchAgent:async()=>{calls++;}});const r=await handle(req({operation:'search',query:'Mamonovo'}),env);assert.equal(r.status,403);assert.equal(calls,0);});
 test('unconfigured agent returns actionable error after authorization',async()=>{const handle=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'1456874273'})});const r=await handle(req({operation:'list'}),{});assert.equal(r.status,503);assert.equal((await r.json()).error,'AGENT_NOT_CONFIGURED');});
 test('hybrid search deduplicates exact int64 IDs and finds leaderboard-only team',async()=>{const messages=[];const handle=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'1456874273'}),fetchAgent:async(url,init)=>{const m=JSON.parse(init.body);messages.push(m);assert.equal(init.headers.Authorization,`Bearer ${env.RM_AGENT_API_KEY}`);return response(m.operation==='searchTeam'?{Status:0,Teams:[{TeamId:'4297277823',Name:'Mamonovo'}]}:{Status:0,WorldTeams:[{TeamId:'4297277823',TeamName:'Mamonovo'},{TeamId:'9223372036854775807',TeamName:'Mamonovo Elite'}],LocalTeams:[]});}});const r=await handle(req({operation:'search',query:'Mamonovo'}),env),data=await r.json();assert.equal(r.status,200);assert.equal(data.data.candidates.length,2);assert.equal(data.data.candidates[1].teamId,'9223372036854775807');assert.deepEqual(data.data.candidates[0].sources,['search','WorldTeams']);assert.equal(messages.length,2);assert.ok(!JSON.stringify(data).includes(env.RM_AGENT_API_KEY));});
+test('BORDER from world leaderboard precedes 48 fuzzy RM search hits, with exact case-insensitive name',async()=>{
+ const fuzzy=Array.from({length:48},(_,i)=>({TeamId:String(4300000000+i),Name:'Border collie '+i}));
+ const target={TeamId:'4309268559',TeamName:'BORDER'};
+ const handle=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'1456874273'}),fetchAgent:async(url,init)=>{
+  const {operation}=JSON.parse(init.body);
+  return response(operation==='searchTeam'?{Status:0,Teams:fuzzy}:{Status:0,WorldTeams:[target],LocalTeams:[]});
+ }});
+ const r=await handle(req({operation:'search',query:'border'}),env),data=await r.json();
+ assert.equal(r.status,200);
+ assert.equal(data.data.candidates.length,49);
+ assert.equal(data.data.candidates[0].teamId,'4309268559');
+ assert.deepEqual(data.data.candidates[0].sources,['WorldTeams']);
+});
+test('RM title ranking prioritizes exact original, then variant exact, prefix and substring without losing IDs',()=>{
+ const input=[{teamId:'1',name:'NEW HAOC club'},{teamId:'2',name:'KHAOS'},{teamId:'3',name:'ХАОС'},{teamId:'4',name:'KHAOS king'},{teamId:'5',name:'ХАОС'}];
+ const out=rankTeamCandidates(input,'ХАОС',queryVariants('ХАОС'));
+ assert.deepEqual(out.map(c=>c.teamId),['3','5','2','4','1']);
+ assert.deepEqual(input.map(c=>c.teamId),['1','2','3','4','5']);
+});
 test('partial search failure is distinguished from empty complete search',async()=>{const handle=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'1456874273'}),fetchAgent:async(url,init)=>JSON.parse(init.body).operation==='searchTeam'?response({Status:0,Teams:[]}):Response.json({ok:false},{status:503})});const data=await(await handle(req({operation:'search',query:'None'}),env)).json();assert.equal(data.ok,true);assert.equal(data.data.warnings.length,1);});
 test('all unavailable sources return failure, never false empty result',async()=>{const handle=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'1456874273'}),fetchAgent:async()=>Response.json({ok:false},{status:503})});assert.equal((await handle(req({operation:'search',query:'None'}),env)).status,502);});
 test('Russian visual and transliteration variants preserved',()=>{assert.deepEqual(queryVariants('СВОИ'),['СВОИ','CBOU','SVOI']);assert.deepEqual(queryVariants('Mamonovo'),['Mamonovo']);});
