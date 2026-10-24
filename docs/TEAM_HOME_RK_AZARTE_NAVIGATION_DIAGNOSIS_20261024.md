@@ -21,7 +21,7 @@
 - CRM, Apps Script, Google Sheets, запись игрового ID, эмблемы и права администратора **не менялись**.
 
 ## Тестирование
-- `node tests/team-navigation-resolver-v0614.test.js`: 11/11 PASS на точных данных локального приватного снимка, а также имеет безопасный синтетический fallback для публичного CI.
+- `node tests/team-navigation-resolver-v0614.test.js`: 13/13 PASS на данных локального приватного снимка и в автономном режиме без приватных файлов (включая эмуляцию реального нажатия на собственную команду в админ-режиме).
 - `node --test tests/admin-data-client-v0600.test.js tests/admin-delete-buttons-v0600.test.js`: 16/16 PASS.
 - `node --check` новых JavaScript-модулей и `git diff --check`: PASS.
 - В тестах есть: латиница/кириллица, флаг РФ, RT/RK/RM, прежнее/новое название с тем же ID, повтор имени в разных играх, несколько одинаковых alias, отсутствующий ID, отсутствие случайного substring-matching.

@@ -94,6 +94,38 @@ check('unknown team is not guessed through substrings',()=>{
  assert.equal(lib.publicTeam(fixture.teams,'АЗАРТ','РК'),null);
  assert.equal(lib.adminTeam(fixtureAdmin,'АЗАРТ','РК',fixture.teams),null);
 });
+check('actual home membership click passes canonical RK team to admin route',()=>{
+ const vm=require('node:vm');
+ const listeners={};const calls=[];
+ const card={
+  childNodes:[{nodeType:3,textContent:'НА АЗАРТЕ'}],
+  querySelector:()=>({textContent:'Лидер · Royal Kingdom'})
+ };
+ const document={
+  body:{classList:{contains:c=>c==='admin-mode'}},
+  addEventListener:(kind,fn)=>{listeners[kind]=fn;},
+  querySelectorAll:()=>[]
+ };
+ const window={
+  RoyalTeamNavigationV0614:lib,
+  RoyalAdminTeamDetailV0600:{open:(...args)=>calls.push(args)},
+  addEventListener:()=>{},
+  RoyalNav:{pushCurrent:()=>{}}
+ };
+ const sandbox={window,document,Node:{TEXT_NODE:3,ELEMENT_NODE:1},
+  MutationObserver:class{observe(){}},
+  requestAnimationFrame:()=>{},
+  snapshotState:fixture};
+ vm.runInNewContext(fs.readFileSync(path.join(root,'profile-team-link-v0614.js'),'utf8'),sandbox);
+ let stopped=false;let prevented=false;
+ listeners.click({
+  target:{closest:selector=>selector==='.self-membership[data-team]'?card:null},
+  preventDefault:()=>{prevented=true;},
+  stopImmediatePropagation:()=>{stopped=true;}
+ });
+ assert.deepEqual(JSON.parse(JSON.stringify(calls)),[[original.name,'Royal Kingdom']]);
+ assert.equal(prevented,true);assert.equal(stopped,true);
+});
 check('v0.6.14 uses resolver, guarded refresh and separate dynamic team loader',()=>{
  const names=['app-v0614.html','profile-team-link-v0614.js',
   'team-identity-fix-v0614.js','admin-team-detail-v0614.js','version-v0614.js'];
