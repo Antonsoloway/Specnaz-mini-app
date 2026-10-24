@@ -13,6 +13,7 @@ jobs:
           node-version: '22'
       - run: node --test tests/sosiska-*.test.mjs tests/verify-rk-emblems.mjs
       - run: node --test tests/admin-write-timeout-v0600.test.js tests/admin-data-client-v0600.test.js tests/admin-media-save-speed.test.js
+      - run: ROYAL_NAV_TEST_NO_PRIVATE=1 node tests/team-navigation-resolver-v0614.test.js && node --check team-navigation-resolver-v0614.js && node --check admin-team-detail-v0614.js && node --check profile-team-link-v0614.js && node --check team-identity-fix-v0614.js && node --check version-v0614.js && node --check changelog-v0614.js
       - run: npx --yes esbuild@0.25.12 worker/src/sosiska-period.js --bundle --format=iife --global-name=SosiskaPeriod --outfile=/tmp/sosiska-period-v061.js && cmp /tmp/sosiska-period-v061.js sosiska-period-v061.js
       - run: node --check sosiska-v061.js && node --check transport-v0514.js
       - run: npx --yes esbuild@0.25.12 worker/src/entry-v1420.js --bundle --format=esm --platform=browser --outfile=/tmp/sosiska-worker.js
