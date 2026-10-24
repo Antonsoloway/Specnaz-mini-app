@@ -83,9 +83,14 @@
     const ref = parseRef(teamRef);
     const wantedKey = identityKey(ref.name, ref.game);
 
-    let team = teams.find(t => identityKey(t?.name, teamGame(t)) === wantedKey);
-    if (!team) team = window.RoyalTeamNavigationV0614?.publicTeam?.(teams, ref.name, ref.game) || null;
-    if (!team && !ref.game) team = teams.find(t => normalizeTeam(t?.name) === normalizeTeam(ref.name));
+    // Identity collisions fail closed; never render the first arbitrary team.
+    let team = null;
+    if (window.RoyalTeamNavigationV0614?.publicTeam) {
+      team = window.RoyalTeamNavigationV0614.publicTeam(teams, ref.name, ref.game);
+    } else {
+      const matches=teams.filter(t=> identityKey(t?.name,teamGame(t))===wantedKey);
+      team=matches.length===1?matches[0]:null;
+    }
 
     if (!team) {
       document.getElementById('panel').innerHTML = `<button type="button" class="back-link" data-page="teams">‹ Команды</button><h2>Команда не найдена</h2>`;

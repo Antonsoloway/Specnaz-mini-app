@@ -94,6 +94,43 @@ check('unknown team is not guessed through substrings',()=>{
  assert.equal(lib.publicTeam(fixture.teams,'АЗАРТ','РК'),null);
  assert.equal(lib.adminTeam(fixtureAdmin,'АЗАРТ','РК',fixture.teams),null);
 });
+check('actual admin renderer refuses duplicate names and duplicate stable IDs',()=>{
+ const source=fs.readFileSync(path.join(root,'admin-team-detail-v0614.js'),'utf8');
+ const begin=source.indexOf('  function findTeam(data, name, teamGame) {');
+ const end=source.indexOf('\n  function captureAdminForBack()',begin);
+ assert.ok(begin>=0&&end>begin);
+ const factory=new Function('norm','game','window','snapshotState',
+  source.slice(begin,end)+'\nreturn findTeam;');
+ const norm=v=>String(v??'').trim().toLocaleLowerCase('ru-RU').replace(/ё/g,'е');
+ const finder=factory(norm,lib.game,{RoyalTeamNavigationV0614:lib},{teams:[]});
+ const dupName=[{name:'Same',game:'Royal Kingdom',gameTeamId:'100001'},
+                {name:'Same',game:'Royal Kingdom',gameTeamId:'100002'}];
+ assert.equal(finder({adminData:{teams:dupName}},'Same','Royal Kingdom'),null);
+ const onePublic=[{name:'Old',game:'Royal Kingdom',gameTeamId:'100001',
+                   searchKeys:['old']}];
+ const dupId=[{name:'Old',game:'Royal Kingdom',gameTeamId:'100001'},
+              {name:'New',game:'Royal Kingdom',gameTeamId:'100001'}];
+ const duplicateIdFinder=factory(norm,lib.game,{RoyalTeamNavigationV0614:lib},
+   {teams:onePublic});
+ assert.equal(duplicateIdFinder({adminData:{teams:dupId}},'Old','Royal Kingdom'),null);
+});
+check('ordinary renderer refuses ambiguous names without opening a team',()=>{
+ const vm=require('node:vm');
+ const panel={innerHTML:''};
+ const source=fs.readFileSync(path.join(root,'team-identity-fix-v0614.js'),'utf8');
+ const teams=[{name:'Same',game:'Royal Kingdom',gameTeamId:'100001'},
+              {name:'Same',game:'Royal Kingdom',gameTeamId:'100002'}];
+ const ctx={window:{RoyalTeamNavigationV0614:lib},
+   snapshotState:{teams,participants:[]},
+   normalizeTeam:lib.key,roleRank:()=>0,
+   esc:x=>String(x),
+   document:{getElementById:()=>panel},
+   renderTeamDetail:()=>{},
+   membershipHtml:()=>{},teamSearchText:()=>{},teamCard:()=>{}};
+ vm.runInNewContext(source,ctx);
+ ctx.renderTeamDetail(JSON.stringify(['Same','Royal Kingdom']));
+ assert.match(panel.innerHTML,/Команда не найдена/);
+});
 check('actual home membership click passes canonical RK team to admin route',()=>{
  const vm=require('node:vm');
  const listeners={};const calls=[];
@@ -132,6 +169,8 @@ check('v0.6.14 uses resolver, guarded refresh and separate dynamic team loader',
  const texts=names.map(f=>fs.readFileSync(path.join(root,f),'utf8'));
  assert.ok(texts[0].includes("__ROYAL_BUILD__='0.6.14'"));
  assert.ok(texts[0].includes('team-navigation-resolver-v0614.js'));
+ assert.ok(texts[0].includes('changelog-v0614.js'));
+ assert.ok(fs.readFileSync(path.join(root,'changelog-v0614.js'),'utf8').includes("const VERSION='0.6.14'"));
  assert.ok(texts[1].includes('RoyalTeamNavigationV0614?.publicTeam'));
  assert.ok(texts[2].includes('RoyalTeamNavigationV0614?.publicTeam'));
  assert.ok(texts[3].includes('RoyalTeamNavigationV0614?.adminTeam'));

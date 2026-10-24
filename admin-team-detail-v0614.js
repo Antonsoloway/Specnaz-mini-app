@@ -109,11 +109,13 @@
   function findTeam(data, name, teamGame) {
     const teams = Array.isArray(data?.adminData?.teams) ? data.adminData.teams : [];
     const publicTeams = typeof snapshotState==='undefined' ? [] : (snapshotState?.teams || []);
-    const stable = window.RoyalTeamNavigationV0614?.adminTeam?.(
-      data, name, teamGame, publicTeams);
-    if (stable) return stable;
-    // Retain the previous exact fallback if the isolated resolver is absent.
-    return teams.find(t => norm(t?.name) === norm(name) && game(t?.game) === game(teamGame)) || null;
+    // An ambiguous resolver result MUST remain null. Never fall back to the
+    // legacy first-match find(), which can open the wrong editable team.
+    if (window.RoyalTeamNavigationV0614?.adminTeam) {
+      return window.RoyalTeamNavigationV0614.adminTeam(data, name, teamGame, publicTeams);
+    }
+    const exact = teams.filter(t => norm(t?.name) === norm(name) && game(t?.game) === game(teamGame));
+    return exact.length === 1 ? exact[0] : null;
   }
 
   function captureAdminForBack() {
