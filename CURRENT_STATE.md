@@ -1,3 +1,9 @@
+## 25 October 2026: owner RM battle discovery released
+
+PR90, reviewed source77f67a7f8e8c2eabc9a9bcaa4aac4387644c63a0, merge378aaa895d60efd320a3a627f32a304638999043. Preserve the dedicated Aia pending-search status and retry automatically only in the same visible owner event view. Leaving the tab, changing teams or losing owner capability stops retries. Existing bracket rendering and owner-before-upstream enforcement remain. No public changelog entry, as explicitly required by the owner.
+
+PR CI40227743919 passed190 module tests, admin/navigation, workerd/isolation and Chromium, including real browser pending-completion/cancellation. Pages40227918623 succeeded; Worker Build24cb33a6-43a9-456d-95df-db9d8a8c36c6 succeeded. Paired Aia source58ccf32b, PR136, live version3d11c7ec-77f6-47c2-bb6e-82b2cc95b52d: bounded resumable first-time group discovery, current-event caches, live verification before indexing, no emulator/PC dependency. Refer to the event-agent BATTLE_NATIVE_GROUP_FIX_20261025.md for receipts and discovery bounds. Signed native Telegram acceptance remains unverified.
+
 ## 19.10.2026 — v0.6.13 team visibility/activity published
 
 Cause: the public visibility policy returned early unless the build was exactly0.6.1, so releases0.6.2+ skipped it. The previous0.6.12 regression fixture omitted the real visibility module; that coverage gap is corrected. Visibility is now version-independent, reconciles counters with the same current-roster helper used by cards, runs on snapshot arrival and synchronously before public-list rendering, and hides inactive/empty teams. Paused teams with current members remain. Admin data/list/rankings remain complete.
