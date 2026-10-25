@@ -462,3 +462,19 @@ for(const cancel of [false,true])test('battle search retries automatically only 
  retryTimers.shift()();await settle();
  assert.equal(groupCalls,cancel?1:2);if(!cancel)assert.match(s.panel.innerHTML,/Found team/);
 });
+
+test('RK battle entry is owner-only and opens Aia group without creating watches',async()=>{
+ const raw={TeamId:'100',TeamName:'Aia team',Description:'',Members:[],Leader:'1',CoLeaders:[]};
+ const s=setup({responder:b=>b.operation==='rkBattle'?{available:true,kind:'battle',selectedTeamId:'100',eventId:110,groupId:'888',observedAt:Date.now(),teams:[{teamId:'100',name:'Aia team',score:42,position:1}]}:b.operation==='team'?raw:b.operation==='history'?{records:[],nextBefore:null}:{watches:[]}});
+ await s.context.window.RoyalSosiska.open('rk');
+ assert.match(s.panel.innerHTML,/Битва Айи/);
+ s.action('rk-battle');await settle();
+ assert.match(s.panel.innerHTML,/Битва · группа из 1 команд/);
+ assert.match(s.panel.innerHTML,/Личные|личные/);
+ assert.deepEqual(s.calls.find(b=>b.operation==='rkBattle'),{operation:'rkBattle',game:'rk'});
+ assert.ok(!s.calls.some(b=>['watch','capture'].includes(b.operation)));
+ const basic=setup({ownerMetrics:false});await basic.context.window.RoyalSosiska.open('rk');
+ assert.ok(!basic.panel.innerHTML.includes('Битва Айи'));basic.action('rk-battle');await settle();
+ assert.ok(!basic.calls.some(b=>b.operation==='rkBattle'));
+ const rm=setup();await rm.context.window.RoyalSosiska.open('rm');assert.ok(!rm.panel.innerHTML.includes('Битва Айи'));
+});

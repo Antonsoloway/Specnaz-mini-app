@@ -59,11 +59,36 @@ const root=path.resolve(__dirname,'..');let browser;
    assert.equal(await page.evaluate(()=>discoveryCalls),1,'leaving the event tab stops automatic reads');
   }
   if(width===390){
+   await page.evaluate(()=>{
+    const original=window.fetch;
+    window.rkEntryCalls=[];
+    window.fetch=async(url,init)=>{
+     const b=JSON.parse(init.body);rkEntryCalls.push(b);
+     if(b.game!=='rk'||!['rkBattle','tournamentPlayers'].includes(b.operation))return original(url,init);
+     const data=b.operation==='rkBattle'?{available:true,kind:'battle',selectedTeamId:'1',eventId:110,groupId:'888',observedAt:Date.now(),teams:Array.from({length:10},(_,i)=>({teamId:String(i+1),name:i===0?'Группа Айи':'Соперник '+i,score:42-i,position:i+1}))}:b.teamId==='1'?{available:true,kind:'battle',teamId:'1',eventId:110,groupId:'888',playersVerified:true,scoresComplete:true,teamScore:42,knownScoreSum:42,players:[{userId:'1',name:'Игрок Айи',score:42}]}:{available:false,reason:'OPPONENT_PERSONAL_UNAVAILABLE',teamId:b.teamId};
+     return Response.json({ok:true,capabilities:{ownerTeamMetrics:true},data});
+    };
+   });
+   await page.evaluate(()=>RoyalSosiska.open('rk'));
+   await page.locator('[data-sosiska-action="rk-battle"]').click();
+   await page.waitForSelector('.sosiska-tournament-teams');
+   assert.equal(await page.locator('.sosiska-tournament-teams > li').count(),10);
+   assert.match(await page.locator('[data-sosiska-tournament]').textContent(),/Доступна группа Айи/);
+   await page.locator('[data-sosiska-action="tournament-players"][data-team-id="1"]').click();
+   await page.waitForSelector('.sosiska-tournament-players');
+   assert.match(await page.locator('.sosiska-tournament-players').textContent(),/Игрок Айи/);
+   await page.locator('[data-sosiska-action="tournament-players"][data-team-id="2"]').click();
+   await page.waitForFunction(()=>document.querySelector('[data-sosiska-tournament]')?.textContent.includes('Личные очки игроков этой команды сервер пока не предоставляет'));
+   assert.equal(await page.locator('.sosiska-tournament-players').count(),0);
+   assert.equal(await page.evaluate(()=>rkEntryCalls.filter(x=>['watch','capture'].includes(x.operation)).length),0);
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),width);
+  }
+  if(width===390){
    await page.evaluate(()=>{window.ownerTeamMetrics=false;window.sessionToken='other-admin-session';});
    for(const game of ['rm','rk']){
     await page.evaluate(game=>RoyalSosiska.open(game),game);
     await page.locator('[data-sosiska-action="team"]').click();await page.waitForSelector('.sosiska-period-roster');
-    assert.equal(await page.locator('[data-metric="help"],[data-metric="event"],[data-sosiska-action="tournament"]').count(),0);
+    assert.equal(await page.locator('[data-metric="help"],[data-metric="event"],[data-sosiska-action="tournament"],[data-sosiska-action="rk-battle"]').count(),0);
     assert.doesNotMatch(await page.locator('.sosiska-screen').textContent(),/Помощь|Оказанная помощь|Полученная помощь|Командный турнир|Командная битва|Промежуток сундуков/);
     await page.locator('[data-sosiska-action="roster-view"]').click();
     assert.doesNotMatch(await page.locator('.sosiska-screen').textContent(),/Помощь/);
