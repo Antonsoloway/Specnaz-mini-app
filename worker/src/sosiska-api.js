@@ -13,9 +13,10 @@ const uint64 = value => typeof value === 'string' && /^[1-9]\d{0,19}$/.test(valu
 const invalid = () => { throw Object.assign(new Error('INVALID_REQUEST'), {status:400}); };
 export function validateAgentAction(body) {
   if (!object(body)) invalid();
-  const keys = {status:[],prepareExport:['teamId','from','to'],profile:['userId'],tournamentGroup:['teamId'],tournamentPlayers:['teamId'],eventGroup:['teamId'],eventPlayers:['teamId'],health:[],search:['query'],team:['teamId'],list:[],watch:['teamId','intervalMinutes'],unwatch:['teamId'],capture:['teamId'],history:['teamId','limit','before'],analysis:['teamId','teamIds'],analysisStatus:['jobId','teamId','teamIds'],analysisTimeline:['jobId','teamId','limit','before']}[body.operation];
+  const keys = {status:[],rkBattle:[],prepareExport:['teamId','from','to'],profile:['userId'],tournamentGroup:['teamId'],tournamentPlayers:['teamId'],eventGroup:['teamId'],eventPlayers:['teamId'],health:[],search:['query'],team:['teamId'],list:[],watch:['teamId','intervalMinutes'],unwatch:['teamId'],capture:['teamId'],history:['teamId','limit','before'],analysis:['teamId','teamIds'],analysisStatus:['jobId','teamId','teamIds'],analysisTimeline:['jobId','teamId','limit','before']}[body.operation];
   if (!Array.isArray(keys) || Object.keys(body).some(k => !['operation','game',...keys].includes(k))) invalid();
   if(body.game!==undefined&&!['rm','rk'].includes(body.game))invalid();
+  if(body.operation==='rkBattle'&&body.game!=='rk')invalid();
   if(keys.includes('userId')&&!id(body.userId))invalid();
   if (keys.includes('teamId') && !(['analysis','analysisStatus'].includes(body.operation) && body.teamId===undefined) && !id(body.teamId)) invalid();
   if(body.teamIds!==undefined&&(!Array.isArray(body.teamIds)||body.teamIds.length<2||body.teamIds.length>5||body.teamIds.some(v=>!id(v))||new Set(body.teamIds).size!==body.teamIds.length||body.teamId!==undefined))invalid();
@@ -76,7 +77,7 @@ export function createSosiskaApi({authorizeAdmin,fetchAgent=fetch,fetchAI=fetch}
     try {
       const principal=await authorizeAdmin(request,env);ownerMetrics=isSosiskaOwner(principal);
       const body=await readBody(request);
-      if(!ownerMetrics&&['tournamentGroup','tournamentPlayers','eventGroup','eventPlayers'].includes(body.operation))return json({ok:false,error:'OWNER_REQUIRED',message:'Эти данные доступны только владельцу.'},403);
+      if(!ownerMetrics&&['tournamentGroup','tournamentPlayers','eventGroup','eventPlayers','rkBattle'].includes(body.operation))return json({ok:false,error:'OWNER_REQUIRED',message:'Эти данные доступны только владельцу.'},403);
       if(body.game==='rk'&&body.operation!=='status')return await handleKingdom(request,env,body,json,fetchAgent,ownerMetrics);
       if(body.operation==='status'){
         const rk=await readKingdomStatus(async()=>{
@@ -102,7 +103,7 @@ export function createSosiskaApi({authorizeAdmin,fetchAgent=fetch,fetchAI=fetch}
           return result.data;
         } finally {clearTimeout(timer);}
       }
-      if(['tournamentGroup','tournamentPlayers','eventGroup','eventPlayers'].includes(body.operation)){
+      if(['tournamentGroup','tournamentPlayers','eventGroup','eventPlayers','rkBattle'].includes(body.operation)){
         if(typeof env.RM_EVENT_API_KEY!=='string'||env.RM_EVENT_API_KEY.length<32)
           return json({ok:false,error:'TOURNAMENT_NOT_CONFIGURED',message:'Турнирный агент Aia ещё не подключён к приложению.'},503);
         const current=['eventGroup','eventPlayers'].includes(body.operation);
@@ -302,13 +303,14 @@ export async function handleKingdom(request,env,body,json,fetcher=fetch,ownerMet
    return json({ok:true,data:{userId:body.userId,name:p.Name,level:p.Level,crown:Number.isSafeInteger(p.Cup)&&p.Cup>=0?p.Cup:null,teamId:p.TeamId,
     teamName:p.TeamName??'',joinedAt:null,profileSetting:p.ProfileSetting,stats:normalizeKingdomProfileStats(d),statsAvailable:d.statsAvailable===true,game:'rk',fetchedAt:typeof d.observedAt==='string'&&!Number.isNaN(Date.parse(d.observedAt))?d.observedAt:new Date().toISOString(),cacheStatus:['live','hit','stale'].includes(d.cacheStatus)?d.cacheStatus:'live'}});
   }
-  if(['tournamentGroup','tournamentPlayers'].includes(operation)){
+  if(['tournamentGroup','tournamentPlayers','rkBattle'].includes(operation)){
    const battle=await invoke(RK_EVENT_ORIGIN,env.RK_EVENT_API_KEY,'getTeamClash');
    if(!battle)return json({ok:false,error:'RK_EVENTS_NOT_CONFIGURED',message:'Аккаунт Aia ещё не подключён к Mini App.'},503);
-   const selected=battle.teams?.find(t=>t.teamId===body.teamId);
-   if(battle.available!==true||!selected)return json({ok:true,data:{available:false,reason:'OUTSIDE_AIA_GROUP',teamId:body.teamId}});
+   const selectedTeamId=operation==='rkBattle'?battle.ownTeamId:body.teamId;
+   const selected=battle.teams?.find(t=>t.teamId===selectedTeamId);
+   if(battle.available!==true||!selected)return json({ok:true,data:{available:false,reason:operation==='rkBattle'?'NO_EVENT_DATA':'OUTSIDE_AIA_GROUP',...(id(selectedTeamId)?{teamId:selectedTeamId}:{})}});
    const base={available:true,kind:'battle',groupId:battle.groupId,eventId:battle.eventId,observedAt:Date.parse(battle.observedAt),serverFreshnessVerified:false};
-   if(operation==='tournamentGroup')return json({ok:true,data:{...base,selectedTeamId:body.teamId,
+   if(operation==='tournamentGroup'||operation==='rkBattle')return json({ok:true,data:{...base,selectedTeamId,
     teams:battle.teams.map((t,i)=>({teamId:t.teamId,name:t.name,score:t.score,position:i+1}))}});
    if(battle.personalTeamId!==body.teamId)return json({ok:true,data:{available:false,reason:'OPPONENT_PERSONAL_UNAVAILABLE',teamId:body.teamId}});
    const players=battle.personalResults.map(p=>({userId:p.userId,name:p.name,score:p.score}));

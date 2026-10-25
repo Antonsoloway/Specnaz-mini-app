@@ -8,7 +8,7 @@ const rkTeam=(level=10)=>({Status:0,TeamId:'100',TeamName:'RK team',TeamLogo:3,
  Leader:'201',CoLeaders:[],Description:'We play',MinLevel:5,MinCup:0,
  IsOpen:true,Score:60000,Members:[{UserId:'201',Name:'A',Level:level,Cup:123,HelpCount:8}]});
 const rkClash={game:'rk',available:true,eventType:'teamClash',eventId:109,
- groupId:'30680773535207044',observedAt:'2026-10-18T12:00:00.000Z',personalTeamId:'100',
+ ownTeamId:'100',groupId:'30680773535207044',observedAt:'2026-10-18T12:00:00.000Z',personalTeamId:'100',
  personalResults:[{userId:'201',name:'A',score:54}],
  teams:[{teamId:'100',name:'RK team',score:560},{teamId:'101',name:'Rival',score:550}]};
 const env={FRONTEND_ORIGIN:'https://antonsoloway.github.io',RM_AGENT_API_KEY:'M'.repeat(64),
@@ -129,4 +129,28 @@ test('RK profile facade propagates original observation timestamp and cache stat
  assert.equal(result.fetchedAt,when);
  assert.equal(result.cacheStatus,'stale');
  assert.equal(result.crown,25000);
+});
+
+test('owner opens current RK battle without supplying or guessing a team ID',async()=>{
+ const calls=[];
+ const handle=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'1456874273'}),fetchAgent:async(url,init)=>{
+  calls.push({url,body:JSON.parse(init.body)});return Response.json({ok:true,data:rkClash});
+ }});
+ const r=await handle(req({operation:'rkBattle',game:'rk'}),env);
+ assert.equal(r.status,200);const d=(await r.json()).data;
+ assert.equal(d.selectedTeamId,'100');assert.equal(d.kind,'battle');assert.equal(d.teams[1].score,550);
+ assert.equal(calls.length,1);assert.equal(calls[0].body.operation,'getTeamClash');assert.deepEqual(calls[0].body.payload,{});
+ assert.match(calls[0].url,/royal-kingdom-events-stage2/);
+ assert.throws(()=>validateAgentAction({operation:'rkBattle'}));
+ assert.throws(()=>validateAgentAction({operation:'rkBattle',game:'rm'}));
+ assert.throws(()=>validateAgentAction({operation:'rkBattle',game:'rk',teamId:'101'}));
+});
+
+test('other admins cannot request RK battle entry, and absence never becomes another team group',async()=>{
+ let calls=0;
+ const denied=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'999'}),fetchAgent:async()=>{calls++;throw Error('must not fetch');}});
+ assert.equal((await denied(req({operation:'rkBattle',game:'rk'}),env)).status,403);assert.equal(calls,0);
+ const owner=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'1456874273'}),fetchAgent:async()=>Response.json({ok:true,data:{...rkClash,ownTeamId:'999'}})});
+ const r=await owner(req({operation:'rkBattle',game:'rk'}),env);const d=(await r.json()).data;
+ assert.equal(d.available,false);assert.equal(d.reason,'NO_EVENT_DATA');assert.equal('teams' in d,false);
 });
