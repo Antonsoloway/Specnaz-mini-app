@@ -8,7 +8,7 @@ for(const [file,target] of [['app.html','app-v0614.html'],['app-v0601.html','app
  const context={URLSearchParams,window:{location:{search:'?gas=fixture&owner=value',hash:'#tgWebAppData=fixture%26signed',replace(value){destination=value;}}}};
  vm.runInNewContext(script,context);
  const url=new URL(destination,'https://miniapp.test/');
- assert.equal(url.pathname,'/'+target);assert.equal(url.searchParams.get('gas'),'fixture');assert.equal(url.searchParams.get('owner'),'value');assert.equal(url.searchParams.get('releaseBuild'),file==='app.html'?'20261024-v0614-rk-nav1':'20261016-v061-agent-status1');assert.equal(url.hash,context.window.location.hash);
+ assert.equal(url.pathname,'/'+target);assert.equal(url.searchParams.get('gas'),'fixture');assert.equal(url.searchParams.get('owner'),'value');assert.equal(url.searchParams.get('releaseBuild'),file==='app.html'?'20261025-service1':'20261016-v061-agent-status1');assert.equal(url.hash,context.window.location.hash);
 });
 test('Sosiska appears in current changelog without losing existing entries',async()=>{
  const source=await readFile(new URL('../changelog-v061-latest.js',import.meta.url),'utf8');

@@ -14,7 +14,7 @@ test('deep redaction preserves identity and level changes, never mutates shared 
 for(const game of ['rm','rk']){
  test(game+' other admin cannot request events or forge owner scope',async()=>{
   let calls=0;const handle=createSosiskaApi({authorizeAdmin:async()=>other,fetchAgent:async()=>{calls++;throw Error();}});
-  for(const operation of ['tournamentGroup','tournamentPlayers']){const r=await handle(req({game,operation,teamId:'1'}),env);assert.equal(r.status,403);assert.equal((await r.json()).error,'OWNER_REQUIRED');}
+  for(const operation of ['tournamentGroup','tournamentPlayers','eventGroup','eventPlayers']){const r=await handle(req({game,operation,teamId:'1'}),env);assert.equal(r.status,403);assert.equal((await r.json()).error,'OWNER_REQUIRED');}
   assert.equal((await handle(req({operation:'team',game,teamId:'1',ownerMetrics:true}),env)).status,400);assert.equal(calls,0);
  });
  test(game+' history and old job IDs use restricted namespace and strip all structured private data',async()=>{

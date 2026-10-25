@@ -65,3 +65,19 @@ test('nonadmin and missing Aia key do not call event service',async()=>{
  const r=await noKey(request({operation:'tournamentGroup',teamId:'10'}),{...baseEnv,RM_EVENT_API_KEY:undefined});
  assert.equal(r.status,503);assert.equal((await r.json()).error,'TOURNAMENT_NOT_CONFIGURED');assert.equal(calls,0);
 });
+
+for(const kind of ['battle','tournament'])test(`current RM ${kind} uses Aia and retains native kind`,async()=>{
+ for(const [operation,native,data] of [['eventGroup','getEventGroup',group],['eventPlayers','getTeamEvent',personal]]){
+  const calls=[];
+  const handle=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'1456874273'}),fetchAgent:mock({...data,kind},calls)});
+  const r=await handle(request({operation,teamId:'10'}),baseEnv);
+  assert.equal(r.status,200);assert.equal((await r.json()).data.kind,kind);
+  assert.equal(calls[0].body.operation,native);
+  assert.equal(calls[0].headers.Authorization,'Bearer '+baseEnv.RM_EVENT_API_KEY);
+ }
+});
+test('empty native battle remains unavailable without fabricated rows or scores',async()=>{
+ const calls=[];const handle=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'1456874273'}),fetchAgent:mock({available:false,kind:'battle'},calls)});
+ const r=await handle(request({operation:'eventGroup',teamId:'10'}),baseEnv);
+ assert.deepEqual((await r.json()).data,{available:false,reason:'NO_EVENT_DATA',teamId:'10',kind:'battle'});
+});

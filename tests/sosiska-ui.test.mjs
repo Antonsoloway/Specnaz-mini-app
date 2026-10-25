@@ -207,15 +207,15 @@ test('picker cancellation discards late search results and does not navigate edi
 
 test('Aia tournament group and selected opponents render without automatically capturing or watching',async()=>{
  const roster={TeamId:'10',TeamName:'BOLTAMnet',Description:'Test',Leader:'111',CoLeaders:[],Type:false,Members:[{UserId:'111',Name:'Alice',Level:10,Crown:0,HelpCount:0}]};
- const group={available:true,selectedTeamId:'10',eventId:88,groupId:'20',observedAt:1792245600000,teams:[{teamId:'10',name:'BOLTAMnet',position:1,score:158400},{teamId:'11',name:'<script>opponent</script>',position:2,score:35000}]};
+ const group={available:true,kind:'tournament',selectedTeamId:'10',eventId:88,groupId:'20',observedAt:1792245600000,teams:[{teamId:'10',name:'BOLTAMnet',position:1,score:158400},{teamId:'11',name:'<script>opponent</script>',position:2,score:35000}]};
  const players={available:true,teamId:'11',groupId:'20',eventId:88,teamScore:35000,observedAt:1792245600000,playersVerified:true,scoresComplete:false,knownScoreSum:20000,players:[{userId:'555',name:'<b>Bob</b>',score:20000},{userId:'556',name:'Unknown',score:null}]};
- const s=setup({responder:b=>b.operation==='team'?roster:b.operation==='tournamentGroup'?group:b.operation==='tournamentPlayers'?players:b.operation==='history'?{records:[],nextBefore:null}:{watches:[]}});
- await s.context.window.RoyalSosiska.open();s.action('team','10');await settle();assert.equal(s.calls.filter(x=>x.operation==='tournamentGroup').length,0);
+ const s=setup({responder:b=>b.operation==='team'?roster:b.operation==='eventGroup'?group:b.operation==='eventPlayers'?players:b.operation==='history'?{records:[],nextBefore:null}:{watches:[]}});
+ await s.context.window.RoyalSosiska.open();s.action('team','10');await settle();assert.equal(s.calls.filter(x=>x.operation==='eventGroup').length,0);
  s.action('tournament');await settle();assert.match(s.panel.innerHTML,/группа из 2 команд/);
  assert.ok(!s.panel.innerHTML.includes('<script>opponent</script>'));
  s.action('tournament-players','11');await settle();assert.match(s.panel.innerHTML,/Личные турнирные очки/);
  assert.match(s.panel.innerHTML,/Часть личных очков недоступна/);assert.ok(!s.panel.innerHTML.includes('<b>Bob</b>'));
- assert.equal(s.calls.filter(x=>x.operation==='tournamentPlayers').length,1);
+ assert.equal(s.calls.filter(x=>x.operation==='eventPlayers').length,1);
  assert.equal(s.calls.filter(x=>['watch','capture'].includes(x.operation)).length,0);
 });
 
@@ -254,7 +254,7 @@ test('tournament snapshot history counts only same-event gains, not tournament s
    assert.match(s.panel.innerHTML,/Турнирные очки по снимкам/,tab);
    assert.equal([...s.panel.innerHTML.matchAll(/<h3>Весь период наблюдения<\/h3>/g)].length,1,
      'full-period section is persistent without duplicate copies for '+tab);
-   if(tab==='tournament')assert.match(s.panel.innerHTML,/<h3>Командный турнир<\/h3>/);
+   if(tab==='tournament')assert.match(s.panel.innerHTML,/<h3>Командн(?:ый турнир|ая битва)<\/h3>/);
    if(tab==='roster-view')assert.doesNotMatch(s.panel.innerHTML,/data-sosiska-tournament/);
  }
 });
@@ -272,9 +272,9 @@ test('calendar alternates tournament and battle, chests have no inferred complet
 });
 test('exact-ID standings link focuses opponent and quick watch is explicit',async()=>{
  const roster=id=>({TeamId:id,TeamName:id==='10'?'SEHAT':'Korea war',Members:[{UserId:'77',Name:'P',Level:1,Crown:0}],Leader:'77',CoLeaders:[],MinLevel:1,MinCrown:0});
- const group={available:true,eventId:68,groupId:'123',observedAt:1792245600000,teams:[{teamId:'10',name:'SEHAT',position:1,score:100},{teamId:'11',name:'Korea war',position:2,score:50}]};
+ const group={available:true,kind:'tournament',eventId:68,groupId:'123',observedAt:1792245600000,teams:[{teamId:'10',name:'SEHAT',position:1,score:100},{teamId:'11',name:'Korea war',position:2,score:50}]};
  let watches=[];
- const ui=setup({responder:b=>b.operation==='team'?roster(b.teamId):b.operation==='tournamentGroup'?group:b.operation==='history'?{records:[],nextBefore:null}:b.operation==='watch'?(watches.push(b),{}):{watches:watches.map(w=>({teamId:w.teamId,intervalMinutes:w.intervalMinutes}))}});
+ const ui=setup({responder:b=>b.operation==='team'?roster(b.teamId):b.operation==='eventGroup'?group:b.operation==='history'?{records:[],nextBefore:null}:b.operation==='watch'?(watches.push(b),{}):{watches:watches.map(w=>({teamId:w.teamId,intervalMinutes:w.intervalMinutes}))}});
  await ui.context.window.RoyalSosiska.open();ui.action('team','10');await settle();
  ui.action('tournament');await settle();
  assert.match(ui.panel.innerHTML,/data-sosiska-action="tournament-team"/);
@@ -289,7 +289,7 @@ test('exact-ID standings link focuses opponent and quick watch is explicit',asyn
 test('tournament and roster are exclusive tabs, never two panels stacked',async()=>{
  const data=filterTeam('12'),group={available:true,groupId:'555',eventId:90,observedAt:1792245600000,
   teams:[{teamId:'12',name:'Team 12',score:340,position:1}]};
- const s=setup({responder:b=>b.operation==='team'?data:b.operation==='tournamentGroup'?group:b.operation==='history'?{records:[],nextBefore:null}:{watches:[]}});
+ const s=setup({responder:b=>b.operation==='team'?data:b.operation==='eventGroup'?group:b.operation==='history'?{records:[],nextBefore:null}:{watches:[]}});
  await s.context.window.RoyalSosiska.open();
  s.action('team','12');await settle();
  s.action('tournament');await settle();
@@ -428,5 +428,21 @@ for(const game of ['rm','rk'])test(game+' restricted UI hides help, event panels
  assert.doesNotMatch(s.panel.innerHTML,/data-metric="(?:help|event)"|Командный турнир|Командная битва|Промежуток сундуков|Помощь/);
  s.action('roster-view');await settle();assert.doesNotMatch(s.panel.innerHTML,/Помощь|999/);
  s.action('profile',undefined,{profileId:'777'});await settle();assert.doesNotMatch(s.panel.innerHTML,/Оказанная помощь|Полученная помощь|999|888/);
- assert.equal(s.calls.some(c=>['tournamentGroup','tournamentPlayers'].includes(c.operation)),false);
+ assert.equal(s.calls.some(c=>['tournamentGroup','tournamentPlayers','eventGroup','eventPlayers'].includes(c.operation)),false);
+});
+
+test('RM battle renders native kind and recovers from failed or empty group reads',async()=>{
+ let mode='error';const roster={TeamId:'10',TeamName:'Team',Members:[]};
+ const group={available:true,kind:'battle',selectedTeamId:'10',eventId:99,groupId:'50',observedAt:1792245600000,teams:[{teamId:'10',name:'Team',position:1,score:300}]};
+ const s=setup({responder:b=>{
+  if(b.operation==='team')return roster;
+  if(b.operation==='history')return {records:[],nextBefore:null};
+  if(b.operation==='eventGroup'){if(mode==='error')throw Error('network');return mode==='empty'?{available:false,kind:'battle'}:group;}
+  return {watches:[]};
+ }});
+ await s.context.window.RoyalSosiska.open();s.action('team','10');await settle();s.action('tournament');await settle();
+ assert.match(s.panel.innerHTML,/role="alert"/);assert.match(s.panel.innerHTML,/Повторить загрузку/);assert.doesNotMatch(s.panel.innerHTML,/Загружаем таблицу/);
+ mode='empty';s.action('tournament-refresh');await settle();assert.match(s.panel.innerHTML,/Командная битва/);assert.match(s.panel.innerHTML,/нет доступных данных/);assert.match(s.panel.innerHTML,/Повторить загрузку/);
+ mode='ok';s.action('tournament-refresh');await settle();assert.match(s.panel.innerHTML,/Битва · группа из 1 команд/);assert.match(s.panel.innerHTML,/300/);
+ assert.equal(s.calls.some(c=>['getTeamBattle','tournamentGroup','watch','capture'].includes(c.operation)),false);
 });

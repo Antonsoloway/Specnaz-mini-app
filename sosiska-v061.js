@@ -17,6 +17,7 @@
   let picker=null;
   let epoch=0,opened=false,busy=false,query='',candidates=[],offset=0,team=null,watches=[],watchesLoaded=false,watchDetailsEpoch=0,records=[],nextBefore=null,notice='',analysis=null;
   let analysisMode=null,analysisEpoch=0,profileId=null,profileLoading=false,profileError='';
+  let eventError='';
   let tournamentGroup=null,tournamentPlayers=null,tournamentTeamId=null,tournamentPeriod=null;
   let selectedHour=null,exportFrom='',exportTo='',exportReady=null;
   const profiles=new Map(),openSections=new Set();
@@ -31,7 +32,7 @@
   const role=(t,id)=>t.Leader===id?'Лидер':t.CoLeaders?.includes(id)?'Помощник':'Участник';
   const admin=()=>typeof authState!=='undefined'&&!!(authState?.role?.isChatAdmin||authState?.role?.code==='admin'||authState?.permissions?.canManageAll);
   const session=()=>typeof sessionToken==='undefined'?'':sessionToken;
-  function reset(){ownerMetrics=false;featureSession='';metric='levels';eventPlayerId=null;eventPlayerScope=null;tournamentGroup=null;tournamentPlayers=null;tournamentTeamId=null;tournamentPeriod=null;openSections.clear();picker?.host.remove();picker=null;selectedHour=null;exportFrom=exportTo='';exportReady=null;profiles.clear();profileId=null;profileLoading=false;profileError='';chartModels.clear();chartRanges.clear();analysisMode=null;analysisEpoch++;selected.clear();comparison=null;playerId=null;clearTimeout(pollTimer);timelines.clear();epoch++;opened=false;busy=false;candidates=[];details.clear();team=null;records=[];watches=[];watchesLoaded=false;watchDetailsEpoch++;nextBefore=null;notice='';analysis=null;filters={};filterLoading=false;stopFilterLoading=true;searchWarnings=[];period=null;periodLoading=false;stopPeriod=true;}
+  function reset(){eventError='';ownerMetrics=false;featureSession='';metric='levels';eventPlayerId=null;eventPlayerScope=null;tournamentGroup=null;tournamentPlayers=null;tournamentTeamId=null;tournamentPeriod=null;openSections.clear();picker?.host.remove();picker=null;selectedHour=null;exportFrom=exportTo='';exportReady=null;profiles.clear();profileId=null;profileLoading=false;profileError='';chartModels.clear();chartRanges.clear();analysisMode=null;analysisEpoch++;selected.clear();comparison=null;playerId=null;clearTimeout(pollTimer);timelines.clear();epoch++;opened=false;busy=false;candidates=[];details.clear();team=null;records=[];watches=[];watchesLoaded=false;watchDetailsEpoch++;nextBefore=null;notice='';analysis=null;filters={};filterLoading=false;stopFilterLoading=true;searchWarnings=[];period=null;periodLoading=false;stopPeriod=true;}
   function decorate(){
     const grid=document.querySelector('.grid');if(!grid)return;
     for(const old of grid.querySelectorAll?.('[data-sosiska-open]')||[])if(!admin())old.remove();
@@ -48,12 +49,16 @@
   }
   async function api(operation,params={},e=epoch){
     const token=session();if(!token||!admin())throw new Error('Откройте приложение заново.');
-    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),operation==='list'?18000:125000);
-    try{const r=await fetch(endpoint,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({operation,...(game==='rk'?{game:'rk'}:{}),...params}),signal:controller.signal});const data=await r.json();
+    const controller=new AbortController();let timer;
+    const timeoutMs=operation==='list'?18000:['eventGroup','eventPlayers','tournamentGroup','tournamentPlayers'].includes(operation)?35000:125000;
+    const deadline=new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(Object.assign(new Error('REQUEST_TIMEOUT'),{name:'AbortError'}));},timeoutMs);});
+    try{const {r,data}=await Promise.race([(async()=>{const r=await fetch(endpoint,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({operation,...(game==='rk'?{game:'rk'}:{}),...params}),signal:controller.signal});return {r,data:await r.json()};})(),deadline]);
       if(e!==epoch||session()!==token||!opened)throw Object.assign(new Error('STALE'),{stale:true});
       if(!r.ok||data.ok!==true){if(r.status===401||r.status===403){details.clear();candidates=[];team=null;records=[];watches=[];watchesLoaded=false;watchDetailsEpoch++;analysis=null;tournamentGroup=null;tournamentPlayers=null;tournamentTeamId=null;timelines.clear();selected.clear();comparison=null;period=null;playerId=null;clearTimeout(pollTimer);}throw Object.assign(new Error(data.message||'Не удалось получить данные агента.'),{denied:r.status===401||r.status===403,limited:r.status===429});}ownerMetrics=data.capabilities?.ownerTeamMetrics===true;featureSession=token;if(!advanced()&&!['levels','crowns'].includes(metric))metric='levels';if(operation==='team'&&game==='rm')window.RoyalTeamEmblems?.remember(data.data?.TeamId,emblemLogo(data.data));return data.data;
     }catch(error){if(e!==epoch||session()!==token||!opened)throw Object.assign(new Error('STALE'),{stale:true});throw error;}finally{clearTimeout(timer);}
   }
+  const currentEventKind=()=>game==='rk'?'battle':tournamentGroup?.kind||(eventWindow(Date.now())?.phase==='battle'?'battle':'tournament');
+  const eventTitle=()=>currentEventKind()==='battle'?'Командная битва':'Командный турнир';
   const button=(action,label,attrs='')=>!advanced()&&(action.startsWith('tournament')||action.startsWith('event-player'))?'':`<button type="button" data-sosiska-action="${action}" ${attrs} ${busy?'disabled':''}>${label}</button>`;
   const labels={Level:'Уровень',Crown:game==='rk'?'Кубки':'Короны',HelpCount:'Помощь',Name:'Ник',MinLevel:'Уровень входа',MinCrown:(game==='rk'?'Кубки входа':'Короны входа'),Description:'Описание',TeamName:'Команда',Role:'Роль'};
   const fields=data=>'<dl>'+Object.entries(data??{}).filter(([k,v])=>labels[k]&&(advanced()||k!=='HelpCount')&&v!==null&&typeof v!=='object').map(([k,v])=>'<dt>'+esc(labels[k])+'</dt><dd>'+esc(value(v))+'</dd>').join('')+'</dl>';
@@ -421,14 +426,15 @@
   }
   function tournamentView(){
     if(!advanced())return '';
+    if(eventError)return '<article data-sosiska-tournament><h3>'+eventTitle()+'</h3><p role="alert">'+esc(eventError)+'</p>'+button('tournament-refresh','Повторить загрузку')+'</article>';
     if(!tournamentGroup)return '';
-    if(!tournamentGroup.available)return '<article><h3>'+(game==='rk'?'Командная битва':'Командный турнир')+'</h3><p>Для этой команды сейчас нет доступных данных события.</p></article>';
-    const players=tournamentPlayers?.available&&tournamentPlayers.teamId===tournamentTeamId&&tournamentPlayers.groupId===tournamentGroup.groupId&&tournamentPlayers.eventId===tournamentGroup.eventId?tournamentPlayers:null;
-    return '<article class="sosiska-tournament" data-sosiska-tournament><h3>'+(game==='rk'?'Битва':'Турнир')+' · группа из '+tournamentGroup.teams.length+' команд</h3>'+
+    if(!tournamentGroup.available)return '<article data-sosiska-tournament><h3>'+eventTitle()+'</h3><p>Для этой команды сейчас нет доступных данных события.</p>'+button('tournament-refresh','Повторить загрузку')+'</article>';
+    const players=tournamentPlayers?.available&&tournamentPlayers.teamId===tournamentTeamId&&tournamentPlayers.groupId===tournamentGroup.groupId&&tournamentPlayers.eventId===tournamentGroup.eventId&&(!tournamentPlayers.kind||tournamentPlayers.kind===tournamentGroup.kind)?tournamentPlayers:null;
+    return '<article class="sosiska-tournament" data-sosiska-tournament><h3>'+(currentEventKind()==='battle'?'Битва':'Турнир')+' · группа из '+tournamentGroup.teams.length+' команд</h3>'+
       '<p class="muted">Позиции по очкам на момент запроса, не официальный порядок при равенстве. Наблюдение: '+esc(when(tournamentGroup.observedAt))+' МСК. Время обновления сервером не подтверждено.</p>'+
       '<ol class="sosiska-tournament-teams">'+tournamentGroup.teams.map(t=>'<li><span>'+esc(t.position)+'. <button type="button" class="sosiska-tournament-team-link" data-sosiska-action="tournament-team" data-team-id="'+esc(t.teamId)+'">'+teamName(t.name,t.teamId)+'</button></span><b>'+esc(profileNumber(t.score))+'</b>'+button('tournament-players','Игроки','data-team-id="'+esc(t.teamId)+'"')+'</li>').join('')+'</ol>'+
-      (tournamentPlayers?.available===false?'<p role="status">Личные очки игроков этой команды сервер RK пока не предоставляет. Командные очки подтверждены.</p>':'')+
-      (players?'<h4>Личные '+(game==='rk'?'очки битвы':'турнирные очки')+' · '+esc(tournamentGroup.teams.find(t=>t.teamId===tournamentTeamId)?.name||'команда')+'</h4>'+
+      (tournamentPlayers?.available===false?'<p role="status">Личные очки игроков этой команды сервер пока не предоставляет. Командные очки подтверждены.</p>':'')+
+      (players?'<h4>Личные '+(currentEventKind()==='battle'?'очки битвы':'турнирные очки')+' · '+esc(tournamentGroup.teams.find(t=>t.teamId===tournamentTeamId)?.name||'команда')+'</h4>'+
        '<p>Очки команды: '+esc(profileNumber(players.teamScore))+' · сумма известных личных: '+esc(profileNumber(players.knownScoreSum))+'</p>'+
        (!players.playersVerified||!players.scoresComplete?'<p role="status">Часть личных очков недоступна или состав не удалось подтвердить полностью; разницу не считаем прогрессом.</p>':'')+
        '<ol class="sosiska-tournament-players">'+players.players.map(p=>'<li><span>'+esc(p.name)+'</span><b>'+esc(profileNumber(p.score))+'</b></li>').join('')+'</ol>':'')+
@@ -440,9 +446,9 @@
   }
   function roster(){
     const w=watches.find(w=>w.teamId===team.TeamId),members=sorted(team.Members),v=teamFilterFields(team);
-    return button('results','← К результатам')+'<article data-sosiska-team-focus><h3>'+teamName(team.TeamName,team.TeamId,emblemLogo(team))+'</h3><p>'+esc(team.Description)+'</p><p>Командные очки: '+esc(value(v.score))+' · участников: '+members.length+'</p><p>Лидер: '+esc(v.leader??'—')+'</p><p>Вход: уровень '+esc(team.MinLevel)+', короны '+esc(team.MinCrown)+' · '+(team.Type?'Открытая':'Закрытая')+'</p>'+button('roster-view','Состав')+button('left-members','Выбывшие'+(period?.complete?' · '+period.players.filter(p=>p.left>0).length:''))+button('new-members','Новенькие'+(period?.complete?' · '+period.players.filter(p=>p.joined>0).length:''))+button('period','Весь период')+button('history','Журнал снимков')+button('tournament',game==='rk'?'⚔️ Командная битва':'🏆 Командный турнир')+(w?'':' '+button('quick-watch','▶ Включить слежение · 60 мин'))+button('analysis','ИИ-анализ всей истории команды')+exportView()+'<details><summary>Управление отслеживанием</summary>'+button('capture','Сохранить снимок сейчас')+'<label>Интервал, минуты<input data-sosiska-interval type="number" min="60" max="10080" step="1" value="'+esc(w?.intervalMinutes??60)+'" '+(busy?'disabled':'')+'></label>'+button('watch',w?'Изменить интервал':'Включить отслеживание')+(w?button('unwatch','Остановить отслеживание'):'')+'<p class="muted">Остановка сохраняет историю снимков.</p></details></article>'+
+    return button('results','← К результатам')+'<article data-sosiska-team-focus><h3>'+teamName(team.TeamName,team.TeamId,emblemLogo(team))+'</h3><p>'+esc(team.Description)+'</p><p>Командные очки: '+esc(value(v.score))+' · участников: '+members.length+'</p><p>Лидер: '+esc(v.leader??'—')+'</p><p>Вход: уровень '+esc(team.MinLevel)+', короны '+esc(team.MinCrown)+' · '+(team.Type?'Открытая':'Закрытая')+'</p>'+button('roster-view','Состав')+button('left-members','Выбывшие'+(period?.complete?' · '+period.players.filter(p=>p.left>0).length:''))+button('new-members','Новенькие'+(period?.complete?' · '+period.players.filter(p=>p.joined>0).length:''))+button('period','Весь период')+button('history','Журнал снимков')+button('tournament',(currentEventKind()==='battle'?'⚔️ ':'🏆 ')+eventTitle())+(w?'':' '+button('quick-watch','▶ Включить слежение · 60 мин'))+button('analysis','ИИ-анализ всей истории команды')+exportView()+'<details><summary>Управление отслеживанием</summary>'+button('capture','Сохранить снимок сейчас')+'<label>Интервал, минуты<input data-sosiska-interval type="number" min="60" max="10080" step="1" value="'+esc(w?.intervalMinutes??60)+'" '+(busy?'disabled':'')+'></label>'+button('watch',w?'Изменить интервал':'Включить отслеживание')+(w?button('unwatch','Остановить отслеживание'):'')+'<p class="muted">Остановка сохраняет историю снимков.</p></details></article>'+
       '<div data-sosiska-team-content>'+
-        (teamView==='tournament'?(tournamentGroup?tournamentView():'<article data-sosiska-tournament><h3>'+(game==='rk'?'Командная битва':'Командный турнир')+'</h3><p>Загружаем таблицу…</p></article>'):
+        (teamView==='tournament'?((tournamentGroup||eventError)?tournamentView():'<article data-sosiska-tournament><h3>'+eventTitle()+'</h3><p>Загружаем таблицу…</p></article>'):
          teamView==='profile'?profileView():teamView==='roster'?rosterView(members):
          teamView==='left'?membershipView('left'):teamView==='joined'?membershipView('joined'):
          teamView==='history'?history():'')+
@@ -686,10 +692,11 @@
       if(action==='team'){eventPlayerId=null;eventPlayerScope=null;selectedHour=null;exportFrom=exportTo='';exportReady=null;const id=target.dataset.teamId;team=await api('team',{teamId:id},e);details.set(id,team);profileId=null;profileError='';await switchAnalysis('team',e);records=[];period=null;tournamentPeriod=null;playerId=null;teamView='period';nextBefore=null;tournamentGroup=null;tournamentPlayers=null;tournamentTeamId=null;await loadPeriod(e);return;}
       if(action==='tournament'||action==='tournament-refresh'){
         if(!team)return;
-        teamView='tournament';render();
-        tournamentGroup=await api('tournamentGroup',{teamId:team.TeamId},e);
+        teamView='tournament';eventError='';tournamentGroup=null;render();
+        try{tournamentGroup=await api(game==='rm'?'eventGroup':'tournamentGroup',{teamId:team.TeamId},e);}
+        catch(error){if(!error.stale)eventError=error.name==='AbortError'?'Сервер не ответил вовремя. Повторите загрузку.':error.message;throw error;}
         tournamentPlayers=null;tournamentTeamId=null;
-        notice=tournamentGroup.available?(game==='rk'?'Таблица текущей битвы загружена.':'Таблица текущего турнира загружена.'):'Для этой команды данные события недоступны.';
+        notice=tournamentGroup.available?(currentEventKind()==='battle'?'Таблица текущей битвы загружена.':'Таблица текущего турнира загружена.'):'Для этой команды данные события недоступны.';
         setTimeout(()=>{if(e===epoch&&opened)document.querySelector('[data-sosiska-team-content]')?.scrollIntoView?.({block:'start',behavior:'smooth'});},0);
         return;
       }
@@ -712,7 +719,8 @@
         if(!team||!tournamentGroup?.available)return;
         const id=target.dataset.teamId;
         if(!tournamentGroup.teams.some(t=>t.teamId===id))throw Error('Команда вне выбранной турнирной группы.');
-        const data=await api('tournamentPlayers',{teamId:id},e);
+        const data=await api(game==='rm'?'eventPlayers':'tournamentPlayers',{teamId:id},e);
+        if(data.available&&data.kind&&data.kind!==tournamentGroup.kind)throw Error('Событие изменилось. Обновите таблицу.');
         if(data.available&&data.groupId!==tournamentGroup.groupId||data.available&&data.eventId!==tournamentGroup.eventId)throw Error('Турнир изменился. Обновите таблицу.');
         tournamentPlayers=data;tournamentTeamId=id;
         return;
