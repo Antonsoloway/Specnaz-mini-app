@@ -112,8 +112,19 @@ export function createSosiskaApi({authorizeAdmin,fetchAgent=fetch,fetchAI=fetch}
         let result;
         try {
           const response=await fetchAgent(EVENT_ORIGIN+'/v1/invoke',{method:'POST',headers:{Authorization:'Bearer '+env.RM_EVENT_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({protocolVersion:1,operation:op,payload:{teamId:body.teamId}}),signal:controller.signal,redirect:'manual'});
-          if(!response.ok)throw Object.assign(new Error('TOURNAMENT_UNAVAILABLE'),{status:response.status===429?429:502});
+          if(!response.ok){
+            const auth=response.status===401||response.status===403;
+            throw Object.assign(new Error('TOURNAMENT_UNAVAILABLE'),{status:response.status===429?429:502,
+              publicMessage:auth?'Aia не приняла подключение мини-приложения. Требуется восстановить подключение.':
+                response.status===429?'Aia занята другим запросом. Повторите загрузку через несколько секунд.':
+                'Aia ответила, но не смогла прочитать данные события в RM. Повторите загрузку.'});
+          }
           result=await response.json();
+        }catch(error){
+          if(!error.publicMessage)error.publicMessage=error.name==='AbortError'?
+            'Aia не ответила вовремя. Повторите загрузку.':
+            'Не удалось получить ответ Aia. Проверьте подключение сервиса.';
+          throw error;
         }finally{clearTimeout(timer);}
         if(result?.ok!==true||result.operation!==op||!object(result.data))
           throw Object.assign(new Error('TOURNAMENT_INVALID'),{status:502});
