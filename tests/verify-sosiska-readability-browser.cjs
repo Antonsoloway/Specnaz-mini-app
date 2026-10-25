@@ -39,6 +39,26 @@ const root=path.resolve(__dirname,'..');let browser;
   await page.evaluate(()=>{reportMode='new';});await page.locator('[data-sosiska-action="team"]').click();await page.waitForFunction(()=>document.querySelector('#sosiskaAnalysis .sosiska-analysis')?.textContent.includes('Прирост подтверждён.')&&document.querySelector('.sosiska-screen')?.getAttribute('aria-busy')==='false');assert.equal(await page.locator('.sosiska-report-table').count(),0);assert.equal(await page.locator('#sosiskaAnalysis .sosiska-analysis').count(),1);
   if(width===390)await page.locator('#sosiskaAnalysis').screenshot({path:'/tmp/sosiska-new-readable-analysis.png'});
   if(width===390){
+   await page.evaluate(()=>{
+    const original=window.fetch;window.discoveryCalls=0;window.discoveryAlwaysPending=false;
+    window.fetch=async(url,init)=>{
+     const b=JSON.parse(init.body);if(b.operation!=='eventGroup')return original(url,init);
+     discoveryCalls++;
+     const data=discoveryAlwaysPending||discoveryCalls===1?{available:false,kind:'battle',teamId:'1',reason:'BATTLE_GROUP_SEARCH_PENDING'}:{available:true,kind:'battle',selectedTeamId:'1',eventId:368,groupId:'20',observedAt:1792245600000,teams:[{teamId:'1',name:'Discovered opponent group',score:123,position:1}]};
+     return Response.json({ok:true,capabilities:{ownerTeamMetrics:true},data});
+    };
+   });
+   await page.locator('[data-sosiska-action="tournament"]').click();
+   await page.waitForFunction(()=>document.querySelector('[data-sosiska-tournament]')?.textContent.includes('Ищем сетку битвы'));
+   await page.waitForFunction(()=>document.querySelector('[data-sosiska-tournament]')?.textContent.includes('Discovered opponent group'));
+   assert.equal(await page.evaluate(()=>discoveryCalls),2,'pending discovery resumes automatically in the real browser');
+   await page.evaluate(()=>{discoveryCalls=0;discoveryAlwaysPending=true;});
+   await page.locator('[data-sosiska-action="tournament-refresh"]').click();
+   await page.waitForFunction(()=>document.querySelector('[data-sosiska-tournament]')?.textContent.includes('Ищем сетку битвы'));
+   await page.locator('[data-sosiska-action="roster-view"]').click();await page.waitForTimeout(1750);
+   assert.equal(await page.evaluate(()=>discoveryCalls),1,'leaving the event tab stops automatic reads');
+  }
+  if(width===390){
    await page.evaluate(()=>{window.ownerTeamMetrics=false;window.sessionToken='other-admin-session';});
    for(const game of ['rm','rk']){
     await page.evaluate(game=>RoyalSosiska.open(game),game);

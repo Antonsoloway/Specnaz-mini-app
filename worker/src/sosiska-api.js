@@ -129,7 +129,7 @@ export function createSosiskaApi({authorizeAdmin,fetchAgent=fetch,fetchAI=fetch}
         if(result?.ok!==true||result.operation!==op||!object(result.data))
           throw Object.assign(new Error('TOURNAMENT_INVALID'),{status:502});
         const d=result.data;
-        if(d.available===false)return json({ok:true,data:{available:false,reason:'NO_EVENT_DATA',teamId:body.teamId,...(['battle','tournament'].includes(d.kind)?{kind:d.kind}:{})}});
+        if(d.available===false)return json({ok:true,data:{available:false,reason:d.reason==='BATTLE_GROUP_SEARCH_PENDING'?'BATTLE_GROUP_SEARCH_PENDING':'NO_EVENT_DATA',teamId:body.teamId,...(['battle','tournament'].includes(d.kind)?{kind:d.kind}:{})}});
         if(d.available!==true||!(current?['tournament','battle'].includes(d.kind):d.kind==='tournament')||!uint64(d.groupId)||!Number.isSafeInteger(d.eventId)||d.eventId<=0||!Number.isSafeInteger(d.observedAt)||d.observedAt<0)
           throw Object.assign(new Error('TOURNAMENT_INVALID'),{status:502});
         if(isGroup){

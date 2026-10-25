@@ -428,7 +428,7 @@
     if(!advanced())return '';
     if(eventError)return '<article data-sosiska-tournament><h3>'+eventTitle()+'</h3><p role="alert">'+esc(eventError)+'</p>'+button('tournament-refresh','Повторить загрузку')+'</article>';
     if(!tournamentGroup)return '';
-    if(!tournamentGroup.available)return '<article data-sosiska-tournament><h3>'+eventTitle()+'</h3><p>Для этой команды сейчас нет доступных данных события.</p>'+button('tournament-refresh','Повторить загрузку')+'</article>';
+    if(!tournamentGroup.available)return '<article data-sosiska-tournament><h3>'+eventTitle()+'</h3><p>'+esc(tournamentGroup.reason==='BATTLE_GROUP_SEARCH_PENDING'?'Ищем сетку битвы этой команды. Первая загрузка может занять несколько минут. Поиск продолжится автоматически.':'Для этой команды сейчас нет доступных данных события.')+'</p>'+button('tournament-refresh','Повторить загрузку')+'</article>';
     const players=tournamentPlayers?.available&&tournamentPlayers.teamId===tournamentTeamId&&tournamentPlayers.groupId===tournamentGroup.groupId&&tournamentPlayers.eventId===tournamentGroup.eventId&&(!tournamentPlayers.kind||tournamentPlayers.kind===tournamentGroup.kind)?tournamentPlayers:null;
     return '<article class="sosiska-tournament" data-sosiska-tournament><h3>'+(currentEventKind()==='battle'?'Битва':'Турнир')+' · группа из '+tournamentGroup.teams.length+' команд</h3>'+
       '<p class="muted">Позиции по очкам на момент запроса, не официальный порядок при равенстве. Наблюдение: '+esc(when(tournamentGroup.observedAt))+' МСК. Время обновления сервером не подтверждено.</p>'+
@@ -696,7 +696,13 @@
         try{tournamentGroup=await api(game==='rm'?'eventGroup':'tournamentGroup',{teamId:team.TeamId},e);}
         catch(error){if(!error.stale)eventError=error.name==='AbortError'?'Сервер не ответил вовремя. Повторите загрузку.':error.message;throw error;}
         tournamentPlayers=null;tournamentTeamId=null;
-        notice=tournamentGroup.available?(currentEventKind()==='battle'?'Таблица текущей битвы загружена.':'Таблица текущего турнира загружена.'):'Для этой команды данные события недоступны.';
+        notice=tournamentGroup.available?(currentEventKind()==='battle'?'Таблица текущей битвы загружена.':'Таблица текущего турнира загружена.'):tournamentGroup.reason==='BATTLE_GROUP_SEARCH_PENDING'?'Ищем сетку битвы…':'Для этой команды данные события недоступны.';
+          if(tournamentGroup.reason==='BATTLE_GROUP_SEARCH_PENDING'){
+            const retryTeamId=team.TeamId;setTimeout(()=>{
+              if(e===epoch&&opened&&teamView==='tournament'&&team?.TeamId===retryTeamId&&advanced())
+                document.querySelector('[data-sosiska-action="tournament-refresh"]')?.click();
+            },1500);
+          }
         setTimeout(()=>{if(e===epoch&&opened)document.querySelector('[data-sosiska-team-content]')?.scrollIntoView?.({block:'start',behavior:'smooth'});},0);
         return;
       }

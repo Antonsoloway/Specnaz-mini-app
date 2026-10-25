@@ -5,10 +5,10 @@ import {readFile} from 'node:fs/promises';
 const source=await readFile(new URL('../sosiska-v061.js',import.meta.url),'utf8');
 const periodSource=await readFile(new URL('../sosiska-period-v061.js',import.meta.url),'utf8');
 const settle=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate);};
-function setup({admin=true,responder,ownerMetrics=true}={}){
+function setup({admin=true,responder,ownerMetrics=true,retryTimers}={}){
   const listeners={},docListeners={},tiles=[],calls=[],panel={innerHTML:'',hidden:false},grid={querySelector:selector=>tiles.find(x=>!x.removed&&(selector==='[data-sosiska-open]'||selector===('[data-sosiska-open="'+x.dataset.sosiskaOpen+'"]')))||null,querySelectorAll:()=>tiles.filter(x=>!x.removed),appendChild:b=>tiles.push(b)};
-  const hosts=[];const document={body:{appendChild:n=>hosts.push(n)},activeElement:{focus(){}},querySelector:s=>s==='.grid'?grid:s==='[data-sosiska-interval]'?{value:'120'}:null,getElementById:()=>panel,createElement:()=>({dataset:{},querySelector:()=>null,remove(){this.removed=true;}}),addEventListener:(type,fn)=>{docListeners[type]=fn;}};
-  const context={document,authState:{role:{isChatAdmin:admin}},sessionToken:'session-a',activePage:'home',setActiveNav(){},renderPage(page){panel.innerHTML=page;},FormData:class{constructor(form){this.form=form;}get(name){return this.form.filters?this.form.filters[name]??'':this.form.query;}},Response,AbortController,setTimeout,clearTimeout,console,fetch:async(url,init)=>{const b=JSON.parse(init.body);calls.push(b);return Response.json({ok:true,capabilities:{ownerTeamMetrics:ownerMetrics},data:await (responder?responder(b):{watches:[]})});}};
+  const hosts=[];const document={body:{appendChild:n=>hosts.push(n)},activeElement:{focus(){}},querySelector:s=>s==='.grid'?grid:s==='[data-sosiska-interval]'?{value:'120'}:s==='[data-sosiska-action="tournament-refresh"]'&&panel.innerHTML.includes('tournament-refresh')?{click(){action('tournament-refresh')}}:null,getElementById:()=>panel,createElement:()=>({dataset:{},querySelector:()=>null,remove(){this.removed=true;}}),addEventListener:(type,fn)=>{docListeners[type]=fn;}};
+  const context={document,authState:{role:{isChatAdmin:admin}},sessionToken:'session-a',activePage:'home',setActiveNav(){},renderPage(page){panel.innerHTML=page;},FormData:class{constructor(form){this.form=form;}get(name){return this.form.filters?this.form.filters[name]??'':this.form.query;}},Response,AbortController,setTimeout:(fn,ms)=>{if(retryTimers&&ms===1500){retryTimers.push(fn);return 0;}return setTimeout(fn,ms);},clearTimeout,console,fetch:async(url,init)=>{const b=JSON.parse(init.body);calls.push(b);return Response.json({ok:true,capabilities:{ownerTeamMetrics:ownerMetrics},data:await (responder?responder(b):{watches:[]})});}};
   context.window={addEventListener:(type,fn)=>{listeners[type]=fn;},RoyalNav:{pushCurrent(){}},RoyalAdminDataV0600:{subscribe(fn){listeners.adminClear=fn;}}};vm.createContext(context);vm.runInContext(periodSource,context);vm.runInContext(source,context);
   const action=(name,id,extra={})=>listeners.click({target:{closest:s=>s==='[data-sosiska-action]'?{dataset:{sosiskaAction:name,teamId:id,...extra}}:null},preventDefault(){},stopImmediatePropagation(){}});
   const search=query=>docListeners.submit({target:{query,matches:selector=>selector==='[data-sosiska-search]',querySelector:()=>({blur(){}})},preventDefault(){},stopImmediatePropagation(){}});
@@ -445,4 +445,20 @@ test('RM battle renders native kind and recovers from failed or empty group read
  mode='empty';s.action('tournament-refresh');await settle();assert.match(s.panel.innerHTML,/Командная битва/);assert.match(s.panel.innerHTML,/нет доступных данных/);assert.match(s.panel.innerHTML,/Повторить загрузку/);
  mode='ok';s.action('tournament-refresh');await settle();assert.match(s.panel.innerHTML,/Битва · группа из 1 команд/);assert.match(s.panel.innerHTML,/300/);
  assert.equal(s.calls.some(c=>['getTeamBattle','tournamentGroup','watch','capture'].includes(c.operation)),false);
+});
+
+for(const cancel of [false,true])test('battle search retries automatically only while its team view is active: '+cancel,async()=>{
+ const retryTimers=[];let groupCalls=0;const raw=filterTeam('1');
+ const s=setup({retryTimers,responder:b=>{
+  if(b.operation==='team')return raw;
+  if(b.operation==='history')return {records:[],nextBefore:null};
+  if(b.operation==='analysisStatus')return {available:false};
+  if(b.operation==='eventGroup'){groupCalls++;return groupCalls===1?{available:false,kind:'battle',teamId:'1',reason:'BATTLE_GROUP_SEARCH_PENDING'}:{available:true,kind:'battle',selectedTeamId:'1',groupId:'20',eventId:368,observedAt:1792245600000,teams:[{teamId:'1',name:'Found team',score:123,position:1}]};}
+  return {watches:[]};
+ }});
+ await s.context.window.RoyalSosiska.open();s.action('team','1');await settle();s.action('tournament');await settle();
+ assert.equal(groupCalls,1);assert.match(s.panel.innerHTML,/Ищем сетку битвы/);assert.equal(retryTimers.length,1);
+ if(cancel){s.action('roster-view');await settle();}
+ retryTimers.shift()();await settle();
+ assert.equal(groupCalls,cancel?1:2);if(!cancel)assert.match(s.panel.innerHTML,/Found team/);
 });
