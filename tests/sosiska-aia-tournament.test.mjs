@@ -81,3 +81,27 @@ test('empty native battle remains unavailable without fabricated rows or scores'
  const r=await handle(request({operation:'eventGroup',teamId:'10'}),baseEnv);
  assert.deepEqual((await r.json()).data,{available:false,reason:'NO_EVENT_DATA',teamId:'10',kind:'battle'});
 });
+
+test('Aia authorization errors are distinguished from owner session authorization',async()=>{
+ for(const status of [401,403]){
+  const handle=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'1456874273'}),fetchAgent:async()=>new Response('upstream private response',{status})});
+  const r=await handle(request({operation:'eventGroup',teamId:'10'}),baseEnv),body=await r.json();
+  assert.equal(r.status,502);assert.equal(body.error,'AGENT_UNAVAILABLE');
+  assert.match(body.message,/Aia не приняла подключение/);
+  assert.equal(body.capabilities.ownerTeamMetrics,true);
+  assert.ok(!JSON.stringify(body).includes('upstream private response'));
+ }
+});
+test('Aia transport, timeout, busy and native failures have distinct safe messages',async()=>{
+ for(const [fetchAgent,status,pattern] of [
+  [async()=>{throw Error('private transport detail');},502,/Не удалось получить ответ Aia/],
+  [async()=>{throw Object.assign(Error('private timeout detail'),{name:'AbortError'});},502,/Aia не ответила вовремя/],
+  [async()=>new Response('private busy detail',{status:429}),429,/Aia занята/],
+  [async()=>new Response('private native detail',{status:502}),502,/Aia ответила, но не смогла прочитать/]
+ ]){
+  const handle=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'1456874273'}),fetchAgent});
+  const r=await handle(request({operation:'eventGroup',teamId:'10'}),baseEnv),body=await r.json();
+  assert.equal(r.status,status);assert.match(body.message,pattern);
+  assert.ok(!JSON.stringify(body).includes('private'));
+ }
+});
