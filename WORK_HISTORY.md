@@ -1,3 +1,13 @@
+## 2026-10-25 ? owner-private RK current battle entry released
+
+- PR #91, reviewed source bb523fc5995c8c558dcd07806a7223cbf2fd78db; main merge 26f2aa9c0da3a08020316729c134925b9cf11f3e.
+- Owner-only RK entry opens Aia current group without team search. Backend selects native ownTeamId; no client-supplied group/team override. Immutable Telegram owner ID 1456874273 is checked before any event fetch. Nonowners cannot forge the entry action; history/export/AI owner ACL unchanged.
+- Supported live scope: all 10 team totals in Aia current RK group, personal results only for Aia own team. Other groups and opponent player totals remain unconfirmed/unavailable. Never display own group as a foreign team's group. No automatic watch/capture from opening entry.
+- Live read: RK event 110, group 30962250659400969, Aia team 4149970304, 10 teams, 46 personal rows. Account membership unchanged.
+- 193 module tests PASS; full PR CI 40231771418/job121284825846 PASS including cold-start/isolation, admin/navigation and real Chromium 320/390/768. Browser coverage opens 10-team group, own personal scores, explicit unavailable opponents, no auto-monitoring and owner restriction. Broad ad-hoc all-*.mjs run also included three existing unrelated Golub ingress failures; bot code was not changed.
+- Cloudflare Git build SUCCESS, deployed mini API version 177c8864-f5e7-4ac7-a794-48177a419507. Published app-v0614.html and sosiska-v061.js byte-identical to reviewed blobs; cache key 20261025-rkbattle1. Live health 200, unauth entry 401. Live RK response projected through local exact facade: synthetic owner 200 with 10 teams; nonowner 403 before upstream. Real signed Telegram owner acceptance is still user-side.
+- No public changelog changes. RM monitoring and bot work untouched.
+
 ## 19.10.2026 — v0.6.13 team visibility/activity published
 
 Cause: the public visibility policy returned early unless the build was exactly0.6.1, so releases0.6.2+ skipped it. The previous0.6.12 regression fixture omitted the real visibility module; that coverage gap is corrected. Visibility is now version-independent, reconciles counters with the same current-roster helper used by cards, runs on snapshot arrival and synchronously before public-list rendering, and hides inactive/empty teams. Paused teams with current members remain. Admin data/list/rankings remain complete.
