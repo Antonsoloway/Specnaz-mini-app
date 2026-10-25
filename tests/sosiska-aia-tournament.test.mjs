@@ -105,3 +105,12 @@ test('Aia transport, timeout, busy and native failures have distinct safe messag
   assert.ok(!JSON.stringify(body).includes('private'));
  }
 });
+
+test('current battle discovery status reaches only the owner without being mislabeled absent',async()=>{
+ const calls=[],pending={available:false,kind:'battle',selectedTeamId:'10',reason:'BATTLE_GROUP_SEARCH_PENDING'};
+ const owner=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'1456874273'}),fetchAgent:mock(pending,calls)});
+ const response=await owner(request({operation:'eventGroup',teamId:'10'}),baseEnv);const out=await response.json();
+ assert.equal(response.status,200);assert.equal(out.data.reason,'BATTLE_GROUP_SEARCH_PENDING');assert.equal(out.data.kind,'battle');
+ const before=calls.length,other=createSosiskaApi({authorizeAdmin:async()=>({telegramId:'222'}),fetchAgent:mock(pending,calls)});
+ assert.equal((await other(request({operation:'eventGroup',teamId:'10'}),baseEnv)).status,403);assert.equal(calls.length,before);
+});
