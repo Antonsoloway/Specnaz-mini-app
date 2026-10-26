@@ -170,7 +170,7 @@ function SPECNAZ_reconcileApprovedReactions() {
   if (!cfg.capture || !cfg.chatId || !cfg.topicId || !cfg.approvers.length) {
     return {status:'DISABLED_OR_NOT_CONFIGURED'};
   }
-  const lock = LockService.getScriptLock();
+  const lock = LockService.getUserLock();
   if (!lock.tryLock(1000)) return {status:'BUSY'};
   try {
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
