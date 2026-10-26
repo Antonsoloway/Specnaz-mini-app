@@ -80,3 +80,25 @@ Read-only audit of the user-provided ChatKeeper CSV `Journal_of_ЧАТ_ПОБЕ�
 - All six trigger-error records have initiator and target IDs of `0` and empty message text; they are **not** enough to safely infer which participant should be awarded lost activity.
 - Important epistemic boundary: `Сработал триггер` is evidence the *trigger condition ran*, **not** proof of successful outbound HTTP to the GAS deployment. The journal CSV has no recipient URL, HTTP response code/body, request timestamp, request-ID, resend attempts, or delivery receipts. This audit **does not** conclusively locate the original five webhook losses inside ChatKeeper vs transport vs Apps Script.
 - Production @125 is already online; do not change it based solely on this CSV. Suggested next investigation: request per-event outgoing HTTP logs/response receipts from ChatKeeper or its support for the five listed journal IDs; also investigate repeated `actual:UNKNOWN` and `Stream was closed` errors on activity triggers.
+
+
+## Proven CRM ingress evidence for five missed awards — 2026-10-26
+
+The user correctly emphasized that the **admin Google workbook itself** has independent inbound/processing logs. Exhaustive cross-check of the five missing award message IDs against the queue and webhook log, using native Sheet searches and event keys, established:
+
+| Target TG message ID | Queue row | Webhook log row | Queue received (MSK) | Entry/result |
+|---|---:|---:|---|---|
+| 315354 | 11171 | 10939 | 24.10 09:39:03 | `stat / REJECTED / WRONG_SECRET` |
+| 315424 | 11388 | 11161 | 24.10 13:44:48 | `stat / REJECTED / WRONG_SECRET` |
+| 315454 | 11512 | 11286 | 24.10 16:24:25 | `stat / REJECTED / WRONG_SECRET` |
+| 315467 | 11673 | 11449 | 24.10 18:21:22 | `stat / REJECTED / WRONG_SECRET` |
+| 315524 | 11705 | 11481 | 24.10 18:37:57 | `stat / REJECTED / WRONG_SECRET` |
+
+- **Exact event-key match** between queue column F and webhook log column U in all five pairs. All have one processing attempt. Raw T column in the webhook log is a JSON Telegram `update_id/message_reaction` envelope with 🆒 emoji and matching Telegram `message_id`. They have no normalized ChatKeeper `event=reputation`, no player `tg_id` in the queue hints, and no CRM secret. Their `WRONG_SECRET` is expected for this other ingress; **do not mislabel it as a bad ChatKeeper secret**.
+- The queued raw reaction event arrived **1–2 seconds** after ChatKeeper's exported journal trigger time. Thus the Telegram reaction reached Apps Script, but in a different, non-awarding event stream.
+- Searching all main webhook-log `event` column D from rows 10100–14488 found **25** `reputation` processing *attempts* on Oct 24–26: 19 successful `REPUTATION_UPDATED` plus six transient `RETRY_LOCKED`; **zero** of those 25 used any of the five missed users' Telegram IDs. This matches the 19 normal history awards plus 5 manual restorations.
+- Independent evidence of **two separate streams for the same successful trip**: Telegram message `315398` had its raw 🆒 `message_reaction` logged as `stat/WRONG_SECRET` in log row **11113**, but its proper ChatKeeper `reputation` separately logged as `RETRY_LOCKED` row **11112** then `REPUTATION_UPDATED` row **11115**. Therefore a raw Telegram `stat/WRONG_SECRET` is *not* causal proof that the corresponding ChatKeeper webhook was rejected.
+- The queue is the earliest normal ChatKeeper receipt point: `05_RELIABLE_WEBHOOK_QUEUE.js/doPost` writes raw body to durable `Очередь вебхуков` before normal `01_CORE_MAIN.js/processWebhookImmediately_` logs to `Лог вебхуков`; `activity_base/activity_outside` processing writes to **separate** `Лог активности`, and `Обработанные события` stores event keys only after business processing.
+- Completed `DONE` queue payloads are cleared and cleanup uses a one-day retention, so historical absence from queue alone is not hard proof of non-delivery. The preserved main webhook log *does* show the absence of a correctly parsed `reputation` processing attempt for the five missing IDs.
+- **What is proven:** five raw reactions reached the CRM ingress as a separate Telegram stream; none of five resulted in logged legitimate ChatKeeper `reputation` business processing; 19 comparable normalized `reputation` webhooks worked.
+- **What remains unknown:** whether ChatKeeper never emitted the normalized webhook, used a different recipient, received non-2xx/timeout, or another pre-log failure occurred. ChatKeeper journal's `Сработал триггер` has no outbound HTTP delivery receipt. Obtain ChatKeeper HTTP delivery diagnostics for its five journal IDs (in preceding section). Until then, do not disable, filter, or alter structured `activity_base`/`activity_outside` or assume the five wrong-secret raw updates were ChatKeeper requests.
