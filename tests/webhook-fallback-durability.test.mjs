@@ -20,6 +20,8 @@ function simulate({event='reputation',emergency=false,sheet=false,result='RETRY_
     RCWQ_readHandlerResult_: x => x,
     RCWQ_errorText_: e => String(e.message || e),
     RCWQ_json_: x => x,
+    RCWQ_PROP_LAST_RECEIVED: 'last_received',
+    RCWQ_PROP_LAST_ERROR: 'last_error',
     PropertiesService: {getScriptProperties: () => ({setProperty(){}})},
     Utilities: {getUuid:()=> 'test-id'},
     processWebhookImmediately_: () => ({status:result}),
