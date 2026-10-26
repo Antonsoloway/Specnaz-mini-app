@@ -102,3 +102,28 @@ The user correctly emphasized that the **admin Google workbook itself** has inde
 - Completed `DONE` queue payloads are cleared and cleanup uses a one-day retention, so historical absence from queue alone is not hard proof of non-delivery. The preserved main webhook log *does* show the absence of a correctly parsed `reputation` processing attempt for the five missing IDs.
 - **What is proven:** five raw reactions reached the CRM ingress as a separate Telegram stream; none of five resulted in logged legitimate ChatKeeper `reputation` business processing; 19 comparable normalized `reputation` webhooks worked.
 - **What remains unknown:** whether ChatKeeper never emitted the normalized webhook, used a different recipient, received non-2xx/timeout, or another pre-log failure occurred. ChatKeeper journal's `Сработал триггер` has no outbound HTTP delivery receipt. Obtain ChatKeeper HTTP delivery diagnostics for its five journal IDs (in preceding section). Until then, do not disable, filter, or alter structured `activity_base`/`activity_outside` or assume the five wrong-secret raw updates were ChatKeeper requests.
+
+
+## Four-ledger forensic follow-up — 2026-10-26 after ChatKeeper CSV
+
+Explicit read-only audit of four native Sheets tabs confirms there is an observable difference between raw Telegram traffic and **separate** normalized ChatKeeper award requests:
+
+1. **`Лог вебхуков`**, raw request in T, status in B, event in D: each of the five source message IDs has a JSON `message_reaction` with 🆒, classified `stat / WRONG_SECRET`:
+   - message `315354`: row **10939**, update `377536126`, 24 Oct 09:39:47
+   - message `315424`: row **11161**, update `377536352`, 24 Oct 13:45:54
+   - message `315454`: row **11286**, update `377536483`, 24 Oct 16:24:59
+   - message `315467`: row **11449**, update `377536656`, 24 Oct 18:22:52
+   - message `315524`: row **11481**, update `377536687`, 24 Oct 18:38:45.
+   These are separate raw Telegram-relay JSON updates, **not** ChatKeeper's URL-encoded `event=reputation` payloads. `WRONG_SECRET` here does not imply the actual ChatKeeper secret is wrong.
+2. **Control events from successful awards** have a separate URL-encoded `event=reputation` entry alongside raw Telegram traffic:
+   - message `315368`: successful `REPUTATION_UPDATED` row **10986**, 24 Oct 10:07:21; nearby Telegram `stat` rows 10983, 10985.
+   - message `315398`: `RETRY_LOCKED` row **11112**, then successful `REPUTATION_UPDATED` row **11115**, with separate 🆒 raw reaction row 11113.
+   - message `315417`: successful `REPUTATION_UPDATED` row **11141**, with separate 🆒 raw reaction row 11142.
+   None of the five missing awards has a matching processed `event=reputation` in the relevant admin webhook log section.
+3. **`Обработанные события`** contains ordinary successful 24 Oct `reputation / REPUTATION_UPDATED` rows (example 6902, 6928, 6929, 6942, 6954, 6993, 7009, 7036), but not the five restored source awards in that period. It contains normal `activity_base`, `activity_outside` and `screens` as expected.
+4. **`Очередь вебхуков`**: a full exact-text search of event column E currently returned 35 `reputation` records, all `DONE` (older September–October entries plus Oct 25–26). The **Oct 24 queue records are absent for both successful and missed awards**, consistent with the configured one-day `DONE` cleanup and therefore **not valid evidence** that Oct 24 requests never entered the queue. Incomplete events `PENDING/RETRY/PROCESSING` and retained `FAILED` were not found as remaining `reputation` rows.
+5. **`Лог активности`** contains separate successful structured activity webhooks; `activity_base` and `activity_outside` must not be dropped while troubleshooting raw Telegram `stat`.
+
+Current supported conclusion: the five Telegram reactions certainly reached the shared Apps Script ingress **as raw Telegram updates**; successful comparison awards also arrived as independent normalized ChatKeeper POSTs. For the five missing cases, there is no evidence of a completed normalized ChatKeeper reputation handler. Neither the raw-reaction logs nor the exported ChatKeeper trigger journal establish whether an independent normalized POST was never sent, sent to another URL, received an HTTP error/timeout, accepted but lost before processing, or received false-success prior to the @124 durability fix. Need sender-side HTTP delivery receipts to distinguish.
+
+Do not reinterpret `WRONG_SECRET/stat` as a general ChatKeeper credentials failure. Do not retroactively issue additional awards: all five were recovered and protected by source-message deduplication in Apps Script @124+.
