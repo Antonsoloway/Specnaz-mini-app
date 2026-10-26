@@ -262,16 +262,20 @@ function processReliableWebhookQueue() {
       return summary;
     }
 
-    /* Читаются только необходимые A:I, а не тяжёлые Result/Error столбцы. */
-    const rows = sheet.getRange(2, 1, lastRow - 1, 9).getValues();
+    /*
+     * Read only unfinished queue rows. Thousands of DONE/REJECTED/FAILED
+     * records remain available for audit but are no longer transferred on
+     * every minute-trigger execution.
+     */
+    const openRows = RCWQ_findOpenQueueRows_(sheet);
     const blockedTgIds = {};
 
-    for (let index = 0; index < rows.length; index++) {
+    for (let index = 0; index < openRows.length; index++) {
       if (summary.processed >= RCWQ_BATCH_SIZE) break;
       if (Date.now() - startedAt >= RCWQ_TIME_BUDGET_MS) break;
 
-      const rowNumber = index + 2;
-      const values = rows[index];
+      const rowNumber = openRows[index];
+      const values = sheet.getRange(rowNumber, 1, 1, 9).getValues()[0];
       const status = String(values[2] || '').toUpperCase();
       const attempts = Number(values[3] || 0);
       const tgId = String(values[6] || '').trim() || '__UNKNOWN__';
@@ -923,30 +927,49 @@ function RCWQ_updateQueueRow_(
   }
 }
 
-function RCWQ_resetStuckRows_(sheet) {
+/**
+ * Server-side exact-cell status search. No business event/status is discarded
+ * and nothing is changed in the workbook. Sort by physical queue row number
+ * to preserve FIFO for each Telegram ID, including "__UNKNOWN__".
+ */
+function RCWQ_findRowsWithStatus_(sheet, status) {
   const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return;
+  if (lastRow < 2) return [];
+  return sheet.getRange(2, 3, lastRow - 1, 1)
+    .createTextFinder(status)
+    .matchEntireCell(true)
+    .findAll()
+    .map(function(cell) { return cell.getRow(); });
+}
 
-  const range = sheet.getRange(2, 3, lastRow - 1, 7); // C:I
-  const values = range.getValues();
-  const cutoff = Date.now() - RCWQ_STUCK_MINUTES * 60 * 1000;
-  let changed = false;
+function RCWQ_findOpenQueueRows_(sheet) {
+  const rows = [];
+  ['PENDING', 'RETRY', 'PROCESSING'].forEach(function(status) {
+    RCWQ_findRowsWithStatus_(sheet, status).forEach(function(row) {
+      rows.push(row);
+    });
+  });
+  return rows.sort(function(a, b) { return a - b; });
+}
 
-  values.forEach(function(row) {
-    const status = String(row[0] || '').toUpperCase();
-    const updated = RCWQ_parseDate_(row[6]);
+/**
+ * Recover only expired PROCESSING rows. Do not write all C:I columns back:
+ * a blanket rewrite would touch queue payloads and 100k+ unrelated cells.
+ * Cleanup/processor share the existing UserLock.
+ */
+function RCWQ_resetStuckRows_(sheet) {
+  const stuck = RCWQ_findRowsWithStatus_(sheet, 'PROCESSING');
+  if (!stuck.length) return;
 
-    if (
-      status === 'PROCESSING' &&
-      (!updated || updated.getTime() < cutoff)
-    ) {
-      row[0] = 'RETRY';
-      row[6] = new Date();
-      changed = true;
+  const now = new Date();
+  const cutoff = now.getTime() - RCWQ_STUCK_MINUTES * 60 * 1000;
+  stuck.forEach(function(rowNumber) {
+    const updated = RCWQ_parseDate_(sheet.getRange(rowNumber, 9).getValue());
+    if (!updated || updated.getTime() < cutoff) {
+      sheet.getRange(rowNumber, 3).setValue('RETRY');
+      sheet.getRange(rowNumber, 9).setValue(now);
     }
   });
-
-  if (changed) range.setValues(values);
 }
 
 function RCWQ_buildFakeEvent_(raw) {
