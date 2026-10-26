@@ -848,9 +848,41 @@ function updateAccountSlot_(sheet, row, player) {
   };
 }
 
+function findSpecnazHistoryAwardForMessage_(ss, tgId, messageLink) {
+  // The direct Telegram recovery and ChatKeeper webhook can have different
+  // event keys; the verified source message may still be awarded only once.
+  const link = normalizeSpecnazMessageLink_(messageLink);
+  const id = normalizeTgId_(tgId);
+  if (!link || !id) return null;
+  const history = ss.getSheetByName(SHEET_HISTORY);
+  if (!history) return null;
+  const last = getHistoryLastContentRow_(history);
+  if (last < 2) return null;
+  const links = history.getRange(2, HISTORY_COL_MESSAGE_LINK, last - 1, 1).getDisplayValues();
+  const ids = history.getRange(2, HISTORY_COL_TG_ID, last - 1, 1).getDisplayValues();
+  for (let i = links.length - 1; i >= 0; i -= 1) {
+    if (normalizeSpecnazMessageLink_(links[i][0]) === link &&
+        normalizeTgId_(ids[i][0]) === id) {
+      return {row: i + 2};
+    }
+  }
+  return null;
+}
+
 function applyReputation_(ss, base, row, player, eventKey) {
   const cell = base.getRange(row, COL_SPECNAZ);
   const oldValue = numberOrZero_(cell.getValue());
+  const alreadyAwarded = findSpecnazHistoryAwardForMessage_(
+    ss, player.tgId, player.replyMessageLink
+  );
+  if (alreadyAwarded) {
+    return {
+      status: 'REPUTATION_SOURCE_ALREADY_COUNTED',
+      value: oldValue,
+      added: 0,
+      history_row: alreadyAwarded.row
+    };
+  }
 
   // ВРЕМЕННОЕ ПРАВИЛО 2026-08-07:
   // 1) real_rating имеет приоритет при разборе входящего события и хранится
