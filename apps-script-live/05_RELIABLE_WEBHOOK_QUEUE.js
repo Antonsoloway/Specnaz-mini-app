@@ -192,7 +192,7 @@ function doPost(e) {
    */
   try {
     if (typeof processWebhookImmediately_ === 'function') {
-      return processWebhookImmediately_(e);
+      return RCWQ_requireCommittedDirectFallback_(processWebhookImmediately_(e));
     }
   } catch (fallbackError) {
     throw new Error(
@@ -207,6 +207,22 @@ function doPost(e) {
     'Не удалось сохранить webhook. Ошибка Script Properties: ' +
     emergencyError + '. Ошибка листа: ' + sheetError
   );
+}
+
+/**
+ * If both durable stores failed, the immediate handler is the LAST resort.
+ * Never acknowledge transient processing failure with HTTP 200: doing so
+ * would allow the sender to consider an unpersisted award delivered.
+ * Normal queue and all activity/reputation routing remain unchanged.
+ */
+function RCWQ_requireCommittedDirectFallback_(response) {
+  const result = RCWQ_readHandlerResult_(response);
+  const status = String(result && result.status || '').toUpperCase();
+  if (!status || status === 'ERROR' || status === 'RETRY_LOCKED' ||
+      status === 'SETUP_REQUIRED' || status === 'UNKNOWN') {
+    throw new Error('DIRECT_FALLBACK_NOT_COMMITTED: ' + (status || 'EMPTY_RESULT'));
+  }
+  return response;
 }
 
 /**
