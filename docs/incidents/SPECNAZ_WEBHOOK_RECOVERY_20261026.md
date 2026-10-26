@@ -55,3 +55,28 @@
 - The live queue's two recently added `stat` rows at Moscow 19:20–19:21 transitioned from `PENDING` to `REJECTED` on the new processor. This shows queue progression after release; it is **not** a proof of a new `reputation` event. Prior manually recovered five award entries still appeared in the admin history, 24 rows in the current period.
 - **Rollback:** redeploy immutable @124 to the existing deployment ID, without changing the webapp URL, Secrets or spreadsheet structures.
 - **Remaining limitation:** all recovery and prioritization start *after the request reaches Apps Script*. Missing outbound requests or HTTP errors at ChatKeeper still require ChatKeeper delivery logs/retries to diagnose. Avoid any guarantee that zero new awards can be missed upstream.
+
+
+## ChatKeeper exported journal audit — 2026-10-26
+
+Read-only audit of the user-provided ChatKeeper CSV `Journal_of_ЧАТ_ПОБЕДИТЕЛЕЙ🪖.csv` (CSV file **not** committed, contains participants' personal and message data). Export includes 1,800 journal records, covering 2026-10-19 11:22:41 through 2026-10-26 19:23:56 by recorded journal time.
+
+- Exactly **24** entries are `Установлена реакция на сообщение`, `Сработал триггер`, `Репутация спецназа`: 16 on Oct 24, 4 on Oct 25, 4 on Oct 26. All have unique target Telegram IDs.
+- Cross-check against live admin `История спецназа` rows 318–341 confirms **24/24 target Telegram IDs** present, once each; **19** normal `Webhook: reputation` rows and **5** `Manual recovery: approved 🆒 reaction` rows.
+- The five historically missing awards had journal trigger records:
+  - 2026-10-24 09:39:01, journal record `582188452`
+  - 2026-10-24 13:44:46, journal record `582188678`
+  - 2026-10-24 16:24:23, journal record `582188809`
+  - 2026-10-24 18:21:20, journal record `582188981`
+  - 2026-10-24 18:37:56, journal record `582189013`
+  (Deliberately omit user identities/Telegram IDs from the public report.) **DO NOT double-award these.**
+- **Six separate journal entries show actual trigger execution errors for activity, never for `Репутация спецназа`**:
+  - Oct 19, 16:33:57 — `Таблица активность вне базы`: `Stream was closed` (journal `582185629`)
+  - Oct 21, 14:17:34 — `Таблица активность вне базы`: `Invalid status: actual:UNKNOWN, expected:OK` (journal `582186633`)
+  - Oct 22, 14:26:12 — `Таблица активность вне базы`: same UNKNOWN error (journal `582186966`)
+  - Oct 23, 14:42:01 — `Таблица активность в базе`: same UNKNOWN error (journal `582187592`)
+  - Oct 24, 14:44:47 — `Таблица активность в базе`: same UNKNOWN error (journal `582188748`)
+  - Oct 26, 05:43:05 — `Таблица активность вне базы`: same UNKNOWN error (journal `582190355`)
+- All six trigger-error records have initiator and target IDs of `0` and empty message text; they are **not** enough to safely infer which participant should be awarded lost activity.
+- Important epistemic boundary: `Сработал триггер` is evidence the *trigger condition ran*, **not** proof of successful outbound HTTP to the GAS deployment. The journal CSV has no recipient URL, HTTP response code/body, request timestamp, request-ID, resend attempts, or delivery receipts. This audit **does not** conclusively locate the original five webhook losses inside ChatKeeper vs transport vs Apps Script.
+- Production @125 is already online; do not change it based solely on this CSV. Suggested next investigation: request per-event outgoing HTTP logs/response receipts from ChatKeeper or its support for the five listed journal IDs; also investigate repeated `actual:UNKNOWN` and `Stream was closed` errors on activity triggers.
