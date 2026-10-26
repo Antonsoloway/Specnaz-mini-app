@@ -86,7 +86,15 @@ function run(entries, overrides = {}) {
     Date, console,
   };
   vm.createContext(context);
+  const dependencies = {
+    RCWQ_ensureQueueSheet_: context.RCWQ_ensureQueueSheet_,
+    RCWQ_recoverEmergencyRecords_: context.RCWQ_recoverEmergencyRecords_,
+    RCWQ_decodePayload_: context.RCWQ_decodePayload_,
+    RCWQ_buildFakeEvent_: context.RCWQ_buildFakeEvent_
+  };
   vm.runInContext(code,context);
+  // Stub only actual external I/O; run the real scanning, recovery and writer.
+  Object.assign(context, dependencies);
   const result = context.processReliableWebhookQueue();
   return {sheet,processed,summary:JSON.parse(JSON.stringify(result))};
 }
