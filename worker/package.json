@@ -1,0 +1,5 @@
+{
+  "name": "royal-crm-miniapp-worker",
+  "private": true,
+  "type": "module"
+}

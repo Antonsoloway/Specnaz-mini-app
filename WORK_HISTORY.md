@@ -1,3 +1,17 @@
+## 06.11.2026 — Реализована «База битв» для администраторов (v0.6.15, до публикации)
+
+Запрос: подключить историю битв из D1 к Royal CRM Mini App и добавить отдельную кнопку «База битв», доступную только администраторам.
+
+Mini App: создан app-v0615.html, обновлены app.html/index.html redirects с сохранением Telegram launch query/hash, добавлены кнопка и раздел, battle-base-v0615.js/.css, changelog-v0615.js. app.js добавляет admin-only route, проверку роли в renderAuth/renderPage и requestAdminBattleBase. Новые Worker-файлы: worker/src/entry-v1430.js и battle-base-api-v1.js; добавлен /verify-admin-session, который Gateway использует для повторной проверки подписанной сессии и Telegram admin status. Новый API /admin-battle-base проверяет Origin и authorizeAdmin. Обычные пользователи не получают данные при прямом запросе. Добавлены worker/package.json (ESM для тестов), tests/battle-base-api-v1.test.mjs, tests/verify-battle-base-workerd.mjs, release regression и обновлён .github/workflows/sosiska.yml.
+
+Gateway: создан competition-index-api-v1.js и wrapper entry-competition-index-v1.js; обновлены wrangler.jsonc и competition-results-v1.js. Отдельный KV COMPETITION_INDEX_CACHE хранит read-only JSON index. После успешной D1 batch записи новый результат ставит dirty marker. Gateway endpoint проверяет тот же signed Mini App session через /verify-admin-session, затем возвращает кэшированный индекс. Перестройка не чаще 30 минут, TTL 60 минут, stale fallback до 7 дней. Mini App Worker cache 5 минут. D1 query ограничен 5 000 экранами и исключает owner-epic-archive-v1; эпичный архив и owner-only Sosiska events/brackets/help metrics остаются вне общего админского поиска.
+
+Существующие competition_screens_v1, competition_teams_v1, competition_sources_v1 и competition_topic_links_v1 используются без копирования в Sheets. Даты означают Telegram publication timestamps, не дату самой битвы. Search by team/opponent использует teamNameSearchKeysV2; результаты сохраняют зеленую community row, оппонентов, score/rank, source link/author/caption/topic.
+
+Проверки: Mini App release/Sosiska curated suite 200/200 PASS; battle-base API 6/6 PASS; Gateway API/session/cache tests 5/5 PASS; Miniflare/workerd 8 checks PASS; esbuild bundle entry-v1430 PASS; Wrangler deploy --dry-run Gateway and Mini App PASS. Полный legacy suite имеет несвязанные старые ошибки в других модулях; исправлена одна устаревшая release assertion app.html, теперь ожидающая app-v0615.html.
+
+На момент записи source готов, но production ещё не публиковался. Live baseline проверен: Mini App API /health вернул health marker 1.41.0, /team-live и /admin-agent подтвердили существование v1.42 routes; Gateway /health показал действующий media-enrichment Worker. Перед публикацией нужно обновить Mini App Worker первым, затем Gateway, затем опубликовать Pages/merge и выполнить live smoke test админской сессией. Native Telegram WebView acceptance ещё не выполнен.
+
 ## 19.10.2026 — v0.6.13 team visibility/activity published
 
 Cause: the public visibility policy returned early unless the build was exactly0.6.1, so releases0.6.2+ skipped it. The previous0.6.12 regression fixture omitted the real visibility module; that coverage gap is corrected. Visibility is now version-independent, reconciles counters with the same current-roster helper used by cards, runs on snapshot arrival and synchronously before public-list rendering, and hides inactive/empty teams. Paused teams with current members remain. Admin data/list/rankings remain complete.

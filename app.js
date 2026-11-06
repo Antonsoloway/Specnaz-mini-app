@@ -137,6 +137,11 @@ function renderAuth(data) {
     : 'Командные роли не указаны';
   document.getElementById('panel').innerHTML = `<h2>${esc(role.title || 'Участник')}</h2><p><strong>${esc(user.crmName || user.telegramFirstName || '')}</strong></p><p class="muted">${teamText}</p><p class="muted" id="dataStatus">Загружаем справочник…</p>`;
   setButtonsEnabled(true);
+  const battleBaseTile = document.querySelector('[data-admin-only="battle-base"]');
+  if (battleBaseTile) {
+    battleBaseTile.hidden = role.isChatAdmin !== true;
+    battleBaseTile.setAttribute('aria-hidden', String(role.isChatAdmin !== true));
+  }
   emitAppLifecycle('auth-ready', {
     access: true,
     user: {
@@ -457,6 +462,17 @@ function renderPage(page) {
     const loaded = snapshotState ? `<p class="muted">CRM: ${Number(stats.inChat || stats.participants || 0)} участников · ${Number(stats.teams || 0)} команд</p>` : '<p class="muted">CRM загружается…</p>';
     panel.innerHTML = `<h2>${esc(role)}</h2><p>Доступ подтверждён.</p>${loaded}`; return;
   }
+  if (page === 'battle-base') {
+    if (authState.role?.isChatAdmin !== true) {
+      setActiveNav('home');
+      panel.innerHTML = '<h2>Доступ закрыт</h2><p>Раздел «База битв» доступен только администраторам чата.</p>';
+      return;
+    }
+    setActiveNav('home');
+    if (window.RoyalBattleBaseV0615?.render) window.RoyalBattleBaseV0615.render();
+    else panel.innerHTML = '<h2>База битв</h2><p>Раздел загружается. Попробуйте открыть его ещё раз.</p>';
+    return;
+  }
   if (page === 'profile') {
     const items = memberships.length ? memberships.map(m => `<li>${esc(m.team || 'Без команды')} — ${esc(m.role || 'Без роли')}</li>`).join('') : '<li>Командные роли не указаны</li>';
     panel.innerHTML = `<h2>Мой профиль</h2><p>Основная роль: <strong>${esc(role)}</strong></p><ul>${items}</ul>`; return;
@@ -482,6 +498,26 @@ if (/^0\.6\./.test(BUILD)) {
     version: BUILD,
     fetchProtectedMediaObjectUrl: protectedMediaObjectUrl,
     releaseProtectedMedia,
+    isChatAdmin: () => authState?.role?.isChatAdmin === true,
+    requestAdminBattleBase: async params => {
+      if (authState?.role?.isChatAdmin !== true || !sessionToken) throw new Error('ADMIN_REQUIRED');
+      const query = params instanceof URLSearchParams ? params.toString() : new URLSearchParams(params || {}).toString();
+      const url = API_URL + '/admin-battle-base' + (query ? '?' + query : '');
+      const response = await fetch(url, {
+        method: 'GET', mode: 'cors', cache: 'no-store',
+        headers: { Authorization: 'Bearer ' + sessionToken }
+      });
+      const data = await readJsonWithDeadline(response, 20000, 'BATTLE_BASE_TIMEOUT').catch(error => {
+        if (error?.code === 'BATTLE_BASE_TIMEOUT') throw error;
+        return {};
+      });
+      if (!response.ok || !data?.ok) {
+        const error = new Error(data?.message || 'База битв временно недоступна.');
+        error.code = data?.error || 'BATTLE_BASE_REQUEST_FAILED';
+        throw error;
+      }
+      return data;
+    },
     reloadSnapshot: async () => {
       const snapshot = await loadSnapshot(true);
       if (activePage !== 'home') renderPage(activePage);
