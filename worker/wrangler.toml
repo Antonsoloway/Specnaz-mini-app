@@ -1,7 +1,7 @@
 name = "royal-crm-miniapp-api"
 account_id = "0dd3beb421783a043d0327ac771a3f1a"
 keep_vars = true
-main = "src/entry-v1420.js"
+main = "src/entry-v1430.js"
 compatibility_date = "2026-08-15"
 
 [[durable_objects.bindings]]
@@ -31,6 +31,7 @@ DATA_BRANCH = "main"
 DATA_PATH = "snapshot.json"
 ADMIN_DATA_PATH = "admin-snapshot.json"
 ACHIEVEMENTS_PATH = "achievements.json"
+COMPETITION_INDEX_URL = "https://specnaz-ai-telegram-gateway.soloway3852.workers.dev/api/internal/competition-index"
 TELEGRAM_CHAT_ID = "-1002109152418"
 
 [observability]

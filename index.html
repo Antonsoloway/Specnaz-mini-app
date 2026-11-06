@@ -11,9 +11,10 @@
   <script>
     (() => {
       const current = new URL(window.location.href);
-      const target = new URL('app-v0614.html', current.href);
+      const target = new URL('app-v0615.html', current.href);
       target.search = current.search;
       target.searchParams.set('from', 'root');
+      target.searchParams.set('releaseBuild', '20261106-admin-battle-base1');
       target.searchParams.set('cb', String(Date.now()));
       target.hash = current.hash;
       window.location.replace(target.toString());

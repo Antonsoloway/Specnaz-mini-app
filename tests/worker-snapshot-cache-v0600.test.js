@@ -65,6 +65,6 @@ test('auth and every public snapshot enricher use the same cache module', () => 
     assert.match(source, /from '\.\/private-snapshot-cache\.js'/, file);
     assert.match(source, /loadPrivateSnapshotCached\(env\)/, file);
   });
-  assert.match(cacheSource, /CACHE_TTL_MS = 60_000/);
+  assert.match(cacheSource, /MEMORY_FRESH_TTL_MS = 60_000/);
   assert.match(cacheSource, /if \(inFlight\) return inFlight/);
 });

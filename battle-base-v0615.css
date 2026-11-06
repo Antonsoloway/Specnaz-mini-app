@@ -1,0 +1,51 @@
+[data-admin-only="battle-base"][hidden],
+.battle-base-more[hidden]{display:none!important}
+.battle-base-screen{display:flex;flex-direction:column;gap:12px;min-width:0}
+.battle-base-back{align-self:flex-start;margin:0}
+.battle-base-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.battle-base-heading h2{margin:0}
+.battle-base-heading p{margin:5px 0 0;color:rgba(255,255,255,.62);font-size:13px;line-height:1.35}
+.battle-base-refresh,.battle-base-more,.battle-base-empty button{border:1px solid rgba(84,169,235,.32);border-radius:12px;background:#203a51;color:#fff;padding:10px 12px;font-size:13px;font-weight:700;white-space:nowrap}
+.battle-base-refresh:disabled,.battle-base-more:disabled{opacity:.5}
+.battle-base-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.battle-base-filters label{display:flex;flex-direction:column;gap:5px;min-width:0;color:rgba(255,255,255,.7);font-size:11px}
+.battle-base-filters label span{padding-left:2px}
+.battle-base-filters input,.battle-base-filters select{width:100%;min-width:0;height:42px;border:1px solid rgba(255,255,255,.08);border-radius:11px;background:#0e1621;color:#fff;padding:0 10px;font:inherit;font-size:14px;color-scheme:dark}
+.battle-base-filters input::placeholder{color:rgba(255,255,255,.4)}
+.battle-base-query{grid-column:1/-1}
+.battle-base-query input{height:46px;font-size:16px}
+.battle-base-status{min-height:18px;color:rgba(255,255,255,.58);font-size:12px}
+.battle-base-results{display:flex;flex-direction:column;gap:11px}
+.battle-base-card{min-width:0;background:#101a25;border:1px solid rgba(255,255,255,.055);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.battle-base-card-head{display:flex;flex-direction:column;gap:7px}
+.battle-base-tags{display:flex;flex-wrap:wrap;gap:5px}
+.battle-base-tag{display:inline-flex;align-items:center;border-radius:7px;padding:4px 7px;background:#263847;color:rgba(255,255,255,.82);font-size:10px;font-weight:700}
+.battle-base-tag.is-game{background:#203a51;color:#9bd3ff}
+.battle-base-tag.is-warning{background:#55421f;color:#ffd78a}
+.battle-base-tag.is-epic{background:#4c2d61;color:#e6c3ff}
+.battle-base-card-head time{color:rgba(255,255,255,.55);font-size:11px}
+.battle-base-community{display:flex;flex-direction:column;gap:3px;border-radius:12px;background:#18362d;border:1px solid rgba(105,211,151,.12);padding:9px 10px}
+.battle-base-community small,.battle-base-community span{font-size:11px;color:rgba(255,255,255,.68)}
+.battle-base-community strong{font-size:15px;overflow-wrap:anywhere}
+.battle-base-community.is-empty{background:#202a35}
+.battle-base-team-list{display:flex;flex-direction:column;gap:4px}
+.battle-base-team-row{display:grid;grid-template-columns:24px 22px minmax(0,1fr) auto;align-items:center;gap:6px;padding:6px 5px;border-radius:9px;background:rgba(255,255,255,.025)}
+.battle-base-team-row.is-community{background:rgba(75,173,123,.13)}
+.battle-base-rank{font-size:11px;color:rgba(255,255,255,.52);text-align:center}
+.battle-base-emblem{font-size:15px;text-align:center}
+.battle-base-team-name{min-width:0;display:flex;flex-direction:column;gap:1px}
+.battle-base-team-name strong{font-size:12px;line-height:1.25;overflow-wrap:anywhere}
+.battle-base-team-name small{font-size:10px;color:rgba(255,255,255,.48)}
+.battle-base-score{font-size:12px;font-weight:750;font-variant-numeric:tabular-nums;white-space:nowrap}
+.battle-base-completion,.battle-base-event-date,.battle-base-issues{font-size:11px;color:rgba(255,255,255,.52)}
+.battle-base-issues{color:#ffd78a}
+.battle-base-source{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;border-top:1px solid rgba(255,255,255,.06);padding-top:9px}
+.battle-base-source>div{min-width:0;display:flex;flex-direction:column;gap:3px}
+.battle-base-source small{font-size:10px;color:rgba(255,255,255,.5)}
+.battle-base-source a{flex:0 0 auto;color:#69baff;font-size:11px;font-weight:700;text-decoration:none}
+.battle-base-caption{margin:0;color:rgba(255,255,255,.78);font-size:12px;line-height:1.35;overflow-wrap:anywhere}
+.battle-base-empty{padding:24px 12px;text-align:center;color:rgba(255,255,255,.62);background:#101a25;border-radius:14px;font-size:13px}
+.battle-base-empty strong{display:block;color:#fff;margin-bottom:5px}
+.battle-base-empty p{margin:5px 0 12px}
+.battle-base-more{width:100%;padding:13px}
+@media(max-width:390px){.battle-base-heading{flex-direction:column}.battle-base-refresh{width:100%}.battle-base-filters{gap:7px}.battle-base-card{padding:10px}.battle-base-team-row{grid-template-columns:20px 18px minmax(0,1fr) auto;gap:4px}.battle-base-score{font-size:11px}}

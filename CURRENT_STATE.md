@@ -1,3 +1,15 @@
+## 06.11.2026 — v0.6.15 «База битв» — реализация до production-публикации
+
+Добавлен админский раздел Royal CRM Mini App. Новый entrypoint app-v0615.html; app.html и index.html направляют на него, сохраняя Telegram query/hash. Кнопка «База битв» скрыта для не-админов; app.js и сервер повторно проверяют права. Worker main подготовлен на src/entry-v1430.js: GET /admin-battle-base и GET /verify-admin-session. Gateway добавляет GET /api/internal/competition-index и KV индекс из существующих competition_* таблиц D1.
+
+Доступ: Mini App проверяет подписанную сессию и актуальный Telegram admin status; Gateway повторно проверяет ту же сессию через /verify-admin-session. Общий админский индекс исключает owner-epic-archive-v1 и owner-only Sosiska payloads. D1 остаётся единственным источником истины; Google Sheets-копия не создаётся. Успешная запись новой битвы помечает индекс dirty. Gateway KV TTL 60 минут, минимальный интервал перестроения 30 минут, Mini App cache 5 минут, stale fallback до 7 дней. Поиск и ввод фильтров не обращаются к D1.
+
+Фильтры: название команды/соперника и варианты чтения, RM/RK, битва/турнир, итог/промежуточный результат, статус распознавания, дата публикации Telegram с/по, минимальные очки команды. Карточка показывает строки команд, места/очки, автора, подпись, тему и исходную ссылку. Неизвестная дата самой битвы не угадывается.
+
+Аудит D1 на 06.11: всего 2 916 экранов, 11 484 строк команд, 2 933 источника, 21 связь с темами. Полная сборка индекса читает 28 259 D1 rows; при максимальном refresh раз в 30 минут верхняя оценка индекса около 1,36 млн rows/day, до учёта остальных D1 потребителей.
+
+Целевые проверки: Mini App curated Sosiska/release suite 200/200 PASS; battle-base API 6/6 PASS; Gateway index/session/cache tests 5/5 PASS; workerd admin/CORS/search checks 8 PASS; Wrangler dry-run обоих Workers PASS. Полный legacy node --test всего репозитория содержит старые несвязанные сбои других подсистем; релизная curated suite зелёная. Production пока не обновлён: перед публикацией live Mini App Worker health был 1.41.0 (entry-v1420 сохраняет старый health marker), Gateway — текущий production media-enrichment Worker.
+
 ## 19.10.2026 — v0.6.13 team visibility/activity published
 
 Cause: the public visibility policy returned early unless the build was exactly0.6.1, so releases0.6.2+ skipped it. The previous0.6.12 regression fixture omitted the real visibility module; that coverage gap is corrected. Visibility is now version-independent, reconciles counters with the same current-roster helper used by cards, runs on snapshot arrival and synchronously before public-list rendering, and hides inactive/empty teams. Paused teams with current members remain. Admin data/list/rankings remain complete.

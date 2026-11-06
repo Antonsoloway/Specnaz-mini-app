@@ -11,14 +11,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test tests/sosiska-*.test.mjs tests/verify-rk-emblems.mjs
+      - run: node --test tests/sosiska-*.test.mjs tests/verify-rk-emblems.mjs tests/battle-base-api-v1.test.mjs
       - run: node --test tests/admin-write-timeout-v0600.test.js tests/admin-data-client-v0600.test.js tests/admin-media-save-speed.test.js
-      - run: ROYAL_NAV_TEST_NO_PRIVATE=1 node tests/team-navigation-resolver-v0614.test.js && node --check team-navigation-resolver-v0614.js && node --check admin-team-detail-v0614.js && node --check profile-team-link-v0614.js && node --check team-identity-fix-v0614.js && node --check version-v0614.js && node --check changelog-v0614.js
+      - run: ROYAL_NAV_TEST_NO_PRIVATE=1 node tests/team-navigation-resolver-v0614.test.js && node --check team-navigation-resolver-v0614.js && node --check admin-team-detail-v0614.js && node --check profile-team-link-v0614.js && node --check team-identity-fix-v0614.js && node --check version-v0614.js && node --check changelog-v0614.js && node --check battle-base-v0615.js && node --check worker/src/entry-v1430.js && node --check worker/src/battle-base-api-v1.js
       - run: npx --yes esbuild@0.25.12 worker/src/sosiska-period.js --bundle --format=iife --global-name=SosiskaPeriod --outfile=/tmp/sosiska-period-v061.js && cmp /tmp/sosiska-period-v061.js sosiska-period-v061.js
       - run: node --check sosiska-v061.js && node --check transport-v0514.js
       - run: npx --yes esbuild@0.25.12 worker/src/entry-v1420.js --bundle --format=esm --platform=browser --outfile=/tmp/sosiska-worker.js
       - run: npm install --prefix /tmp/sosiska-runtime --no-audit --no-fund miniflare@5.20261006.1-alpha
       - run: node tests/verify-sosiska-workerd.mjs /tmp/sosiska-runtime/package.json /tmp/sosiska-worker.js
+      - run: npx --yes esbuild@0.25.12 worker/src/entry-v1430.js --bundle --format=esm --platform=browser --outfile=/tmp/royal-crm-worker-v1430.js
+      - run: node tests/verify-battle-base-workerd.mjs /tmp/sosiska-runtime/package.json /tmp/royal-crm-worker-v1430.js
       - run: npx --yes esbuild@0.25.12 worker/src/entry-v1410.js --bundle --format=esm --platform=browser --outfile=/tmp/sosiska-legacy-worker.js
       - run: node tests/verify-sosiska-isolation-workerd.mjs /tmp/sosiska-runtime/package.json /tmp/sosiska-legacy-worker.js /tmp/sosiska-worker.js
       - run: npm install --prefix /tmp/sosiska-browser --no-audit --no-fund playwright@1.62.1
