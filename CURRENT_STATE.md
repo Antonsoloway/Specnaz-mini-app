@@ -1,4 +1,4 @@
-## 06.11.2026 — v0.6.15 «База битв» — реализация до production-публикации
+## 06.11.2026 — v0.6.15 «База битв» — production опубликован
 
 Добавлен админский раздел Royal CRM Mini App. Новый entrypoint app-v0615.html; app.html и index.html направляют на него, сохраняя Telegram query/hash. Кнопка «База битв» скрыта для не-админов; app.js и сервер повторно проверяют права. Worker main подготовлен на src/entry-v1430.js: GET /admin-battle-base и GET /verify-admin-session. Gateway добавляет GET /api/internal/competition-index и KV индекс из существующих competition_* таблиц D1.
 
@@ -8,7 +8,7 @@
 
 Аудит D1 на 06.11: всего 2 916 экранов, 11 484 строк команд, 2 933 источника, 21 связь с темами. Полная сборка индекса читает 28 259 D1 rows; при максимальном refresh раз в 30 минут верхняя оценка индекса около 1,36 млн rows/day, до учёта остальных D1 потребителей.
 
-Целевые проверки: Mini App curated Sosiska/release suite 200/200 PASS; battle-base API 6/6 PASS; Gateway index/session/cache tests 5/5 PASS; workerd admin/CORS/search checks 8 PASS; Wrangler dry-run обоих Workers PASS. Полный legacy node --test всего репозитория содержит старые несвязанные сбои других подсистем; релизная curated suite зелёная. Production пока не обновлён: перед публикацией live Mini App Worker health был 1.41.0 (entry-v1420 сохраняет старый health marker), Gateway — текущий production media-enrichment Worker.
+Целевые проверки: Mini App curated Sosiska/release suite 200/200 PASS; battle-base API 6/6 PASS; Gateway index/session/cache tests 5/5 PASS; workerd admin/CORS/search checks 8 PASS; Wrangler dry-run обоих Workers PASS. Полный legacy node --test всего репозитория содержит старые несвязанные сбои других подсистем; релизная curated suite зелёная. Production опубликован 06.11.2026. Mini App Worker v1.43.0 deployed: /health подтвердил version=1.43.0 и adminBattleBase=admin-only-cached-d1-index-v1. Gateway Worker deployed, version ID d14f5da0-b84d-4ab0-8bd6-9ee9ac2aebd0; /health подтвердил competitionIndexApi=private-kv-cache-v1 и сохранённый mediaEnrichment/queues. Gateway /api/internal/competition-index без сессии возвращает 401 SESSION_MISSING, с неподписанным bearer — 401 ADMIN_REQUIRED после callback проверки; Mini App /admin-battle-base без сессии возвращает 401, с неподписанным bearer — 401 SESSION_INVALID. GitHub Pages уже отдаёт app-v0615.html с кнопкой data-admin-only= battle-base и новыми JS/CSS. Остаётся живая приёмка из Telegram под действующей admin-сессией: первое открытие/поиск построит KV индекс из D1; последующие поиски будут работать по кэшу.
 
 ## 19.10.2026 — v0.6.13 team visibility/activity published
 

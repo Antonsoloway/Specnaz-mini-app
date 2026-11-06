@@ -1,4 +1,4 @@
-## 06.11.2026 — Реализована «База битв» для администраторов (v0.6.15, до публикации)
+## 06.11.2026 — Опубликована «База битв» для администраторов (v0.6.15)
 
 Запрос: подключить историю битв из D1 к Royal CRM Mini App и добавить отдельную кнопку «База битв», доступную только администраторам.
 
@@ -10,7 +10,7 @@ Gateway: создан competition-index-api-v1.js и wrapper entry-competition-i
 
 Проверки: Mini App release/Sosiska curated suite 200/200 PASS; battle-base API 6/6 PASS; Gateway API/session/cache tests 5/5 PASS; Miniflare/workerd 8 checks PASS; esbuild bundle entry-v1430 PASS; Wrangler deploy --dry-run Gateway and Mini App PASS. Полный legacy suite имеет несвязанные старые ошибки в других модулях; исправлена одна устаревшая release assertion app.html, теперь ожидающая app-v0615.html.
 
-На момент записи source готов, но production ещё не публиковался. Live baseline проверен: Mini App API /health вернул health marker 1.41.0, /team-live и /admin-agent подтвердили существование v1.42 routes; Gateway /health показал действующий media-enrichment Worker. Перед публикацией нужно обновить Mini App Worker первым, затем Gateway, затем опубликовать Pages/merge и выполнить live smoke test админской сессией. Native Telegram WebView acceptance ещё не выполнен.
+Production publication выполнена в правильном порядке: PR #96 merged в Antonsoloway/Specnaz-mini-app; Mini App Worker v1.43.0 deployed и live health подтверждает adminBattleBase. Затем PR #157 merged в Antonsoloway/Specnaz-ai; Gateway Worker deployed, version ID d14f5da0-b84d-4ab0-8bd6-9ee9ac2aebd0; в wrangler.jsonc закреплён account_id 62c513d37c8b15db448b263dfb7d2dee после того, как Wrangler обнаружил два Cloudflare аккаунта. GitHub Pages отдаёт app-v0615.html, app.html/index.html и новый раздел. Live smoke подтвердил 401 на неавторизованных/поддельных сессиях для обоих API, а Gateway callback к Mini App verification endpoint работает. Реальный admin Telegram session search и native Telegram WebView acceptance остаются финальной пользовательской приёмкой; первый валидный admin запрос сформирует KV index из D1.
 
 ## 19.10.2026 — v0.6.13 team visibility/activity published
 
