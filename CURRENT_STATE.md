@@ -6,7 +6,7 @@
 
 Фильтры: название команды/соперника и варианты чтения, RM/RK, битва/турнир, итог/промежуточный результат, статус распознавания, дата публикации Telegram с/по, минимальные очки команды. Карточка показывает строки команд, места/очки, автора, подпись, тему и исходную ссылку. Неизвестная дата самой битвы не угадывается.
 
-Аудит D1 на 06.11: всего 2 916 экранов, 11 484 строк команд, 2 933 источника, 21 связь с темами. Полная сборка индекса читает 28 259 D1 rows; при максимальном refresh раз в 30 минут верхняя оценка индекса около 1,36 млн rows/day, до учёта остальных D1 потребителей.
+Аудит D1 на 06.11: всего 2 916 экранов, 11 484 строк команд, 2 933 источника, 21 связь с темами. Реальная read-only сборка индекса 06.11 прочитала 28 144 D1 rows и вернула 2 776 экранов (2 684 parsed, 92 review), 11 435 командных строк, JSON 7 092 492 байта, 0 epic и 0 malformed. Проверочный поиск нашёл 42 совпадения JoyBand и 4 AVENGERS. При максимальном refresh раз в 30 минут верхняя оценка около 1,35 млн rows/day, до учёта остальных D1 потребителей.
 
 Целевые проверки: Mini App curated Sosiska/release suite 200/200 PASS; battle-base API 6/6 PASS; Gateway index/session/cache tests 5/5 PASS; workerd admin/CORS/search checks 8 PASS; Wrangler dry-run обоих Workers PASS. Полный legacy node --test всего репозитория содержит старые несвязанные сбои других подсистем; релизная curated suite зелёная. Production опубликован 06.11.2026. Mini App Worker v1.43.0 deployed: /health подтвердил version=1.43.0 и adminBattleBase=admin-only-cached-d1-index-v1. Gateway Worker deployed, version ID d14f5da0-b84d-4ab0-8bd6-9ee9ac2aebd0; /health подтвердил competitionIndexApi=private-kv-cache-v1 и сохранённый mediaEnrichment/queues. Gateway /api/internal/competition-index без сессии возвращает 401 SESSION_MISSING, с неподписанным bearer — 401 ADMIN_REQUIRED после callback проверки; Mini App /admin-battle-base без сессии возвращает 401, с неподписанным bearer — 401 SESSION_INVALID. GitHub Pages уже отдаёт app-v0615.html с кнопкой data-admin-only= battle-base и новыми JS/CSS. Остаётся живая приёмка из Telegram под действующей admin-сессией: первое открытие/поиск построит KV индекс из D1; последующие поиски будут работать по кэшу.
 
@@ -1205,3 +1205,10 @@ visible and refresh recovers. Busy session gets separate429 explanation without
 immediate replay. Agent source confirms snapshots/cards serialize on one session;
 actual FORTUNA capture overlap is unverified (no connected Commander devices).
 142Node tests and new loading plus existing cache/card/emblem browser tests PASS.
+
+
+### Live production D1 index build — 2026-11-06 16:07 UTC
+
+Ran the exact deployed buildCompetitionIndexV1 builder against the production Cloudflare D1 database (one D1 API query; no write). Result: ok=true, partial=false, 2,776 standard competition records, 11,435 team rows, 2,014 final and 754 intermediate results, 92 review records; RM 2,213 / RK 560; 0 epic records; 0 malformed results; 28,144 D1 rows read; serialized index size 7,092,492 bytes. Search-key spot checks: JoyBand 42 matches, Avengers 4. Latest Telegram publication timestamp in index: 2026-11-06T15:34:28Z.
+
+Important distinction: this validates the live D1-to-index builder and current source data. It does not itself write the production KV cache. The first request authenticated with a real Telegram admin session to the deployed Gateway endpoint will perform the KV refresh. The actual Telegram admin-session UI acceptance remains pending.

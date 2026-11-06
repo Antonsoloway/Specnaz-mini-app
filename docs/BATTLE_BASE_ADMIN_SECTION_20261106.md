@@ -96,3 +96,10 @@ HTML-текст API экранируется перед отображением
 - Wrangler deploy --dry-run for both Workers.
 
 Полный legacy node --test по всему Mini App также запускается, но в нём есть старые несвязанные с этим разделом проверки других подсистем. В отчёте релиза отдельно фиксируются только целевые результаты и любые оставшиеся CI failures.
+
+
+### Live production D1 index build — 2026-11-06 16:07 UTC
+
+Ran the exact deployed buildCompetitionIndexV1 builder against the production Cloudflare D1 database (one D1 API query; no write). Result: ok=true, partial=false, 2,776 standard competition records, 11,435 team rows, 2,014 final and 754 intermediate results, 92 review records; RM 2,213 / RK 560; 0 epic records; 0 malformed results; 28,144 D1 rows read; serialized index size 7,092,492 bytes. Search-key spot checks: JoyBand 42 matches, Avengers 4. Latest Telegram publication timestamp in index: 2026-11-06T15:34:28Z.
+
+Important distinction: this validates the live D1-to-index builder and current source data. It does not itself write the production KV cache. The first request authenticated with a real Telegram admin session to the deployed Gateway endpoint will perform the KV refresh. The actual Telegram admin-session UI acceptance remains pending.
