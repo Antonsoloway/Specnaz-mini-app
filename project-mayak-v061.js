@@ -1,7 +1,8 @@
 /* Royal CRM Mini App v0.6.1 — Project MAYAK + dynamic achievement registry */
 (() => {
   'use strict';
-  if (String(window.__ROYAL_BUILD__ || '') !== '0.6.1') return;
+  // Compatible with the 0.6.1+ app contract; exact patch matching disabled it after v0.6.1.
+  if (!/^0\.6\.(?:[1-9]\d*)$/.test(String(window.__ROYAL_BUILD__ || '').trim())) return;
 
   const VERSION = '0.6.1-mayak-achievements.1';
   const MAYAK_CODE = 'mayak';
