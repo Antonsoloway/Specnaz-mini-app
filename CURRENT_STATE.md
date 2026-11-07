@@ -1,3 +1,34 @@
+## 07.11.2026 — v0.6.16 «МАЯК» — production published
+
+Root cause: `project-mayak-v061.js` returned unless `window.__ROYAL_BUILD__`
+was exactly `0.6.1`. On app build `0.6.15` the file loaded but exited before
+registering `window.RoyalMayak`; the project route, participant badge and
+project media loader therefore never became available.
+
+Fix: the module now accepts patch builds `0.6.1+` inside the compatible
+`0.6.x` line, while leaving `0.6.0` and `0.7.x+` disabled. Added
+`app-v0616.html` and `changelog-v0616.js`; permanent `app.html` and
+`index.html` redirects now target v0.6.16 and preserve Telegram launch
+query/hash. The v0.6.15 admin battle-base modules and release history remain
+in the new entrypoint.
+
+Production: PR #97 merged as `5f4b90a3668fbda7cd0c068b0cdbe938373e7611`.
+PR CI run `42385596809`, main CI run `42385762236`, and Pages deployment
+`42385761561` completed successfully. Local curated suite 205/205,
+admin regressions 32/32, navigation 15/15 and Mayak compatibility 5/5 PASS.
+Live Pages returned HTTP 200 for both redirects, v0.6.16 entrypoint, Mayak
+module and changelog. The fetched production module was evaluated against
+build 0.6.16 and registered `window.RoyalMayak` with project/participant
+entrypoints. Mini App Worker remains v1.43.0; the protected media route still
+returns 401 without a session. No Worker, Apps Script, CRM data or media
+storage was changed. The four source media files remain in
+`royal-crm-data/media/projects/mayak`.
+
+Remaining owner acceptance: open the app in Telegram with a valid session and
+confirm the two rating images, song, video and participant list render/play.
+This release session did not have an authenticated Telegram WebView, so
+end-to-end authenticated media playback is not claimed.
+
 ## 06.11.2026 — v0.6.15 «База битв» — production опубликован
 
 Добавлен админский раздел Royal CRM Mini App. Новый entrypoint app-v0615.html; app.html и index.html направляют на него, сохраняя Telegram query/hash. Кнопка «База битв» скрыта для не-админов; app.js и сервер повторно проверяют права. Worker main подготовлен на src/entry-v1430.js: GET /admin-battle-base и GET /verify-admin-session. Gateway добавляет GET /api/internal/competition-index и KV индекс из существующих competition_* таблиц D1.

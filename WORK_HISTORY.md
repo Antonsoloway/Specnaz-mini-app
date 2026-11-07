@@ -1,3 +1,40 @@
+## 2026-11-07 — v0.6.16 published: restore Project «МАЯК»
+
+Request: restore the missing project materials in the Royal CRM Mini App
+«Проекты → МАЯК».
+
+Cause: the Mayak module used an exact `window.__ROYAL_BUILD__ === '0.6.1'`
+gate. The v0.6.15 entrypoint loaded the module, but it immediately returned
+without registering its UI/API, so the project route and participant
+decorations disappeared and media loading never started.
+
+Changes: replaced the exact patch gate with a compatibility check for
+`0.6.1+` within `0.6.x`; added regression coverage that keeps 0.6.0 and
+0.7.x+ disabled. Added `app-v0616.html` and `changelog-v0616.js`, updated
+the permanent app.html/index.html redirects, retained the v0.6.15 battle
+base and changelog history, and documented the build-compatibility invariant.
+Telegram query/hash preservation remains covered by release tests.
+
+Files: `project-mayak-v061.js`, `app-v0616.html`, `app.html`,
+`index.html`, `changelog-v0616.js`, `tests/project-mayak-build-compat.test.js`,
+`tests/sosiska-release.test.mjs`, `.github/workflows/sosiska.yml`,
+`RELEASE_RULES.md`.
+
+Validation: local curated Sosiska/asset/battle/Mayak suite 205/205 PASS;
+admin regression 32/32 PASS; team navigation 15/15 PASS; Mayak compatibility
+5/5 PASS; syntax and diff checks PASS. PR #97 merged as
+`5f4b90a3668fbda7cd0c068b0cdbe938373e7611`. PR and main CI passed, including
+workerd and the complete browser regression suite. GitHub Pages deployment
+passed. Live HTTP checks returned 200 for the new entrypoint/module/changelog
+and both permanent redirects. The live module activated in a runtime smoke
+test with build 0.6.16. Worker health remained v1.43.0; unauthenticated
+protected media access still returns 401. No Worker, Apps Script, CRM data or
+media storage changes.
+
+Remaining: owner should confirm authenticated ratings/audio/video playback
+and participant list inside Telegram WebView. No authenticated Telegram
+WebView was available during this release verification.
+
 ## 06.11.2026 — Опубликована «База битв» для администраторов (v0.6.15)
 
 Запрос: подключить историю битв из D1 к Royal CRM Mini App и добавить отдельную кнопку «База битв», доступную только администраторам.
