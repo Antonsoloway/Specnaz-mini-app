@@ -46,7 +46,7 @@ test('МАЯК activates on current and future 0.6.x application builds', () => 
 });
 
 test('МАЯК stays disabled outside its compatible 0.6.x release line', () => {
-  for (const build of ['0.5.59', '0.7.0', '1.0.0', 'invalid']) {
+  for (const build of ['0.5.59', '0.6.0', '0.7.0', '1.0.0', 'invalid']) {
     const window = loadMayak(build);
     assert.equal(window.RoyalMayak, undefined, build);
     assert.equal(window.__ROYAL_MAYAK_VERSION__, undefined, build);
