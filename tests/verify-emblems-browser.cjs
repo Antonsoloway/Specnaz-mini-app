@@ -1,7 +1,7 @@
 const {chromium}=require('playwright'),http=require('http'),fs=require('fs'),path=require('path'),assert=require('assert/strict');
 const root=path.resolve(__dirname,'..');
 (async()=>{
- const server=http.createServer((req,res)=>{const p=path.join(root,new URL(req.url,'http://fixture').pathname);if(!p.startsWith(root+'/')){res.writeHead(403).end();return;}try{const bytes=fs.readFileSync(p);res.setHeader('Content-Type',p.endsWith('.webp')?'image/webp':p.endsWith('.css')?'text/css':'text/javascript');res.end(bytes);}catch{res.writeHead(404).end();}});await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
+ const server=http.createServer((req,res)=>{const pathname=new URL(req.url,'http://fixture').pathname;if(pathname==='/fixture.html'){res.setHeader('Content-Type','text/html; charset=utf-8');res.end('<!doctype html><html><body></body></html>');return;}const p=path.resolve(root,'.'+pathname),relative=path.relative(root,p);if(relative.startsWith('..')||path.isAbsolute(relative)){res.writeHead(403).end();return;}try{const bytes=fs.readFileSync(p);res.setHeader('Content-Type',p.endsWith('.webp')?'image/webp':p.endsWith('.css')?'text/css':'text/javascript');res.end(bytes);}catch{res.writeHead(404).end();}});await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
  const browser=await chromium.launch({headless:true,...(process.env.ROYAL_CHROMIUM_PATH?{executablePath:process.env.ROYAL_CHROMIUM_PATH}:{}),args:['--no-sandbox','--disable-gpu']});const errors=[];
  for(const width of [320,390,768]){
   const page=await browser.newPage({viewport:{width,height:844},isMobile:true,hasTouch:true});page.on('pageerror',e=>errors.push(e.message));
