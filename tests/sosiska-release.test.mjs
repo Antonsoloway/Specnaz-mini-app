@@ -2,13 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
-for(const [file,target] of [['app.html','app-v0616.html'],['app-v0601.html','app-v0600.html']])test(file+' preserves Telegram launch query and hash',async()=>{
+for(const [file,target] of [['app.html','app-v0617.html'],['app-v0601.html','app-v0600.html']])test(file+' preserves Telegram launch query and hash',async()=>{
  const html=await readFile(new URL('../'+file,import.meta.url),'utf8'),script=html.match(/<script>([\s\S]*?)<\/script>/)[1];
  let destination;
  const context={URLSearchParams,window:{location:{search:'?gas=fixture&owner=value',hash:'#tgWebAppData=fixture%26signed',replace(value){destination=value;}}}};
  vm.runInNewContext(script,context);
  const url=new URL(destination,'https://miniapp.test/');
- assert.equal(url.pathname,'/'+target);assert.equal(url.searchParams.get('gas'),'fixture');assert.equal(url.searchParams.get('owner'),'value');assert.equal(url.searchParams.get('releaseBuild'),file==='app.html'?'20261107-mayak-build-compat1':'20261016-v061-agent-status1');assert.equal(url.hash,context.window.location.hash);
+ assert.equal(url.pathname,'/'+target);assert.equal(url.searchParams.get('gas'),'fixture');assert.equal(url.searchParams.get('owner'),'value');assert.equal(url.searchParams.get('releaseBuild'),file==='app.html'?'20261108-sosiska-player-membership1':'20261016-v061-agent-status1');assert.equal(url.hash,context.window.location.hash);
 });
 test('Sosiska appears in current changelog without losing existing entries',async()=>{
  const source=await readFile(new URL('../changelog-v061-latest.js',import.meta.url),'utf8');
@@ -85,6 +85,23 @@ test('v0.6.6 links release retains prior history, installed services and separat
  assert.equal(ctx.window.RoyalChangelog.releases[1].version,'0.6.5');
 });
 
+test('v0.6.17 Sosiska release preserves the published Mayak and battle-base modules',async()=>{
+ const html=await readFile(new URL('../app-v0617.html',import.meta.url),'utf8');
+ const app=await readFile(new URL('../app.html',import.meta.url),'utf8');
+ const index=await readFile(new URL('../index.html',import.meta.url),'utf8');
+ assert.ok(html.includes("window.__ROYAL_BUILD__='0.6.17'"));
+ assert.ok(html.includes('project-mayak-v061.js?v=20261107-v0616-build-compat1'));
+ assert.ok(html.includes('battle-base-v0615.js?v=20261106-admin-battle-base1'));
+ assert.ok(html.includes('sosiska-v061.js?v=20261108-sosiska-player-membership1'));
+ assert.ok(html.includes('sosiska-v061.css?v=20261108-sosiska-player-membership1'));
+ assert.ok(html.indexOf('changelog-v0616.js')<html.indexOf('changelog-v0617.js'));
+ assert.ok(app.includes('app-v0617.html'));assert.ok(index.includes('app-v0617.html'));
+ const source=await readFile(new URL('../changelog-v0617.js',import.meta.url),'utf8');
+ const ctx={window:{RoyalChangelog:{releases:[{version:'0.6.16',title:'Mayak'}]}}};
+ vm.runInNewContext(source,ctx);
+ assert.equal(ctx.window.RoyalChangelog.version,'0.6.17');
+ assert.equal(ctx.window.RoyalChangelog.releases[1].version,'0.6.16');
+});
 test('v0.6.15 battle base remains intact in the v0.6.16 Mayak release',async()=>{
  const html=await readFile(new URL('../app-v0615.html',import.meta.url),'utf8');
  const latest=await readFile(new URL('../app-v0616.html',import.meta.url),'utf8');
@@ -97,7 +114,7 @@ test('v0.6.15 battle base remains intact in the v0.6.16 Mayak release',async()=>
  assert.match(html,/battle-base-v0615\.js/);
  assert.match(html,/battle-base-v0615\.css/);
  assert.match(html,/changelog-v0615\.js/);
- assert.match(index,/app-v0616\.html/);
+ assert.match(index,/app-v0617\.html/);
  assert.match(latest,/window.__ROYAL_BUILD__='0\.6\.16'/);
  assert.match(latest,/project-mayak-v061\.js\?v=20261107-v0616-build-compat1/);
  assert.ok(latest.indexOf('changelog-v0615.js')<latest.indexOf('changelog-v0616.js'));

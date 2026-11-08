@@ -249,6 +249,14 @@ cannot inflate the current roster count or be sent to current-roster-only profil
 lookup; keep their activity accessible. Membership event detail is opt-in for
 the frontend and must not inflate existing backend AI period payloads.
 
+An explicit historical-player profile action may use the separate read-only native
+getProfile operation by exact game-scoped UserId; this is not a current-roster
+lookup. Never infer current membership from old snapshots. Only a validated live
+profile TeamId may establish current team membership: positive ID opens that exact
+game-scoped team and roster; numeric zero means no team; missing/invalid ID or
+failed profile remains unknown. RM and RK profile/team IDs, statistics and routes
+must never cross. Viewing a profile/team must not create a watch or capture.
+
 
 ### Sequential admin writes
 

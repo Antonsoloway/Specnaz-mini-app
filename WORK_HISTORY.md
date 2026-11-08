@@ -1,3 +1,15 @@
+## 08.11.2026 — Sosiska departed-player profiles, release v0.6.17 (PR candidate)
+
+The main branch advanced while this feature was being prepared: v0.6.16 is already the published Mayak compatibility release. The Sosiska profile feature is therefore prepared as v0.6.17; no existing release number or module is overwritten.
+
+Prepared app-v0617.html and changelog-v0617.js from the current main v0.6.16 entrypoint, preserving the Mayak compatibility loader, admin battle base v0.6.15, Telegram launch routing and all current modules. Both app.html and index.html now target v0.6.17 with a unique releaseBuild cache key. Only the Sosiska JS/CSS cache keys are advanced for this feature. The v0.6.16 Mayak changelog remains loaded before v0.6.17 Sosiska notes.
+
+The feature implementation and browser acceptance remain unchanged: departed-member row opens the exact RM/RK native player profile, displays verified current team/no-team/unknown state, and navigates to the current team roster. RM/RK identities and statistics stay isolated. Browsing does not create monitoring or captures.
+
+Local validation before integration: 206/206 Sosiska/RK/battle-base Node tests; 32/32 admin transport/cache/media tests; 15/15 team-navigation tests; Edge acceptance at 320/390/768; Workerd battle-base and Sosiska fixtures; static asset audit 153/153. After integration with main, rerun the full CI-equivalent suite and asset audit.
+
+Not published. This is a PR candidate only; no Worker, GAS, D1, secrets, or live deployment changes.
+
 ## 2026-11-07 — v0.6.16 published: restore Project «МАЯК»
 
 Request: restore the missing project materials in the Royal CRM Mini App

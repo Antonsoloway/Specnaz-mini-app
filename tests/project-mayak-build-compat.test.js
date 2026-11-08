@@ -53,18 +53,22 @@ test('МАЯК stays disabled outside its compatible 0.6.x release line', () => 
   }
 });
 
-test('v0.6.16 entrypoint and permanent redirects keep the Mayak module and launch hash', () => {
+test('v0.6.16 Mayak release remains intact and v0.6.17 redirects keep the module and launch hash', () => {
   const entry = fs.readFileSync(path.join(root, 'app-v0616.html'), 'utf8');
   const app = fs.readFileSync(path.join(root, 'app.html'), 'utf8');
   const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  const next = fs.readFileSync(path.join(root, 'app-v0617.html'), 'utf8');
 
   assert.match(entry, /window\.__ROYAL_BUILD__='0\.6\.16'/);
   assert.match(entry, /project-mayak-v061\.js\?v=20261107-v0616-build-compat1/);
   assert.ok(entry.indexOf('changelog-v0615.js') < entry.indexOf('changelog-v0616.js'));
   assert.match(entry, /changelog-v0616\.js\?v=20261107-mayak-build-compat1/);
-  assert.match(app, /app-v0616\.html/);
+  assert.match(next, /window\.__ROYAL_BUILD__='0\.6\.17'/);
+  assert.match(next, /project-mayak-v061\.js\?v=20261107-v0616-build-compat1/);
+  assert.ok(next.indexOf('changelog-v0616.js') < next.indexOf('changelog-v0617.js'));
+  assert.match(app, /app-v0617\.html/);
   assert.match(app, /window\.location\.hash/);
-  assert.match(index, /app-v0616\.html/);
+  assert.match(index, /app-v0617\.html/);
   assert.match(index, /current\.hash/);
 });
 

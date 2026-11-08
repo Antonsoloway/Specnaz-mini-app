@@ -183,6 +183,83 @@ test('clicking a roster member opens detailed native profile and close returns t
  s.action('profile',undefined,{profileId:'778'});await settle();assert.match(s.panel.innerHTML,/<h4>Second<\/h4>/);
  assert.equal(s.calls.some(b=>['watch','capture','analysis'].includes(b.operation)),false);
 });
+test('departed member opens live profile, reports current team and navigates to that team',async()=>{
+ const member=(id,name,level)=>({UserId:id,Name:name,Level:level,Crown:20,HelpCount:3});
+ const oldTeam={TeamId:'1',TeamName:'Old team',Members:[member('A','Still here',100)],Leader:'A'};
+ const currentTeam={TeamId:'2',TeamName:'Current team',Members:[member('B','Former player',200)],Leader:'B'};
+ const history=[2,1].map(n=>({sequence:n,snapshot:{teamId:'1',capturedAt:new Date(Date.UTC(2026,9,13,n)).toISOString(),raw:{TeamName:'Old team',Members:n===2?[member('A','Still here',100)]:[member('A','Still here',99),member('B','Former player',90)]}},changes:{baseline:n===1}}));
+ const s=setup({responder:b=>{
+  if(b.operation==='team')return b.teamId==='2'?currentTeam:oldTeam;
+  if(b.operation==='history')return b.teamId==='2'?{records:[],nextBefore:null}:{records:history,nextBefore:null};
+  if(b.operation==='profile')return {userId:'B',name:'Former player',level:250,crown:900,teamId:'2',teamName:'Current team',teamLogo:1,joinedAt:'1685577600',stats:{totalCrown:'12345',highestCrown:'900',leagueWins:'12',firstTryWins:'700',helpsMade:'80',helpsReceived:'20',areasCompleted:'140',collectionsCompleted:'8',setsCompleted:'90'},fetchedAt:'2026-10-13T20:00:00Z'};
+  return {watches:[]};
+ }});
+ await s.context.window.RoyalSosiska.open();s.action('team','1');await settle();s.action('left-members');await settle();
+ assert.match(s.panel.innerHTML,/data-sosiska-action="player-profile" data-player-id="B"/);assert.match(s.panel.innerHTML,/Former player/);
+ s.action('player-profile',undefined,{playerId:'B'});await settle();
+ assert.deepEqual(s.calls.find(b=>b.operation==='profile'),{operation:'profile',userId:'B'});
+ assert.match(s.panel.innerHTML,/Сейчас в команде/);assert.match(s.panel.innerHTML,/Current team/);assert.doesNotMatch(s.panel.innerHTML,/sosiska-player-detail/);
+ assert.ok(s.panel.innerHTML.includes('12 345')||s.panel.innerHTML.includes('12 345'));assert.match(s.panel.innerHTML,/В истории команды Old team: вступлений 0 · выходов 1/);
+ s.action('profile-close');await settle();assert.match(s.panel.innerHTML,/data-membership-view="left"/);
+ s.action('player-profile',undefined,{playerId:'B'});await settle();
+ s.action('player-current-team','2');await settle();
+ assert.equal(s.calls.filter(b=>b.operation==='team').at(-1).teamId,'2');
+ assert.match(s.panel.innerHTML,/Current team/);assert.match(s.panel.innerHTML,/Former player/);assert.doesNotMatch(s.panel.innerHTML,/Old team/);
+ assert.equal(s.calls.some(b=>b.operation==='watch'||b.operation==='capture'),false);
+});
+
+test('departed roster row opens the same native profile and returns to roster without the activity chart',async()=>{
+ const member=(id,name,level)=>({UserId:id,Name:name,Level:level,Crown:20,HelpCount:3});
+ const oldTeam={TeamId:'1',TeamName:'Old team',Members:[member('A','Still here',100)],Leader:'A'};
+ const history=[2,1].map(n=>({sequence:n,snapshot:{teamId:'1',capturedAt:new Date(Date.UTC(2026,9,13,n)).toISOString(),raw:{TeamName:'Old team',Members:n===2?[member('A','Still here',100)]:[member('A','Still here',99),member('B','Former player',90)]}},changes:{baseline:n===1}}));
+ const s=setup({responder:b=>b.operation==='team'?oldTeam:b.operation==='history'?{records:history,nextBefore:null}:b.operation==='profile'?{userId:'B',name:'Former player',level:250,crown:900,teamId:'2',teamName:'Current team',stats:{totalCrown:'12345'},fetchedAt:'2026-10-13T20:00:00Z'}:{watches:[]}});
+ await s.context.window.RoyalSosiska.open();s.action('team','1');await settle();s.action('roster-view');await settle();
+ assert.match(s.panel.innerHTML,/data-sosiska-action="player-profile"[^>]*data-player-id="B"/);
+ s.action('player-profile',undefined,{playerId:'B'});await settle();
+ assert.match(s.panel.innerHTML,/Former player/);assert.doesNotMatch(s.panel.innerHTML,/sosiska-player-detail/);
+ s.action('profile-close');await settle();assert.match(s.panel.innerHTML,/data-sosiska-action="roster-view"/);
+ assert.equal(s.calls.some(b=>b.operation==='watch'||b.operation==='capture'),false);
+});
+
+test('RK departed member uses RK profile and team routes without RM statistics or ID crossover',async()=>{
+ const member=(id,name)=>({UserId:id,Name:name,Level:500,Crown:80,HelpCount:2});
+ const oldTeam={TeamId:'101',TeamName:'RK old team',Members:[member('A','Still here')]};
+ const currentTeam={TeamId:'202',TeamName:'RK current team',Members:[member('B','RK former player')]};
+ const history=[2,1].map(n=>({sequence:n,snapshot:{teamId:'101',capturedAt:new Date(Date.UTC(2026,9,13,n)).toISOString(),raw:{TeamName:'RK old team',Members:n===2?[member('A','Still here')]:[member('A','Still here'),member('B','RK former player')]}},changes:{baseline:n===1}}));
+ const s=setup({responder:b=>{
+  if(b.operation==='team')return b.teamId==='202'?currentTeam:oldTeam;
+  if(b.operation==='history')return b.teamId==='202'?{records:[],nextBefore:null}:{records:history,nextBefore:null};
+  if(b.operation==='profile')return {userId:'B',name:'RK former player',level:800,crown:9000,teamId:'202',teamName:'RK current team',stats:{totalCup:'123456',highestCup:'12000',arenaWins:'55',firstTryWins:'800',levelWins:'900',helpsMade:'20',highestWeeklyWins:'40',collectionsCompleted:'7',districtsBuilt:'12'},game:'rk',fetchedAt:'2026-10-13T20:00:00Z',cacheStatus:'live'};
+  return {watches:[]};
+ }});
+ await s.context.window.RoyalSosiska.open('rk');s.action('team','101');await settle();s.action('left-members');await settle();s.action('player-profile',undefined,{playerId:'B'});await settle();
+ assert.deepEqual(s.calls.find(b=>b.operation==='profile'),{operation:'profile',game:'rk',userId:'B'});
+ assert.match(s.panel.innerHTML,/Статистика арены/);assert.match(s.panel.innerHTML,/Всего кубков/);assert.match(s.panel.innerHTML,/123 456/);
+ assert.doesNotMatch(s.panel.innerHTML,/Всего корон|Больше всего корон/);
+ s.action('player-current-team','202');await settle();
+ assert.deepEqual(s.calls.filter(b=>b.operation==='team').at(-1),{operation:'team',game:'rk',teamId:'202'});
+ assert.match(s.panel.innerHTML,/RK current team/);assert.match(s.panel.innerHTML,/RK former player/);
+});
+
+test('departed member with verified TeamId zero is explicitly shown without a team link',async()=>{
+ const oldTeam={TeamId:'1',TeamName:'Old team',Members:[{UserId:'A',Name:'Still here',Level:100,Crown:1}]};
+ const history=[2,1].map(n=>({sequence:n,snapshot:{teamId:'1',capturedAt:new Date(Date.UTC(2026,9,13,n)).toISOString(),raw:{TeamName:'Old team',Members:n===2?oldTeam.Members:[...oldTeam.Members,{UserId:'B',Name:'No team',Level:50,Crown:0}]}},changes:{baseline:n===1}}));
+ const s=setup({responder:b=>b.operation==='team'?oldTeam:b.operation==='history'?{records:history,nextBefore:null}:b.operation==='profile'?{userId:'B',name:'No team',level:60,crown:0,teamId:'0',teamName:'',stats:{},fetchedAt:'2026-10-13T20:00:00Z'}:{watches:[]}});
+ await s.context.window.RoyalSosiska.open();s.action('team','1');await settle();s.action('left-members');await settle();s.action('player-profile',undefined,{playerId:'B'});await settle();
+ assert.match(s.panel.innerHTML,/Сейчас без команды/);assert.match(s.panel.innerHTML,/Без команды/);
+ assert.equal(s.panel.innerHTML.includes('data-sosiska-action="player-current-team"'),false);
+});
+
+test('missing current TeamId remains unknown rather than claiming no team',async()=>{
+ const oldTeam={TeamId:'1',TeamName:'Old team',Members:[{UserId:'A',Name:'Still here',Level:100,Crown:1}]};
+ const history=[2,1].map(n=>({sequence:n,snapshot:{teamId:'1',capturedAt:new Date(Date.UTC(2026,9,13,n)).toISOString(),raw:{TeamName:'Old team',Members:n===2?oldTeam.Members:[...oldTeam.Members,{UserId:'B',Name:'Unknown team',Level:50,Crown:0}]}},changes:{baseline:n===1}}));
+ const s=setup({responder:b=>b.operation==='team'?oldTeam:b.operation==='history'?{records:history,nextBefore:null}:b.operation==='profile'?{userId:'B',name:'Unknown team',level:60,crown:0,stats:{},fetchedAt:'2026-10-13T20:00:00Z'}:{watches:[]}});
+ await s.context.window.RoyalSosiska.open();s.action('team','1');await settle();s.action('left-members');await settle();s.action('player-profile',undefined,{playerId:'B'});await settle();
+ assert.match(s.panel.innerHTML,/Текущую команду не удалось подтвердить/);assert.match(s.panel.innerHTML,/Статус не подтверждён/);
+ assert.doesNotMatch(s.panel.innerHTML,/Сейчас без команды|Без команды/);
+ assert.equal(s.panel.innerHTML.includes('data-sosiska-action="player-current-team"'),false);
+});
+
 test('failed or mismatched profile never supplies fabricated lifetime statistics',async()=>{
  const s=setup({responder:b=>b.operation==='team'?{TeamId:'1',TeamName:'Team',Members:[{UserId:'777',Name:'Player',Level:100,Crown:4}]}:b.operation==='profile'?{userId:'778',name:'Wrong person',stats:{totalCrown:'999'}}:b.operation==='history'?{records:[],nextBefore:null}:{watches:[]}});
  await s.context.window.RoyalSosiska.open();s.action('team','1');await settle();s.action('profile',undefined,{profileId:'777'});await settle();assert.match(s.panel.innerHTML,/Профиль не соответствует/);assert.ok(!s.panel.innerHTML.includes('Wrong person'));assert.ok(!s.panel.innerHTML.includes('>999<'));assert.match(s.panel.innerHTML,/Повторить загрузку/);
