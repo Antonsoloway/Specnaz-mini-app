@@ -1,3 +1,14 @@
+## 08.11.2026 — v0.6.16 Sosiska departed-player profiles (release candidate, not published)
+
+Implemented interactive departed-player profiles for RM/RK in isolated branch feature/sosiska-player-membership-navigation-20261108. Names in the departed-membership list open the native game profile by exact UserId; profile combines historical join/leave observations and current live membership. Positive validated TeamId opens exact current team directly on roster; numeric TeamId=0 means no team; missing/invalid data remains unknown. RM/RK routes, TeamIds and stats remain isolated. Profile browsing creates no watches/captures.
+
+Prepared app-v0616.html, changelog-v0616.js and app.html/index.html redirects in this worktree only. v0.6.15 entrypoint and existing modules remain preserved; 153 local asset references audited, zero missing. Browser acceptance using Playwright 1.62.1 with Microsoft Edge passed at 320/390/768, including departed list drilldown, current profile, team navigation, roster, empty/gap history and no horizontal overflow.
+
+Validation: 206/206 Sosiska/RK/battle-base Node tests; 32/32 admin transport/cache/media tests; 15/15 team-navigation resolver tests; release tests 10/10; Workerd battle-base 8 checks; Workerd Sosiska diagnostics/SQLite/cold-start/full-history 6 checks; esbuild v0.25.12 bundles PASS; git diff --check PASS. The prebuilt period bundle matches a fresh build after Windows CRLF normalization.
+
+Not published: redirects and v0.6.16 entrypoint exist only in this isolated worktree. No GitHub Pages, Worker, GAS, secret, D1, game-agent or monitoring production changes. Main checkout remains on fix/crm-name-corruption-and-public-sync-20261106 with its unrelated pre-existing CRM edits untouched. Full details: docs/sosiska/PLAYER_CURRENT_MEMBERSHIP_NAVIGATION_20261108.md.
+
+
 ## 06.11.2026 — v0.6.15 «База битв» — production опубликован
 
 Добавлен админский раздел Royal CRM Mini App. Новый entrypoint app-v0615.html; app.html и index.html направляют на него, сохраняя Telegram query/hash. Кнопка «База битв» скрыта для не-админов; app.js и сервер повторно проверяют права. Worker main подготовлен на src/entry-v1430.js: GET /admin-battle-base и GET /verify-admin-session. Gateway добавляет GET /api/internal/competition-index и KV индекс из существующих competition_* таблиц D1.
