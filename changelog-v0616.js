@@ -1,17 +1,16 @@
-/* Royal CRM Mini App v0.6.16 — admin-only battle archive. */
 (() => {
   const VERSION='0.6.16';
-  const sections=[{title:'База битв',changes:[
-    'Добавлен закрытый для участников раздел «База битв»: поиск по названию команды и соперника, RM/RK, битвам и турнирам, итоговым и промежуточным скриншотам, датам публикации и очкам.',
-    'Раздел использует существующую базу D1. Поисковый индекс кэшируется отдельно и помечается на обновление при поступлении новых распознанных скриншотов — повторный поиск не сканирует D1.',
-    'Доступ к разделу и данным повторно проверяется сервером по статусу администратора Telegram. Архив эпичных битв дополнительно остаётся доступен только владельцу.'
+  const sections=[{title:'Проект «МАЯК»',changes:[
+    'Восстановлена работа раздела «МАЯК» в актуальной версии приложения: модуль достижений и список участников запускаются на всей совместимой линейке 0.6.x.',
+    'Возвращено отображение командного и личного рейтингов, песни и видео проекта через прежнюю защищённую загрузку.',
+    'Добавлена проверка совместимости, чтобы последующие обновления 0.6.x не отключали раздел из-за несовпадения номера сборки.'
   ]}];
   const previous=Array.isArray(window.RoyalChangelog?.releases)
     ? window.RoyalChangelog.releases.filter(item=>String(item?.version||'')!==VERSION):[];
-  const release={version:VERSION,title:'База битв для администраторов',sections,changes:sections.flatMap(section=>section.changes)};
+  const release={version:VERSION,title:'Восстановлен проект «МАЯК»',sections,changes:sections.flatMap(section=>section.changes)};
   const releases=[release,...previous];
   const esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')
-    .replaceAll('"','&quot;').replaceAll("'",'&#039;');
+    .replaceAll('"','&quot;').replaceAll("'","&#039;");
   const list=changes=>'<ul>'+(changes||[]).map(change=>'<li>'+esc(change)+'</li>').join('')+'</ul>';
   const releaseBody=item=>Array.isArray(item.sections)&&item.sections.length
     ?item.sections.map(section=>'<section class="release-group">'+(section.title?'<h3>'+esc(section.title)+'</h3>':'')+list(section.changes)+'</section>').join('')

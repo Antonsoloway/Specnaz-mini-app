@@ -327,3 +327,14 @@ The Royal CRM Mini App «База битв» is visible only to verified Telegra
 D1 remains the single source of truth. Do not copy competition records into Google Sheets. Build a compact read-only search index in the dedicated COMPETITION_INDEX_CACHE KV namespace. New successful competition persistence marks the index dirty; rebuild no more frequently than once per 30 minutes, with a 60-minute fallback TTL and a 5-minute Mini App memory cache. Searches and keystrokes must never issue D1 queries. Serve a bounded stale index (up to 7 days) only when refresh fails, and mark it stale in the API response.
 
 The general admin battle base includes parsed/review standard competition screenshots only. Exclude owner-epic-archive-v1 and every owner-only Sosiska event/bracket/help-metric payload. Preserve source links, author/caption and Telegram publication timestamps. Date filters mean Telegram publication date, not an inferred competition date; unknown dates remain unknown. Never infer a battle date or merge separate screenshots into a single event without verified evidence. RM/RK, battle/tournament, final/intermediate, review status and the green community row retain their stored meaning.
+
+
+### Build compatibility for shared modules
+
+A shared frontend module that supports a release line must not gate itself on one
+exact patch build. Use an explicit compatible major/minor range (for example,
+`0.6.x`) and keep incompatible release lines disabled when their contract may
+differ. Add regression coverage for the original build, the current build, a
+future patch in the same line, and at least one incompatible minor/major line.
+Every new app entrypoint must keep its matching changelog, update both permanent
+redirects, and preserve the complete Telegram launch query and hash.

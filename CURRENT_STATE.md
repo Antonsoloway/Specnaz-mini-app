@@ -1,13 +1,45 @@
-## 08.11.2026 — v0.6.16 Sosiska departed-player profiles (release candidate, not published)
+## 08.11.2026 — Sosiska departed-player profiles, release v0.6.17 (PR candidate)
 
-Implemented interactive departed-player profiles for RM/RK in isolated branch feature/sosiska-player-membership-navigation-20261108. Names in the departed-membership list open the native game profile by exact UserId; profile combines historical join/leave observations and current live membership. Positive validated TeamId opens exact current team directly on roster; numeric TeamId=0 means no team; missing/invalid data remains unknown. RM/RK routes, TeamIds and stats remain isolated. Profile browsing creates no watches/captures.
+The main branch advanced while this feature was being prepared: v0.6.16 is already the published Mayak compatibility release. The Sosiska profile feature is therefore prepared as v0.6.17; no existing release number or module is overwritten.
 
-Prepared app-v0616.html, changelog-v0616.js and app.html/index.html redirects in this worktree only. v0.6.15 entrypoint and existing modules remain preserved; 153 local asset references audited, zero missing. Browser acceptance using Playwright 1.62.1 with Microsoft Edge passed at 320/390/768, including departed list drilldown, current profile, team navigation, roster, empty/gap history and no horizontal overflow.
+Prepared app-v0617.html and changelog-v0617.js from the current main v0.6.16 entrypoint, preserving the Mayak compatibility loader, admin battle base v0.6.15, Telegram launch routing and all current modules. Both app.html and index.html now target v0.6.17 with a unique releaseBuild cache key. Only the Sosiska JS/CSS cache keys are advanced for this feature. The v0.6.16 Mayak changelog remains loaded before v0.6.17 Sosiska notes.
 
-Validation: 206/206 Sosiska/RK/battle-base Node tests; 32/32 admin transport/cache/media tests; 15/15 team-navigation resolver tests; release tests 10/10; Workerd battle-base 8 checks; Workerd Sosiska diagnostics/SQLite/cold-start/full-history 6 checks; esbuild v0.25.12 bundles PASS; git diff --check PASS. The prebuilt period bundle matches a fresh build after Windows CRLF normalization.
+The feature implementation and browser acceptance remain unchanged: departed-member row opens the exact RM/RK native player profile, displays verified current team/no-team/unknown state, and navigates to the current team roster. RM/RK identities and statistics stay isolated. Browsing does not create monitoring or captures.
 
-Not published: redirects and v0.6.16 entrypoint exist only in this isolated worktree. No GitHub Pages, Worker, GAS, secret, D1, game-agent or monitoring production changes. Main checkout remains on fix/crm-name-corruption-and-public-sync-20261106 with its unrelated pre-existing CRM edits untouched. Full details: docs/sosiska/PLAYER_CURRENT_MEMBERSHIP_NAVIGATION_20261108.md.
+Local validation before integration: 206/206 Sosiska/RK/battle-base Node tests; 32/32 admin transport/cache/media tests; 15/15 team-navigation tests; Edge acceptance at 320/390/768; Workerd battle-base and Sosiska fixtures; static asset audit 153/153. After integration with main, rerun the full CI-equivalent suite and asset audit.
 
+Not published. This is a PR candidate only; no Worker, GAS, D1, secrets, or live deployment changes.
+
+## 07.11.2026 — v0.6.16 «МАЯК» — production published
+
+Root cause: `project-mayak-v061.js` returned unless `window.__ROYAL_BUILD__`
+was exactly `0.6.1`. On app build `0.6.15` the file loaded but exited before
+registering `window.RoyalMayak`; the project route, participant badge and
+project media loader therefore never became available.
+
+Fix: the module now accepts patch builds `0.6.1+` inside the compatible
+`0.6.x` line, while leaving `0.6.0` and `0.7.x+` disabled. Added
+`app-v0616.html` and `changelog-v0616.js`; permanent `app.html` and
+`index.html` redirects now target v0.6.16 and preserve Telegram launch
+query/hash. The v0.6.15 admin battle-base modules and release history remain
+in the new entrypoint.
+
+Production: PR #97 merged as `5f4b90a3668fbda7cd0c068b0cdbe938373e7611`.
+PR CI run `42385596809`, main CI run `42385762236`, and Pages deployment
+`42385761561` completed successfully. Local curated suite 205/205,
+admin regressions 32/32, navigation 15/15 and Mayak compatibility 5/5 PASS.
+Live Pages returned HTTP 200 for both redirects, v0.6.16 entrypoint, Mayak
+module and changelog. The fetched production module was evaluated against
+build 0.6.16 and registered `window.RoyalMayak` with project/participant
+entrypoints. Mini App Worker remains v1.43.0; the protected media route still
+returns 401 without a session. No Worker, Apps Script, CRM data or media
+storage was changed. The four source media files remain in
+`royal-crm-data/media/projects/mayak`.
+
+Remaining owner acceptance: open the app in Telegram with a valid session and
+confirm the two rating images, song, video and participant list render/play.
+This release session did not have an authenticated Telegram WebView, so
+end-to-end authenticated media playback is not claimed.
 
 ## 06.11.2026 — v0.6.15 «База битв» — production опубликован
 
