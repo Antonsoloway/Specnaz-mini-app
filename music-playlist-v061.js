@@ -1,7 +1,9 @@
 /* Royal CRM Mini App v0.6.1 — private randomized background playlist */
 (() => {
   'use strict';
-  if (String(window.__ROYAL_BUILD__ || '') !== '0.6.1') return;
+  // The player is shared by all compatible 0.6.x app releases, not only v0.6.1.
+  // A strict equality silently disabled the whole playlist after each app update.
+  if (!/^0\.6\.\d+$/.test(String(window.__ROYAL_BUILD__ || ''))) return;
   if (window.__ROYAL_MUSIC_PLAYLIST_V061__) return;
 
   const VERSION = '0.6.1-playlist.1';
