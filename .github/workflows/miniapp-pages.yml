@@ -1,0 +1,56 @@
+name: Mini App Pages publish
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: miniapp-pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout public Mini App
+        uses: actions/checkout@v4
+
+      - name: Stage only public web assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p _pages_site
+          find . -maxdepth 1 -type f \( \
+            -name '*.html' -o -name '*.js' -o -name '*.css' -o \
+            -name '*.png' -o -name '*.jpg' -o -name '*.jpeg' -o \
+            -name '*.webp' -o -name '*.svg' -o -name '*.gif' -o \
+            -name '*.ico' -o -name '*.woff' -o -name '*.woff2' -o \
+            -name '*.webmanifest' -o -name '.nojekyll' \
+          \) -exec cp -- {} _pages_site/ \;
+          if [ -d assets ]; then cp -a assets _pages_site/assets; fi
+          test -s _pages_site/index.html
+          test -s _pages_site/app.html
+          test -s _pages_site/app-v0617.html
+          test -s _pages_site/music-playlist-v061.js
+          grep -Fq '20261116-v0617-music-compat1' _pages_site/app-v0617.html
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload static Mini App
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _pages_site
+
+      - name: Publish to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
