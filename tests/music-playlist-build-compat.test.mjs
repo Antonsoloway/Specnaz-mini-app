@@ -32,6 +32,12 @@ for (const build of ['0.5.59','1.0.0','',null]) {
   vm.runInNewContext(source,{window});
   assert.equal(window.RoyalMusicPlaylistV061,undefined,'disabled for '+build);
 }
+for (const entry of ['app.html','index.html']) {
+  const source=fs.readFileSync(new URL('../'+entry,import.meta.url),'utf8');
+  assert.match(source,/20261116-miniapp-music-compat1/);
+  assert.match(source,/app-v0617\.html/);
+  assert.match(source,/\.hash/);
+}
 assert.match(html,/music-playlist-v061\.js\?v=20261116-v0617-music-compat1/);
 assert.doesNotMatch(html,/music-playlist-v061\.js\?v=20260824-v061-music-playlist1/);
 console.log('PASS music playlist 0.6.x build compatibility, installation and cache bust (9 checks)');
