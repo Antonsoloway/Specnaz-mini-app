@@ -1,6 +1,7 @@
 import { loadPrivateSnapshotCached } from './private-snapshot-cache.js';
 
 const SESSION_TTL_SEC = 6 * 60 * 60;
+const TELEGRAM_ROLE_TIMEOUT_MS = 2500;
 const INIT_DATA_MAX_AGE_SEC = 5 * 60;
 const ALLOWED_CHAT_STATE = 'В чате';
 const WORKER_VERSION = '1.6.0';
@@ -240,11 +241,13 @@ async function getTelegramAdminInfo(telegramId, env) {
   const chatId = String(env.TELEGRAM_CHAT_ID || '').trim();
   if (!chatId) return { isAdmin: false, status: '', check: 'CHAT_ID_MISSING' };
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TELEGRAM_ROLE_TIMEOUT_MS);
   try {
     const url = new URL(`https://api.telegram.org/bot${env.BOT_TOKEN}/getChatMember`);
     url.searchParams.set('chat_id', chatId);
     url.searchParams.set('user_id', telegramId);
-    const response = await fetch(url.toString());
+    const response = await fetch(url.toString(), { signal: controller.signal });
     const body = await response.json().catch(() => ({}));
     if (!response.ok || !body.ok || !body.result) {
       return { isAdmin: false, status: '', check: 'BOT_API_ERROR' };
@@ -256,7 +259,9 @@ async function getTelegramAdminInfo(telegramId, env) {
       check: 'OK'
     };
   } catch {
-    return { isAdmin: false, status: '', check: 'BOT_API_EXCEPTION' };
+    return { isAdmin: false, status: '', check: controller.signal.aborted ? 'BOT_API_TIMEOUT' : 'BOT_API_EXCEPTION' };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
