@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
-import worker from '../worker/src/index.js';
+import worker, {checkActiveSession} from '../worker/src/index.js';
 
 const env = {
   BOT_TOKEN: 'fixture-bot',
@@ -50,3 +50,21 @@ for (const scenario of ['slow','left','kicked','member','restricted','administra
     assert.equal(body.role.adminCheck, 'OK');
   });
 }
+
+test('an existing admin session loses authority on demotion and exit', async t => {
+  let status = 'administrator';
+  t.mock.method(globalThis, 'fetch', async url => {
+    if (new URL(url).hostname === 'api.github.com') {
+      return Response.json({participants:[{telegramId:'42',chatState:'В чате'}]});
+    }
+    return Response.json({ok:true,result:{status}});
+  });
+  const login = await (await worker.fetch(authRequest(),env)).json();
+  assert.ok(login.session);
+  const request = new Request('https://worker.test/admin-data',{headers:{Authorization:'Bearer '+login.session}});
+  assert.equal(await checkActiveSession(request,env),null);
+  status = 'member';
+  assert.equal((await (await checkActiveSession(request,env)).json()).error,'ROLE_CHANGED');
+  status = 'left';
+  assert.equal((await (await checkActiveSession(request,env)).json()).error,'NOT_IN_CHAT');
+});
