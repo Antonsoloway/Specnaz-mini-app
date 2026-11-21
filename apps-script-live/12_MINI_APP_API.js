@@ -176,6 +176,12 @@ function MINIAPP_buildAuthResult_(e) {
   }
 
   const adminInfo = MINIAPP_getTelegramAdminInfo_(tgUser.id);
+  if (adminInfo.check !== 'OK') {
+    return { ok:false, access:false, error:'MEMBERSHIP_UNAVAILABLE', message:'Не удалось проверить участие в ЧП. Повторите вход.' };
+  }
+  if (!adminInfo.isMember) {
+    return { ok:true, access:false, reason:'NOT_IN_CHAT', message:'Приложение доступно только участникам Чата Победителей.' };
+  }
   const primaryRole = MINIAPP_resolvePrimaryRole_(adminInfo.isAdmin, profile.memberships);
 
   return {
@@ -307,6 +313,7 @@ function MINIAPP_getTelegramAdminInfo_(telegramId) {
     }
     const status = MINIAPP_value_(body.result.status);
     return {
+      isMember: ['creator','administrator','member'].indexOf(status) >= 0 || (status === 'restricted' && body.result.is_member === true),
       isAdmin: status === 'creator' || status === 'administrator',
       status: status,
       check: 'OK'

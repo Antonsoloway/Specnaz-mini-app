@@ -70,7 +70,7 @@ async function handleParticipantRole(request, env, ctx, url) {
     tgUrl.searchParams.set('chat_id', chatId);
     tgUrl.searchParams.set('user_id', telegramId);
 
-    const response = await fetch(tgUrl.toString(), { cache: 'no-store' });
+    const response = await fetch(tgUrl.toString(), { cache: 'no-store', signal:AbortSignal.timeout(2500) });
     const body = await response.json().catch(() => ({}));
     if (!response.ok || !body?.ok || !body?.result) {
       return jsonFrom(auth, {

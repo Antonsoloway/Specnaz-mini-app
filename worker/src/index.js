@@ -79,6 +79,8 @@ async function handleAuth(request, env, cors) {
   }
 
   const adminInfo = await getTelegramAdminInfo(telegramId, env);
+  const denied = membershipDenial(adminInfo, cors);
+  if (denied) return denied;
   const role = resolveRole(adminInfo.isAdmin, profile.memberships || []);
   const session = await issueSession({
     tg: telegramId,
@@ -254,6 +256,7 @@ async function getTelegramAdminInfo(telegramId, env) {
     }
     const status = String(body.result.status || '');
     return {
+      isMember: ['member','administrator','creator'].includes(status) || (status === 'restricted' && body.result.is_member === true),
       isAdmin: status === 'creator' || status === 'administrator',
       status,
       check: 'OK'
@@ -263,6 +266,39 @@ async function getTelegramAdminInfo(telegramId, env) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+function membershipDenial(info, cors) {
+  if (info.check !== 'OK') {
+    return json({ok:false, error:'MEMBERSHIP_UNAVAILABLE', message:'Не удалось проверить участие в ЧП. Повторите вход.'}, 503, cors);
+  }
+  if (!info.isMember) {
+    return json({ok:false, error:'NOT_IN_CHAT', message:'Приложение доступно только участникам Чата Победителей.'}, 403, cors);
+  }
+  return null;
+}
+
+export async function checkActiveSession(request, env) {
+  const token = bearerToken(request);
+  if (!token || request.method === 'OPTIONS') return null;
+  const cors = corsHeaders(request, env);
+  let session;
+  try {
+    session = await verifySession(token, env.SESSION_SECRET);
+  } catch (error) {
+    return json({ok:false,error:error.code || 'SESSION_INVALID'},401,cors);
+  }
+  const info = await getTelegramAdminInfo(session.tg, env);
+  const denied = membershipDenial(info, cors);
+  if (denied) return denied;
+  const path = new URL(request.url).pathname;
+  if (!info.isAdmin && session.role === 'admin') {
+    return json({ok:false,error:'ROLE_CHANGED'},403,cors);
+  }
+  if (!info.isAdmin && (path.startsWith('/admin-') || path === '/verify-admin-session')) {
+    return json({ok:false,error:'ADMIN_REQUIRED'},403,cors);
+  }
+  return null;
 }
 
 function resolveRole(isAdmin, memberships) {

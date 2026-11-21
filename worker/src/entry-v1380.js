@@ -256,7 +256,7 @@ async function getTelegramAdminStatusCached(telegramId, env) {
       const url = new URL(`https://api.telegram.org/bot${botToken}/getChatMember`);
       url.searchParams.set('chat_id', chatId);
       url.searchParams.set('user_id', telegramId);
-      const response = await fetch(url.toString(), { method:'GET', cache:'no-store' });
+      const response = await fetch(url.toString(), { method:'GET', cache:'no-store', signal:AbortSignal.timeout(2500) });
       const body = await response.json().catch(() => ({}));
       if (!response.ok || !body?.ok || !body?.result) {
         return { ok:false, error:'TELEGRAM_ADMIN_CHECK_FAILED', status:502, isAdmin:false };

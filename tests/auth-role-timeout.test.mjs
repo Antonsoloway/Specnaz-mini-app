@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
-import worker from '../worker/src/index.js';
+import worker, {checkActiveSession} from '../worker/src/index.js';
 
 const env = {
   BOT_TOKEN: 'fixture-bot',
@@ -24,24 +24,47 @@ function authRequest() {
   });
 }
 
-for (const scenario of ['slow', 'administrator']) {
+for (const scenario of ['slow','left','kicked','member','restricted','administrator']) {
   test('authenticated CRM participant with Telegram role lookup ' + scenario, {timeout: 6000}, async t => {
     t.mock.method(globalThis, 'fetch', async (url, options) => {
       if (new URL(url).hostname === 'api.github.com') {
         return Response.json({ participants: [{ telegramId: '42', chatState: '\u0412 \u0447\u0430\u0442\u0435' }] });
       }
       assert.equal(new URL(url).pathname, '/botfixture-bot/getChatMember');
-      if (scenario === 'administrator') return Response.json({ ok: true, result: { status: scenario } });
+      if (scenario !== 'slow') return Response.json({ ok: true, result: { status: scenario } });
       return new Promise((_, reject) => {
         options.signal.addEventListener('abort', () => reject(options.signal.reason), { once:true });
       });
     });
     const response = await worker.fetch(authRequest(), env);
     const body = await response.json();
+    if (['slow','left','kicked','restricted'].includes(scenario)) {
+      assert.equal(response.status, scenario === 'slow' ? 503 : 403);
+      assert.equal(body.session, undefined);
+      return;
+    }
     assert.equal(response.status, 200);
     assert.equal(body.access, true);
     assert.ok(body.session);
     assert.equal(body.role.isChatAdmin, scenario === 'administrator');
-    assert.equal(body.role.adminCheck, scenario === 'administrator' ? 'OK' : 'BOT_API_TIMEOUT');
+    assert.equal(body.role.adminCheck, 'OK');
   });
 }
+
+test('an existing admin session loses authority on demotion and exit', async t => {
+  let status = 'administrator';
+  t.mock.method(globalThis, 'fetch', async url => {
+    if (new URL(url).hostname === 'api.github.com') {
+      return Response.json({participants:[{telegramId:'42',chatState:'В чате'}]});
+    }
+    return Response.json({ok:true,result:{status}});
+  });
+  const login = await (await worker.fetch(authRequest(),env)).json();
+  assert.ok(login.session);
+  const request = new Request('https://worker.test/admin-data',{headers:{Authorization:'Bearer '+login.session}});
+  assert.equal(await checkActiveSession(request,env),null);
+  status = 'member';
+  assert.equal((await (await checkActiveSession(request,env)).json()).error,'ROLE_CHANGED');
+  status = 'left';
+  assert.equal((await (await checkActiveSession(request,env)).json()).error,'NOT_IN_CHAT');
+});
