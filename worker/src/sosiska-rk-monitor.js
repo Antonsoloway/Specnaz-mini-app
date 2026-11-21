@@ -89,7 +89,7 @@ export function createKingdomMonitor({storage,env,fetcher=fetch,now=Date.now,set
    return {watches};
   }
   if(b.operation==='watch'){
-   if(!Number.isInteger(b.intervalMinutes)||b.intervalMinutes<60||b.intervalMinutes>10080)throw Error('RK_INVALID_REQUEST');
+   if(!Number.isInteger(b.intervalMinutes)||b.intervalMinutes<1||b.intervalMinutes>10080)throw Error('RK_INVALID_REQUEST');
    const watches=await watchMap();
    if(!watches[teamId]&&Object.keys(watches).length>=100)throw Error('RK_WATCH_LIMIT');
    watches[teamId]={teamId,intervalMinutes:b.intervalMinutes,lastSuccessAt:watches[teamId]?.lastSuccessAt??null,lastError:null,

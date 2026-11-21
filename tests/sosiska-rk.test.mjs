@@ -60,10 +60,10 @@ test('RK isolated monitor records ordered changes, no historical contamination; 
  const monitor=createKingdomMonitor({storage,env,fetcher,now:()=>Date.parse('2026-10-18T12:00:00.000Z')+at,
   setAlarm:v=>storage.setAlarm(v),deleteAlarm:()=>storage.deleteAlarm()});
  const empty=await monitor.perform({operation:'history',teamId:'100'});assert.deepEqual(empty.records,[]);assert.equal(calls.length,0);
- const watched=await monitor.perform({operation:'watch',teamId:'100',intervalMinutes:60});
+ const watched=await monitor.perform({operation:'watch',teamId:'100',intervalMinutes:1});
  assert.equal(watched.watching,true);assert.equal(calls.filter(c=>c.operation==='getTeamInfo').length,1);
  const rows=await monitor.perform({operation:'history',teamId:'100'});assert.equal(rows.records.length,1);assert.equal(rows.records[0].changes.baseline,true);
- level=13;at=60*60000;await monitor.alarm();
+ level=13;at=60000;await monitor.alarm();
  const next=await monitor.perform({operation:'history',teamId:'100'});assert.equal(next.records.length,2);
  assert.equal(next.records[0].sequence,2);assert.equal(next.records[0].changes.members[0].changes[0].delta,3);
  assert.equal(next.records[0].snapshot.tournament.teamScore,560);
