@@ -24,24 +24,29 @@ function authRequest() {
   });
 }
 
-for (const scenario of ['slow', 'administrator']) {
+for (const scenario of ['slow','left','kicked','member','restricted','administrator']) {
   test('authenticated CRM participant with Telegram role lookup ' + scenario, {timeout: 6000}, async t => {
     t.mock.method(globalThis, 'fetch', async (url, options) => {
       if (new URL(url).hostname === 'api.github.com') {
         return Response.json({ participants: [{ telegramId: '42', chatState: '\u0412 \u0447\u0430\u0442\u0435' }] });
       }
       assert.equal(new URL(url).pathname, '/botfixture-bot/getChatMember');
-      if (scenario === 'administrator') return Response.json({ ok: true, result: { status: scenario } });
+      if (scenario !== 'slow') return Response.json({ ok: true, result: { status: scenario } });
       return new Promise((_, reject) => {
         options.signal.addEventListener('abort', () => reject(options.signal.reason), { once:true });
       });
     });
     const response = await worker.fetch(authRequest(), env);
     const body = await response.json();
+    if (['slow','left','kicked','restricted'].includes(scenario)) {
+      assert.equal(response.status, scenario === 'slow' ? 503 : 403);
+      assert.equal(body.session, undefined);
+      return;
+    }
     assert.equal(response.status, 200);
     assert.equal(body.access, true);
     assert.ok(body.session);
     assert.equal(body.role.isChatAdmin, scenario === 'administrator');
-    assert.equal(body.role.adminCheck, scenario === 'administrator' ? 'OK' : 'BOT_API_TIMEOUT');
+    assert.equal(body.role.adminCheck, 'OK');
   });
 }

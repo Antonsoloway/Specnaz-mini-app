@@ -138,7 +138,7 @@
       const result = nativeRenderPage(page);
       if (page === 'home') {
         setTimeout(() => {
-          if (eligibility === true) ensureTile();
+          if (eligibility === true) check(true);
           else {
             removeTile();
             if (eligibility === null) check(false);
@@ -155,6 +155,9 @@
   setTimeout(() => { if (eligibility !== true) check(true); }, 1000);
   setTimeout(() => { if (eligibility !== true) check(true); }, 2500);
 
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && sessionToken) check(true);
+  });
   window.RoyalAdminEligibilityV0600 = {
     version: VERSION,
     check,

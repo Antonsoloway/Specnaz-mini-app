@@ -226,7 +226,13 @@
 
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       try {
-        return await fetchWithTimeout(input, init, timeoutMs, timeoutCode);
+        const response = await fetchWithTimeout(input, init, timeoutMs, timeoutCode);
+        if (!isAuth && response.status === 403) {
+          const denial = await response.clone().json().catch(() => ({}));
+          if (denial.error === 'NOT_IN_CHAT') showDenied(denial.message);
+          if (denial.error === 'ROLE_CHANGED') window.location.reload();
+        }
+        return response;
       } catch (workerError) {
         lastError = workerError;
         if (isAuth && attempt < attempts && isTransientWorkerError(workerError)) {
@@ -241,7 +247,7 @@
     if (isTeamLive || pathname === '/admin-agent' || isAdminData || isAdminWrite || pathname === '/admin-team-photo') {
       throw lastError || workerRequiredError();
     }
-    if (!GAS_URL) throw lastError || timeoutError(timeoutCode);
+    if (isAuth || !GAS_URL) throw lastError || timeoutError(timeoutCode);
     console.warn('Worker unavailable; using GAS fallback:', lastError?.message || lastError);
     return fallbackFor(urlString, init);
   };

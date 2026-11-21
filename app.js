@@ -261,8 +261,9 @@ async function authenticate() {
       if (status) status.textContent = `Справочник временно недоступен: ${error?.code || error?.message || 'UNKNOWN'}`;
     });
   } catch (error) {
+    if (error?.code === 'NOT_IN_CHAT') { showDenied(error.message); return; }
     console.error('Mini App auth error:', error);
-    showFatal('Сервер авторизации пока недоступен.', `${error?.code || error?.message || 'NETWORK_ERROR'} · build=${BUILD}`);
+    showFatal(['NOT_IN_CHAT','MEMBERSHIP_UNAVAILABLE'].includes(error?.code) ? error.message : 'Сервер авторизации пока недоступен.', `${error?.code || error?.message || 'NETWORK_ERROR'} · build=${BUILD}`);
   }
 }
 

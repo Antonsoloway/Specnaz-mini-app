@@ -1,3 +1,4 @@
+import {checkActiveSession} from './index.js';
 import currentWorker from './entry-v1420.js';
 import {createAdminBattleBaseApi} from './battle-base-api-v1.js';
 import {authorizeAdmin} from './entry-v1380.js';
@@ -21,6 +22,8 @@ export {
 
 export default {
   async fetch(request, env, ctx) {
+    const denied = await checkActiveSession(request, env);
+    if (denied) return denied;
     const url = new URL(request.url);
     if (url.pathname === '/verify-admin-session') return verifyAdminSession(request, env);
     if (url.pathname === '/admin-battle-base') return battleBase(request, env);
