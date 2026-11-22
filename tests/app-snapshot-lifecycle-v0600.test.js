@@ -35,7 +35,7 @@ function createElement(id = '') {
   };
 }
 
-function createHarness(snapshotBodies) {
+function createHarness(snapshotBodies, authError) {
   const bodies = [...snapshotBodies];
   const elements = new Map();
   const lifecycle = [];
@@ -95,6 +95,7 @@ function createHarness(snapshotBodies) {
     async fetch(url) {
       const pathname = new URL(String(url)).pathname;
       if (pathname === '/auth') {
+        if (authError) return {ok:false,status:401,json:async()=>({error:authError,message:'Откройте приложение заново из Telegram.'})};
         return {
           ok: true,
           status: 200,
@@ -223,4 +224,15 @@ test('same-session non-force loads share one pending snapshot request', async ()
   assert.equal(second.marker, 'shared');
   assert.equal(harness.lifecycle.filter(event => event.type === 'snapshot-ready').length, 1);
   assert.equal(harness.readSnapshotState().marker, 'shared');
+});
+
+ test('expired Telegram data reports a fresh-launch instruction and its actual code', async () => {
+  const harness = createHarness([], 'INIT_DATA_EXPIRED');
+  await ticks();
+  const fatal = harness.lifecycle.find(event => event.type === 'fatal');
+  assert.ok(fatal);
+  assert.match(fatal.detail.message, /Telegram/);
+  assert.doesNotMatch(fatal.detail.message, /Сервер авторизации пока недоступен/);
+  assert.match(fatal.detail.code, /^INIT_DATA_EXPIRED/);
+  assert.equal(harness.snapshotRequests.length, 0);
 });

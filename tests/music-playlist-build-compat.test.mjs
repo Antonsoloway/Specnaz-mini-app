@@ -34,7 +34,7 @@ for (const build of ['0.5.59','1.0.0','',null]) {
 }
 for (const entry of ['app.html','index.html']) {
   const source=fs.readFileSync(new URL('../'+entry,import.meta.url),'utf8');
-  assert.match(source,/20261116-miniapp-music-compat1/);
+  assert.match(source,/20261122-auth-recovery1/);
   assert.match(source,/app-v0617\.html/);
   assert.match(source,/\.hash/);
 }
