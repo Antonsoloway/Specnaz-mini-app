@@ -10,6 +10,7 @@
     "admin-write-endpoint-pin.test.js",
     "admin-write-timeout-v0600.test.js",
     "app-snapshot-lifecycle-v0600.test.js",
+    "auth-network-relay.test.mjs",
     "auth-role-timeout.test.mjs",
     "battle-base-api-v1.test.mjs",
     "changelog-v0600.test.js",

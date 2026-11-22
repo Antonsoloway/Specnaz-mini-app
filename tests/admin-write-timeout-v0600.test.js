@@ -67,7 +67,7 @@ test('admin writes receive a 60 second transport window', async () => {
   );
   assert.equal(transport.scheduled.at(-1), 60000);
   assert.equal(transport.nativeCalls.length, 1);
-  assert.equal(transport.window.__ROYAL_TRANSPORT_VERSION__, '0.5.14.4');
+  assert.equal(transport.window.__ROYAL_TRANSPORT_VERSION__, '0.5.14.5');
 });
 
 test('admin-data receives one 20 second transport attempt', async () => {
