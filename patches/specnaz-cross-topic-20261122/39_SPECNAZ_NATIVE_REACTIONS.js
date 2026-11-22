@@ -175,3 +175,20 @@ function SNR_process_(ss,data,eventKey) {
   }
   return result;
 }
+
+// Queue the existing atomic public/admin exporter once per history append.
+// No GitHub I/O or participant writes occur inside the webhook processor.
+function SNR_queueHistorySnapshot_(ss) {
+  if (typeof MINIAPP_queueUnifiedSnapshotRefresh_ !== 'function' ||
+      typeof getHistoryLastContentRow_ !== 'function') return {status:'UNAVAILABLE'};
+  var history = ss.getSheetByName(SHEET_HISTORY);
+  if (!history) return {status:'NO_HISTORY'};
+  var cursor = String(getHistoryLastContentRow_(history));
+  var props = PropertiesService.getScriptProperties();
+  var property = 'SNR_HISTORY_SNAPSHOT_CURSOR_V1';
+  if (props.getProperty(property) === cursor) return {status:'UNCHANGED'};
+  var queued = MINIAPP_queueUnifiedSnapshotRefresh_('specnaz_history:' + cursor, true);
+  if (!queued || queued.ok !== true || queued.scheduled !== true) return {status:'RETRY'};
+  props.setProperty(property, cursor);
+  return {status:'QUEUED',historyRow:Number(cursor)};
+}

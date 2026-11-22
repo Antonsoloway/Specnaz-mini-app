@@ -1,0 +1,16 @@
+--- a/05_RELIABLE_WEBHOOK_QUEUE.js
++++ b/05_RELIABLE_WEBHOOK_QUEUE.js
+@@ -391,6 +391,13 @@
+       }
+     }
+ 
++    // Export committed history even when the periodic exporter missed a busy
++    // source. A failed scheduling attempt must not fail an already saved award.
++    if (typeof SNR_queueHistorySnapshot_ === 'function') {
++      try { summary.history_snapshot = SNR_queueHistorySnapshot_(ss).status; }
++      catch (_) { summary.history_snapshot = 'RETRY'; }
++    }
++
+     PropertiesService.getScriptProperties().setProperty(
+       RCWQ_PROP_LAST_SUCCESS,
+       new Date().toISOString()
