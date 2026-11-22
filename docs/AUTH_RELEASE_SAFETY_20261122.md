@@ -53,3 +53,16 @@ above live Worker version as rollback target. After rollout verify /health,
 unauthenticated access denial, and real owner Telegram startup; test member,
 nonmember and revoked-admin scenarios without weakening fail-closed policy.
 The candidate has not yet been published or accepted in Telegram.
+
+Additional verification: Windows application gate also passed 329/329;
+Wrangler dry-run succeeded. Its bundled diff against the downloaded live
+module contains only the intended private-snapshot-cache changes (110 diff
+lines); no other runtime modules changed. Live /health returned 200 and empty
+Telegram auth returned 401 INIT_DATA_MISSING.
+
+Ordinary Wrangler deployments now execute the application gate through
+worker/wrangler.toml [build]. Cloudflare managed Builds settings could not be
+read (HTTP 403 with current OAuth scope). Their configured production build
+command therefore remains unverified; do not claim this independent route is
+guarded until settings are inspected and updated. Pages publication requires
+both unit/contracts and the full existing runtime/browser workflow.
