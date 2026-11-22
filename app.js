@@ -263,7 +263,14 @@ async function authenticate() {
   } catch (error) {
     if (error?.code === 'NOT_IN_CHAT') { showDenied(error.message); return; }
     console.error('Mini App auth error:', error);
-    showFatal(['NOT_IN_CHAT','MEMBERSHIP_UNAVAILABLE'].includes(error?.code) ? error.message : 'Сервер авторизации пока недоступен.', `${error?.code || error?.message || 'NETWORK_ERROR'} · build=${BUILD}`);
+    const code = /^[A-Z][A-Z0-9_]{1,63}$/.test(String(error?.code || '')) ? String(error.code) : 'NETWORK_ERROR';
+    const messages = {
+      INIT_DATA_EXPIRED: 'Данные входа Telegram устарели. Закройте это окно и откройте приложение снова кнопкой бота.',
+      AUTH_DATE_INVALID: 'Данные входа Telegram недействительны. Закройте это окно и откройте приложение снова кнопкой бота.',
+      INVALID_HASH: 'Не удалось подтвердить данные входа Telegram. Закройте приложение и откройте его снова кнопкой бота.',
+      SNAPSHOT_FETCH_FAILED: 'Не удалось загрузить данные участников. Повторите вход немного позже.'
+    };
+    showFatal(messages[code] || (code === 'MEMBERSHIP_UNAVAILABLE' ? error.message : 'Не удалось связаться с сервером авторизации. Повторите вход.'), `${code} · build=${BUILD}`);
   }
 }
 

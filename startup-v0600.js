@@ -22,6 +22,7 @@
   const reducedMotion = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   let state = 'boot';
+  let fatalCode = '';
   let participantName = '';
   let authComplete = false;
   let snapshotComplete = false;
@@ -106,8 +107,9 @@
     if (retryButton) retryButton.textContent = 'Повторить загрузку';
   }
 
-  function showFatal(reason) {
+  function showFatal(reason, code) {
     if (revealed || terminal) return;
+    fatalCode = String(code || '').match(/^([A-Z][A-Z0-9_]{1,63})(?:\s|$)/)?.[1] || '';
     terminal = true;
     flowGeneration += 1;
     cancelFlowTimers();
@@ -123,10 +125,10 @@
     transition(
       'fatal',
       'Не удалось запустить приложение',
-      String(reason || 'Закройте приложение и откройте его снова из бота.'),
+      String(reason || 'Закройте приложение и откройте его снова из бота.') + (fatalCode ? ` Код: ${fatalCode}` : ''),
       true
     );
-    if (retryButton) retryButton.textContent = 'Открыть заново';
+    if (retryButton) retryButton.textContent = ['INIT_DATA_EXPIRED','AUTH_DATE_INVALID'].includes(fatalCode) ? 'Закрыть приложение' : 'Открыть заново';
   }
 
   function emitReady() {
@@ -181,6 +183,10 @@
 
   function retrySnapshot() {
     if (state === 'fatal') {
+      if (['INIT_DATA_EXPIRED','AUTH_DATE_INVALID'].includes(fatalCode)) {
+        try { window.Telegram?.WebApp?.close?.(); } catch (_) {}
+        return;
+      }
       try { window.location.reload(); } catch (_) {}
       return;
     }
@@ -239,7 +245,7 @@
       return;
     }
     if (type === 'fatal') {
-      showFatal(detail.message);
+      showFatal(detail.message, detail.code);
       return;
     }
     if (type === 'access-denied') {

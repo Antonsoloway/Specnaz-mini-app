@@ -796,6 +796,8 @@ function createStartupHarness() {
   vm.runInContext(startupSource, sandbox, { filename: 'startup-v0600.js' });
   return {
     controller: sandbox.RoyalStartupV0600,
+    sandbox,
+    retry,
     root,
     title,
     message,
@@ -1090,4 +1092,30 @@ test('startup video is compact, fast-started and has a poster fallback', () => {
   assert.ok(video.indexOf(Buffer.from('moov')) > 0);
   assert.ok(video.indexOf(Buffer.from('moov')) < video.indexOf(Buffer.from('mdat')));
   assert.ok(poster.size > 0 && poster.size < 50_000);
+});
+
+test('expired auth exposes the code and closes Telegram instead of reloading stale initData', () => {
+  const harness = createStartupHarness();
+  let closes=0, reloads=0;
+  harness.sandbox.Telegram={WebApp:{close(){closes++;}}};
+  harness.sandbox.location.reload=()=>{reloads++;};
+  harness.controller.handleAppEvent('fatal', {message:'Откройте приложение заново из Telegram.',code:'INIT_DATA_EXPIRED · build=0.6.17'});
+  assert.match(harness.message.textContent,/INIT_DATA_EXPIRED/);
+  assert.equal(harness.retry.textContent,'Закрыть приложение');
+  harness.retry.click();
+  assert.equal(closes,1);
+  assert.equal(reloads,0);
+});
+
+test('transient startup error keeps retry and reveals only a bounded diagnostic code', () => {
+  const harness = createStartupHarness();
+  let reloads=0;
+  harness.sandbox.location.reload=()=>{reloads++;};
+  harness.controller.handleAppEvent('fatal', {message:'Не удалось связаться с сервером.',code:'AUTH_TIMEOUT · build=0.6.17'});
+  assert.match(harness.message.textContent,/AUTH_TIMEOUT/);
+  harness.retry.click();
+  assert.equal(reloads,1);
+  const unsafe = createStartupHarness();
+  unsafe.controller.handleAppEvent('fatal', {message:'Ошибка входа',code:'initData=private-test-data'});
+  assert.doesNotMatch(unsafe.message.textContent,/private-test-data/);
 });
