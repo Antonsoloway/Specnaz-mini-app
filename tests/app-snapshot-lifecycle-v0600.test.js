@@ -35,7 +35,7 @@ function createElement(id = '') {
   };
 }
 
-function createHarness(snapshotBodies, authError) {
+function createHarness(snapshotBodies, authError, authPayload = {}) {
   const bodies = [...snapshotBodies];
   const elements = new Map();
   const lifecycle = [];
@@ -105,7 +105,8 @@ function createHarness(snapshotBodies, authError) {
             session: 'session-a',
             user: { crmName: 'Тест', participantKey: 'opaque-test-user' },
             role: { title: 'Участник' },
-            memberships: []
+            memberships: [],
+            ...authPayload
           })
         };
       }
@@ -235,4 +236,12 @@ test('same-session non-force loads share one pending snapshot request', async ()
   assert.doesNotMatch(fatal.detail.message, /Сервер авторизации пока недоступен/);
   assert.match(fatal.detail.code, /^INIT_DATA_EXPIRED/);
   assert.equal(harness.snapshotRequests.length, 0);
+});
+
+test('a post-auth rendering failure is never labelled a network failure', async () => {
+ const harness=createHarness([],undefined,{memberships:[null]});
+ await ticks();
+ const fatal=harness.lifecycle.find(event=>event.type==='fatal');
+ assert.match(fatal.detail.code,/^AUTH_RENDER_FAILED/);
+ assert.doesNotMatch(fatal.detail.message,/связаться с сервером/);
 });

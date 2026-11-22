@@ -8,6 +8,8 @@
  */
 (() => {
   const WORKER_ORIGIN = 'https://royal-crm-miniapp-api.tropical-spoon.workers.dev';
+  const RELAY_ORIGIN = 'https://royal-crm-api-relay.pages.dev';
+  let useRelay = false;
   const params = new URLSearchParams(window.location.search);
   const GAS_URL = String(params.get('gas') || '').trim();
   const nativeFetch = window.fetch.bind(window);
@@ -226,7 +228,14 @@
 
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       try {
-        const response = await fetchWithTimeout(input, init, timeoutMs, timeoutCode);
+        let routedInput = input;
+        if (useRelay || (isAuth && attempt > 1)) {
+          const routedUrl = new URL(urlString);
+          routedUrl.host = new URL(RELAY_ORIGIN).host;
+          routedInput = typeof input === 'string' ? routedUrl.toString() : new Request(routedUrl, input);
+        }
+        const response = await fetchWithTimeout(routedInput, init, timeoutMs, timeoutCode);
+        if (useRelay || (isAuth && attempt > 1)) useRelay = true;
         if (!isAuth && response.status === 403) {
           const denial = await response.clone().json().catch(() => ({}));
           if (denial.error === 'NOT_IN_CHAT') showDenied(denial.message);
@@ -252,6 +261,6 @@
     return fallbackFor(urlString, init);
   };
 
-  window.__ROYAL_TRANSPORT_VERSION__ = '0.5.14.4';
+  window.__ROYAL_TRANSPORT_VERSION__ = '0.5.14.5';
 })();
 

@@ -250,10 +250,12 @@ async function authenticate() {
   const previewUser = tg.initDataUnsafe?.user;
   if (previewUser?.first_name) document.getElementById('hello').textContent = `Привет, ${previewUser.first_name}!`;
   document.getElementById('userMeta').textContent = 'Проверяем доступ…';
+  let authPhase = 'request';
   try {
     const data = await workerAuth(tg.initData);
     if (!data?.ok) { showFatal(data?.message || 'Не удалось подтвердить Telegram-пользователя.', `${data?.error || 'UNKNOWN'} · build=${BUILD}`); return; }
     if (!data.access) { showDenied(data.message || 'Извините, вы не состоите в спецназе.'); return; }
+    authPhase = 'render';
     renderAuth(data);
     loadSnapshot().then(() => { if (activePage !== 'home') renderPage(activePage); }).catch(error => {
       console.error('Snapshot load error:', error);
@@ -263,8 +265,9 @@ async function authenticate() {
   } catch (error) {
     if (error?.code === 'NOT_IN_CHAT') { showDenied(error.message); return; }
     console.error('Mini App auth error:', error);
-    const code = /^[A-Z][A-Z0-9_]{1,63}$/.test(String(error?.code || '')) ? String(error.code) : 'NETWORK_ERROR';
+    const code = authPhase === 'render' ? 'AUTH_RENDER_FAILED' : /^[A-Z][A-Z0-9_]{1,63}$/.test(String(error?.code || '')) ? String(error.code) : 'NETWORK_ERROR';
     const messages = {
+      AUTH_RENDER_FAILED: 'Вход подтверждён, но не удалось открыть интерфейс приложения.',
       INIT_DATA_EXPIRED: 'Данные входа Telegram устарели. Закройте это окно и откройте приложение снова кнопкой бота.',
       AUTH_DATE_INVALID: 'Данные входа Telegram недействительны. Закройте это окно и откройте приложение снова кнопкой бота.',
       INVALID_HASH: 'Не удалось подтвердить данные входа Telegram. Закройте приложение и откройте его снова кнопкой бота.',
