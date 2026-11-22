@@ -1,5 +1,4 @@
 name = "royal-crm-api-relay"
-account_id = "0dd3beb421783a043d0327ac771a3f1a"
 pages_build_output_dir = "./public"
 compatibility_date = "2026-08-15"
 
