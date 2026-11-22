@@ -44,3 +44,9 @@ test('relay has one fixed service destination even when a query contains another
 test('missing relay binding fails closed and never fabricates an authenticated response',async()=>{
  const response=await relay.fetch(new Request(alternate+'/auth',{headers:{Origin:origin}}),{});assert.equal(response.status,503);assert.equal((await response.json()).error,'API_RELAY_UNAVAILABLE');
 });
+
+test('failure of both auth transports is bounded and has an unambiguous code',async()=>{
+ let calls=0;const fetch=transport(async()=>{calls++;throw new TypeError('Failed to fetch');});
+ await assert.rejects(fetch(primary+'/auth',{method:'POST'}),error=>error.code==='AUTH_NETWORK_UNAVAILABLE');
+ assert.equal(calls,2);
+});

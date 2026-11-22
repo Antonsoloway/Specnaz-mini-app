@@ -267,6 +267,7 @@ async function authenticate() {
     console.error('Mini App auth error:', error);
     const code = authPhase === 'render' ? 'AUTH_RENDER_FAILED' : /^[A-Z][A-Z0-9_]{1,63}$/.test(String(error?.code || '')) ? String(error.code) : 'NETWORK_ERROR';
     const messages = {
+      AUTH_NETWORK_UNAVAILABLE: 'Не удалось подключиться к серверу ни основным, ни резервным способом.',
       AUTH_RENDER_FAILED: 'Вход подтверждён, но не удалось открыть интерфейс приложения.',
       INIT_DATA_EXPIRED: 'Данные входа Telegram устарели. Закройте это окно и откройте приложение снова кнопкой бота.',
       AUTH_DATE_INVALID: 'Данные входа Telegram недействительны. Закройте это окно и откройте приложение снова кнопкой бота.',

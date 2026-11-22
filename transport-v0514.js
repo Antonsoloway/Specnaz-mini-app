@@ -225,11 +225,13 @@
             : DEFAULT_TIMEOUT_MS;
     const timeoutCode = isAuth ? 'AUTH_TIMEOUT' : 'WORKER_TIMEOUT';
     let lastError = null;
+    let relayAttempted = false;
 
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       try {
         let routedInput = input;
         if (useRelay || (isAuth && attempt > 1)) {
+          if (isAuth) relayAttempted = true;
           const routedUrl = new URL(urlString);
           routedUrl.host = new URL(RELAY_ORIGIN).host;
           routedInput = typeof input === 'string' ? routedUrl.toString() : new Request(routedUrl, input);
@@ -255,6 +257,11 @@
 
     if (isTeamLive || pathname === '/admin-agent' || isAdminData || isAdminWrite || pathname === '/admin-team-photo') {
       throw lastError || workerRequiredError();
+    }
+    if (isAuth && relayAttempted && isTransientWorkerError(lastError)) {
+      const error = new Error('Primary and relay authorization transport unavailable');
+      error.code = 'AUTH_NETWORK_UNAVAILABLE';
+      throw error;
     }
     if (isAuth || !GAS_URL) throw lastError || timeoutError(timeoutCode);
     console.warn('Worker unavailable; using GAS fallback:', lastError?.message || lastError);
