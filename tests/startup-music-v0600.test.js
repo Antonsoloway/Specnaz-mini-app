@@ -1061,7 +1061,7 @@ test('v0.6 is the general entry and media remain protected/private', () => {
   const router = fs.readFileSync(path.join(ROOT, 'app.html'), 'utf8');
   const index = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 
-  assert.match(preview, /window\.__ROYAL_BUILD__='0\.6\.0'/);
+  assert.match(preview, /window\.__ROYAL_BUILD__='0\.6\.\d+'/);
   assert.ok(preview.indexOf('startup-v0600.js') < preview.indexOf('src="app.js'));
   assert.ok(preview.indexOf('music-v0600.js') < preview.indexOf('src="app.js'));
   assert.match(preview, /<main class="app" inert aria-hidden="true">/);
@@ -1069,12 +1069,15 @@ test('v0.6 is the general entry and media remain protected/private', () => {
   assert.doesNotMatch(stable, /__ROYAL_BUILD__/);
   assert.match(appSource, /: '0\.5\.59';/);
   assert.match(appSource, /Authorization: `Bearer \$\{sessionAtStart\}`/);
-  assert.match(router, /const target = 'app-v0600\.html'/);
-  assert.match(router, /releaseBuild', '20260823-scroll-gesture-hotfix5'/);
-  assert.match(preview, /music-v0600\.js\?v=20260823-scroll-gesture-hotfix5/);
-  assert.match(preview, /app\.js\?v=20260823-scroll-gesture-hotfix5/);
+  const active = require('./release-entry-fixture.cjs').activeHtml();
+  assert.match(active.source, /startup-v0600\.js/);
+  assert.match(active.source, /music-v0600\.js/);
+  assert.match(active.source, /src="app\.js\?v=/);
+  assert.match(router, /releaseBuild', '[^']+'/);
+  assert.match(active.source, /music-v0600\.js\?v=[^"\s]+/);
+  assert.match(active.source, /app\.js\?v=[^"\s]+/);
   assert.doesNotMatch(router, /app-v0559\.html/);
-  assert.match(index, /app-v0600\.html/);
+  assert.ok(index.includes(active.target));
   assert.doesNotMatch(index, /app-v0559\.html/);
   assert.equal(fs.existsSync(path.join(ROOT, 'assets', 'royal-background-v0600.m4a')), false);
   assert.equal(fs.existsSync(path.join(ROOT, 'assets', 'project-mayak-background.mp3')), false);

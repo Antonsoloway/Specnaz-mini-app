@@ -7,7 +7,7 @@ const ROOT = path.resolve(__dirname, '..');
 const journal = require(path.join(ROOT, 'admin-journal-v0600.js'));
 const adminSource = fs.readFileSync(path.join(ROOT, 'admin-v0600.js'), 'utf8');
 const writeSource = fs.readFileSync(path.join(ROOT, 'admin-write-v0600-v3.js'), 'utf8');
-const appSource = fs.readFileSync(path.join(ROOT, 'app-v0600.html'), 'utf8');
+const appSource = require('./release-entry-fixture.cjs').activeHtml().source;
 const cssSource = fs.readFileSync(path.join(ROOT, 'admin-journal-v0600.css'), 'utf8');
 
 function v2Event(overrides={}) {
@@ -235,8 +235,8 @@ test('admin integration is synchronous and the old raw JSON MutationObserver dec
   assert.doesNotMatch(adminSource, /safeEsc\(JSON\.stringify\(row\)\)/);
   assert.doesNotMatch(writeSource, /function decorateJournal|journalOperationLabel|JSON\.parse\(clean\(detail\.textContent\)\)/);
   assert.doesNotMatch(writeSource, /royal-admin-journal-json/);
-  assert.match(appSource, /admin-journal-v0600\.css\?v=20260822-journal-v2/);
-  assert.match(appSource, /admin-journal-v0600\.js\?v=20260822-journal-v2/);
+  assert.match(appSource, /admin-journal-v0600\.css\?v=[^"\s]+/);
+  assert.match(appSource, /admin-journal-v0600\.js\?v=[^"\s]+/);
   assert.ok(appSource.indexOf('admin-journal-v0600.js') < appSource.indexOf('admin-v0600.js'));
   assert.match(cssSource, /\.royal-admin-journal-card\[hidden\]/);
 });

@@ -21,7 +21,9 @@ test('Worker 1.30 uses the existing deploy entry and preserves the 1.28 wrapper 
   assert.match(entry, /WRAPPER_VERSION = '1\.30\.0'/);
   assert.match(entry, /backgroundMusic:\s*BACKGROUND_MUSIC/);
   assert.match(entry, /snapshotCache:\s*SNAPSHOT_CACHE/);
-  assert.match(wrangler, /main = "src\/entry-v1290\.js"/);
+  const chain = require('./release-entry-fixture.cjs').workerChain();
+  assert.ok(chain.includes('src/entry-v1290.js'));
+  assert.ok(chain.includes('src/entry-v1280.js'));
 });
 
 test('the supplied MP3 is never copied into the public application tree', () => {

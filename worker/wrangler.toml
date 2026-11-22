@@ -4,6 +4,10 @@ keep_vars = true
 main = "src/entry-v1430.js"
 compatibility_date = "2026-08-15"
 
+# Fail closed before ordinary Wrangler deploys, including dry-runs.
+[build]
+command = "node -e \"require(require('node:fs').existsSync('scripts/verify-release.cjs') ? './scripts/verify-release.cjs' : '../scripts/verify-release.cjs')\""
+
 [[durable_objects.bindings]]
 name = "SOSISKA_ANALYSIS"
 class_name = "SosiskaAnalysisJobs"

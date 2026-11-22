@@ -16,7 +16,8 @@ function deferred() {
 }
 
 function loadCache(fetch) {
-  const sandbox = { fetch, Promise, Date, Error, encodeURIComponent };
+  const sandbox = { fetch, Promise, Date, Error, encodeURIComponent,
+    AbortController, Request, Response, Headers, setTimeout, clearTimeout };
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   const executable = cacheSource
@@ -42,6 +43,7 @@ test('shared private snapshot cache deduplicates concurrent and sequential reads
 
   const first = load(env);
   const second = load(env);
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal(calls.length, 1);
   body.resolve(JSON.stringify({ participants: [{ name: 'A' }], teams: [] }));
   const [one, two] = await Promise.all([first, second]);
