@@ -1,0 +1,33 @@
+--- a/01_CORE_MAIN.js
++++ b/01_CORE_MAIN.js
+@@ -1916,7 +1916,7 @@
+   const history = ss.getSheetByName(SHEET_HISTORY);
+   if (!history) return;
+ 
+-  ensureHistoryStructure_(history);
++  ensureHistoryStructureForAppend_(history);
+   ensureSpecnazPeriodDivider_(history, new Date());
+ 
+   const targetRow = getHistoryLastContentRow_(history) + 1;
+@@ -1984,6 +1984,21 @@
+   });
+ 
+   return best;
++}
++
++// Appending one award must not reformat the entire existing history grid.
++// Setup/maintenance still use the full formatter. Repair a changed schema first.
++function ensureHistoryStructureForAppend_(sheet) {
++  const expected = [
++    'Дата', 'Аватар', 'Имя', 'Команда', 'Было', 'Стало', 'Добавлено',
++    'Звание', 'Сообщение', 'Источник', 'Строка базы', 'Telegram ID',
++    'Ключ события', 'Тип события', 'Имя для Telegram-ссылки', 'Ссылка сообщения'
++  ];
++  if (sheet.getMaxColumns() >= HISTORY_WIDTH) {
++    const actual = sheet.getRange(1, 1, 1, HISTORY_WIDTH).getDisplayValues()[0];
++    if (expected.every(function(header, i) { return clean_(actual[i]) === header; })) return;
++  }
++  ensureHistoryStructure_(sheet);
+ }
+ 
+ function ensureHistoryStructure_(sheet) {
