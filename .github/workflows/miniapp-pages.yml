@@ -15,7 +15,20 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  application-regressions:
+    uses: ./.github/workflows/sosiska.yml
+
+  release-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/verify-release.cjs app
+
   publish:
+    needs: [release-gate, application-regressions]
     runs-on: ubuntu-latest
     environment:
       name: github-pages

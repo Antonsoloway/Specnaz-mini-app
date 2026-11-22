@@ -2,6 +2,7 @@ const MEMORY_FRESH_TTL_MS = 60_000;
 const STALE_FALLBACK_MAX_AGE_MS = 10 * 60_000;
 const GITHUB_ATTEMPT_TIMEOUT_MS = 1_800;
 const GITHUB_RETRY_DELAY_MS = 220;
+const CACHE_OPERATION_TIMEOUT_MS = 250;
 const EDGE_CACHE_ORIGIN = 'https://royal-crm-miniapp-api.tropical-spoon.workers.dev';
 
 let cacheKey = '';
@@ -22,6 +23,23 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+async function withDeadline(operation, timeoutMs, message, cancel) {
+  let timer;
+  try {
+    return await Promise.race([
+      Promise.resolve().then(operation),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          cancel?.();
+          reject(new Error(message));
+        }, timeoutMs);
+      })
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function cacheRequest(settings) {
   const encoded = [settings.repo, settings.branch, settings.path]
     .map(value => encodeURIComponent(String(value || '')))
@@ -39,11 +57,13 @@ function validateSnapshot(snapshot) {
 async function readEdgeCache(settings) {
   try {
     if (typeof caches === 'undefined' || !caches?.default) return null;
-    const response = await caches.default.match(cacheRequest(settings));
+    const response = await withDeadline(() => caches.default.match(cacheRequest(settings)),
+      CACHE_OPERATION_TIMEOUT_MS, 'snapshot cache read timed out');
     if (!response) return null;
     const storedAt = Number(response.headers.get('X-Royal-Snapshot-Stored-At') || 0);
     if (!Number.isFinite(storedAt) || storedAt <= 0) return null;
-    const snapshot = validateSnapshot(await response.json());
+    const snapshot = validateSnapshot(await withDeadline(() => response.json(),
+      CACHE_OPERATION_TIMEOUT_MS, 'snapshot cache body timed out'));
     return { snapshot, storedAt, age: Math.max(0, Date.now() - storedAt) };
   } catch (error) {
     console.warn('snapshot edge cache read failed', error?.message || 'unknown');
@@ -59,23 +79,22 @@ async function writeEdgeCache(settings, snapshot, storedAt) {
       'Cache-Control': `public, max-age=${Math.ceil(STALE_FALLBACK_MAX_AGE_MS / 1000)}`,
       'X-Royal-Snapshot-Stored-At': String(storedAt)
     });
-    await caches.default.put(
+    await withDeadline(() => caches.default.put(
       cacheRequest(settings),
       new Response(JSON.stringify(snapshot), { status: 200, headers })
-    );
+    ), CACHE_OPERATION_TIMEOUT_MS, 'snapshot cache write timed out');
   } catch (error) {
     console.warn('snapshot edge cache write failed', error?.message || 'unknown');
   }
 }
 
-async function fetchWithTimeout(url, options, timeoutMs) {
+async function fetchWithTimeout(url, options, timeoutMs, consume) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...(options || {}), signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
+  // Receiving headers is not completion: keep the deadline through body read.
+  return withDeadline(async () => {
+    const response = await fetch(url, { ...(options || {}), signal: controller.signal });
+    return consume(response);
+  }, timeoutMs, 'snapshot request timed out', () => controller.abort());
 }
 
 async function fetchSnapshotFromGitHub(settings) {
@@ -85,7 +104,7 @@ async function fetchSnapshotFromGitHub(settings) {
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const response = await fetchWithTimeout(url, {
+      return await fetchWithTimeout(url, {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${settings.token}`,
@@ -94,17 +113,17 @@ async function fetchSnapshotFromGitHub(settings) {
           'User-Agent': 'Royal-CRM-MiniApp-Worker'
         },
         cache: 'no-store'
-      }, GITHUB_ATTEMPT_TIMEOUT_MS);
+      }, GITHUB_ATTEMPT_TIMEOUT_MS, async response => {
+        if (!response.ok) {
+          const error = new Error(`snapshot ${response.status}`);
+          error.status = response.status;
+          throw error;
+        }
 
-      if (!response.ok) {
-        const error = new Error(`snapshot ${response.status}`);
-        error.status = response.status;
-        throw error;
-      }
-
-      const text = await response.text();
-      if (!text.trim()) throw new Error('snapshot empty');
-      return validateSnapshot(JSON.parse(text));
+        const text = await response.text();
+        if (!text.trim()) throw new Error('snapshot empty');
+        return validateSnapshot(JSON.parse(text));
+      });
     } catch (error) {
       lastError = error;
       if (attempt === 0) await sleep(GITHUB_RETRY_DELAY_MS);

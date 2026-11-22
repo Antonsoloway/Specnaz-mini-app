@@ -1,0 +1,31 @@
+name: Mini App release contracts
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  application:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/verify-release.cjs app
+  crm-source:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify CRM and bot changes when their source changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git diff --name-only "$BASE_SHA" HEAD -- apps-script-live gas tests/admin-audit-v2.test.js tests/admin-delete-write5.test.js tests/chatkeeper-webhook-secret.test.js tests/golub-ingress-resilience.test.mjs tests/journal-v2-rollout-script.test.js tests/journal-v2-source-only-repair.test.js | grep -q .; then
+            node scripts/verify-release.cjs crm
+          fi
