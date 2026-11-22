@@ -103,9 +103,42 @@
     }).join('');
     return '<svg viewBox="0 0 360 295" role="img" aria-label="'+esc(title+' '+chartUnit)+'">'+grid+paths+axes+'</svg>';
     }
-    chartModels.set(String(number),{view,svg});
+    chartModels.set(String(number),{view,svg,lines,metric:chartMetric});
     const one=lines.length===1,latest=all.at(-1),hours=all.reduce((n,p)=>n+p.hours,0),average=all.reduce((n,p)=>n+p[chartMetric],0)/hours;
-    return '<figure class="sosiska-chart" data-chart-id="'+number+'"><figcaption>'+esc(title)+'<small>'+esc(chartUnit)+' · время МСК</small></figcaption>'+(one?'<div class="sosiska-chart-stats"><div><small>Последний интервал</small><b>'+rate(latest[chartMetric]/latest.hours)+'</b></div><div><small>В среднем</small><b>'+rate(average)+'</b></div><div><small>Пик</small><b>'+rate(peak)+'</b></div></div>':'')+'<div class="sosiska-chart-controls">'+[['in','+','Увеличить'],['out','−','Уменьшить'],['left','←','Ранее'],['right','→','Позже'],['reset','Вся история','Показать всю историю']].map(([action,label,hint])=>'<button type="button" data-chart-action="'+action+'" aria-label="'+hint+'" title="'+hint+'">'+label+'</button>').join('')+'</div><div class="sosiska-chart-viewport" data-chart-viewport tabindex="0" role="group" aria-label="Масштаб и перемещение графика: плюс, минус, стрелки, Home">'+svg()+'</div><p class="sosiska-chart-range" data-chart-range>'+chartRangeLabel(view)+'</p><label class="sosiska-chart-scroll">Положение во всей истории<input type="range" data-chart-scroll min="0" max="1000" value="'+(view.max-view.min>view.end-view.start?Math.round(1000*(view.start-view.min)/(view.max-view.min-view.end+view.start)):0)+'" '+(view.end-view.start>=view.max-view.min?'disabled':'')+'></label><p class="sosiska-chart-hint">Два пальца — масштаб · один — перемещение. Кнопки + / − и стрелки делают то же.</p><div class="sosiska-chart-key">'+lines.map((l,i)=>'<span class="sosiska-legend" style="color:'+(one?metricColor(chartMetric):colors[i%colors.length])+'">● '+(l.teamId?teamName(l.name,l.teamId):esc(l.name))+'</span>').join('')+'</div><details class="sosiska-chart-values"><summary>Значения по интервалам</summary>'+lines.map(l=>'<h4>'+(l.teamId?teamName(l.name,l.teamId):esc(l.name))+'</h4><div class="sosiska-interval-values">'+l.points.filter(valid).map(p=>'<div><span>'+esc(day(p.from)+' '+clock(p.from)+' — '+day(p.to)+' '+clock(p.to))+'</span><b>'+rate(p[chartMetric]/p.hours)+' '+esc(chartUnit)+'</b></div>').join('')+'</div>').join('')+'</details></figure>';
+    return '<figure class="sosiska-chart" data-chart-id="'+number+'"><figcaption>'+esc(title)+'<small>'+esc(chartUnit)+' · время МСК</small></figcaption>'+(one?'<div class="sosiska-chart-stats"><div><small>Последний интервал</small><b>'+rate(latest[chartMetric]/latest.hours)+'</b></div><div><small>В среднем</small><b>'+rate(average)+'</b></div><div><small>Пик</small><b>'+rate(peak)+'</b></div></div>':'')+'<div class="sosiska-chart-controls">'+[['in','+','Увеличить'],['out','−','Уменьшить'],['left','←','Ранее'],['right','→','Позже'],['reset','Вся история','Показать всю историю']].map(([action,label,hint])=>'<button type="button" data-chart-action="'+action+'" aria-label="'+hint+'" title="'+hint+'">'+label+'</button>').join('')+'</div><div class="sosiska-chart-viewport" data-chart-viewport tabindex="0" role="group" aria-label="Масштаб и перемещение графика: плюс, минус, стрелки, Home">'+svg()+'</div><section class="sosiska-chart-selection" data-chart-selection aria-live="polite" hidden></section><p class="sosiska-chart-range" data-chart-range>'+chartRangeLabel(view)+'</p><label class="sosiska-chart-scroll">Положение во всей истории<input type="range" data-chart-scroll min="0" max="1000" value="'+(view.max-view.min>view.end-view.start?Math.round(1000*(view.start-view.min)/(view.max-view.min-view.end+view.start)):0)+'" '+(view.end-view.start>=view.max-view.min?'disabled':'')+'></label><p class="sosiska-chart-hint">Нажмите на график — игроки за интервал. Два пальца — масштаб · один — перемещение. Кнопки + / − и стрелки делают то же.</p><div class="sosiska-chart-key">'+lines.map((l,i)=>'<span class="sosiska-legend" style="color:'+(one?metricColor(chartMetric):colors[i%colors.length])+'">● '+(l.teamId?teamName(l.name,l.teamId):esc(l.name))+'</span>').join('')+'</div><details class="sosiska-chart-values"><summary>Значения по интервалам</summary>'+lines.map(l=>'<h4>'+(l.teamId?teamName(l.name,l.teamId):esc(l.name))+'</h4><div class="sosiska-interval-values">'+l.points.filter(valid).map(p=>'<div><button type="button" data-chart-interval="'+esc(p.from)+'" data-chart-line="'+lines.indexOf(l)+'"><span>'+esc(day(p.from)+' '+clock(p.from)+' — '+day(p.to)+' '+clock(p.to))+'</span><b>'+rate(p[chartMetric]/p.hours)+' '+esc(chartUnit)+'</b></button></div>').join('')+'</div>').join('')+'</details></figure>';
+  }
+  function intervalPlayers(players,point,which){
+    return (players||[]).flatMap(player=>{
+      const interval=player.series?.find(p=>p.from===point.from&&p.to===point.to);
+      const gain=interval?.[which];
+      return Number.isFinite(gain)&&gain>0?[{id:player.userId,name:player.name,gain}]:[];
+    }).sort((a,b)=>b.gain-a.gain||String(a.id).localeCompare(String(b.id)));
+  }
+  function showChartIntervals(figure,model,chosen){
+    if(!admin()||!opened)return;
+    const host=figure.querySelector('[data-chart-selection]');if(!host)return;
+    const labels={levels:'Уровни',crowns:game==='rk'?'Кубки':'Короны',help:'Помощь',event:'Очки события'};
+    host.hidden=false;
+    host.innerHTML='<button type="button" data-chart-dismiss>Закрыть список</button>'+
+      (chosen.length?chosen.map(({line,point})=>{
+        const rows=intervalPlayers(line.players,point,model.metric);
+        return '<h4>'+esc(line.name)+'</h4><p>'+esc(when(point.from)+' — '+when(point.to))+' МСК</p>'+
+          '<p>'+esc(labels[model.metric])+' · прирост за интервал: <b>+'+rate(point[model.metric])+'</b></p>'+
+          (rows.length?'<ol class="sosiska-chart-player-list">'+rows.map(row=>'<li><span>'+esc(row.name)+'</span><b>+'+rate(row.gain)+'</b></li>').join('')+'</ol>':'<p>Нет подтверждённого положительного прироста игроков за этот интервал.</p>')+
+          (model.metric==='event'?'<p class="muted">Командные и доступные личные очки могут отличаться: не все личные результаты присутствуют в снимках.</p>':'');
+      }).join(''):'<p>В этой точке нет наблюдаемого интервала. Выберите участок с данными.</p>')+
+      '<p class="muted">Игроки по убыванию прироста выбранного показателя. Данные между двумя снимками; точное время игры неизвестно. Сбросы, неизвестные значения и вступление не считаются приростом.</p>';
+  }
+  function selectChartAt(figure,model,viewport,clientX){
+    const rect=(viewport.querySelector?.('svg')||viewport).getBoundingClientRect();
+    const fraction=(clientX-rect.left-rect.width*48/360)/(rect.width*296/360);
+    if(fraction<0||fraction>1)return;
+    const time=model.view.start+fraction*(model.view.end-model.view.start);
+    const chosen=model.lines.flatMap(line=>{
+      const point=line.points.find(p=>p.hours>0&&Number.isFinite(p[model.metric])&&Date.parse(p.from)<=time&&Date.parse(p.to)>=time);
+      return point?[{line,point}]:[];
+    });
+    showChartIntervals(figure,model,chosen);
   }
   function chartRangeLabel(v){return esc(when(new Date(v.start).toISOString())+' — '+when(new Date(v.end).toISOString()))+' МСК · ×'+rate((v.max-v.min)/(v.end-v.start));}
   function setChartWindow(v,start,span){
@@ -131,6 +164,14 @@
     paintChart(figure,model);
   }
   window.addEventListener('click',event=>{
+    const interval=event.target.closest?.('[data-chart-interval]'),dismiss=event.target.closest?.('[data-chart-dismiss]');
+    if(interval||dismiss){
+      const target=chartTarget(interval||dismiss);if(!target)return;
+      event.preventDefault();event.stopImmediatePropagation();
+      if(dismiss){target.figure.querySelector('[data-chart-selection]').hidden=true;return;}
+      const line=target.model.lines[Number(interval.dataset.chartLine)],point=line?.points.find(p=>p.from===interval.dataset.chartInterval);
+      if(point)showChartIntervals(target.figure,target.model,[{line,point}]);return;
+    }
     const control=event.target.closest?.('[data-chart-action]'),target=control&&chartTarget(control);if(!target)return;
     event.preventDefault();event.stopImmediatePropagation();chartAction(target.figure,target.model,control.dataset.chartAction);
   },true);
@@ -148,18 +189,24 @@
   const gestureDistance=g=>{const p=gesturePoints(g);return Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y);};
   document.addEventListener('pointerdown',event=>{
     const viewport=event.target.closest?.('[data-chart-viewport]'),target=viewport&&chartTarget(viewport);if(!target||event.button>0)return;
-    if(!chartGesture||chartGesture.viewport!==viewport)chartGesture={...target,viewport,pointers:new Map()};
-    const g=chartGesture;g.pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});g.viewport.setPointerCapture?.(event.pointerId);event.preventDefault();
+    if(!chartGesture||chartGesture.viewport!==viewport)chartGesture={...target,viewport,pointers:new Map(),origin:{x:event.clientX,y:event.clientY},moved:false};
+    const g=chartGesture;if(g.pointers.size)g.moved=true;g.pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});g.viewport.setPointerCapture?.(event.pointerId);event.preventDefault();
   });
   document.addEventListener('pointermove',event=>{
     const g=chartGesture;if(!g||!g.pointers.has(event.pointerId)||!g.viewport.isConnected)return;
+    if(!g.moved&&Math.hypot(event.clientX-g.origin.x,event.clientY-g.origin.y)<8)return;
+    g.moved=true;
     const prev=g.pointers.get(event.pointerId),before=g.pointers.size===2?gestureDistance(g):0,p=gesturePoints(g),oldMid=p.reduce((n,p)=>n+p.x,0)/p.length;
     g.pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});const rect=g.viewport.getBoundingClientRect(),width=rect.width*296/360,v=g.model.view;
     if(g.pointers.size===2&&before>0){const now=gesturePoints(g),mid=now.reduce((n,p)=>n+p.x,0)/now.length;zoomChart(v,gestureDistance(g)/before,(oldMid-rect.left-rect.width*48/360)/width);setChartWindow(v,v.start-(mid-oldMid)/width*(v.end-v.start),v.end-v.start);}
     else if(g.pointers.size===1)setChartWindow(v,v.start-(event.clientX-prev.x)/width*(v.end-v.start),v.end-v.start);
     event.preventDefault();paintChart(g.figure,g.model);
   });
-  for(const type of ['pointerup','pointercancel','lostpointercapture'])document.addEventListener(type,event=>{if(!chartGesture)return;chartGesture.pointers.delete(event.pointerId);if(!chartGesture.pointers.size)chartGesture=null;});
+  for(const type of ['pointerup','pointercancel','lostpointercapture'])document.addEventListener(type,event=>{
+    const g=chartGesture;if(!g||!g.pointers.has(event.pointerId))return;
+    if(type==='pointerup'&&!g.moved&&g.pointers.size===1)selectChartAt(g.figure,g.model,g.viewport,event.clientX);
+    g.pointers.delete(event.pointerId);if(!g.pointers.size)chartGesture=null;
+  });
   document.addEventListener('wheel',event=>{
     const viewport=event.target.closest?.('[data-chart-viewport]'),target=viewport&&chartTarget(viewport);if(!target)return;
     // Ctrl+wheel or trackpad pinch zooms; ordinary wheel retains page scrolling.
@@ -177,8 +224,8 @@
    const scopes=[...(tournamentPeriod?.events?.values()||[])];
    const sections=metric==='event'?
       (scopes.map(e=>({event:e,points:e.series.slice().sort((a,b)=>a.from.localeCompare(b.from))})).filter(e=>e.points.length)
-        .map(e=>chart([{name,teamId:team?.TeamId,points:e.points}],(e.event.kind==='battle'?'Битва':'Турнир')+' · '+e.event.eventId+' · очки по снимкам','event')).join('')||'<p>Нет сопоставимых снимков соревнований.</p>'):
-      chart([{name,teamId:team?.TeamId,points}],'Активность во времени');
+        .map(e=>chart([{name,teamId:team?.TeamId,points:e.points,players:[...e.event.players.values()]}],(e.event.kind==='battle'?'Битва':'Турнир')+' · '+e.event.eventId+' · очки по снимкам','event')).join('')||'<p>Нет сопоставимых снимков соревнований.</p>'):
+      chart([{name,teamId:team?.TeamId,points,players:period?.players}],'Активность во времени');
    return '<h3>Темп активности команды</h3>'+metricButtons()+sections+'<p class="muted">Прирост за интервал между снимками / длительность интервала. Сбросы счётчиков и вступление игроков не считаются прогрессом. График охватывает всю загруженную историю. Масштабируйте, чтобы рассмотреть отдельные интервалы.</p>';}
   function hourDetails(p){
    if(selectedHour===null)return '<p class="muted">Нажмите на час, чтобы посмотреть его по дням.</p>';
@@ -200,7 +247,7 @@
    }
    const hoursKey={levels:'levelHours',crowns:'crownHours',help:'helpHours'}[metric];
    const bins=p.hourly.map(h=>({hour:h.hour,value:h[hoursKey]??h.hours,rate:(h[hoursKey]??h.hours)>0?h[metric]/(h[hoursKey]??h.hours):null})),peak=bins.filter(h=>h.rate!==null).sort((a,b)=>b.rate-a.rate)[0];
-   return '<article class="sosiska-player-detail"><h3>'+esc(p.name)+' · активность</h3>'+button('player-close','Закрыть графики игрока')+metricButtons()+chart([{name:p.name,points:p.series}], 'Темп игрока')+
+   return '<article class="sosiska-player-detail"><h3>'+esc(p.name)+' · активность</h3>'+button('player-close','Закрыть графики игрока')+metricButtons()+chart([{name:p.name,points:p.series,players:[p]}], 'Темп игрока')+
     '<h4>🏆 Турниры и битвы · '+esc(p.name)+'</h4>'+playerEventStats(p.userId,p.name)+
     '<h4>В какое время активнее · МСК</h4>'+hourlyChart(bins)+hourDetails(p)+'<p>'+(!peak||peak.rate===0?'Положительный прирост не наблюдался.':'Наибольший наблюдаемый темп: '+peak.hour+':00–'+((peak.hour+1)%24)+':00 · '+rate(peak.rate)+' '+unit())+'</p><p class="muted">Это оценка по снимкам: прирост равномерно распределён по охваченному интервалу. Точное время игры неизвестно. При редких снимках профиль менее точный. Короны не переводятся в пройденные уровни.</p></article>';
   }
@@ -217,7 +264,7 @@
         '<div class="sosiska-event-player-metrics"><div><small>Всего очков</small><b>'+esc(profileNumber(p.latestScore))+'</b></div>'+
         '<div><small>Последний снимок · Δ</small><b>'+esc(interval)+'</b></div>'+
         '<div><small>Прирост за период</small><b>'+esc(span)+'</b></div></div>'+
-        (points.length?chart([{name,points}],'Прирост личных очков · '+kind,'event'):
+        (points.length?chart([{name,points,players:[p]}],'Прирост личных очков · '+kind,'event'):
         '<p class="muted">Для графика нужны два сопоставимых снимка этого соревнования.</p>')+
         '<p class="muted">Последнее наблюдение игрока: '+esc(when(p.lastObservedAt))+' МСК. '+(p.latestScore===null?'Личные очки неизвестны. ':'')+
         'Изменения считаются только внутри одного события и группы; точное время игры между снимками неизвестно.</p></section>';
@@ -226,7 +273,7 @@
   }
   function comparisonView(){
    if(analysisMode!=='selected'||!selected.size)return '';
-   return '<article><h3>Сравнение выбранных команд · '+selected.size+'/5</h3><p>'+[...selected].map(([id,n])=>teamName(n,id)).join(', ')+'</p>'+button('compare','Построить сравнение')+button('analysis-selected','ИИ-анализ выбранных команд')+button('clear-selection','Сбросить выбор')+(comparison?'<p>Общий период: '+esc(when(comparison.from))+' — '+esc(when(comparison.to))+' МСК</p>'+metricButtons()+chart(comparison.teams.map(t=>({name:t.teamName,teamId:t.teamId,points:t.series})), 'Темп команд')+comparison.teams.map(t=>'<div class="sosiska-player"><b>'+teamName(t.teamName,t.teamId)+'</b><p>Уровни: '+(t.hours?'+'+t.levels:'—')+' · '+rate(t.levelsPerHour)+'/ч<br>'+(game==='rk'?'Кубки':'Короны')+': '+(t.hours?'+'+t.crowns:'—')+' · '+rate(t.crownsPerHour)+'/ч'+(advanced()?'<br>Помощь: '+(t.hours?'+'+t.help:'—'):'')+'</p><p>Охват: '+rate(t.hours)+' ч · '+esc(when(t.from))+' — '+esc(when(t.to))+'</p></div>').join('')+'<p class="muted">Сравниваются только целые интервалы внутри общего периода; суммы и темп показаны раздельно. Границы снимков могут различаться. Нет интервалов — нет оценки. Интервалы, пересекающие границу общего периода, исключены; фактический охват указан у каждой команды.</p>':'')+'</article>';
+   return '<article><h3>Сравнение выбранных команд · '+selected.size+'/5</h3><p>'+[...selected].map(([id,n])=>teamName(n,id)).join(', ')+'</p>'+button('compare','Построить сравнение')+button('analysis-selected','ИИ-анализ выбранных команд')+button('clear-selection','Сбросить выбор')+(comparison?'<p>Общий период: '+esc(when(comparison.from))+' — '+esc(when(comparison.to))+' МСК</p>'+metricButtons()+chart(comparison.teams.map(t=>({name:t.teamName,teamId:t.teamId,points:t.series,players:t.players})), 'Темп команд')+comparison.teams.map(t=>'<div class="sosiska-player"><b>'+teamName(t.teamName,t.teamId)+'</b><p>Уровни: '+(t.hours?'+'+t.levels:'—')+' · '+rate(t.levelsPerHour)+'/ч<br>'+(game==='rk'?'Кубки':'Короны')+': '+(t.hours?'+'+t.crowns:'—')+' · '+rate(t.crownsPerHour)+'/ч'+(advanced()?'<br>Помощь: '+(t.hours?'+'+t.help:'—'):'')+'</p><p>Охват: '+rate(t.hours)+' ч · '+esc(when(t.from))+' — '+esc(when(t.to))+'</p></div>').join('')+'<p class="muted">Сравниваются только целые интервалы внутри общего периода; суммы и темп показаны раздельно. Границы снимков могут различаться. Нет интервалов — нет оценки. Интервалы, пересекающие границу общего периода, исключены; фактический охват указан у каждой команды.</p>':'')+'</article>';
   }
   function tournamentPeriodView(){
     if(!advanced())return '';
@@ -701,7 +748,7 @@
        for(const id of selected.keys()){notice='Загружаем историю: '+selected.get(id);render();const acc=SosiskaPeriod.createPeriodAccumulator(id,{retainIntervals:true,includeHelp:advanced()});let before;
         for(;;){const page=await api('history',{teamId:id,limit:20,...(before?{before}:{})},e);if(!page.records.length)break;for(const r of page.records)acc.add(r);if(!page.nextBefore)break;if(before&&page.nextBefore>=before)throw Error('Ошибка порядка истории.');before=page.nextBefore;}
         periods.push(acc.result());}
-       try{comparison=SosiskaPeriod.comparePeriods(periods);}catch(error){throw Error(error.message==='COMPARISON_NO_OVERLAP'?'У команд нет общего периода наблюдения.':'Для сравнения каждой команде нужны хотя бы два снимка и полная история.');}return;}
+       try{comparison=SosiskaPeriod.comparePeriods(periods);for(const row of comparison.teams)row.players=periods.find(p=>p.teamId===row.teamId)?.players||[];}catch(error){throw Error(error.message==='COMPARISON_NO_OVERLAP'?'У команд нет общего периода наблюдения.':'Для сравнения каждой команде нужны хотя бы два снимка и полная история.');}return;}
       if(action==='switch-game'){await open(target.dataset.game);return;}
       if(action==='results'){eventPlayerId=null;eventPlayerScope=null;team=null;records=[];tournamentGroup=null;tournamentPlayers=null;tournamentTeamId=null;await switchAnalysis(null,e);return;}
       if(action==='clear-filters'){filters={};offset=0;notice='Фильтры сброшены.';await hydrate(e);return;}
