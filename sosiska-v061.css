@@ -129,3 +129,5 @@
   font:inherit!important;box-shadow:none!important}
 .sosiska-membership-player-link h4{margin:4px 0 8px!important;color:#75d7ff;overflow-wrap:anywhere}
 .sosiska-membership-player-link:focus-visible{outline:2px solid #9ed5fa;outline-offset:3px;border-radius:5px}
+
+.sosiska-chart-selection{margin:12px 0;padding:12px;border:1px solid #527289;border-radius:12px;background:#142734}.sosiska-chart-selection[hidden]{display:none}.sosiska-chart-player-list{padding-left:28px;max-height:360px;overflow:auto}.sosiska-chart-player-list li{padding:7px 4px;border-bottom:1px solid #365064}.sosiska-chart-player-list li span{display:inline-block;width:72%;overflow-wrap:anywhere}.sosiska-chart-player-list li b{float:right}.sosiska-interval-values button{width:100%;text-align:left;display:flex;justify-content:space-between;gap:8px}
