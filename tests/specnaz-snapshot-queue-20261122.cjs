@@ -1,0 +1,14 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),path=require('node:path');
+const code=fs.readFileSync(path.join(__dirname,'../patches/specnaz-cross-topic-20261122/39_SPECNAZ_NATIVE_REACTIONS.js'),'utf8');
+let last=432,scheduled=true,requests=0;const props=new Map();
+const ctx={SHEET_HISTORY:'История спецназа',getHistoryLastContentRow_:()=>last,PropertiesService:{getScriptProperties:()=>({getProperty:k=>props.get(k),setProperty:(k,v)=>props.set(k,v)})},MINIAPP_queueUnifiedSnapshotRefresh_:(reason,admin)=>{assert.equal(admin,true);assert.match(reason,/^specnaz_history:\d+$/);requests++;return {ok:true,scheduled};}};
+vm.createContext(ctx);vm.runInContext(code,ctx);
+const ss={getSheetByName:()=>({})};
+assert.equal(ctx.SNR_queueHistorySnapshot_(ss).status,'QUEUED');assert.equal(requests,1);
+assert.equal(ctx.SNR_queueHistorySnapshot_(ss).status,'UNCHANGED');assert.equal(requests,1);
+last++;assert.equal(ctx.SNR_queueHistorySnapshot_(ss).status,'QUEUED');assert.equal(requests,2);
+last++;scheduled=false;assert.equal(ctx.SNR_queueHistorySnapshot_(ss).status,'RETRY');
+scheduled=true;assert.equal(ctx.SNR_queueHistorySnapshot_(ss).status,'QUEUED');assert.equal(requests,4);
+assert.equal(ctx.SNR_queueHistorySnapshot_({getSheetByName:()=>null}).status,'NO_HISTORY');
+delete ctx.MINIAPP_queueUnifiedSnapshotRefresh_;assert.equal(ctx.SNR_queueHistorySnapshot_(ss).status,'UNAVAILABLE');
+console.log('PASS: initial history recovery, one queue per revision, new append, retry after scheduling failure, missing helpers/history');
