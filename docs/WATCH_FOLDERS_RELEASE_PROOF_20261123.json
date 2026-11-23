@@ -1,0 +1,40 @@
+{
+  "sourceCommit": "d53747340691e12868b933ce8cfd3b8a6c3f88af",
+  "workerVersion": "62ec1c3c-0134-484c-b620-cb9116efb50e",
+  "workerDeployment": "6a3d241a-dbf7-4e6e-9c38-ae350951ae27",
+  "bindingsUnchanged": true,
+  "bundleSha256": "c1ec51d185d25c6b5e8b34c5183f7293d30acbeb036466e381d34d7048454a28",
+  "public": {
+    "sourceCommit": "d53747340691e12868b933ce8cfd3b8a6c3f88af",
+    "mergeCommit": "dc2084546a76186f39a82ab86d6d2df8981d0134",
+    "files": [
+      {
+        "file": "app.html",
+        "sha256": "cdb17b5aaf4d10f9774f11075af954baf0aed4054bf1993bd4125b1be3dc5fff"
+      },
+      {
+        "file": "index.html",
+        "sha256": "8e72a63314956801d65fa595c2ba5ea7f18d37d1535b8022115034da9d5892ea"
+      },
+      {
+        "file": "app-v0618.html",
+        "sha256": "1bf8583d3bd7c8cf1a6bbbda803d89cf195a755eee3175df2eefc05e3dc19c25"
+      },
+      {
+        "file": "sosiska-v061.js",
+        "sha256": "d2b27e647210c99fae286a4cb04a08ed2045d628b2d4bd8dc0414140490d631f"
+      },
+      {
+        "file": "sosiska-v061.css",
+        "sha256": "cab8647d4062509f82f08374b7f1a25f96042f4c49a446fc1e378916cc120dbd"
+      },
+      {
+        "file": "changelog-v0618.js",
+        "sha256": "b37f76175df68b0cc5e4dbd75bf3ee9361f6431d746ae0296810f5221f0ca292"
+      }
+    ]
+  },
+  "pagesRun": 45131190301,
+  "appTestsPassed": 352,
+  "phoneAcceptance": "pending"
+}
