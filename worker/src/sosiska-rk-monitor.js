@@ -1,3 +1,4 @@
+import {isFolderAction,performFolderAction} from './sosiska-watch-folders.js';
 // Dedicated Royal Kingdom observation store. No RM data, tokens or raw game packets.
 const RK_ORIGIN='https://specnaz-royal-kingdom-search-stage1.soloway3852.workers.dev';
 const EVENT_ORIGIN='https://specnaz-royal-kingdom-events-stage2.soloway3852.workers.dev';
@@ -132,8 +133,8 @@ export class SosiskaKingdomMonitor {
  service(){return createKingdomMonitor({storage:this.ctx.storage,env:this.env,setAlarm:t=>this.ctx.storage.setAlarm(t),
   deleteAlarm:()=>this.ctx.storage.deleteAlarm()});}
  fetch(request){return this.serialize(async()=>{
-  try{const body=await request.json();return json({ok:true,data:await this.service().perform(body)});}
-  catch(error){return json({ok:false,error:safeError(error)},502);}
+  try{const body=await request.json();return json({ok:true,data:isFolderAction(body.operation)?await performFolderAction(this.ctx.storage,body):await this.service().perform(body)});}
+  catch(error){return json({ok:false,error:safeError(error),...(error.publicMessage?{message:error.publicMessage}:{})},error.status||502);}
  });}
  alarm(){return this.serialize(()=>this.service().alarm());}
 }

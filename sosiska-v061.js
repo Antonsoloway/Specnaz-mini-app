@@ -18,6 +18,7 @@
   let epoch=0,opened=false,busy=false,query='',candidates=[],offset=0,team=null,watches=[],watchesLoaded=false,watchDetailsEpoch=0,records=[],nextBefore=null,notice='',analysis=null;
   let analysisMode=null,analysisEpoch=0,profileId=null,profileLoading=false,profileError='',profileReturnView='roster';
   let eventError='',profileFallback=null;
+  let folderState={revision:0,folders:[]},foldersLoaded=false,folderError='',folderOpen=null,folderDraft=null;
   let tournamentGroup=null,tournamentPlayers=null,tournamentTeamId=null,tournamentPeriod=null;
   let selectedHour=null,exportFrom='',exportTo='',exportReady=null;
   const profiles=new Map(),openSections=new Set();
@@ -32,7 +33,7 @@
   const role=(t,id)=>t.Leader===id?'Лидер':t.CoLeaders?.includes(id)?'Помощник':'Участник';
   const admin=()=>typeof authState!=='undefined'&&!!(authState?.role?.isChatAdmin||authState?.role?.code==='admin'||authState?.permissions?.canManageAll);
   const session=()=>typeof sessionToken==='undefined'?'':sessionToken;
-  function reset(){profileFallback=null;eventError='';ownerMetrics=false;featureSession='';metric='levels';eventPlayerId=null;eventPlayerScope=null;tournamentGroup=null;tournamentPlayers=null;tournamentTeamId=null;tournamentPeriod=null;openSections.clear();picker?.host.remove();picker=null;selectedHour=null;exportFrom=exportTo='';exportReady=null;profiles.clear();profileId=null;profileLoading=false;profileError='';profileReturnView='roster';chartModels.clear();chartRanges.clear();analysisMode=null;analysisEpoch++;selected.clear();comparison=null;playerId=null;clearTimeout(pollTimer);timelines.clear();epoch++;opened=false;busy=false;candidates=[];details.clear();team=null;records=[];watches=[];watchesLoaded=false;watchDetailsEpoch++;nextBefore=null;notice='';analysis=null;filters={};filterLoading=false;stopFilterLoading=true;searchWarnings=[];period=null;periodLoading=false;stopPeriod=true;}
+  function reset(){folderState={revision:0,folders:[]};foldersLoaded=false;folderError='';folderOpen=null;folderDraft=null;profileFallback=null;eventError='';ownerMetrics=false;featureSession='';metric='levels';eventPlayerId=null;eventPlayerScope=null;tournamentGroup=null;tournamentPlayers=null;tournamentTeamId=null;tournamentPeriod=null;openSections.clear();picker?.host.remove();picker=null;selectedHour=null;exportFrom=exportTo='';exportReady=null;profiles.clear();profileId=null;profileLoading=false;profileError='';profileReturnView='roster';chartModels.clear();chartRanges.clear();analysisMode=null;analysisEpoch++;selected.clear();comparison=null;playerId=null;clearTimeout(pollTimer);timelines.clear();epoch++;opened=false;busy=false;candidates=[];details.clear();team=null;records=[];watches=[];watchesLoaded=false;watchDetailsEpoch++;nextBefore=null;notice='';analysis=null;filters={};filterLoading=false;stopFilterLoading=true;searchWarnings=[];period=null;periodLoading=false;stopPeriod=true;}
   function decorate(){
     const grid=document.querySelector('.grid');if(!grid)return;
     for(const old of grid.querySelectorAll?.('[data-sosiska-open]')||[])if(!admin())old.remove();
@@ -50,11 +51,11 @@
   async function api(operation,params={},e=epoch){
     const token=session();if(!token||!admin())throw new Error('Откройте приложение заново.');
     const controller=new AbortController();let timer;
-    const timeoutMs=operation==='list'?18000:['eventGroup','eventPlayers','tournamentGroup','tournamentPlayers'].includes(operation)?35000:125000;
+    const timeoutMs=['list','folders','folderSave','folderDelete'].includes(operation)?18000:['eventGroup','eventPlayers','tournamentGroup','tournamentPlayers'].includes(operation)?35000:125000;
     const deadline=new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(Object.assign(new Error('REQUEST_TIMEOUT'),{name:'AbortError'}));},timeoutMs);});
     try{const {r,data}=await Promise.race([(async()=>{const r=await fetch(endpoint,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({operation,...(game==='rk'?{game:'rk'}:{}),...params}),signal:controller.signal});return {r,data:await r.json()};})(),deadline]);
       if(e!==epoch||session()!==token||!opened)throw Object.assign(new Error('STALE'),{stale:true});
-      if(!r.ok||data.ok!==true){if(r.status===401||r.status===403){details.clear();candidates=[];team=null;records=[];watches=[];watchesLoaded=false;watchDetailsEpoch++;analysis=null;tournamentGroup=null;tournamentPlayers=null;tournamentTeamId=null;timelines.clear();selected.clear();comparison=null;period=null;playerId=null;clearTimeout(pollTimer);}throw Object.assign(new Error(data.message||'Не удалось получить данные агента.'),{denied:r.status===401||r.status===403,limited:r.status===429});}ownerMetrics=data.capabilities?.ownerTeamMetrics===true;featureSession=token;if(!advanced()&&!['levels','crowns'].includes(metric))metric='levels';if(operation==='team'&&game==='rm')window.RoyalTeamEmblems?.remember(data.data?.TeamId,emblemLogo(data.data));return data.data;
+      if(!r.ok||data.ok!==true){if(r.status===401||r.status===403){folderState={revision:0,folders:[]};foldersLoaded=false;folderOpen=null;folderDraft=null;details.clear();candidates=[];team=null;records=[];watches=[];watchesLoaded=false;watchDetailsEpoch++;analysis=null;tournamentGroup=null;tournamentPlayers=null;tournamentTeamId=null;timelines.clear();selected.clear();comparison=null;period=null;playerId=null;clearTimeout(pollTimer);}throw Object.assign(new Error(data.message||'Не удалось получить данные агента.'),{denied:r.status===401||r.status===403,limited:r.status===429});}ownerMetrics=data.capabilities?.ownerTeamMetrics===true;featureSession=token;if(!advanced()&&!['levels','crowns'].includes(metric))metric='levels';if(operation==='team'&&game==='rm')window.RoyalTeamEmblems?.remember(data.data?.TeamId,emblemLogo(data.data));return data.data;
     }catch(error){if(e!==epoch||session()!==token||!opened)throw Object.assign(new Error('STALE'),{stale:true});throw error;}finally{clearTimeout(timer);}
   }
   const currentEventKind=()=>game==='rk'?'battle':tournamentGroup?.kind||(eventWindow(Date.now())?.phase==='battle'?'battle':'tournament');
@@ -163,6 +164,22 @@
     if(action==='reset')setChartWindow(v,v.min,v.max-v.min);
     paintChart(figure,model);
   }
+
+  window.addEventListener('input',event=>{
+    const form=event.target.closest?.('[data-sosiska-folder-form]');if(!form||!folderDraft||busy)return;
+    folderDraft={...folderDraft,name:form.elements.folderName.value,teamIds:[...form.querySelectorAll('[name="folderTeam"]:checked')].map(x=>x.value)};
+  },true);
+  window.addEventListener('submit',event=>{
+    const form=event.target.closest?.('[data-sosiska-folder-form]');if(!form)return;
+    event.preventDefault();event.stopImmediatePropagation();if(busy||!folderDraft)return;
+    folderDraft={...folderDraft,name:form.elements.folderName.value,teamIds:[...form.querySelectorAll('[name="folderTeam"]:checked')].map(x=>x.value)};
+    const draft=folderDraft;
+    run(async e=>{
+      folderState=await api('folderSave',{folderId:draft.id,name:draft.name,teamIds:draft.teamIds,revision:draft.revision},e);
+      foldersLoaded=true;folderOpen=draft.id||folderState.folders.at(-1)?.id;folderDraft=null;notice='Папка сохранена.';
+    });
+  },true);
+
   window.addEventListener('click',event=>{
     const interval=event.target.closest?.('[data-chart-interval]'),dismiss=event.target.closest?.('[data-chart-dismiss]');
     if(interval||dismiss){
@@ -520,7 +537,23 @@
       '</section>';
   }
   function gameTabs(){return '<nav class="sosiska-game-tabs" role="tablist" aria-label="Игра">'+['rm','rk'].map(g=>'<button type="button" role="tab" data-sosiska-action="switch-game" data-game="'+g+'" aria-selected="'+(game===g)+'" class="'+(game===g?'active':'')+'">'+(g==='rk'?'👑 Royal Kingdom':'🏰 Royal Match')+'</button>').join('')+'</nav>';}
-  function render(){if(!opened)return;if(picker){picker.host.innerHTML='<section class="sosiska-screen sosiska-picker" role="dialog" aria-modal="true" aria-label="Привязать команду '+(game==='rk'?'Royal Kingdom':'Royal Match')+'">'+button('back','← Вернуться к редактированию')+'<h2>Выберите команду '+(game==='rk'?'РК':'РМ')+'</h2><form data-sosiska-search><label>Название команды<input name="query" maxlength="160" value="'+esc(query)+'" required '+(busy?'disabled':'')+'></label><button '+(busy?'disabled':'')+'>Найти</button></form><p role="status">'+esc(notice|| (busy?'Получаем данные…':''))+'</p>'+(filterLoading?'<button type="button" data-sosiska-action="stop-filters">Остановить загрузку</button>':'')+results()+'</section>';return;}chartModels.clear();chartGesture=null;const panel=document.getElementById('panel');if(!panel)return;panel.hidden=false;panel.innerHTML=`<section class="sosiska-screen" aria-busy="${busy}">${button('back','← На главную')}<h2>🌭 Агент «Сосиска»</h2>${gameTabs()}${game==='rk'&&advanced()?button('rk-battle','⚔️ Битва Айи'):''}<p class="muted">${game==='rk'?'Royal Kingdom':'Royal Match'} · доступ администраторам</p><form data-sosiska-search><label>Название команды<input name="query" maxlength="160" value="${esc(query)}" placeholder="Например, Mamonovo" required ${busy?'disabled':''}></label><button ${busy?'disabled':''}>Найти</button></form><p role="status" aria-live="polite">${esc(busy?(notice||'Получаем данные…'):notice)}</p>${filterLoading?'<button type="button" data-sosiska-action="stop-filters">Остановить загрузку</button>':''}${periodLoading?'<button type="button" data-sosiska-action="stop-period">Остановить загрузку истории</button>':''}${team&&analysisMode!=='selected'?roster():results()}${comparisonView()}<div id="sosiskaAnalysis">${analysisView()}</div><h3>Отслеживаемые команды</h3>${button('list','Обновить список')}${watches.length?watches.map(w=>`<article><b data-sosiska-watch-name="${esc(w.teamId)}">${teamName(w.teamName||details.get(w.teamId)?.TeamName||'Команда без названия',w.teamId,emblemLogo(details.get(w.teamId))??w.teamLogo)}</b><p>Каждые ${esc(w.intervalMinutes)} мин. · последний снимок: ${esc(when(w.lastSuccessAt))}</p>${w.lastError?`<p>Последняя попытка не удалась: ${esc(w.lastError)}</p>`:''}${button('select-team',selected.has(w.teamId)?'✓ Выбрана для сравнения':'Выбрать для сравнения',`data-team-id="${esc(w.teamId)}"`)}${button('team','Открыть',`data-team-id="${esc(w.teamId)}"`)}</article>`).join(''):watchesLoaded?'<p>Отслеживание не включено.</p>':busy?'<p role="status">Загружаем список отслеживаемых команд…</p>':'<p role="status">Список не загрузился. Нажмите «Обновить список».</p>'}</section>`;}
+
+  async function loadFolders(e){
+    try{const data=await api('folders',{},e);if(!Array.isArray(data?.folders)||!Number.isSafeInteger(data.revision))throw Error('Некорректный список папок.');folderState=data;foldersLoaded=true;folderError='';if(folderOpen&&!data.folders.some(f=>f.id===folderOpen))folderOpen=null;}
+    catch(error){if(error.stale||error.denied)throw error;foldersLoaded=false;folderError='Папки не загрузились. Обновите список.';}
+  }
+  function watchFoldersView(){
+    const folders=folderState.folders,active=folders.find(f=>f.id===folderOpen);
+    const grouped=new Set(folders.flatMap(f=>f.teamIds)),items=!foldersLoaded?watches:active?watches.filter(w=>active.teamIds.includes(w.teamId)):watches.filter(w=>!grouped.has(w.teamId));
+    const draft=folderDraft;
+    const editor=draft?'<form data-sosiska-folder-form><h4>'+ (draft.id?'Редактировать папку':'Новая папка')+'</h4><label>Название папки<input name="folderName" maxlength="80" required value="'+esc(draft.name)+'"></label><p>Выберите команды. Команды из других папок будут перенесены сюда.</p><div class="sosiska-folder-choices">'+watches.map(w=>'<label><input type="checkbox" name="folderTeam" value="'+esc(w.teamId)+'" '+(draft.teamIds.includes(w.teamId)?'checked':'')+'><span>'+teamName(w.teamName||details.get(w.teamId)?.TeamName||'Команда без названия',w.teamId,emblemLogo(details.get(w.teamId))??w.teamLogo)+'</span></label>').join('')+'</div><button '+(busy?'disabled':'')+'>Сохранить папку</button>'+button('folder-cancel','Отмена')+'</form>':'';
+    return '<div data-sosiska-folders>'+ (folderError?'<p role="status">'+esc(folderError)+'</p>':'')+(foldersLoaded?button('folder-create','📁 Создать папку'):'')+editor+
+      (active?'<h4>📁 '+esc(active.name)+'</h4>'+button('folder-back','← Все папки')+button('folder-edit','Изменить название и команды')+button('folder-delete','Удалить папку'):
+      foldersLoaded?'<div class="sosiska-folder-list">'+folders.map(f=>'<article><h4>📁 '+esc(f.name)+'</h4><p>Команд: '+watches.filter(w=>f.teamIds.includes(w.teamId)).length+'</p>'+button('folder-open','Открыть папку','data-folder-id="'+esc(f.id)+'"')+'</article>').join('')+'</div>'+(folders.length?'<h4>Без папки</h4>':''):'')+
+      (items.length?items.map(w=>`<article><b data-sosiska-watch-name="${esc(w.teamId)}">${teamName(w.teamName||details.get(w.teamId)?.TeamName||'Команда без названия',w.teamId,emblemLogo(details.get(w.teamId))??w.teamLogo)}</b><p>Каждые ${esc(w.intervalMinutes)} мин. · последний снимок: ${esc(when(w.lastSuccessAt))}</p>${w.lastError?`<p>Последняя попытка не удалась: ${esc(w.lastError)}</p>`:''}${button('select-team',selected.has(w.teamId)?'✓ Выбрана для сравнения':'Выбрать для сравнения',`data-team-id="${esc(w.teamId)}"`)}${button('team','Открыть',`data-team-id="${esc(w.teamId)}"`)}</article>`).join(''):watchesLoaded?'<p>'+ (folderOpen?'В этой папке нет отслеживаемых команд.':watches.length?'Команд без папки нет.':'Отслеживание не включено.')+'</p>':busy?'<p role="status">Загружаем список отслеживаемых команд…</p>':'<p role="status">Список не загрузился. Нажмите «Обновить список».</p>')+'</div>';
+  }
+
+  function render(){if(!opened)return;if(picker){picker.host.innerHTML='<section class="sosiska-screen sosiska-picker" role="dialog" aria-modal="true" aria-label="Привязать команду '+(game==='rk'?'Royal Kingdom':'Royal Match')+'">'+button('back','← Вернуться к редактированию')+'<h2>Выберите команду '+(game==='rk'?'РК':'РМ')+'</h2><form data-sosiska-search><label>Название команды<input name="query" maxlength="160" value="'+esc(query)+'" required '+(busy?'disabled':'')+'></label><button '+(busy?'disabled':'')+'>Найти</button></form><p role="status">'+esc(notice|| (busy?'Получаем данные…':''))+'</p>'+(filterLoading?'<button type="button" data-sosiska-action="stop-filters">Остановить загрузку</button>':'')+results()+'</section>';return;}chartModels.clear();chartGesture=null;const panel=document.getElementById('panel');if(!panel)return;panel.hidden=false;panel.innerHTML=`<section class="sosiska-screen" aria-busy="${busy}">${button('back','← На главную')}<h2>🌭 Агент «Сосиска»</h2>${gameTabs()}${game==='rk'&&advanced()?button('rk-battle','⚔️ Битва Айи'):''}<p class="muted">${game==='rk'?'Royal Kingdom':'Royal Match'} · доступ администраторам</p><form data-sosiska-search><label>Название команды<input name="query" maxlength="160" value="${esc(query)}" placeholder="Например, Mamonovo" required ${busy?'disabled':''}></label><button ${busy?'disabled':''}>Найти</button></form><p role="status" aria-live="polite">${esc(busy?(notice||'Получаем данные…'):notice)}</p>${filterLoading?'<button type="button" data-sosiska-action="stop-filters">Остановить загрузку</button>':''}${periodLoading?'<button type="button" data-sosiska-action="stop-period">Остановить загрузку истории</button>':''}${team&&analysisMode!=='selected'?roster():results()}${comparisonView()}<div id="sosiskaAnalysis">${analysisView()}</div><h3>Отслеживаемые команды</h3>${button('list','Обновить список')}${watchFoldersView()}</section>`;}
 
   // Render a small, escaped Markdown subset; model HTML is never trusted.
   function reportText(text,key){
@@ -686,6 +719,7 @@
     const data=await api('list',{},e);
     if(!Array.isArray(data.watches))throw Error('Ответ мониторинга не содержит список команд.');
     watches=data.watches;watchesLoaded=true;
+    await loadFolders(e);
     const version=++watchDetailsEpoch;
     render();
     void enrichWatchLabels(e,version,watches).catch(()=>{});
@@ -724,6 +758,17 @@
     const chartProfile=chartPlayer?{player:chartPlayer,teamId:chartLine.teamId||team?.TeamId,period:chartLine.period}:null;
     const interval=Number(document.querySelector('[data-sosiska-interval]')?.value);
     run(async e=>{
+
+      if(action==='folder-open'){folderOpen=target.dataset.folderId;folderDraft=null;return;}
+      if(action==='folder-back'){folderOpen=null;folderDraft=null;return;}
+      if(action==='folder-cancel'){folderDraft=null;return;}
+      if(action==='folder-create'){folderDraft={id:null,name:'',teamIds:[],revision:folderState.revision};return;}
+      if(action==='folder-edit'){const f=folderState.folders.find(f=>f.id===folderOpen);if(f)folderDraft={...f,teamIds:f.teamIds.filter(id=>watches.some(w=>w.teamId===id)),revision:folderState.revision};return;}
+      if(action==='folder-delete'){
+        if(!window.confirm('Удалить папку? Команды останутся под наблюдением и появятся без папки.'))return;
+        folderState=await api('folderDelete',{folderId:folderOpen,revision:folderState.revision},e);folderOpen=null;folderDraft=null;notice='Папка удалена. Слежение за командами сохранено.';return;
+      }
+
       if(action==='bind'){if(!picker)return;const id=target.dataset.teamId,data=details.get(id)||await api('team',{teamId:id},e);if(data.TeamId!==id)throw Error('Некорректный ID команды.');const choose=picker.choose,focus=picker.focus;reset();choose(data);focus?.focus?.();return;}
       if(action==='hour'){selectedHour=Number(target.dataset.hour);return;}
       if(action==='hour-close'){selectedHour=null;return;}

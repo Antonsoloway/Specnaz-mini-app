@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 const source = fs.readFileSync(new URL('../music-playlist-v061.js', import.meta.url),'utf8');
-const html = fs.readFileSync(new URL('../app-v0617.html',import.meta.url),'utf8');
-for (const build of ['0.6.1','0.6.15','0.6.16','0.6.17']) {
+const html = fs.readFileSync(new URL('../app-v0618.html',import.meta.url),'utf8');
+for (const build of ['0.6.1','0.6.15','0.6.16','0.6.17','0.6.18']) {
   const timers=[];
   const handlers={};
   const listeners={};
@@ -34,8 +34,8 @@ for (const build of ['0.5.59','1.0.0','',null]) {
 }
 for (const entry of ['app.html','index.html']) {
   const source=fs.readFileSync(new URL('../'+entry,import.meta.url),'utf8');
-  assert.match(source,/20261122-network-relay1/);
-  assert.match(source,/app-v0617\.html/);
+  assert.match(source,/20261123-watch-folders1/);
+  assert.match(source,/app-v0618\.html/);
   assert.match(source,/\.hash/);
 }
 assert.match(html,/music-playlist-v061\.js\?v=20261116-v0617-music-compat1/);

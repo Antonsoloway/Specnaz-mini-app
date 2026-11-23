@@ -41,7 +41,8 @@
     "webhook-fallback-durability.test.mjs",
     "webhook-queue-open-row-optimization.test.mjs",
     "worker-background-music-v0600.test.js",
-    "worker-snapshot-cache-v0600.test.js"
+    "worker-snapshot-cache-v0600.test.js",
+    "sosiska-watch-folders.test.mjs"
   ],
   "crm": [
     "admin-audit-v2.test.js",
