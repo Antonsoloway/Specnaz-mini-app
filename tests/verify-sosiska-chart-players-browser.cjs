@@ -22,7 +22,7 @@ const root=path.resolve(__dirname,'..');let browser;
    window.chartCalls=[];
    window.fetch=async(_,init)=>{
     const b=JSON.parse(init.body);chartCalls.push(b);
-    const data=b.operation==='list'?{watches:[{teamId:'1',intervalMinutes:60}]}:b.operation==='team'?chartTeam:b.operation==='history'?{records:b.limit===1?chartSnapshots.slice(0,1):chartSnapshots,nextBefore:null}:b.operation==='analysisStatus'?{available:false}:null;
+    const data=b.operation==='list'?{watches:[{teamId:'1',intervalMinutes:60}]}:b.operation==='team'?chartTeam:b.operation==='history'?{records:b.limit===1?chartSnapshots.slice(0,1):chartSnapshots,nextBefore:null}:b.operation==='analysisStatus'?{available:false}:b.operation==='profile'?{userId:b.userId,name:'<Fast> live',teamId:'1',teamName:'Fixture',level:777,crown:7,stats:{},fetchedAt:'2026-11-20T10:00:00Z'}:null;
     if(data===null)throw Error('Unexpected '+b.operation);
     return Response.json({ok:true,capabilities:{ownerTeamMetrics:true},data});
    };
@@ -48,8 +48,40 @@ const root=path.resolve(__dirname,'..');let browser;
    assert.equal(await selection.isVisible(),false,'drag keeps list closed');
    await figure.locator('.sosiska-chart-values summary').click();
    await figure.locator('[data-chart-interval]').first().click();assert.equal(await selection.isVisible(),true,'keyboard-accessible interval alternative opens list');
+   await selection.locator('[data-chart-player="fast"]').click();
+   await page.waitForSelector('[data-player-profile]');
+   await page.waitForFunction(()=>document.querySelector('[data-player-profile] h4')?.textContent==='<Fast> live');
+   assert.equal(await page.locator('[data-player-profile] img,[data-player-profile] script').count(),0);
+   const request=await page.evaluate(()=>chartCalls.filter(c=>c.operation==='profile').at(-1));
+   assert.equal(request.userId,'fast');assert.equal(request.game,game==='rk'?'rk':undefined);
+   await page.locator('[data-sosiska-action="profile-close"]').click();
+   assert.equal(await page.locator('[data-player-profile]').count(),0);
+
   }
   assert.equal(await page.evaluate(()=>chartCalls.some(c=>['capture','watch'].includes(c.operation))),false);
+  // Same displayed nickname in another team's history resolves by ID, not name.
+  await page.evaluate(()=>{
+   const original=window.fetch;
+   window.fetch=async(url,init)=>{
+    const b=JSON.parse(init.body),res=await original(url,init),data=await res.json();
+    if(b.operation==='list')data.data.watches=[{teamId:'1',intervalMinutes:60},{teamId:'2',intervalMinutes:60}];
+    if(b.operation==='team'&&b.teamId==='2'){data.data.TeamId='2';data.data.TeamName='Second Team';for(const m of data.data.Members)m.UserId+='2';}
+    if(b.operation==='history'&&b.teamId==='2')for(const r of data.data.records){r.snapshot.teamId='2';r.snapshot.raw.TeamName='Second Team';for(const m of r.snapshot.raw.Members)m.UserId+='2';}
+    return Response.json(data);
+   };
+  });
+  await page.evaluate(g=>RoyalSosiska.open(g),game);
+  await page.locator('[data-sosiska-action="select-team"][data-team-id="1"]').click();
+  await page.locator('[data-sosiska-action="select-team"][data-team-id="2"]').click();
+  await page.locator('[data-sosiska-action="compare"]').click();await page.waitForSelector('.sosiska-chart');
+  const compare=page.locator('.sosiska-chart').first();
+  await compare.locator('.sosiska-chart-values summary').click();
+  await compare.locator('[data-chart-interval][data-chart-line="1"]').first().click();
+  await compare.locator('[data-chart-player="fast2"]').click();
+  await page.waitForFunction(()=>document.querySelector('[data-player-profile] h4')?.textContent==='<Fast> live');
+  const comparedRequest=await page.evaluate(()=>chartCalls.filter(c=>c.operation==='profile').at(-1));
+  assert.equal(comparedRequest.userId,'fast2');
+  assert.match(await page.locator('[data-player-profile]').textContent(),/Second Team/);
   await page.close();
  }
  assert.deepEqual(errors,[]);await browser.close();console.log('Chart players: RM/RK x 4 metrics, mobile tap, descending gains, resets/joins/unknown excluded, event scope, escaping, drag and interval alternative PASS');
