@@ -15,7 +15,7 @@ const payload=Buffer.from(JSON.stringify({tg:'123',exp:Math.floor(Date.now()/100
 const token=payload+'.'+createHmac('sha256',sessionSecret).update(payload).digest('base64url');
 const calls=[];
 const record=n=>({sequence:n,snapshot:{teamId:'1',capturedAt:new Date(Date.UTC(2026,9,1)+n*3600000).toISOString(),raw:{TeamName:'Fixture',Members:[{UserId:'100',Name:'Player',Level:100+n,Crown:n,HelpCount:n}]},derived:{memberCount:1,levelTotal:100+n,crownTotal:n,helpTotal:n}},changes:{baseline:n===1,from:n>1?new Date(Date.UTC(2026,9,1)+(n-1)*3600000).toISOString():null,team:[],derived:[],joined:[],left:[],members:n===1?[]:[{userId:'100',name:'Player',changes:[{field:'Level',before:99+n,after:100+n,delta:1}]}]}});
-const options={rootPath:dirname(scriptPath),name:'sosiska-fixture',modules:true,scriptPath,compatibilityDate:'2026-08-15',durableObjects:{SOSISKA_ANALYSIS:{className:'SosiskaAnalysisJobs',useSQLite:true}},durableObjectsPersist:persist,bindings:{FRONTEND_ORIGIN:'https://antonsoloway.github.io',SESSION_SECRET:sessionSecret,BOT_TOKEN:'test-bot',TELEGRAM_CHAT_ID:'-1001',RM_AGENT_API_KEY:'private-test-agent-key-'.repeat(3),SOSISKA_GROQ_KEY:'test-ai-key'},outboundService:async request=>{
+const options={rootPath:dirname(scriptPath),name:'sosiska-fixture',modules:true,scriptPath,compatibilityDate:'2026-08-15',durableObjects:{SOSISKA_RK_MONITOR:{className:'SosiskaKingdomMonitor',useSQLite:true},SOSISKA_ANALYSIS:{className:'SosiskaAnalysisJobs',useSQLite:true}},durableObjectsPersist:persist,bindings:{FRONTEND_ORIGIN:'https://antonsoloway.github.io',SESSION_SECRET:sessionSecret,BOT_TOKEN:'test-bot',TELEGRAM_CHAT_ID:'-1001',RM_AGENT_API_KEY:'private-test-agent-key-'.repeat(3),SOSISKA_GROQ_KEY:'test-ai-key'},outboundService:async request=>{
   const u=new URL(request.url);calls.push(u.hostname);
   if(u.hostname==='api.telegram.org')return Response.json({ok:true,result:{status:'administrator'}});
   const b=await request.json();
@@ -35,6 +35,13 @@ const invoke=async body=>{const r=await mf.dispatchFetch('https://miniapp.test/a
 try {
   mf=new Miniflare(convertV4MiniflareOptions?{...convertV4MiniflareOptions(options),resourcePersistencePath:persist}:options);
   const denied=await mf.dispatchFetch('https://miniapp.test/admin-agent',{method:'POST',headers:{Authorization:'Bearer forged','Content-Type':'application/json'},body:'{"operation":"analysis"}'});assert.equal(denied.status,401);
+  const folders=await invoke({operation:'folderSave',folderId:null,revision:0,name:'Маяк',teamIds:['1','2']});
+  assert.equal(folders.folders.length,1);
+  assert.deepEqual(await invoke({operation:'folders',game:'rk'}),{revision:0,folders:[]});
+  const conflict=await mf.dispatchFetch('https://miniapp.test/admin-agent',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({operation:'folderSave',folderId:null,revision:0,name:'Conflict',teamIds:[]})});
+  assert.equal(conflict.status,409);
+  const deniedFolders=await mf.dispatchFetch('https://miniapp.test/admin-agent',{method:'POST',headers:{Authorization:'Bearer forged','Content-Type':'application/json'},body:'{"operation":"folders"}'});
+  assert.equal(deniedFolders.status,401);
   const status=await invoke({operation:'status'});assert.equal(status.agents[0].status,'online');assert.equal(status.agents[0].level,14800);assert.equal(status.agents[0].levelVerified,true);
   const otherEvents=await mf.dispatchFetch('https://miniapp.test/admin-agent',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json','X-Sosiska-Metrics-Scope':'owner'},body:JSON.stringify({operation:'tournamentGroup',teamId:'1'})});assert.equal(otherEvents.status,403);assert.equal((await otherEvents.json()).error,'OWNER_REQUIRED');
   const basicHistory=await invoke({operation:'history',teamId:'1'});assert.doesNotMatch(JSON.stringify(basicHistory),/HelpCount|helpTotal/);
@@ -44,6 +51,7 @@ try {
   const ownerData=await ownerHistory.json();assert.equal(ownerData.capabilities.ownerTeamMetrics,true);assert.match(JSON.stringify(ownerData),/HelpCount|helpTotal/);
   const job=await invoke({operation:'analysis',teamId:'1'});assert.equal(job.state,'running');
   await mf.dispose();mf=new Miniflare(convertV4MiniflareOptions?{...convertV4MiniflareOptions(options),resourcePersistencePath:persist}:options);
+  assert.deepEqual(await invoke({operation:'folders'}),folders,'folder metadata survives actual SQLite cold start');
   assert.equal((await invoke({operation:'analysisStatus',jobId:job.jobId})).jobId,job.jobId);
   let result;
   for(let i=0;i<30;i++){result=await invoke({operation:'analysisStatus',jobId:job.jobId});if(result.state!=='running')break;await new Promise(r=>setTimeout(r,1000));}

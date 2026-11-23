@@ -66,9 +66,9 @@ test('v0.6.16 Mayak release remains intact and v0.6.17 redirects keep the module
   assert.match(next, /window\.__ROYAL_BUILD__='0\.6\.17'/);
   assert.match(next, /project-mayak-v061\.js\?v=20261107-v0616-build-compat1/);
   assert.ok(next.indexOf('changelog-v0616.js') < next.indexOf('changelog-v0617.js'));
-  assert.match(app, /app-v0617\.html/);
+  assert.match(app, /app-v0618\.html/);
   assert.match(app, /window\.location\.hash/);
-  assert.match(index, /app-v0617\.html/);
+  assert.match(index, /app-v0618\.html/);
   assert.match(index, /current\.hash/);
 });
 

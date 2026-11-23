@@ -8,7 +8,7 @@ const settle=async()=>{for(let i=0;i<8;i++)await new Promise(setImmediate);};
 function setup({admin=true,responder,ownerMetrics=true,retryTimers}={}){
   const listeners={},docListeners={},tiles=[],calls=[],panel={innerHTML:'',hidden:false},grid={querySelector:selector=>tiles.find(x=>!x.removed&&(selector==='[data-sosiska-open]'||selector===('[data-sosiska-open="'+x.dataset.sosiskaOpen+'"]')))||null,querySelectorAll:()=>tiles.filter(x=>!x.removed),appendChild:b=>tiles.push(b)};
   const hosts=[];const document={body:{appendChild:n=>hosts.push(n)},activeElement:{focus(){}},querySelector:s=>s==='.grid'?grid:s==='[data-sosiska-interval]'?{value:'120'}:s==='[data-sosiska-action="tournament-refresh"]'&&panel.innerHTML.includes('tournament-refresh')?{click(){action('tournament-refresh')}}:null,getElementById:()=>panel,createElement:()=>({dataset:{},querySelector:()=>null,remove(){this.removed=true;}}),addEventListener:(type,fn)=>{docListeners[type]=fn;}};
-  const context={document,authState:{role:{isChatAdmin:admin}},sessionToken:'session-a',activePage:'home',setActiveNav(){},renderPage(page){panel.innerHTML=page;},FormData:class{constructor(form){this.form=form;}get(name){return this.form.filters?this.form.filters[name]??'':this.form.query;}},Response,AbortController,setTimeout:(fn,ms)=>{if(retryTimers&&ms===1500){retryTimers.push(fn);return 0;}return setTimeout(fn,ms);},clearTimeout,console,fetch:async(url,init)=>{const b=JSON.parse(init.body);calls.push(b);return Response.json({ok:true,capabilities:{ownerTeamMetrics:ownerMetrics},data:await (responder?responder(b):{watches:[]})});}};
+  const context={document,authState:{role:{isChatAdmin:admin}},sessionToken:'session-a',activePage:'home',setActiveNav(){},renderPage(page){panel.innerHTML=page;},FormData:class{constructor(form){this.form=form;}get(name){return this.form.filters?this.form.filters[name]??'':this.form.query;}},Response,AbortController,setTimeout:(fn,ms)=>{if(retryTimers&&ms===1500){retryTimers.push(fn);return 0;}return setTimeout(fn,ms);},clearTimeout,console,fetch:async(url,init)=>{const b=JSON.parse(init.body);calls.push(b);return Response.json({ok:true,capabilities:{ownerTeamMetrics:ownerMetrics},data:await (b.operation==='folders'?{revision:0,folders:[]}:responder?responder(b):{watches:[]})});}};
   context.window={addEventListener:(type,fn)=>{listeners[type]=fn;},RoyalNav:{pushCurrent(){}},RoyalAdminDataV0600:{subscribe(fn){listeners.adminClear=fn;}}};vm.createContext(context);vm.runInContext(periodSource,context);vm.runInContext(source,context);
   const action=(name,id,extra={})=>listeners.click({target:{closest:s=>s==='[data-sosiska-action]'?{dataset:{sosiskaAction:name,teamId:id,...extra}}:null},preventDefault(){},stopImmediatePropagation(){}});
   const search=query=>docListeners.submit({target:{query,matches:selector=>selector==='[data-sosiska-search]',querySelector:()=>({blur(){}})},preventDefault(){},stopImmediatePropagation(){}});
@@ -17,7 +17,7 @@ function setup({admin=true,responder,ownerMetrics=true,retryTimers}={}){
 }
 test('tile only appears for admins and opening lists watches without enabling any',async()=>{
   const denied=setup({admin:false});assert.equal(denied.tiles.length,0);await denied.context.window.RoyalSosiska.open();assert.equal(denied.calls.length,0);
-  const s=setup();assert.equal(s.tiles.length,2);await s.context.window.RoyalSosiska.open();assert.deepEqual(s.calls,[{operation:'list'}]);assert.match(s.panel.innerHTML,/Отслеживание не включено/);
+  const s=setup();assert.equal(s.tiles.length,2);await s.context.window.RoyalSosiska.open();assert.deepEqual(s.calls,[{operation:'list'},{operation:'folders'}]);assert.match(s.panel.innerHTML,/Отслеживание не включено/);
 });
 test('same-name results show description and leader, with HTML escaped',async()=>{
   const s=setup({responder:b=>b.operation==='list'?{watches:[]}:b.operation==='search'?{candidates:[{teamId:'1',name:'<img src=x onerror=evil()>',memberCount:1,sources:['search']}],warnings:[]}:{TeamId:'1',TeamName:'Team',Description:'<script>evil()</script>',Leader:'2',CoLeaders:[],Members:[{UserId:'2',Name:'Leader & Co',Level:1,Crown:0,HelpCount:0}]}});
@@ -491,7 +491,7 @@ test('RM and RK tabs keep independent requests, game labels, watched lists and r
  assert.match(s.panel.innerHTML,/Цикл RK определяется данными игрового сервера/);
  s.action('switch-game',undefined,{game:'rm'});await settle();
  assert.match(s.panel.innerHTML,/Royal Match/);
- assert.equal(s.calls.at(-1).operation,'list');
+ assert.equal(s.calls.at(-1).operation,'folders');
  assert.equal('game' in s.calls.at(-1),false);
  assert.doesNotMatch(s.panel.innerHTML,/RK team/);
 });

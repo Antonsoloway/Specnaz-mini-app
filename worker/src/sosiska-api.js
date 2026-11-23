@@ -1,3 +1,4 @@
+import {isFolderAction,validateFolderAction} from './sosiska-watch-folders.js';
 import {isSosiskaOwner,restrictSosiskaData} from './sosiska-access.js';
 import {prepareHistoryExport} from './sosiska-export.js';
 import {readSosiskaStatus,readKingdomStatus} from './agent-status.js';
@@ -13,6 +14,7 @@ const uint64 = value => typeof value === 'string' && /^[1-9]\d{0,19}$/.test(valu
 const invalid = () => { throw Object.assign(new Error('INVALID_REQUEST'), {status:400}); };
 export function validateAgentAction(body) {
   if (!object(body)) invalid();
+  if(isFolderAction(body.operation))return validateFolderAction(body);
   const keys = {status:[],rkBattle:[],prepareExport:['teamId','from','to'],profile:['userId'],tournamentGroup:['teamId'],tournamentPlayers:['teamId'],eventGroup:['teamId'],eventPlayers:['teamId'],health:[],search:['query'],team:['teamId'],list:[],watch:['teamId','intervalMinutes'],unwatch:['teamId'],capture:['teamId'],history:['teamId','limit','before'],analysis:['teamId','teamIds'],analysisStatus:['jobId','teamId','teamIds'],analysisTimeline:['jobId','teamId','limit','before']}[body.operation];
   if (!Array.isArray(keys) || Object.keys(body).some(k => !['operation','game',...keys].includes(k))) invalid();
   if(body.game!==undefined&&!['rm','rk'].includes(body.game))invalid();
@@ -77,6 +79,13 @@ export function createSosiskaApi({authorizeAdmin,fetchAgent=fetch,fetchAI=fetch}
     try {
       const principal=await authorizeAdmin(request,env);ownerMetrics=isSosiskaOwner(principal);
       const body=await readBody(request);
+      if(isFolderAction(body.operation)){
+        if(!env.SOSISKA_RK_MONITOR)return json({ok:false,message:'Хранилище папок недоступно.'},503);
+        const stub=env.SOSISKA_RK_MONITOR.get(env.SOSISKA_RK_MONITOR.idFromName('watch-folders-v1'));
+        const response=await stub.fetch('https://folders.internal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        const result=await response.json();return json(result,response.status);
+      }
+
       if(!ownerMetrics&&['tournamentGroup','tournamentPlayers','eventGroup','eventPlayers','rkBattle'].includes(body.operation))return json({ok:false,error:'OWNER_REQUIRED',message:'Эти данные доступны только владельцу.'},403);
       if(body.game==='rk'&&body.operation!=='status')return await handleKingdom(request,env,body,json,fetchAgent,ownerMetrics);
       if(body.operation==='status'){

@@ -11,9 +11,9 @@
   <script>
   (() => {
     const params = new URLSearchParams(window.location.search || '');
-    const target = 'app-v0617.html';
+    const target = 'app-v0618.html';
     params.set('chartPlayers', '20261123-links');
-    params.set('releaseBuild', '20261122-network-relay1');
+    params.set('releaseBuild', '20261123-watch-folders1');
     const search = params.toString() ? `?${params.toString()}` : '';
     const next = target + search + (window.location.hash || '');
     window.location.replace(next);

@@ -1252,3 +1252,15 @@ No actual game API read claimed without authenticated access.
 Ran the exact deployed buildCompetitionIndexV1 builder against the production Cloudflare D1 database (one D1 API query; no write). Result: ok=true, partial=false, 2,776 standard competition records, 11,435 team rows, 2,014 final and 754 intermediate results, 92 review records; RM 2,213 / RK 560; 0 epic records; 0 malformed results; 28,144 D1 rows read; serialized index size 7,092,492 bytes. Search-key spot checks: JoyBand 42 matches, Avengers 4. Latest Telegram publication timestamp in index: 2026-11-06T15:34:28Z.
 
 Important distinction: this validates the live D1-to-index builder and current source data. It does not itself write the production KV cache. The first request authenticated with a real Telegram admin session to the deployed Gateway endpoint will perform the KV refresh. The actual Telegram admin-session UI acceptance remains pending.
+
+
+## 2026-11-23 — Папки отслеживаемых команд, кандидат0.6.18
+Implemented RM/RK folder create, named multi-selection, open, rename/edit/move,
+delete preserving monitoring/history. Durable shared admin metadata, game-isolated
+keys in a separate named instance of the existing DO class; no new binding or
+migration. Same signed admin gate, serialized revision conflicts409, no automatic
+write replay. See docs/WATCH_FOLDERS_20261123.md for exact scope and rollout.
+Application contracts352/352 PASS; browser both games320/390/768 PASS; existing
+chart player profile browser suite PASS. Mandatory CI pending. SOURCE/OFFLINE_PASS,
+not published; production unchanged. New entrypointapp-v0618.html and matching
+changelog retain installed Mayak/battle/music modules and Telegram query/hash.
