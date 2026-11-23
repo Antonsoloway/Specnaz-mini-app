@@ -144,3 +144,5 @@
 [data-sosiska-folder-form]{padding:12px;border:1px solid #506373;border-radius:12px;margin:12px 0}
 
 .sosiska-chart-range-summary{padding:12px;margin:12px 0;border:1px solid #eab308;border-radius:12px;background:#152b38}.sosiska-chart-range-summary[hidden]{display:none}.sosiska-chart-range-summary label{display:block;margin:10px 0}.sosiska-chart-range-summary input{display:block;width:100%;min-height:40px;accent-color:#facc15}.sosiska-chart-controls button[aria-pressed="true"]{border-color:#facc15!important;background:#384837!important}
+
+.sosiska-chart-controls button[data-chart-action="reset"],.sosiska-chart-controls button[data-chart-action="select"]{flex:1 1 140px!important;white-space:nowrap;font-size:14px}.sosiska-chart-key{display:flex;flex-wrap:wrap;gap:8px}.sosiska-legend{overflow-wrap:anywhere}
