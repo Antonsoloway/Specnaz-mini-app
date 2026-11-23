@@ -77,38 +77,42 @@
   let chartNumber=0;
   const chartModels=new Map(),chartRanges=new Map();
   function chart(lines,title,chartMetric=metric){
-    const valid=p=>p.hours>0&&Number.isFinite(p[chartMetric]);
-    const all=lines.flatMap(l=>l.points).filter(valid);if(!all.length)return '<p>Нет наблюдаемых интервалов для графика.</p>';
-    const min=all.reduce((n,p)=>Math.min(n,Date.parse(p.from)),Infinity),maxTime=all.reduce((n,p)=>Math.max(n,Date.parse(p.to)),-Infinity),peak=all.reduce((n,p)=>Math.max(n,p[chartMetric]/p.hours),0),number=++chartNumber;
-    const key=JSON.stringify([analysisMode,team?.TeamId,playerId,[...selected.keys()].sort(),title,chartMetric,min,maxTime]);
+    const lineMetric=l=>l.metric||chartMetric;
+    const valid=(p,k=chartMetric)=>p.hours>0&&Number.isFinite(p[k]);
+    const chartMetrics=[...new Set(lines.map(lineMetric))],mixed=chartMetrics.length>1;
+    const metricName=k=>({levels:'Уровни',crowns:game==='rk'?'Кубки':'Короны',help:'Помощь',event:'Очки события'}[k]);
+    const lineSuffix=l=>mixed?' · '+metricName(lineMetric(l))+' ('+unit(lineMetric(l))+')':'';
+    const all=lines.flatMap(l=>l.points.filter(p=>valid(p,lineMetric(l))).map(p=>({...p,chartValue:p[lineMetric(l)]})));if(!all.length)return '<p>Нет наблюдаемых интервалов для графика.</p>';
+    const min=all.reduce((n,p)=>Math.min(n,Date.parse(p.from)),Infinity),maxTime=all.reduce((n,p)=>Math.max(n,Date.parse(p.to)),-Infinity),peak=all.reduce((n,p)=>Math.max(n,p.chartValue/p.hours),0),number=++chartNumber;
+    const key=JSON.stringify([analysisMode,team?.TeamId,playerId,[...selected.keys()].sort(),title,chartMetrics,min,maxTime]);
     const view=chartRanges.get(key)||{min,max:maxTime,start:min,end:maxTime,minSpan:Math.max(1,all.reduce((n,p)=>Math.min(n,Date.parse(p.to)-Date.parse(p.from)),Infinity))};
     chartRanges.set(key,view);if(chartRanges.size>100)chartRanges.delete(chartRanges.keys().next().value);
-    const chartUnit=unit(chartMetric),singleColor=metricColor(chartMetric),selection={mode:false,start:null,end:null};
+    const chartUnit=chartMetrics.map(unit).join(' · '),singleColor=metricColor(chartMetric),selection={mode:false,start:null,end:null};
     const boundaries=[...new Set(all.flatMap(p=>[Date.parse(p.from),Date.parse(p.to)]))].sort((a,b)=>a-b);
     function svg(){
     const start=view.start,end=view.end;
-    const visible=all.filter(p=>Date.parse(p.to)>start&&Date.parse(p.from)<end),visiblePeak=visible.reduce((v,p)=>Math.max(v,p[chartMetric]/p.hours),0);
+    const visible=all.filter(p=>Date.parse(p.to)>start&&Date.parse(p.from)<end),visiblePeak=visible.reduce((v,p)=>Math.max(v,p.chartValue/p.hours),0);
     const scale=visiblePeak>0?10**Math.floor(Math.log10(visiblePeak)):1,max=Math.max(1,Math.ceil(visiblePeak/scale)*scale);
     const x=t=>48+296*((typeof t==='number'?t:Date.parse(t))-start)/Math.max(1,end-start),y=v=>230-194*v/max;
     const grid=Array.from({length:5},(_,i)=>{const v=max*i/4;return '<path d="M48 '+y(v)+'H344" stroke="#365064" stroke-dasharray="3 5"/><text x="40" y="'+(y(v)+5)+'" text-anchor="end" fill="#cbd5e1" font-size="15">'+esc(rate(v))+'</text>';}).join('');
     const axes=[0,.5,1].map(f=>{const t=new Date(start+(end-start)*f).toISOString(),px=48+296*f;return '<text x="'+px+'" y="257" text-anchor="'+(f===0?'start':f===1?'end':'middle')+'" fill="#f1f5f9" font-size="16">'+esc(clock(t))+'</text><text x="'+px+'" y="278" text-anchor="'+(f===0?'start':f===1?'end':'middle')+'" fill="#94a3b8" font-size="13">'+esc(day(t))+'</text>';}).join('');
     const paths=lines.map((l,i)=>{
-      const color=lines.length===1?singleColor:colors[i%colors.length],points=l.points.filter(valid).filter(p=>Date.parse(p.to)>start&&Date.parse(p.from)<end),groups=[];let group=[];
+      const color=mixed?metricColor(lineMetric(l)):lines.length===1?singleColor:colors[i%colors.length],points=l.points.filter(p=>valid(p,lineMetric(l))).filter(p=>Date.parse(p.to)>start&&Date.parse(p.from)<end),groups=[];let group=[];
       for(const p of points){if(group.length&&group.at(-1).to!==p.from){groups.push(group);group=[];}group.push(p);}if(group.length)groups.push(group);
       if(!points.length)return '';
       const gradient='sosiska-fill-'+number+'-'+i;
       return '<defs><linearGradient id="'+gradient+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+color+'" stop-opacity=".35"/><stop offset="100%" stop-color="'+color+'" stop-opacity=".02"/></linearGradient></defs>'+groups.map(g=>{
-       let path='M'+x(Math.max(start,Date.parse(g[0].from))).toFixed(2)+' '+y(g[0][chartMetric]/g[0].hours).toFixed(2);
-       for(let j=0;j<g.length;j++){const p=g[j];if(j)path+='V'+y(p[chartMetric]/p.hours).toFixed(2);path+='H'+x(Math.min(end,Date.parse(p.to))).toFixed(2);}
+       let path='M'+x(Math.max(start,Date.parse(g[0].from))).toFixed(2)+' '+y(g[0][lineMetric(l)]/g[0].hours).toFixed(2);
+       for(let j=0;j<g.length;j++){const p=g[j];if(j)path+='V'+y(p[lineMetric(l)]/p.hours).toFixed(2);path+='H'+x(Math.min(end,Date.parse(p.to))).toFixed(2);}
        const area=path+'V230H'+x(Math.max(start,Date.parse(g[0].from))).toFixed(2)+'Z';
        return '<path d="'+area+'" fill="url(#'+gradient+')"/><path d="'+path+'" stroke="'+color+'" stroke-width="3.5" stroke-linejoin="round" fill="none"><title>'+esc(l.name)+'</title></path>';
-      }).join('')+'<circle cx="'+x(Math.min(end,Date.parse(points.at(-1).to))).toFixed(2)+'" cy="'+y(points.at(-1)[chartMetric]/points.at(-1).hours).toFixed(2)+'" r="4" fill="'+color+'"/>';
+      }).join('')+'<circle cx="'+x(Math.min(end,Date.parse(points.at(-1).to))).toFixed(2)+'" cy="'+y(points.at(-1)[lineMetric(l)]/points.at(-1).hours).toFixed(2)+'" r="4" fill="'+color+'"/>';
     }).join('');
     return '<svg viewBox="0 0 360 295" role="img" aria-label="'+esc(title+' '+chartUnit)+'">'+grid+paths+(selection.start!==null?'<rect x="'+Math.max(48,x(selection.start))+'" y="36" width="'+Math.max(0,Math.min(344,x(selection.end))-Math.max(48,x(selection.start)))+'" height="194" fill="#facc15" fill-opacity=".18" stroke="#facc15" pointer-events="none"/>':'')+axes+'</svg>';
     }
     chartModels.set(String(number),{view,svg,lines,metric:chartMetric,selection,boundaries,coverage:new WeakMap()});
-    const one=lines.length===1,latest=all.at(-1),hours=all.reduce((n,p)=>n+p.hours,0),average=all.reduce((n,p)=>n+p[chartMetric],0)/hours;
-    return '<figure class="sosiska-chart" data-chart-id="'+number+'" data-chart-metric="'+chartMetric+'"><figcaption>'+esc(title)+'<small>'+esc(chartUnit)+' · время МСК</small></figcaption>'+(one?'<div class="sosiska-chart-stats"><div><small>Последний интервал</small><b>'+rate(latest[chartMetric]/latest.hours)+'</b></div><div><small>В среднем</small><b>'+rate(average)+'</b></div><div><small>Пик</small><b>'+rate(peak)+'</b></div></div>':'')+'<div class="sosiska-chart-controls">'+[['in','+','Увеличить'],['out','−','Уменьшить'],['left','←','Ранее'],['right','→','Позже'],['reset','Вся история','Показать всю историю'],['select','Выделить период','Выделить период для подсчёта'],['clear-range','Сбросить выделение','Сбросить выделенный период']].map(([action,label,hint])=>'<button type="button" data-chart-action="'+action+'" aria-label="'+hint+'" title="'+hint+'">'+label+'</button>').join('')+'</div><div class="sosiska-chart-viewport" data-chart-viewport tabindex="0" role="group" aria-label="Масштаб и перемещение графика: плюс, минус, стрелки, Home">'+svg()+'</div><section class="sosiska-chart-range-summary" data-chart-range-summary aria-live="polite" hidden></section><section class="sosiska-chart-selection" data-chart-selection aria-live="polite" hidden></section><p class="sosiska-chart-range" data-chart-range>'+chartRangeLabel(view)+'</p><label class="sosiska-chart-scroll">Положение во всей истории<input type="range" data-chart-scroll min="0" max="1000" value="'+(view.max-view.min>view.end-view.start?Math.round(1000*(view.start-view.min)/(view.max-view.min-view.end+view.start)):0)+'" '+(view.end-view.start>=view.max-view.min?'disabled':'')+'></label><p class="sosiska-chart-hint">Нажмите на график — игроки за интервал. Два пальца — масштаб · один — перемещение. Кнопки + / − и стрелки делают то же.</p><div class="sosiska-chart-key">'+lines.map((l,i)=>'<span class="sosiska-legend" style="color:'+(one?metricColor(chartMetric):colors[i%colors.length])+'">● '+(l.teamId?teamName(l.name,l.teamId):esc(l.name))+'</span>').join('')+'</div><details class="sosiska-chart-values"><summary>Значения по интервалам</summary>'+lines.map(l=>'<h4>'+(l.teamId?teamName(l.name,l.teamId):esc(l.name))+'</h4><div class="sosiska-interval-values">'+l.points.filter(valid).map(p=>'<div><button type="button" data-chart-interval="'+esc(p.from)+'" data-chart-line="'+lines.indexOf(l)+'"><span>'+esc(day(p.from)+' '+clock(p.from)+' — '+day(p.to)+' '+clock(p.to))+'</span><b>'+rate(p[chartMetric]/p.hours)+' '+esc(chartUnit)+'</b></button></div>').join('')+'</div>').join('')+'</details></figure>';
+    const one=lines.length===1,latest=all.at(-1),hours=all.reduce((n,p)=>n+p.hours,0),average=all.reduce((n,p)=>n+p.chartValue,0)/hours;
+    return '<figure class="sosiska-chart" data-chart-id="'+number+'" data-chart-metric="'+chartMetric+'" data-chart-metrics="'+chartMetrics.join(' ')+'"><figcaption>'+esc(title)+'<small>'+esc(chartUnit)+' · время МСК</small></figcaption>'+(one?'<div class="sosiska-chart-stats"><div><small>Последний интервал</small><b>'+rate(latest.chartValue/latest.hours)+'</b></div><div><small>В среднем</small><b>'+rate(average)+'</b></div><div><small>Пик</small><b>'+rate(peak)+'</b></div></div>':'')+'<div class="sosiska-chart-controls">'+[['in','+','Увеличить'],['out','−','Уменьшить'],['left','←','Ранее'],['right','→','Позже'],['reset','Вся история','Показать всю историю'],['select','Выделить период','Выделить период для подсчёта'],['clear-range','Сбросить выделение','Сбросить выделенный период']].map(([action,label,hint])=>'<button type="button" data-chart-action="'+action+'" aria-label="'+hint+'" title="'+hint+'">'+label+'</button>').join('')+'</div><div class="sosiska-chart-viewport" data-chart-viewport tabindex="0" role="group" aria-label="Масштаб и перемещение графика: плюс, минус, стрелки, Home">'+svg()+'</div><section class="sosiska-chart-range-summary" data-chart-range-summary aria-live="polite" hidden></section><section class="sosiska-chart-selection" data-chart-selection aria-live="polite" hidden></section><p class="sosiska-chart-range" data-chart-range>'+chartRangeLabel(view)+'</p><label class="sosiska-chart-scroll">Положение во всей истории<input type="range" data-chart-scroll min="0" max="1000" value="'+(view.max-view.min>view.end-view.start?Math.round(1000*(view.start-view.min)/(view.max-view.min-view.end+view.start)):0)+'" '+(view.end-view.start>=view.max-view.min?'disabled':'')+'></label><p class="sosiska-chart-hint">Нажмите на график — игроки за интервал. Два пальца — масштаб · один — перемещение. Кнопки + / − и стрелки делают то же.</p><div class="sosiska-chart-key">'+lines.map((l,i)=>'<span class="sosiska-legend" style="color:'+(mixed?metricColor(lineMetric(l)):one?metricColor(chartMetric):colors[i%colors.length])+'">● '+(l.teamId?teamName(l.name,l.teamId):esc(l.name))+esc(lineSuffix(l))+'</span>').join('')+'</div><details class="sosiska-chart-values"><summary>Значения по интервалам</summary>'+lines.map(l=>'<h4>'+(l.teamId?teamName(l.name,l.teamId):esc(l.name))+esc(lineSuffix(l))+'</h4><div class="sosiska-interval-values">'+l.points.filter(p=>valid(p,lineMetric(l))).map(p=>'<div><button type="button" data-chart-interval="'+esc(p.from)+'" data-chart-interval-metric="'+lineMetric(l)+'" data-chart-line="'+lines.indexOf(l)+'"><span>'+esc(day(p.from)+' '+clock(p.from)+' — '+day(p.to)+' '+clock(p.to))+'</span><b>'+rate(p[lineMetric(l)]/p.hours)+' '+esc(unit(lineMetric(l)))+'</b></button></div>').join('')+'</div>').join('')+'</details></figure>';
   }
   function intervalPlayers(players,point,which){
     return (players||[]).flatMap(player=>{
@@ -124,11 +128,11 @@
     host.hidden=false;
     host.innerHTML='<button type="button" data-chart-dismiss>Закрыть список</button>'+
       (chosen.length?chosen.map(({line,point})=>{
-        const rows=intervalPlayers(line.players,point,model.metric);
-        return '<h4>'+esc(line.name)+'</h4><p>'+esc(when(point.from)+' — '+when(point.to))+' МСК</p>'+
-          '<p>'+esc(labels[model.metric])+' · прирост за интервал: <b>+'+rate(point[model.metric])+'</b></p>'+
+        const which=line.metric||model.metric,rows=intervalPlayers(line.players,point,which);
+        return '<section data-selected-metric="'+which+'"><h4>'+esc(line.name)+'</h4><p>'+esc(when(point.from)+' — '+when(point.to))+' МСК</p>'+
+          '<p>'+esc(labels[which])+' · прирост за интервал: <b>+'+rate(point[which])+'</b></p>'+
           (rows.length?'<ol class="sosiska-chart-player-list">'+rows.map(row=>'<li><span>'+button('chart-profile',esc(row.name),'data-chart-player="'+esc(row.id)+'" data-chart-player-line="'+model.lines.indexOf(line)+'"')+'</span><b>+'+rate(row.gain)+'</b></li>').join('')+'</ol>':'<p>Нет подтверждённого положительного прироста игроков за этот интервал.</p>')+
-          (model.metric==='event'?'<p class="muted">Командные и доступные личные очки могут отличаться: не все личные результаты присутствуют в снимках.</p>':'');
+          (which==='event'?'<p class="muted">Командные и доступные личные очки могут отличаться: не все личные результаты присутствуют в снимках.</p>':'')+'</section>';
       }).join(''):'<p>В этой точке нет наблюдаемого интервала. Выберите участок с данными.</p>')+
       '<p class="muted">Игроки по убыванию прироста выбранного показателя. Данные между двумя снимками; точное время игры неизвестно. Сбросы, неизвестные значения и вступление не считаются приростом.</p>';
   }
@@ -138,7 +142,7 @@
     if(fraction<0||fraction>1)return;
     const time=model.view.start+fraction*(model.view.end-model.view.start);
     const chosen=model.lines.flatMap(line=>{
-      const point=line.points.find(p=>p.hours>0&&Number.isFinite(p[model.metric])&&Date.parse(p.from)<=time&&Date.parse(p.to)>=time);
+      const point=line.points.find(p=>p.hours>0&&Number.isFinite(p[line.metric||model.metric])&&Date.parse(p.from)<=time&&Date.parse(p.to)>=time);
       return point?[{line,point}]:[];
     });
     showChartIntervals(figure,model,chosen);
@@ -164,7 +168,7 @@
     if(host.hidden)return;
     const names={levels:'Уровни',crowns:game==='rk'?'Кубки':'Короны',help:'Помощь',event:'Очки события'};
     const results='<h4>Итог за выделенный период</h4><p>'+esc(when(new Date(selection.start).toISOString())+' — '+when(new Date(selection.end).toISOString()))+' МСК</p>'+
-      model.lines.map(line=>{
+      model.lines.filter((line,i,all)=>all.findIndex(l=>l.teamId===line.teamId&&l.points===line.points)===i).map(line=>{
         const points=line.points.filter(p=>Date.parse(p.from)>=selection.start&&Date.parse(p.to)<=selection.end);
         const keys=model.metric==='event'?['event']:['levels','crowns',...(advanced()?['help']:[])];
         let coverage=model.coverage.get(line);
@@ -307,10 +311,10 @@
   function charts(points,name){
    const scopes=[...(tournamentPeriod?.events?.values()||[])];
    const selectedMetrics=[...teamMetrics].filter(k=>advanced()||['levels','crowns'].includes(k));if(!selectedMetrics.length)selectedMetrics.push('levels');
-   const sections=selectedMetrics.map(which=>which==='event'?
-      (scopes.map(e=>({event:e,points:e.series.slice().sort((a,b)=>a.from.localeCompare(b.from))})).filter(e=>e.points.length)
-        .map(e=>chart([{name,teamId:team?.TeamId,points:e.points,players:[...e.event.players.values()]}],(e.event.kind==='battle'?'Битва':'Турнир')+' · '+e.event.eventId+' · очки по снимкам','event')).join('')||'<p>Нет сопоставимых снимков соревнований.</p>'):
-      chart([{name,teamId:team?.TeamId,points,players:period?.players}],'Активность во времени',which)).join('');
+   const regular=selectedMetrics.filter(k=>k!=='event');
+   const sections=(regular.length?chart(regular.map(which=>({name,teamId:team?.TeamId,points,players:period?.players,metric:which})),'Активность во времени',regular[0]):'')+
+      (selectedMetrics.includes('event')?(scopes.map(e=>({event:e,points:e.series.slice().sort((a,b)=>a.from.localeCompare(b.from))})).filter(e=>e.points.length)
+        .map(e=>chart([{name,teamId:team?.TeamId,points:e.points,players:[...e.event.players.values()]}],(e.event.kind==='battle'?'Битва':'Турнир')+' · '+e.event.eventId+' · очки по снимкам','event')).join('')||'<p>Нет сопоставимых снимков соревнований.</p>'):'');
    return '<h3>Темп активности команды</h3>'+metricButtons(true)+sections+'<p class="muted">Прирост за интервал между снимками / длительность интервала. Сбросы счётчиков и вступление игроков не считаются прогрессом. График охватывает всю загруженную историю. Масштабируйте, чтобы рассмотреть отдельные интервалы.</p>';}
   function hourDetails(p){
    if(selectedHour===null)return '<p class="muted">Нажмите на час, чтобы посмотреть его по дням.</p>';
