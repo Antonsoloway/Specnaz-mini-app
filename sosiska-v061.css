@@ -142,3 +142,5 @@
 .sosiska-screen .sosiska-folder-choices input{width:22px;min-width:22px;height:22px;margin:0}
 .sosiska-folder-choices span{overflow-wrap:anywhere}
 [data-sosiska-folder-form]{padding:12px;border:1px solid #506373;border-radius:12px;margin:12px 0}
+
+.sosiska-chart-range-summary{padding:12px;margin:12px 0;border:1px solid #eab308;border-radius:12px;background:#152b38}.sosiska-chart-range-summary[hidden]{display:none}.sosiska-chart-range-summary label{display:block;margin:10px 0}.sosiska-chart-range-summary input{display:block;width:100%;min-height:40px;accent-color:#facc15}.sosiska-chart-controls button[aria-pressed="true"]{border-color:#facc15!important;background:#384837!important}

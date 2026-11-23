@@ -30,9 +30,53 @@ const root=path.resolve(__dirname,'..');let browser;
   for(const f of ['sosiska-period-v061.js','sosiska-v061.js'])await page.addScriptTag({path:path.join(root,f)});
   await page.evaluate(g=>RoyalSosiska.open(g),game);
   await page.locator('[data-sosiska-action="team"]').first().click();await page.waitForSelector('.sosiska-chart');
+  await page.locator('[data-team-metric][data-metric="crowns"]').click();
+  assert.equal(await page.locator('.sosiska-chart').count(),2,'levels and crowns selected simultaneously');
+  for(const metric of ['levels','crowns'])assert.equal(await page.locator('[data-team-metric][data-metric="'+metric+'"]').getAttribute('aria-pressed'),'true');
+  await page.locator('.sosiska-period-roster > summary').click();
+  await page.locator('.sosiska-period-roster [data-sosiska-action="player-profile"][data-player-id="fast"]').click();
+  await page.waitForFunction(()=>document.querySelector('[data-player-profile] h4')?.textContent==='<Fast> live');
+  await page.locator('[data-sosiska-action="profile-close"]').click();
+  await page.evaluate(()=>{
+    window.chartBaseline=structuredClone(chartSnapshots);
+    const third=structuredClone(chartSnapshots[0]);third.sequence=3;third.snapshot.capturedAt='2026-11-20T11:00:00Z';
+    third.changes.from='2026-11-20T10:00:00Z';third.changes.to=third.snapshot.capturedAt;
+    for(const m of third.snapshot.raw.Members){
+      if(m.UserId==='fast'){m.Level+=14;m.Crown+=10;}
+      if(m.UserId==='slow'){m.Level+=4;m.Crown+=2;}
+    }
+    chartSnapshots=[third,...chartSnapshots];
+  });
+  await page.locator('[data-sosiska-action="team"][data-team-id="1"]').first().click();
+  let rangeFigure=page.locator('.sosiska-chart[data-chart-metric="levels"]');
+  await rangeFigure.locator('[data-chart-action="select"]').click();
+  const summary=rangeFigure.locator('[data-chart-range-summary]');
+  assert.equal(await summary.locator('[data-range-total="levels"] b').textContent(),'+27');
+  assert.equal(await summary.locator('[data-range-total="crowns"] b').textContent(),'+18');
+  const viewport=rangeFigure.locator('[data-chart-viewport]');
+  async function dragRange(a,b){
+    await viewport.scrollIntoViewIfNeeded();const rect=await viewport.boundingBox();
+    const x=f=>rect.x+rect.width*(48+296*f)/360,y=rect.y+rect.height*.5;
+    await page.mouse.move(x(a),y);await page.mouse.down();await page.mouse.move(x(b),y,{steps:8});await page.mouse.up();
+  }
+  await dragRange(.05,.45);
+  assert.equal(await summary.locator('[data-range-total="levels"] b').textContent(),'+9');
+  assert.equal(await summary.locator('[data-range-total="crowns"] b').textContent(),'+6');
+  await dragRange(.95,.55);
+  assert.equal(await summary.locator('[data-range-total="levels"] b').textContent(),'+18');
+  assert.equal(await summary.locator('[data-range-total="crowns"] b').textContent(),'+12');
+  assert.match(await summary.textContent(),/13:00:00.*14:00:00/s);
+  await summary.locator('[data-chart-range-bound="start"]').fill('0');
+  assert.equal(await summary.locator('[data-range-total="levels"] b').textContent(),'+27');
+  await rangeFigure.locator('[data-chart-action="clear-range"]').click();
+  assert.equal(await summary.isVisible(),false);
+  await page.evaluate(()=>{chartSnapshots=chartBaseline;});
+  await page.locator('[data-sosiska-action="team"][data-team-id="1"]').first().click();
+  // Remove the extra crown selection before the single metric cases below.
+  await page.locator('[data-team-metric][data-metric="crowns"]').click();
   for(const [metric,gains] of [['levels',[7,2]],['crowns',[5,1]],['help',[4,1]],['event',[40,15]]]){
-   await page.locator('[data-metric="'+metric+'"]').first().click();
-   const figure=page.locator('.sosiska-chart').first(),viewport=figure.locator('[data-chart-viewport]');
+   if(await page.locator('[data-team-metric][data-metric="'+metric+'"]').getAttribute('aria-pressed')!=='true')await page.locator('[data-team-metric][data-metric="'+metric+'"]').click();
+   const figure=page.locator('.sosiska-chart[data-chart-metric="'+metric+'"]').first(),viewport=figure.locator('[data-chart-viewport]');
    await viewport.scrollIntoViewIfNeeded();const box=await viewport.boundingBox();
    await page.touchscreen.tap(box.x+box.width*.55,box.y+box.height*.5);
    const selection=figure.locator('[data-chart-selection]');await selection.waitFor({state:'visible'});

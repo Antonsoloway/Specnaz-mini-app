@@ -92,8 +92,8 @@ test('v0.6.17 Sosiska release preserves the published Mayak and battle-base modu
  assert.ok(html.includes("window.__ROYAL_BUILD__='0.6.17'"));
  assert.ok(html.includes('project-mayak-v061.js?v=20261107-v0616-build-compat1'));
  assert.ok(html.includes('battle-base-v0615.js?v=20261106-admin-battle-base1'));
- assert.ok(html.includes('sosiska-v061.js?v=20261123-chart-player-links1'));
- assert.ok(html.includes('sosiska-v061.css?v=20261123-chart-player-links1'));
+ assert.ok(html.includes('sosiska-v061.js?v=20261124-chart-multi-range1'));
+ assert.ok(html.includes('sosiska-v061.css?v=20261124-chart-multi-range1'));
  assert.ok(html.indexOf('changelog-v0616.js')<html.indexOf('changelog-v0617.js'));
  assert.ok(app.includes('app-v0618.html'));assert.ok(index.includes('app-v0618.html'));
  const source=await readFile(new URL('../changelog-v0617.js',import.meta.url),'utf8');
