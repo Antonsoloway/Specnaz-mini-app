@@ -555,3 +555,24 @@ test('RK battle entry is owner-only and opens Aia group without creating watches
  assert.ok(!basic.calls.some(b=>b.operation==='rkBattle'));
  const rm=setup();await rm.context.window.RoyalSosiska.open('rm');assert.ok(!rm.panel.innerHTML.includes('Битва Айи'));
 });
+
+test('period roster ranks combined level and crown gains regardless of selected graph metric',async()=>{
+ const members=n=>[
+  {UserId:'1',Name:'LevelLeader',Level:100+n*20,Crown:100,HelpCount:n*900},
+  {UserId:'2',Name:'CrownLeader',Level:100,Crown:100+n*30,HelpCount:0},
+  {UserId:'3',Name:'CombinedLeader',Level:100+n*10,Crown:100+n*25,HelpCount:0},
+  {UserId:'4',Name:'CombinedTie',Level:100+n*15,Crown:100+n*20,HelpCount:0}
+ ];
+ const raw={TeamId:'1',TeamName:'Ranking',Members:members(1),Leader:'1',CoLeaders:[],MinLevel:0,MinCrown:0};
+ const records=[2,1].map(n=>({sequence:n,snapshot:{teamId:'1',capturedAt:'2026-11-20T'+(n===1?'09':'10')+':00:00Z',raw:{TeamName:'Ranking',Members:members(n-1)}},changes:{baseline:n===1}}));
+ const s=setup({responder:b=>b.operation==='team'?raw:b.operation==='history'?{records,nextBefore:null}:b.operation==='analysisStatus'?{available:false}:{watches:[]}});
+ await s.context.window.RoyalSosiska.open();s.action('team','1');await settle();
+ for(const metric of ['levels','crowns','help','event']){
+  s.action('metric',undefined,{metric});await settle();
+  const html=s.panel.innerHTML;
+  assert.ok(html.indexOf('CombinedTie')<html.indexOf('CombinedLeader'),metric+' combined tie uses levels');
+  assert.ok(html.indexOf('CombinedLeader')<html.indexOf('CrownLeader'),metric+' combined growth first');
+  assert.ok(html.indexOf('CrownLeader')<html.indexOf('LevelLeader'),metric+' not sorted only by levels or help');
+  assert.match(html,/наибольший суммарный прирост/);
+ }
+});
