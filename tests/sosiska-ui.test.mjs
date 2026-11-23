@@ -569,7 +569,7 @@ test('period roster ranks combined level and crown gains regardless of selected 
  await s.context.window.RoyalSosiska.open();s.action('team','1');await settle();
  for(const metric of ['levels','crowns','help','event']){
   s.action('metric',undefined,{metric});await settle();
-  const html=s.panel.innerHTML;
+  const html=s.panel.innerHTML.slice(s.panel.innerHTML.indexOf('class="sosiska-disclosure sosiska-period-roster"')); 
   assert.ok(html.indexOf('CombinedTie')<html.indexOf('CombinedLeader'),metric+' combined tie uses levels');
   assert.ok(html.indexOf('CombinedLeader')<html.indexOf('CrownLeader'),metric+' combined growth first');
   assert.ok(html.indexOf('CrownLeader')<html.indexOf('LevelLeader'),metric+' not sorted only by levels or help');
